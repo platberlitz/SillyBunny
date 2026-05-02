@@ -3609,6 +3609,105 @@ body.sb-shell-resizing * {
     display: none;
 }
 
+@media screen and (min-width: 1001px) {
+    body.charListGrid #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 148px), 1fr));
+        gap: 10px;
+        align-content: flex-start;
+        justify-content: stretch;
+        overflow-x: hidden;
+    }
+
+    body.charListGrid #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) {
+        display: flex !important;
+        flex-direction: column !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start;
+        position: relative;
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        height: auto !important;
+        min-height: 160px;
+        padding: 12px 10px;
+        box-sizing: border-box;
+        border: 1px solid color-mix(in srgb, var(--sb-shell-border) 72%, transparent);
+        border-radius: 12px;
+        background: var(--sb-card-bg);
+        box-shadow: 0 10px 18px color-mix(in srgb, var(--SmartThemeShadowColor) 8%, transparent);
+        overflow: hidden;
+    }
+
+    body.charListGrid #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) > :is(.avatar, .missing-avatar) {
+        width: 88px !important;
+        min-width: 88px !important;
+        max-width: 88px !important;
+        height: 88px !important;
+        min-height: 88px !important;
+        max-height: 88px !important;
+        flex: 0 0 88px !important;
+        margin: 0 auto 8px !important;
+        aspect-ratio: 1 / 1 !important;
+        overflow: hidden;
+    }
+
+    body.charListGrid #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) > .avatar:not(.avatar_collage) img {
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        max-height: 100% !important;
+        object-fit: cover;
+        object-position: center;
+    }
+
+    body.charListGrid #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) > :is(.character_select_container, .group_select_container) {
+        display: flex !important;
+        flex-direction: column !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start;
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+    }
+
+    body.charListGrid #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) :is(.character_name_block, .group_name_block) {
+        display: flex !important;
+        flex-direction: column !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        gap: 2px;
+        margin: 0;
+    }
+
+    body.charListGrid #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) :is(.ch_name, .group_select_counter, .bogus_folder_counter) {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        margin: 0;
+        overflow: visible;
+        overflow-wrap: anywhere;
+        text-align: center;
+        text-overflow: clip;
+        white-space: normal;
+    }
+
+    body.charListGrid #right-nav-panel.openDrawer #rm_print_characters_block.bulk_select:not(.group_overlay_mode_select) > .character_select > .bulk_select_checkbox {
+        position: absolute !important;
+        top: 8px !important;
+        left: 8px !important;
+        margin: 0 !important;
+        z-index: 2;
+    }
+}
+
 @media screen and (max-width: 1100px) {
     #left-nav-panel.openDrawer,
     #user-settings-block.openDrawer,
