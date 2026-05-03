@@ -3156,6 +3156,10 @@ body.sb-shell-resizing * {
 }
 
 .sb-chat-delete-overlay {
+    --sb-chat-delete-vv-left: 0px;
+    --sb-chat-delete-vv-top: 0px;
+    --sb-chat-delete-vv-width: 100vw;
+    --sb-chat-delete-vv-height: 100dvh;
     position: fixed;
     inset: 0;
     z-index: 12000;
@@ -3165,11 +3169,20 @@ body.sb-shell-resizing * {
     box-sizing: border-box;
     padding: 16px;
     background: color-mix(in srgb, var(--SmartThemeShadowColor) 42%, transparent);
+    overscroll-behavior: contain;
+}
+
+.sb-chat-delete-overlay.sb-chat-delete-overlay--visual-viewport {
+    inset: auto;
+    top: var(--sb-chat-delete-vv-top);
+    left: var(--sb-chat-delete-vv-left);
+    width: var(--sb-chat-delete-vv-width);
+    height: var(--sb-chat-delete-vv-height);
 }
 
 .sb-chat-delete-dialog {
     width: min(560px, 100%);
-    max-height: min(720px, calc(100dvh - 32px));
+    max-height: min(720px, calc(var(--sb-chat-delete-vv-height, 100dvh) - 32px));
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
@@ -3180,6 +3193,7 @@ body.sb-shell-resizing * {
     color: var(--SmartThemeBodyColor);
     background: var(--SmartThemeBlurTintColor);
     box-shadow: 0 24px 70px color-mix(in srgb, var(--SmartThemeShadowColor) 34%, transparent);
+    overscroll-behavior: contain;
 }
 
 @supports (-webkit-touch-callout: none) {
@@ -3189,7 +3203,7 @@ body.sb-shell-resizing * {
     }
 
     .sb-chat-delete-dialog {
-        max-height: min(720px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px));
+        max-height: min(720px, calc(var(--sb-chat-delete-vv-height, 100dvh) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px));
     }
 }
 
@@ -3207,7 +3221,7 @@ body.sb-shell-resizing * {
     .sb-chat-delete-dialog {
         gap: 10px;
         height: calc(100vh - 32px);
-        height: min(720px, calc(100dvh - max(16px, env(safe-area-inset-top, 0px)) - max(12px, env(safe-area-inset-bottom, 0px)) - 24px));
+        height: min(720px, calc(var(--sb-chat-delete-vv-height, 100dvh) - max(16px, env(safe-area-inset-top, 0px)) - max(12px, env(safe-area-inset-bottom, 0px)) - 24px));
         max-height: none;
         min-height: 0;
         overflow: hidden;
@@ -3228,6 +3242,8 @@ body.sb-shell-resizing * {
     .sb-chat-delete-presets .menu_button,
     .sb-chat-delete-actions .menu_button {
         flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
     }
 }
 
@@ -3271,6 +3287,7 @@ body.sb-shell-resizing * {
     min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -3278,7 +3295,8 @@ body.sb-shell-resizing * {
 }
 
 .sb-chat-delete-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
     align-items: center;
     gap: 10px;
     padding: 10px;
@@ -3289,6 +3307,10 @@ body.sb-shell-resizing * {
 
 .sb-chat-delete-row input[type='checkbox'] {
     flex: 0 0 auto;
+    justify-self: center;
+    align-self: center;
+    width: 18px;
+    height: 18px;
     margin: 0;
 }
 

@@ -2897,6 +2897,66 @@ function getMassDeleteOlderThanDays(files, days, currentChatId) {
     return files.filter(chatFile => chatFile.fileName !== currentChatId && chatFile.sortTimestamp > 0 && chatFile.sortTimestamp < cutoff);
 }
 
+function bindChatDeleteVisualViewport(overlay) {
+    const visualViewport = window.visualViewport;
+    if (!(overlay instanceof HTMLElement) || !isMobileViewport() || !visualViewport) {
+        return () => {};
+    }
+
+    let animationFrame = 0;
+
+    function readViewportNumber(value, fallback = 0) {
+        const number = Number(value);
+        return Number.isFinite(number) && number > 0 ? number : fallback;
+    }
+
+    function update() {
+        animationFrame = 0;
+        const fallbackWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+        const fallbackHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        const viewportLeft = Math.max(0, readViewportNumber(visualViewport.offsetLeft));
+        const viewportTop = Math.max(0, readViewportNumber(visualViewport.offsetTop));
+        const viewportWidth = Math.max(1, readViewportNumber(visualViewport.width, fallbackWidth));
+        const viewportHeight = Math.max(1, readViewportNumber(visualViewport.height, fallbackHeight));
+
+        overlay.style.setProperty('--sb-chat-delete-vv-left', `${viewportLeft}px`);
+        overlay.style.setProperty('--sb-chat-delete-vv-top', `${viewportTop}px`);
+        overlay.style.setProperty('--sb-chat-delete-vv-width', `${viewportWidth}px`);
+        overlay.style.setProperty('--sb-chat-delete-vv-height', `${viewportHeight}px`);
+    }
+
+    function scheduleUpdate() {
+        if (animationFrame) {
+            return;
+        }
+
+        animationFrame = window.requestAnimationFrame(update);
+    }
+
+    overlay.classList.add('sb-chat-delete-overlay--visual-viewport');
+    update();
+    visualViewport.addEventListener('resize', scheduleUpdate);
+    visualViewport.addEventListener('scroll', scheduleUpdate);
+    window.addEventListener('resize', scheduleUpdate, { passive: true });
+    window.addEventListener('orientationchange', scheduleUpdate);
+
+    return () => {
+        if (animationFrame) {
+            window.cancelAnimationFrame(animationFrame);
+        }
+
+        visualViewport.removeEventListener('resize', scheduleUpdate);
+        visualViewport.removeEventListener('scroll', scheduleUpdate);
+        window.removeEventListener('resize', scheduleUpdate);
+        window.removeEventListener('orientationchange', scheduleUpdate);
+        overlay.classList.remove('sb-chat-delete-overlay--visual-viewport');
+        overlay.style.removeProperty('--sb-chat-delete-vv-left');
+        overlay.style.removeProperty('--sb-chat-delete-vv-top');
+        overlay.style.removeProperty('--sb-chat-delete-vv-width');
+        overlay.style.removeProperty('--sb-chat-delete-vv-height');
+    };
+}
+
 function showBottomChatMassDeleteDialog(files, currentChatId) {
     return new Promise(resolve => {
         const overlay = createElement('div', { className: 'sb-chat-delete-overlay' });
@@ -2928,9 +2988,17 @@ function showBottomChatMassDeleteDialog(files, currentChatId) {
         const deleteOlderButton = createElement('button', { className: 'menu_button', text: 'Delete older', attrs: { type: 'button' } });
         const cancelButton = createElement('button', { className: 'menu_button', text: 'Cancel', attrs: { type: 'button' } });
         const checkboxes = [];
+        let cleanupVisualViewport = () => {};
+        let isFinished = false;
 
         function finish(result) {
+            if (isFinished) {
+                return;
+            }
+
+            isFinished = true;
             document.removeEventListener('keydown', handleKeydown);
+            cleanupVisualViewport();
             overlay.remove();
             resolve(result);
         }
@@ -3000,6 +3068,7 @@ function showBottomChatMassDeleteDialog(files, currentChatId) {
         dialog.append(title, note, ageRow, status, list, actions);
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
+        cleanupVisualViewport = bindChatDeleteVisualViewport(overlay);
         document.addEventListener('keydown', handleKeydown);
         updateStatus();
         if (!isMobileViewport()) {
