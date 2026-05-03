@@ -123,8 +123,8 @@ cd SillyBunny
 bash start.sh
 ```
 
-- The launcher defaults to Node.js + npm on native Termux (more reliable than Bun under grun)
-- To force Bun anyway: `SILLYBUNNY_TERMUX_RUNTIME=bun bash start.sh`
+- The launcher defaults to Node.js + npm on native Termux and ARM devices when Node.js is available
+- To force Bun anyway: `SILLYBUNNY_USE_BUN=1 bash start.sh`
 - For shared storage access: `termux-setup-storage` once before starting
   
 ### How to Update
@@ -232,9 +232,11 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 * Opening Customize no longer closes an already-open Workspace or Agents shell, and opening Workspace or Agents no longer closes Customize.
 * Moving UI now keeps control of the character drawer position and size instead of being overridden by SillyBunny desktop drawer sizing.
 * Disabled the SillyBunny character drawer resize handle while Moving UI is active so the upstream drag/resize controls remain the single source of truth.
+* Aligned Character Author's Note placement controls and Custom API key controls on mobile WebKit.
 
 **Pathfinder And Release Metadata**
 * Suppressed expected `AbortError` stack traces when Pathfinder sidecar generation is cancelled by its retrieval timeout or a closed client connection.
+* Added `SILLYBUNNY_USE_BUN=1 bash start.sh` as the launcher override for users who want to force Bun on ARM devices.
 * Updated app, Horde client, bundled extension, and package metadata to 1.5.3.
 
 ### v1.5.2 (2026-04-30)

@@ -29,6 +29,11 @@ prefer_node_runtime() {
         return 0
     fi
 
+    # Forced Bun override for users who accept the ARM/macOS CPU tradeoff
+    if is_truthy "${SILLYBUNNY_USE_BUN:-}"; then
+        return 1
+    fi
+
     # Termux always prefers Node unless overridden
     if is_termux; then
         case "${SILLYBUNNY_TERMUX_RUNTIME:-auto}" in

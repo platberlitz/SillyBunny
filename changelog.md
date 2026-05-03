@@ -16,6 +16,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Disabled the SillyBunny character drawer resize handle while Moving UI is active so the upstream drag/resize controls remain the single source of truth.
 - Preserved Launchpad highlighting when the SillyBunny shell reinitializes so Moonlit Echoes and Guided Generations toast actions open the correct Launchpad cards.
 - Center-aligned checkbox controls and label text across desktop, mobile, OpenAI/API cards, settings cards, theme toggles, chat delete rows, and Pathfinder prompt settings.
+- Aligned Character Author's Note placement controls and Custom API key controls on mobile WebKit.
 - Kept the persona chat mass-delete dialog inside iOS safe areas and tightened its narrow-screen controls so the age input and presets remain reachable on mobile Safari.
 - Bound the mobile chat mass-delete dialog to iOS WebKit's visual viewport, kept the overlay above app chrome during browser toolbar shifts, constrained scrolling to the dialog list, avoided mobile autofocus jumps, aligned checkbox rows, and rotated the SillyBunny shell cache keys so corrected styles load immediately.
 - Made active character and chat lorebook toolbar icons glow with the active accent color so linked lorebooks are easier to spot in the character editor.
@@ -33,6 +34,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Suppressed expected `AbortError` stack traces when Pathfinder sidecar generation is cancelled by its retrieval timeout or a closed client connection.
 - Kept Pathfinder prompt action buttons from collapsing into icon-only controls by wrapping visible button labels in spans.
 - Restored default Pathfinder tool toggles for existing template agents with empty tool definitions and made diagnostics report the last pipeline retrieval result.
+- Added `SILLYBUNNY_USE_BUN=1 bash start.sh` as the launcher override for users who want to force Bun on ARM devices.
 - Updated app, Horde client, bundled extension, and package metadata to 1.5.3.
 
 ### Character Drawer
@@ -49,6 +51,9 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Let manual agent runs start independently in Parallel mode instead of queuing them behind other manual runs.
 - Restored agent transform badges and undo/redo access after chat refreshes when the active swipe still has saved transform history.
 - Deferred post-processing for new assistant messages while an agent is already working so users can keep sending or swiping without the older agent touching the newer message.
+
+### Local Commits
+- `fix(mobile): align settings controls and bun override`
 
 ## v1.5.2
 
