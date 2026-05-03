@@ -3195,6 +3195,7 @@ body.sb-shell-resizing * {
     .sb-chat-delete-overlay {
         align-items: flex-start;
         overflow-y: auto;
+        padding-top: max(16px, env(safe-area-inset-top, 0px));
         padding-left: 12px;
         padding-right: 12px;
     }
