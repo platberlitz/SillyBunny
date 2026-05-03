@@ -6,7 +6,7 @@ import { setConfigFilePath } from '../src/util.js';
 import { CHAT_COMPLETION_SOURCES } from '../src/constants.js';
 import { MockServer } from './util/mock-server.js';
 
-setConfigFilePath(fileURLToPath(new URL('../config.yaml', import.meta.url)));
+setConfigFilePath(fileURLToPath(new URL('../default/config.yaml', import.meta.url)));
 
 describe('OpenAI Responses integration', () => {
     /** @type {import('express').Router} */

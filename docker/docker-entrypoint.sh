@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Function to handle startup logic (Config check + Postinstall + Start)
+# Function to handle startup logic (Config check + init + Start)
 start_sillybunny() {
     local PREFIX="$1"
     shift # Remove the first argument (PREFIX) so $@ contains the rest
@@ -11,8 +11,8 @@ start_sillybunny() {
         $PREFIX cp "default/config.yaml" "config/config.yaml"
     fi
 
-    # Execute postinstall to auto-populate config.yaml with missing values
-    $PREFIX bun run postinstall
+    # Execute init script to auto-populate config.yaml with missing values
+    $PREFIX bun run init
 
     # Start the server
     exec $PREFIX bun server.js --listen "$@"

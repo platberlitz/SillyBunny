@@ -256,6 +256,8 @@ else
     echo "Dependencies are up to date."
 fi
 
+"$PACKAGE_MANAGER_CMD" run init
+
 echo "Entering SillyBunny..."
 export NODE_NO_WARNINGS=1
 export SILLYBUNNY_LAUNCHER=1

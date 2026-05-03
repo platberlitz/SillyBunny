@@ -72,6 +72,9 @@ if !errorlevel! neq 0 (
     echo Dependencies are up to date.
 )
 
+call bun run init
+if !errorlevel! neq 0 goto end
+
 REM Check if running on ARM — Bun has CPU overhead issues on ARM (oven-sh/bun#26415)
 set "_server_runtime=bun"
 if /I "%PROCESSOR_ARCHITECTURE%"=="ARM64" (
