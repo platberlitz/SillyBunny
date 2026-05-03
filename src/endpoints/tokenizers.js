@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Buffer } from 'node:buffer';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import zlib from 'node:zlib';
 import { promisify } from 'node:util';
 
@@ -20,6 +21,7 @@ import { getConfigValue, isValidUrl } from '../util.js';
 
 const require = createRequire(import.meta.url);
 const { getTokenizer: getClaudeTokenizer } = require('@anthropic-ai/tokenizer');
+const WEB_TOKENIZERS_MODULE_URL = pathToFileURL(require.resolve('@agnai/web-tokenizers')).href;
 
 /**
  * @typedef { (req: import('express').Request, res: import('express').Response) => Promise<any> } TokenizationHandler
@@ -205,6 +207,62 @@ class SentencePieceTokenizer {
 }
 
 /**
+ * @returns {boolean} True when the server runtime needs a stable file URL for the tokenizer bootstrap.
+ */
+function shouldPatchWebTokenizerRuntimeLocation() {
+    if (typeof document !== 'undefined') {
+        return false;
+    }
+
+    const href = String(globalThis.location?.href ?? '').trim();
+    if (!href) {
+        return true;
+    }
+
+    try {
+        createRequire(href);
+        return false;
+    } catch {
+        return true;
+    }
+}
+
+/**
+ * @template T
+ * @param {() => Promise<T>} callback Initializer that may load the tokenizer WASM module
+ * @returns {Promise<T>}
+ */
+async function withWebTokenizerRuntimeLocation(callback) {
+    if (!shouldPatchWebTokenizerRuntimeLocation()) {
+        return callback();
+    }
+
+    const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'location');
+
+    try {
+        // SillyBunny: some Bun/ARM server surfaces expose an empty location.href,
+        // which makes @agnai/web-tokenizers pass '' to createRequire during WASM bootstrap.
+        Object.defineProperty(globalThis, 'location', {
+            value: { href: WEB_TOKENIZERS_MODULE_URL },
+            configurable: true,
+            writable: true,
+        });
+    } catch {
+        return callback();
+    }
+
+    try {
+        return await callback();
+    } finally {
+        if (originalDescriptor) {
+            Object.defineProperty(globalThis, 'location', originalDescriptor);
+        } else {
+            delete globalThis.location;
+        }
+    }
+}
+
+/**
  * Web tokenizer for tokenizing text.
  */
 class WebTokenizer {
@@ -244,7 +302,7 @@ class WebTokenizer {
         try {
             pathToModel = await getPathToTokenizer(this.#model, this.#fallbackModel);
             const fileBuffer = await fs.promises.readFile(pathToModel);
-            this.#instance = await Tokenizer.fromJSON(fileBuffer.toString('utf-8'));
+            this.#instance = await withWebTokenizerRuntimeLocation(() => Tokenizer.fromJSON(fileBuffer.toString('utf-8')));
             console.info('Instantiated the tokenizer for', path.parse(pathToModel).name);
             return this.#instance;
         } catch (error) {
