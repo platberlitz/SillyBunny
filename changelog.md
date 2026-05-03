@@ -36,6 +36,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Restored default Pathfinder tool toggles for existing template agents with empty tool definitions and made diagnostics report the last pipeline retrieval result.
 - Added `SILLYBUNNY_USE_BUN=1 bash start.sh` as the launcher override for users who want to force Bun on ARM devices.
 - Kept iOS WebKit chats pinned to the bottom while regenerated replies and post-generation agent refreshes update the latest message.
+- Softened the idle send button glyph so the paper-plane icon no longer reads overly bright across themes.
 - Prevented DeepSeek and other web tokenizers from failing when a Bun/ARM runtime exposes an empty server-side `location.href`.
 - Updated app, Horde client, bundled extension, and package metadata to 1.5.3.
 
@@ -58,6 +59,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - `fix(mobile): align settings controls and bun override`
 - `fix(mobile): preserve ios chat position during regeneration`
 - `fix(tokenizers): stabilize web tokenizer runtime loading`
+- `fix(ui): soften idle send icon contrast`
 
 ## v1.5.2
 

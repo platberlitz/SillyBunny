@@ -965,13 +965,23 @@ body .panelControlBar {
 #send_but {
     order: 2;
     background-color: var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) !important;
-    color: var(--sb-on-solid-accent, var(--sb-on-accent, var(--color-background, var(--SmartThemeBlurTintColor)))) !important;
+    color: color-mix(
+        in srgb,
+        var(--sb-on-solid-accent, var(--sb-on-accent, var(--color-background, var(--SmartThemeBlurTintColor)))) 74%,
+        var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) 26%
+    ) !important;
     border-color: transparent !important;
     border-radius: var(--avatar-roundness, 8px);
     font-weight: 600;
     text-shadow: none !important;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+}
+
+#send_but:hover,
+#send_but:focus-visible,
+#send_but:active {
+    color: var(--sb-on-solid-accent, var(--sb-on-accent, var(--color-background, var(--SmartThemeBlurTintColor)))) !important;
 }
 
 #mes_continue {
