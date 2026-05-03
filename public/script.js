@@ -476,6 +476,7 @@ const MOBILE_SEND_SCROLL_IMMUNITY_MS = 1500;
 const MOBILE_SEND_SCROLL_SETTLE_MS = 200;
 const IOS_CHAT_MANUAL_SCROLL_SUPPRESS_MS = 1400;
 const IOS_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
+const IOS_CHAT_BOTTOM_PIN_MS = 1500;
 const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 8;
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 let isLoadingMoreMessages = false;
@@ -498,6 +499,7 @@ let scrollLock = false;
 let scrollLockImmunityUntil = 0;
 let iosChatTouchScrolling = false;
 let iosChatManualScrollSuppressedUntil = 0;
+let iosChatBottomPinUntil = 0;
 export let abortStatusCheck = new AbortController();
 export let charDragDropHandler = null;
 export let chatDragDropHandler = null;
@@ -1545,6 +1547,8 @@ function markIOSChatManualScroll({ touchActive = false, suppressMs = IOS_CHAT_MA
         return;
     }
 
+    iosChatBottomPinUntil = 0;
+
     if (touchActive) {
         iosChatTouchScrolling = true;
     }
@@ -1568,11 +1572,68 @@ function shouldSuppressIOSChatAutoScroll() {
         return false;
     }
 
+    if (Date.now() < iosChatBottomPinUntil) {
+        return false;
+    }
+
     if (iosChatTouchScrolling) {
         return true;
     }
 
     return Date.now() < iosChatManualScrollSuppressedUntil && !isChatScrolledNearBottom();
+}
+
+function requestIOSChatBottomPin({ requireNearBottom = true, durationMs = IOS_CHAT_BOTTOM_PIN_MS } = {}) {
+    if (!shouldGuardIOSChatScroll() || iosChatTouchScrolling) {
+        return false;
+    }
+
+    if (requireNearBottom && !isChatScrolledNearBottom()) {
+        return false;
+    }
+
+    iosChatBottomPinUntil = Math.max(iosChatBottomPinUntil, Date.now() + durationMs);
+    return true;
+}
+
+function shouldPinIOSChatToBottom() {
+    if (!shouldGuardIOSChatScroll() || iosChatTouchScrolling) {
+        return false;
+    }
+
+    return Date.now() < iosChatBottomPinUntil || isChatScrolledNearBottom();
+}
+
+function pinIOSChatToBottom({ waitForFrame = true, settle = false } = {}) {
+    if (!shouldGuardIOSChatScroll()) {
+        return;
+    }
+
+    iosChatManualScrollSuppressedUntil = 0;
+    requestIOSChatBottomPin({ requireNearBottom: false });
+    scrollLock = false;
+    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
+
+    const pin = () => {
+        const element = chatElement[0];
+        if (element) {
+            element.scrollTop = element.scrollHeight;
+        }
+    };
+
+    pin();
+
+    if (waitForFrame) {
+        requestAnimationFrame(pin);
+    }
+
+    if (settle) {
+        setTimeout(() => {
+            if (Date.now() < iosChatBottomPinUntil) {
+                pin();
+            }
+        }, MOBILE_SEND_SCROLL_SETTLE_MS);
+    }
 }
 
 function shouldDeferMobileMessageUpdates() {
@@ -2292,6 +2353,8 @@ function applyMessageBlockUpdate(messageId, message, { rerenderMessage = true } 
         return;
     }
 
+    const shouldPinIOSBottom = shouldPinIOSChatToBottom();
+
     if (rerenderMessage) {
         const text = message?.extra?.display_text ?? message.mes;
         messageElement.find('.mes_text').html(messageFormatting(text, message.name, message.is_system, message.is_user, messageId, {}, false));
@@ -2302,6 +2365,10 @@ function applyMessageBlockUpdate(messageId, message, { rerenderMessage = true } 
 
     addCopyToCodeBlocks(messageElement);
     appendMediaToMessage(message, messageElement);
+
+    if (shouldPinIOSBottom) {
+        pinIOSChatToBottom({ waitForFrame: true, settle: true });
+    }
 }
 
 /**
@@ -2843,6 +2910,7 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
         }
         return chat.length - 1;
     })();
+    const shouldPinIOSBottom = !insertAfter && !insertBefore && scroll && shouldPinIOSChatToBottom();
 
     let messageElement;
 
@@ -2875,7 +2943,11 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
     if (showSwipes) refreshSwipeButtons();
     // Don't scroll if not inserting last
     if (!insertAfter && !insertBefore && scroll) {
-        scrollChatToBottom({ waitForFrame: true });
+        if (shouldPinIOSBottom) {
+            pinIOSChatToBottom({ waitForFrame: true, settle: true });
+        } else {
+            scrollChatToBottom({ waitForFrame: true });
+        }
     }
 
     applyCharacterTagsToMessageDivs({ mesIds: messageId });
@@ -4077,6 +4149,7 @@ class StreamingProcessor {
     async onProgressStreaming(messageId, text, isFinal) {
         const isImpersonate = this.type == 'impersonate';
         const isContinue = this.type == 'continue';
+        const shouldPinIOSBottom = !isImpersonate && shouldPinIOSChatToBottom();
 
         if (!isImpersonate && !isContinue && Array.isArray(this.swipes) && this.swipes.length > 0) {
             for (let i = 0; i < this.swipes.length; i++) {
@@ -4181,7 +4254,9 @@ class StreamingProcessor {
             this.setFirstSwipe(messageId);
         }
 
-        if (!scrollLock) {
+        if (shouldPinIOSBottom) {
+            pinIOSChatToBottom({ waitForFrame: true, settle: isFinal });
+        } else if (!scrollLock) {
             scrollChatToBottom({ waitForFrame: true });
         }
     }
@@ -4907,6 +4982,9 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         if (chat.length && lastMessage.is_user) {
             //do nothing? why does this check exist?
         } else if (type !== 'quiet' && type !== 'swipe' && !isImpersonate && !dryRun && !depth && chat.length) {
+            if (type === 'regenerate') {
+                requestIOSChatBottomPin();
+            }
             deleteItemizedPromptForMessage(chat.length - 1);
             chat.length = chat.length - 1;
             await removeLastMessage();

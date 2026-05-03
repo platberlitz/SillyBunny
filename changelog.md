@@ -35,6 +35,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Kept Pathfinder prompt action buttons from collapsing into icon-only controls by wrapping visible button labels in spans.
 - Restored default Pathfinder tool toggles for existing template agents with empty tool definitions and made diagnostics report the last pipeline retrieval result.
 - Added `SILLYBUNNY_USE_BUN=1 bash start.sh` as the launcher override for users who want to force Bun on ARM devices.
+- Kept iOS WebKit chats pinned to the bottom while regenerated replies and post-generation agent refreshes update the latest message.
 - Updated app, Horde client, bundled extension, and package metadata to 1.5.3.
 
 ### Character Drawer
@@ -54,6 +55,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 
 ### Local Commits
 - `fix(mobile): align settings controls and bun override`
+- `fix(mobile): preserve ios chat position during regeneration`
 
 ## v1.5.2
 
