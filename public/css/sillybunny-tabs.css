@@ -3193,6 +3193,8 @@ body.sb-shell-resizing * {
 
 @media screen and (max-width: 480px) {
     .sb-chat-delete-overlay {
+        align-items: flex-start;
+        overflow-y: auto;
         padding-left: 12px;
         padding-right: 12px;
     }
