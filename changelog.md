@@ -17,7 +17,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Preserved Launchpad highlighting when the SillyBunny shell reinitializes so Moonlit Echoes and Guided Generations toast actions open the correct Launchpad cards.
 - Center-aligned checkbox controls and label text across desktop, mobile, OpenAI/API cards, settings cards, theme toggles, chat delete rows, and Pathfinder prompt settings.
 - Kept the persona chat mass-delete dialog inside iOS safe areas and tightened its narrow-screen controls so the age input and presets remain reachable on mobile Safari.
-- Anchored the mobile chat mass-delete dialog below the SillyBunny top bar on iOS WebKit, kept scrolling inside the dialog list, and avoided mobile autofocus so the title, age filter, presets, and delete actions stay reachable.
+- Kept the mobile chat mass-delete dialog in a high-z-index viewport modal on iOS WebKit, constrained scrolling to the dialog list, avoided mobile autofocus jumps, and rotated the SillyBunny shell cache keys so corrected styles load immediately.
 - Made active character and chat lorebook toolbar icons glow with the active accent color so linked lorebooks are easier to spot in the character editor.
 
 ### Settings Panels And Preset Prompts
