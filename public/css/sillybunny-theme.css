@@ -4003,7 +4003,7 @@ input[type='range']::-moz-range-thumb {
     line-height: 1.45;
 }
 
-#user-settings-utility-actions #clear_all_cache_button {
+#user-settings-utility-actions .sb-settings-utility-action {
     flex: 0 1 220px;
     min-width: min(100%, 180px);
     justify-content: center;
@@ -4640,7 +4640,7 @@ input[type='range']::-moz-range-thumb {
         align-items: stretch;
     }
 
-    #user-settings-utility-actions #clear_all_cache_button {
+    #user-settings-utility-actions .sb-settings-utility-action {
         width: 100%;
     }
 

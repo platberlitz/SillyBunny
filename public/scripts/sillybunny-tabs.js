@@ -1826,6 +1826,162 @@ function getChatScriptModule() {
     return sbChatScriptModulePromise;
 }
 
+function getCookieClearDomains(hostname) {
+    if (!hostname || hostname === 'localhost' || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) {
+        return [''];
+    }
+
+    const parts = hostname.split('.').filter(Boolean);
+    const domains = [''];
+
+    for (let index = 0; index < parts.length - 1; index++) {
+        const domain = parts.slice(index).join('.');
+        domains.push(domain, `.${domain}`);
+    }
+
+    return [...new Set(domains)];
+}
+
+function getCookieClearPaths(pathname) {
+    const paths = new Set(['/']);
+    const segments = pathname.split('/').filter(Boolean);
+    let currentPath = '';
+
+    for (const segment of segments) {
+        currentPath += `/${segment}`;
+        paths.add(currentPath);
+        paths.add(`${currentPath}/`);
+    }
+
+    return [...paths];
+}
+
+function getCookieClearNames(cookieName) {
+    const names = new Set([cookieName]);
+
+    try {
+        names.add(encodeURIComponent(decodeURIComponent(cookieName)));
+    } catch {
+        names.add(encodeURIComponent(cookieName));
+    }
+
+    return [...names];
+}
+
+// SillyBunny: iOS WebKit keeps cookies outside cache/storage APIs, so expire them explicitly.
+function clearAllBrowserCookies() {
+    if (!document.cookie) {
+        return 0;
+    }
+
+    const cookieNames = document.cookie
+        .split(';')
+        .map(cookie => cookie.trim().split('=')[0])
+        .filter(Boolean);
+    const domains = getCookieClearDomains(window.location.hostname);
+    const paths = getCookieClearPaths(window.location.pathname);
+    const expires = 'expires=Thu, 01 Jan 1970 00:00:00 GMT';
+
+    for (const cookieName of cookieNames) {
+        for (const clearName of getCookieClearNames(cookieName)) {
+            for (const path of paths) {
+                document.cookie = `${clearName}=; ${expires}; max-age=0; path=${path}; SameSite=Lax`;
+
+                for (const domain of domains) {
+                    if (!domain) {
+                        continue;
+                    }
+
+                    document.cookie = `${clearName}=; ${expires}; max-age=0; path=${path}; domain=${domain}; SameSite=Lax`;
+                }
+            }
+        }
+    }
+
+    return cookieNames.length;
+}
+
+async function confirmClearCookiesAndCache() {
+    const context = getSillyTavernContext();
+    if (!context?.Popup?.show?.confirm) {
+        return window.confirm('Clear cookies & cache? This removes browser-accessible SillyBunny cookies and cached UI data, then reloads the page.');
+    }
+
+    const result = await context?.Popup?.show?.confirm?.(
+        'Clear cookies & cache?',
+        'This removes browser-accessible SillyBunny cookies, browser cache, temporary session data, and IndexedDB cache stores, then reloads the page. Saved settings and account data stay intact, but you may need to sign in again if your setup uses browser cookies.',
+        {
+            okButton: 'Clear cookies & cache',
+            cancelButton: 'Cancel',
+        },
+    );
+
+    if (context?.POPUP_RESULT) {
+        return result === context.POPUP_RESULT.AFFIRMATIVE;
+    }
+
+    return result === true || result === 1;
+}
+
+async function handleClearCookiesAndCacheClick(event) {
+    event?.preventDefault();
+
+    const button = document.getElementById('clear_cookies_cache_button');
+    if (!(button instanceof HTMLButtonElement) || button.disabled) {
+        return;
+    }
+
+    button.disabled = true;
+    button.classList.add('disabled');
+    button.setAttribute('aria-busy', 'true');
+
+    try {
+        const confirmed = await confirmClearCookiesAndCache();
+        if (!confirmed) {
+            button.disabled = false;
+            button.classList.remove('disabled');
+            button.removeAttribute('aria-busy');
+            return;
+        }
+
+        const clearFrontendCache = window.SillyBunnyClearFrontendCache;
+        if (typeof clearFrontendCache !== 'function') {
+            throw new Error('Cache clear helper is not available yet. Reload the page and try again.');
+        }
+
+        const didClear = await clearFrontendCache({ skipConfirmation: true });
+        if (!didClear) {
+            button.disabled = false;
+            button.classList.remove('disabled');
+            button.removeAttribute('aria-busy');
+            return;
+        }
+
+        const clearedCookieCount = clearAllBrowserCookies();
+        globalThis.toastr?.success?.('Cookies and cache cleared. Reloading SillyBunny...', 'Cookies cleared');
+        console.info(`[Cache] Expired ${clearedCookieCount} browser cookies before reload`);
+        window.setTimeout(() => window.location.reload(), 450);
+    } catch (error) {
+        console.error('Failed to clear cookies and cache', error);
+        globalThis.toastr?.error?.(String(error?.message || error), 'Clear failed');
+        button.disabled = false;
+        button.classList.remove('disabled');
+        button.removeAttribute('aria-busy');
+    }
+}
+
+function bindClearCookiesAndCacheButton() {
+    const button = document.getElementById('clear_cookies_cache_button');
+    if (!(button instanceof HTMLButtonElement) || button.dataset.sbCookiesCacheBound === 'true') {
+        return;
+    }
+
+    button.dataset.sbCookiesCacheBound = 'true';
+    button.addEventListener('click', event => {
+        void handleClearCookiesAndCacheClick(event);
+    });
+}
+
 function hasActiveTopBarChat(context = getSillyTavernContext()) {
     return Boolean(context && (context.groupId || (context.characterId !== undefined && context.characterId !== null)));
 }
@@ -9420,6 +9576,7 @@ function initAll() {
     scheduleBottomChatBarRefresh(0);
     bindTopbarDragEvents();
     bindChatbarEvents();
+    bindClearCookiesAndCacheButton();
     scheduleChatbarRefresh(0);
     interceptDrawerOpeners();
     bindWorldInfoRoute();
