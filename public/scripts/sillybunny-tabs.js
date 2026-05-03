@@ -1175,8 +1175,13 @@ function getDesktopShellDimensions(shellKey = '') {
         };
     }
 
+    // SillyBunny: cap shell width to the active chat width (--sheldWidth) so settings
+    // panels narrow when the user reduces the chat width, matching standard ST behaviour.
+    const sheldWidthStr = window.getComputedStyle(document.documentElement).getPropertyValue('--sheldWidth').trim();
+    const sheldWidthVw = parseFloat(sheldWidthStr);
+    const chatWidthPx = Number.isFinite(sheldWidthVw) ? Math.round((sheldWidthVw / 100) * viewportWidth) : viewportWidth;
     const desiredWidth = clampNumber(
-        viewportWidth * SB_DESKTOP_SHELL_LAYOUT.ratio,
+        Math.min(viewportWidth * SB_DESKTOP_SHELL_LAYOUT.ratio, chatWidthPx),
         SB_DESKTOP_SHELL_LAYOUT.minWidth,
         maxShellWidth,
     );
@@ -9594,6 +9599,12 @@ function initAll() {
 
     window.addEventListener('resize', syncMobileViewportState, { passive: true });
     window.addEventListener('orientationchange', syncMobileViewportState);
+
+    // SillyBunny: re-sync shell width when the chat width slider changes so settings
+    // panels narrow alongside the chat container (matches standard ST behaviour).
+    $(document).on('input change mouseup touchend', '#chat_width_slider', () => {
+        syncDesktopShellSizing();
+    });
 
     // Reinitialize Select2 widgets after shell reparents DOM elements.
     // Select2 bindings break when elements are moved in the DOM.

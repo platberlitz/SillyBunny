@@ -1117,7 +1117,11 @@ class PromptManager {
      * @returns {number} - Scroll position of the prompt manager
      */
     #getScrollPosition() {
-        return document.getElementById(this.configuration.prefix + 'prompt_manager')?.closest('.scrollableInner')?.scrollTop;
+        // SillyBunny: prefer .sb-shell-panel-scroller (the actual scroll container inside
+        // the SillyBunny shell) before falling back to upstream .scrollableInner, which is
+        // set to overflow:visible inside the shell and always reports scrollTop 0.
+        return document.getElementById(this.configuration.prefix + 'prompt_manager')
+            ?.closest('.sb-shell-panel-scroller, .scrollableInner')?.scrollTop;
     }
 
     /**
@@ -1126,7 +1130,13 @@ class PromptManager {
      */
     #setScrollPosition(scrollPosition) {
         if (scrollPosition === undefined || scrollPosition === null) return;
-        document.getElementById(this.configuration.prefix + 'prompt_manager')?.closest('.scrollableInner')?.scrollTo(0, scrollPosition);
+        const container = document.getElementById(this.configuration.prefix + 'prompt_manager')
+            ?.closest('.sb-shell-panel-scroller, .scrollableInner');
+        if (!container) return;
+        container.scrollTo(0, scrollPosition);
+        // Defer a second restore to handle the reflow that occurs when renderPromptManager
+        // clears innerHTML; the browser may reset scrollTop before content is re-added.
+        requestAnimationFrame(() => container.scrollTo(0, scrollPosition));
     }
 
     /**

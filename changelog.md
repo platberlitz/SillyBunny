@@ -20,6 +20,10 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Anchored the mobile chat mass-delete dialog to the top of the viewport with scrollable safe-area padding so the title, age filter, presets, and delete actions stay reachable.
 - Made active character and chat lorebook toolbar icons glow with the active accent color so linked lorebooks are easier to spot in the character editor.
 
+### Settings Panels And Preset Prompts
+- Settings panels (Customize, Presets, Workspace, etc.) now narrow alongside the chat when the chat width is reduced, matching standard SillyTavern behaviour.
+- Toggling a prompt on or off inside a preset no longer jumps the scroll position back to the top; the panel stays at the user's current scroll position.
+
 ### Settings And Browser Storage
 - Added a dedicated Clear cookies & cache utility action, wired through the cache-busted SillyBunny shell script so stale browser cache does not leave the button inert.
 
