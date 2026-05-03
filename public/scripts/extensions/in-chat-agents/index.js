@@ -417,6 +417,38 @@ function buildAgentFromSnapshot(snapshot) {
     };
 }
 
+function shouldMigratePathfinderAgentTools(agent, template) {
+    if (!template || shouldSkipBundledTemplateMigrations(agent)) {
+        return false;
+    }
+
+    if (String(template?.id ?? '').trim() !== 'tpl-pathfinder') {
+        return false;
+    }
+
+    const templateTools = Array.isArray(template?.tools) ? template.tools : [];
+    const agentTools = Array.isArray(agent?.tools) ? agent.tools : [];
+    return templateTools.length > 0 && agentTools.length === 0;
+}
+
+async function migratePathfinderAgentToolsFromTemplate() {
+    let migratedCount = 0;
+
+    for (const agent of getAgents()) {
+        const template = findTemplateForAgent(agent);
+        if (!shouldMigratePathfinderAgentTools(agent, template)) {
+            continue;
+        }
+
+        agent.tools = structuredClone(template.tools);
+        agent.sourceTemplateId = agent.sourceTemplateId || template.id;
+        await saveAgent(agent);
+        migratedCount++;
+    }
+
+    return migratedCount;
+}
+
 function shouldSkipBundledTemplateMigrations(agent) {
     return Boolean(agent?.phaseLocked);
 }
@@ -2983,6 +3015,11 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     const migratedRegexPostDefaultsCount = await migrateBundledRegexPostDefaultsToSavedAgents();
     if (migratedRegexPostDefaultsCount > 0) {
         toastr.success(`Updated ${migratedRegexPostDefaultsCount} bundled regex agent(s) to post-generation defaults.`);
+    }
+
+    const migratedPathfinderToolCount = await migratePathfinderAgentToolsFromTemplate();
+    if (migratedPathfinderToolCount > 0) {
+        toastr.success(`Updated ${migratedPathfinderToolCount} Pathfinder agent(s) with default tool toggles.`);
     }
 
     const migratedPromptTransformImpersonateCount = await migrateBundledPromptTransformImpersonateToSavedAgents();

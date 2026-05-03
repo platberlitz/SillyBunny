@@ -25,10 +25,12 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 ### Pathfinder And Release Metadata
 - Suppressed expected `AbortError` stack traces when Pathfinder sidecar generation is cancelled by its retrieval timeout or a closed client connection.
 - Kept Pathfinder prompt action buttons from collapsing into icon-only controls by wrapping visible button labels in spans.
+- Restored default Pathfinder tool toggles for existing template agents with empty tool definitions and made diagnostics report the last pipeline retrieval result.
 - Updated app, Horde client, bundled extension, and package metadata to 1.5.3.
 
 ### Character Drawer
 - Reset character drawer tag grid placement and containment so inline tags stay inside their own character rows without overlapping adjacent entries.
+- Made the character drawer X close the panel completely, added a dedicated back-to-list control for edit mode, restored inline tags in mobile grid view, and reduced the mobile header height.
 
 ### In-Chat Agents
 - Prevented swipe navigation from re-running already-applied post-generation agents while preserving real new-swipe generation processing.

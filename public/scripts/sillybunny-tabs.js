@@ -4137,11 +4137,6 @@ function isCharacterPanelOpen() {
     return isDrawerActuallyOpen('right-nav-panel');
 }
 
-function getCharacterPanelMenuType() {
-    const panel = document.getElementById('right-nav-panel');
-    return panel instanceof HTMLElement ? panel.dataset.menuType ?? '' : '';
-}
-
 function hasActiveCharacterChat(context = getSillyTavernContext()) {
     if (context?.groupId) {
         return true;
@@ -8702,6 +8697,26 @@ function injectCharacterDrawerControls() {
         target.appendChild(lockButton);
     }
 
+    let backButton = target.querySelector('#sb-character-back-to-list');
+    if (!(backButton instanceof HTMLButtonElement)) {
+        backButton = createElement('button', {
+            id: 'sb-character-back-to-list',
+            className: 'sb-character-back-to-list menu_button menu_button_icon',
+            attrs: {
+                type: 'button',
+                title: 'Back to characters list',
+                'aria-label': 'Back to characters list',
+            },
+        });
+
+        backButton.innerHTML = '<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>';
+        backButton.addEventListener('click', () => {
+            showCharacterListView();
+            syncChatbarVisibilityState();
+        });
+        target.appendChild(backButton);
+    }
+
     let closeButton = target.querySelector('#sb-character-mobile-close');
     if (!(closeButton instanceof HTMLButtonElement)) {
         closeButton = createElement('button', {
@@ -8716,12 +8731,6 @@ function injectCharacterDrawerControls() {
 
         closeButton.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
         closeButton.addEventListener('click', () => {
-            if (['character_edit', 'create'].includes(getCharacterPanelMenuType())) {
-                showCharacterListView();
-                syncChatbarVisibilityState();
-                return;
-            }
-
             closeCharacterPanel();
         });
         target.appendChild(closeButton);
@@ -8738,8 +8747,7 @@ function bindCharacterEditorExitButton() {
 
     button.dataset.sbBound = 'true';
     button.addEventListener('click', () => {
-        showCharacterListView();
-        syncChatbarVisibilityState();
+        closeCharacterPanel();
     });
 }
 

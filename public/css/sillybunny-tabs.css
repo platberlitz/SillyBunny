@@ -1658,7 +1658,8 @@ body.sb-shell-resizing * {
     box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 78%, transparent);
 }
 
-.sb-character-close {
+.sb-character-close,
+.sb-character-back-to-list {
     display: none;
     flex: 0 0 auto;
 }
@@ -1671,12 +1672,21 @@ body.sb-shell-resizing * {
     margin-left: 8px;
 }
 
-.sb-character-close {
+.sb-character-close,
+.sb-character-back-to-list {
     margin-left: 0;
 }
 
-.sb-character-right-lock + .sb-character-close {
+.sb-character-right-lock + .sb-character-close,
+.sb-character-back-to-list + .sb-character-close {
     margin-left: 0;
+}
+
+#right-nav-panel[data-menu-type="character_edit"] .sb-character-back-to-list,
+#right-nav-panel[data-menu-type="create"] .sb-character-back-to-list {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .sb-character-right-lock.is-active {
@@ -4806,21 +4816,21 @@ body.sb-shell-resizing * {
     #right-nav-panel.openDrawer > #CharListButtonAndHotSwaps {
         flex: 0 0 auto;
         display: grid;
-        grid-template-columns: 44px minmax(0, 1fr) 44px 44px;
+        grid-template-columns: 36px minmax(0, 1fr) 36px 36px;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         width: 100%;
         min-width: 0;
         margin: 0;
-        padding: 10px 8px 6px;
+        padding: 6px 8px 4px;
         border-bottom: 1px solid color-mix(in srgb, var(--sb-shell-border) 76%, transparent);
         box-sizing: border-box;
     }
 
     #right-nav-panel.openDrawer > #CharListButtonAndHotSwaps > .flexFlowColumn.flex-container {
-        width: 44px;
-        min-width: 44px;
-        max-width: 44px;
+        width: 36px;
+        min-width: 36px;
+        max-width: 36px;
         align-items: center;
         justify-content: center;
     }
@@ -4840,24 +4850,54 @@ body.sb-shell-resizing * {
         text-overflow: ellipsis;
     }
 
-    #right-nav-panel.openDrawer :is(#rm_button_characters, #sb-character-right-lock, #sb-character-mobile-close) {
-        width: 44px;
-        min-width: 44px;
-        max-width: 44px;
-        height: 44px;
-        min-height: 44px;
-        max-height: 44px;
+    #right-nav-panel.openDrawer :is(#rm_button_characters, #sb-character-right-lock, #sb-character-back-to-list, #sb-character-mobile-close) {
+        width: 36px;
+        min-width: 36px;
+        max-width: 36px;
+        height: 36px;
+        min-height: 36px;
+        max-height: 36px;
         margin: 0;
         padding: 0 !important;
-        border-radius: 12px;
+        border-radius: 10px;
+    }
+
+    #right-nav-panel.openDrawer #sb-character-right-lock {
+        grid-column: 3;
+    }
+
+    #right-nav-panel.openDrawer #sb-character-back-to-list {
+        grid-column: 4;
+    }
+
+    #right-nav-panel.openDrawer #sb-character-mobile-close {
+        display: inline-flex;
+        grid-column: 4;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) > #CharListButtonAndHotSwaps {
+        grid-template-columns: 36px minmax(0, 1fr) 36px 36px 36px;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #sb-character-mobile-close {
+        grid-column: 5;
+    }
+
+    #right-nav-panel.openDrawer:not([data-menu-type="character_edit"]):not([data-menu-type="create"]) #sb-character-back-to-list {
+        display: none;
     }
 
     #right-nav-panel.openDrawer > #rm_PinAndTabs {
         flex: 0 0 auto;
         margin: 0;
-        padding: 4px 8px 0;
+        padding: 2px 8px 0;
         min-width: 0;
         box-sizing: border-box;
+    }
+
+    #right-nav-panel.openDrawer:not([data-menu-type="character_edit"]):not([data-menu-type="create"]) #rm_button_selected_ch,
+    #right-nav-panel.openDrawer:not([data-menu-type="character_edit"]):not([data-menu-type="create"]) #result_info {
+        display: none !important;
     }
 
     #right-nav-panel.openDrawer > .scrollableInner,
@@ -4936,6 +4976,7 @@ body.sb-shell-resizing * {
     }
 
     #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) .tags_inline {
+        display: flex !important;
         grid-column: 1;
         grid-row: auto;
         max-width: 100%;

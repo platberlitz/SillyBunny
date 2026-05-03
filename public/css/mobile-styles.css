@@ -48,12 +48,12 @@
 
     #right-nav-panel #CharListButtonAndHotSwaps {
         display: grid;
-        grid-template-columns: 44px minmax(0, 1fr) 44px 44px;
+        grid-template-columns: 36px minmax(0, 1fr) 36px 36px;
         align-items: center;
         gap: 6px;
         width: 100%;
         box-sizing: border-box;
-        padding: 4px 0 8px;
+        padding: 4px 0 6px;
     }
 
     #right-nav-panel #CharListButtonAndHotSwaps > .flexFlowColumn.flex-container {
@@ -62,8 +62,8 @@
         align-items: center;
         justify-content: center;
         gap: 0;
-        width: 44px;
-        min-width: 44px;
+        width: 36px;
+        min-width: 36px;
     }
 
     #right-nav-panel #HotSwapWrapper {
@@ -93,13 +93,13 @@
         flex: 0 0 auto;
     }
 
-    #right-nav-panel #CharListButtonAndHotSwaps :is(#rm_button_characters, #sb-character-right-lock, #sb-character-mobile-close) {
-        width: 44px;
-        min-width: 44px;
-        max-width: 44px;
-        height: 44px;
-        min-height: 44px;
-        max-height: 44px;
+    #right-nav-panel #CharListButtonAndHotSwaps :is(#rm_button_characters, #sb-character-right-lock, #sb-character-back-to-list, #sb-character-mobile-close) {
+        width: 36px;
+        min-width: 36px;
+        max-width: 36px;
+        height: 36px;
+        min-height: 36px;
+        max-height: 36px;
         margin: 0;
         padding: 0 !important;
         box-sizing: border-box;
@@ -109,8 +109,20 @@
         grid-column: 3;
     }
 
+    #right-nav-panel #sb-character-back-to-list {
+        grid-column: 4;
+    }
+
     #right-nav-panel #sb-character-mobile-close {
         grid-column: 4;
+    }
+
+    #right-nav-panel:is([data-menu-type="character_edit"], [data-menu-type="create"]) #CharListButtonAndHotSwaps {
+        grid-template-columns: 36px minmax(0, 1fr) 36px 36px 36px;
+    }
+
+    #right-nav-panel:is([data-menu-type="character_edit"], [data-menu-type="create"]) #sb-character-mobile-close {
+        grid-column: 5;
     }
 
     #right-nav-panel.openDrawer,
