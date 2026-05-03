@@ -3193,15 +3193,18 @@ body.sb-shell-resizing * {
 
 @media screen and (max-width: 480px) {
     .sb-chat-delete-overlay {
-        align-items: flex-start;
-        overflow-y: auto;
-        padding-top: max(16px, env(safe-area-inset-top, 0px));
+        inset: var(--sb-topbar-layout-offset, var(--topBarBlockSize)) 0 0;
+        overflow: hidden;
+        padding-top: 12px;
+        padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
         padding-left: 12px;
         padding-right: 12px;
     }
 
     .sb-chat-delete-dialog {
         gap: 10px;
+        max-height: 100%;
+        overflow: hidden;
         padding: 12px;
     }
 
@@ -3258,8 +3261,10 @@ body.sb-shell-resizing * {
 }
 
 .sb-chat-delete-list {
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
     gap: 6px;

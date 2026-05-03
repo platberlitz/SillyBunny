@@ -3002,7 +3002,9 @@ function showBottomChatMassDeleteDialog(files, currentChatId) {
         document.body.appendChild(overlay);
         document.addEventListener('keydown', handleKeydown);
         updateStatus();
-        ageInput.focus();
+        if (!isMobileViewport()) {
+            ageInput.focus();
+        }
     });
 }
 
