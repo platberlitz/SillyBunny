@@ -42,6 +42,13 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Prevented DeepSeek and other web tokenizers from failing when a Bun/ARM runtime exposes an empty server-side `location.href`.
 - Updated app, Horde client, bundled extension, and package metadata to 1.5.3.
 
+### Runtime And Upstream Sync
+- Aligned the startup init flow with SillyTavern 1.18 by moving the old post-install bootstrap into `src/server-init.js` and wiring launchers plus Docker startup through `bun run init`.
+- Kept first-run default public-file synchronization additive so missing bundled files are copied without overwriting existing user files.
+- Updated default configuration with upstream keep-alive, forwarded header, trusted proxy, private address whitelist, authentication rate-limit, and cache buster options.
+- Added upstream runtime dependencies and npm install guards for safer package installation defaults.
+- Pointed OpenAI Responses tests at `default/config.yaml` so they do not depend on mutable local configuration.
+
 ### Character Drawer
 - Reset character drawer tag grid placement and containment so inline tags stay inside their own character rows without overlapping adjacent entries.
 - Made the character drawer X close the panel completely, added a dedicated back-to-list control for edit mode, restored inline tags in mobile grid view, and reduced the mobile header height.
@@ -64,6 +71,10 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - `fix(ui): soften idle send icon contrast`
 - `fix(mobile): reduce ios reasoning stream churn`
 - `fix(mobile): keep previous chats bottom-pinned`
+- `sync: merge PR 11 runtime init alignment`
+- `sync: align runtime init with SillyTavern 1.18`
+- `fix: make OpenAI Responses tests use default config`
+- `docs(changelog): place PR 11 notes under 1.5.3`
 
 ## v1.5.2
 
