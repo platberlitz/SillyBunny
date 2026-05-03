@@ -17,6 +17,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Preserved Launchpad highlighting when the SillyBunny shell reinitializes so Moonlit Echoes and Guided Generations toast actions open the correct Launchpad cards.
 - Center-aligned checkbox controls and label text across desktop, mobile, OpenAI/API cards, settings cards, theme toggles, chat delete rows, and Pathfinder prompt settings.
 - Kept the persona chat mass-delete dialog inside iOS safe areas and tightened its narrow-screen controls so the age input and presets remain reachable on mobile Safari.
+- Anchored the mobile chat mass-delete dialog to the top of the viewport with scrollable safe-area padding so the title, age filter, presets, and delete actions stay reachable.
 - Made active character and chat lorebook toolbar icons glow with the active accent color so linked lorebooks are easier to spot in the character editor.
 
 ### Settings And Browser Storage
@@ -33,6 +34,8 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Made the character drawer X close the panel completely, added a dedicated back-to-list control for edit mode, restored inline tags in mobile grid view, and reduced the mobile header height.
 
 ### In-Chat Agents
+- Updated bundled Achievements Tracker reset defaults to use `[ACH|Title|Rarity|Description of the achievement]`.
+- Updated bundled Scene Tracker reset defaults to use `detail: one-line sensory detail to set the current scene`.
 - Prevented swipe navigation from re-running already-applied post-generation agents while preserving real new-swipe generation processing.
 - Made Cancel Agent requests persist through in-flight manual runs, added a Cancel Agent action directly to running prompt-pass toasts, and prevented cancelled manual outputs from applying after they return.
 - Added pre-generation prompt preview actions in the agent editor and eligible agent cards so macro-expanded prompts can be checked before sending.
