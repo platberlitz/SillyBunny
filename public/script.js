@@ -296,6 +296,7 @@ import { onboardingExperimentalMacroEngine } from './scripts/macros/engine/Macro
 import { compressRequest, setRequestCompressionConfig } from './scripts/request-compression.js';
 import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker } from './scripts/swipe-picker.js';
 import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
+import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
 
 // API OBJECT FOR EXTERNAL WIRING
 globalThis.SillyTavern = {
@@ -4085,6 +4086,14 @@ class StreamingProcessor {
         this.reasoningSignature = null;
         /** @type {number} */
         this.reasoningTokens = 0;
+        /** @type {string?} Latest reasoning received from the stream, applied on UI ticks */
+        this.pendingReasoning = null;
+    }
+
+    #applyPendingReasoning() {
+        if (typeof this.pendingReasoning === 'string') {
+            this.reasoningHandler.updateReasoning(this.messageId, this.pendingReasoning);
+        }
     }
 
     /**
@@ -4199,6 +4208,7 @@ class StreamingProcessor {
             chat[messageId].extra.time_to_first_token = this.timeToFirstToken;
 
             // Update reasoning
+            this.#applyPendingReasoning();
             await this.reasoningHandler.process(messageId, mesChanged, this.promptReasoning);
             processedText = chat[messageId].mes;
 
@@ -4399,7 +4409,7 @@ class StreamingProcessor {
         this.stoppingStrings = getStoppingStrings(isImpersonate, isContinue, main_api);
 
         try {
-            const sw = new Stopwatch(1000 / power_user.streaming_fps);
+            const sw = new Stopwatch(getStreamingUpdateInterval(1000 / power_user.streaming_fps));
             const timestamps = [];
             for await (const { text, swipes, logprobs, toolCalls, state } of this.generator()) {
                 const now = Date.now();
@@ -4420,8 +4430,9 @@ class StreamingProcessor {
                 if (logprobs) {
                     this.messageLogprobs.push(...(Array.isArray(logprobs) ? logprobs : [logprobs]));
                 }
-                // Get the updated reasoning string into the handler
-                this.reasoningHandler.updateReasoning(this.messageId, state?.reasoning);
+                // SillyBunny: keep full reasoning regex/DOM work on UI ticks. Reasoning-heavy
+                // streams like DeepSeek and GLM can otherwise overwhelm iOS WebKit.
+                this.pendingReasoning = typeof state?.reasoning === 'string' ? state.reasoning : null;
                 this.images = state?.images ?? [];
                 this.reasoningSignature = state?.signature ?? null;
                 this.reasoningTokens = state?.reasoning_tokens ?? 0;

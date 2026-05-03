@@ -9,6 +9,7 @@ import { chat_completion_sources, getChatCompletionModel, oai_settings } from '.
 import { Popup } from './popup.js';
 import { performFuzzySearch, power_user } from './power-user.js';
 import { getPresetManager } from './preset-manager.js';
+import { shouldReduceStreamingDomWork, shouldRenderLiveReasoningContent } from './mobile-streaming.js';
 import { SlashCommand } from './slash-commands/SlashCommand.js';
 import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from './slash-commands/SlashCommandArgument.js';
 import { commonEnumProviders, enumIcons } from './slash-commands/SlashCommandCommonEnumsProvider.js';
@@ -351,6 +352,8 @@ export class ReasoningHandler {
     #parsingReasoningMesStartIndex = null;
     /** @type {ReasoningTemplate?} The template currently being parsed from streamed message text */
     #activeStreamingTemplate = null;
+    /** @type {number} Last time the live reasoning body was rendered */
+    #lastReasoningDomRenderAt = 0;
 
     /**
      * @param {Date?} [timeStarted=null] - When the generation started
@@ -665,14 +668,29 @@ export class ReasoningHandler {
         setDatasetProperty(this.messageReasoningDetailsDom, 'state', this.state);
         setDatasetProperty(this.messageReasoningDetailsDom, 'type', this.type);
 
-        // Update the reasoning message
-        const reasoning = trimSpaces(this.reasoningDisplayText ?? this.reasoning);
-        const displayReasoning = messageFormatting(reasoning, '', false, false, messageId, {}, true);
+        const now = Date.now();
+        const shouldRenderReasoning = shouldRenderLiveReasoningContent({
+            isReducedDomWork: shouldReduceStreamingDomWork(),
+            state: this.state,
+            detailsOpen: Boolean(this.messageReasoningDetailsDom.open),
+            hasRenderedContent: Boolean(this.messageReasoningContentDom.childNodes.length),
+            lastRenderAt: this.#lastReasoningDomRenderAt,
+            now,
+        });
 
-        if (power_user.stream_fade_in) {
-            applyStreamFadeIn(this.messageReasoningContentDom, displayReasoning);
-        } else {
-            applyStreamDomPatch(this.messageReasoningContentDom, displayReasoning);
+        // SillyBunny: iOS WebKit can force-reload under reasoning-heavy streams if we
+        // format and morph a growing hidden reasoning block on every live tick.
+        if (shouldRenderReasoning) {
+            const reasoning = trimSpaces(this.reasoningDisplayText ?? this.reasoning);
+            const displayReasoning = messageFormatting(reasoning, '', false, false, messageId, {}, true);
+
+            if (power_user.stream_fade_in) {
+                applyStreamFadeIn(this.messageReasoningContentDom, displayReasoning);
+            } else {
+                applyStreamDomPatch(this.messageReasoningContentDom, displayReasoning);
+            }
+
+            this.#lastReasoningDomRenderAt = now;
         }
 
         // Update tooltip for hidden reasoning edit

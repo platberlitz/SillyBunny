@@ -22,6 +22,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Made active character and chat lorebook toolbar icons glow with the active accent color so linked lorebooks are easier to spot in the character editor.
 - Made Clear cookies & cache expire server-side HttpOnly session cookies as well as browser-visible cookies before reloading.
 - Paused streaming autoscroll while iOS WebKit users touch or momentum-scroll the chat so mid-generation updates no longer snap the view away from the scroll position.
+- Reduced live reasoning render churn on iOS WebKit so reasoning-heavy DeepSeek and GLM streams no longer overwhelm the browser during generation.
 
 ### Settings Panels And Preset Prompts
 - Settings panels (Customize, Presets, Workspace, etc.) now narrow alongside the chat when the chat width is reduced, matching standard SillyTavern behaviour.
@@ -60,6 +61,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - `fix(mobile): preserve ios chat position during regeneration`
 - `fix(tokenizers): stabilize web tokenizer runtime loading`
 - `fix(ui): soften idle send icon contrast`
+- `fix(mobile): reduce ios reasoning stream churn`
 
 ## v1.5.2
 
