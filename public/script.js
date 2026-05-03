@@ -474,6 +474,9 @@ const MOBILE_MESSAGE_UPDATE_DELAY_MS = 24;
 const MOBILE_MEDIA_SCROLL_MAX_DELAY_MS = 300;
 const MOBILE_SEND_SCROLL_IMMUNITY_MS = 1500;
 const MOBILE_SEND_SCROLL_SETTLE_MS = 200;
+const IOS_CHAT_MANUAL_SCROLL_SUPPRESS_MS = 1400;
+const IOS_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
+const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 8;
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 let isLoadingMoreMessages = false;
 let lastShowMoreTouchEventAt = 0;
@@ -493,6 +496,8 @@ let is_delete_mode = false;
 let fav_ch_checked = false;
 let scrollLock = false;
 let scrollLockImmunityUntil = 0;
+let iosChatTouchScrolling = false;
+let iosChatManualScrollSuppressedUntil = 0;
 export let abortStatusCheck = new AbortController();
 export let charDragDropHandler = null;
 export let chatDragDropHandler = null;
@@ -1519,6 +1524,55 @@ export async function replaceCurrentChat() {
 function shouldBatchMobileChatRendering() {
     const isNarrowViewport = window.matchMedia?.(MOBILE_CHAT_RENDER_MEDIA_QUERY)?.matches;
     return Boolean(isNarrowViewport || isMobile());
+}
+
+function shouldGuardIOSChatScroll() {
+    return Boolean(shouldBatchMobileChatRendering() && isIOSWebKitPlatform());
+}
+
+function isChatScrolledNearBottom(threshold = CHAT_SCROLL_BOTTOM_THRESHOLD_PX) {
+    const element = chatElement[0];
+
+    if (!element) {
+        return true;
+    }
+
+    return Math.abs(element.scrollHeight - element.clientHeight - element.scrollTop) <= threshold;
+}
+
+function markIOSChatManualScroll({ touchActive = false, suppressMs = IOS_CHAT_MANUAL_SCROLL_SUPPRESS_MS } = {}) {
+    if (!shouldGuardIOSChatScroll()) {
+        return;
+    }
+
+    if (touchActive) {
+        iosChatTouchScrolling = true;
+    }
+
+    iosChatManualScrollSuppressedUntil = Math.max(iosChatManualScrollSuppressedUntil, Date.now() + suppressMs);
+    scrollLockImmunityUntil = 0;
+}
+
+function releaseIOSChatTouchScroll() {
+    if (!shouldGuardIOSChatScroll()) {
+        iosChatTouchScrolling = false;
+        return;
+    }
+
+    iosChatTouchScrolling = false;
+    markIOSChatManualScroll();
+}
+
+function shouldSuppressIOSChatAutoScroll() {
+    if (!shouldGuardIOSChatScroll()) {
+        return false;
+    }
+
+    if (iosChatTouchScrolling) {
+        return true;
+    }
+
+    return Date.now() < iosChatManualScrollSuppressedUntil && !isChatScrolledNearBottom();
 }
 
 function shouldDeferMobileMessageUpdates() {
@@ -3123,6 +3177,12 @@ export function scrollChatToBottom({ waitForFrame } = {}) {
     }
 
     const doScroll = () => {
+        // SillyBunny: iOS WebKit can fight streaming autoscroll during touch and momentum scrolling.
+        if (shouldSuppressIOSChatAutoScroll()) {
+            requestId = null;
+            return;
+        }
+
         let position = chatElement[0].scrollHeight;
 
         if (power_user.waifuMode) {
@@ -13194,17 +13254,38 @@ jQuery(async function () {
     }
 
     const chatElementScroll = document.getElementById('chat');
+    const markIOSChatTouchScrollStart = () => markIOSChatManualScroll({ touchActive: true });
+    const markIOSChatTouchScrollMove = () => markIOSChatManualScroll();
+    const markIOSChatWheelScroll = () => markIOSChatManualScroll();
+    const markIOSViewportScroll = () => {
+        if (iosChatTouchScrolling || Date.now() < iosChatManualScrollSuppressedUntil) {
+            markIOSChatManualScroll({ suppressMs: IOS_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS });
+        }
+    };
+
+    chatElementScroll.addEventListener('touchstart', markIOSChatTouchScrollStart, { passive: true });
+    chatElementScroll.addEventListener('touchmove', markIOSChatTouchScrollMove, { passive: true });
+    chatElementScroll.addEventListener('touchend', releaseIOSChatTouchScroll, { passive: true });
+    chatElementScroll.addEventListener('touchcancel', releaseIOSChatTouchScroll, { passive: true });
+    chatElementScroll.addEventListener('wheel', markIOSChatWheelScroll, { passive: true });
+    window.visualViewport?.addEventListener('scroll', markIOSViewportScroll, { passive: true });
+    window.visualViewport?.addEventListener('resize', markIOSViewportScroll, { passive: true });
+
     const chatScrollHandler = function () {
         if (power_user.waifuMode) {
             scrollLock = true;
             return;
         }
 
+        if (iosChatTouchScrolling || Date.now() < iosChatManualScrollSuppressedUntil) {
+            markIOSChatManualScroll();
+        }
+
         if (Date.now() < scrollLockImmunityUntil) {
             return;
         }
 
-        const scrollIsAtBottom = Math.abs(chatElementScroll.scrollHeight - chatElementScroll.clientHeight - chatElementScroll.scrollTop) < 5;
+        const scrollIsAtBottom = isChatScrolledNearBottom(5);
 
         // Resume autoscroll if the user scrolls to the bottom
         if (scrollLock && scrollIsAtBottom) {
