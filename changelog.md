@@ -36,6 +36,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 ### Character Drawer
 - Reset character drawer tag grid placement and containment so inline tags stay inside their own character rows without overlapping adjacent entries.
 - Made the character drawer X close the panel completely, added a dedicated back-to-list control for edit mode, restored inline tags in mobile grid view, and reduced the mobile header height.
+- Restored mobile list-view character tags, hid the edit-only header after returning to the character list, hid the mobile hotswap strip while editing, compacted the mobile editor header, and kept the FAV/ADV controls readable on narrow screens.
 
 ### In-Chat Agents
 - Updated bundled Achievements Tracker reset defaults to use `[ACH|Title|Rarity|Description of the achievement]`.

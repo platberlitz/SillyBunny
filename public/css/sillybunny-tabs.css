@@ -4913,6 +4913,12 @@ body.sb-shell-resizing * {
 
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) > #CharListButtonAndHotSwaps {
         grid-template-columns: 36px minmax(0, 1fr) 36px 36px 36px;
+        min-height: 46px;
+        padding-block: 5px;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #HotSwapWrapper {
+        display: none !important;
     }
 
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #sb-character-mobile-close {
@@ -4929,6 +4935,79 @@ body.sb-shell-resizing * {
         padding: 2px 8px 0;
         min-width: 0;
         box-sizing: border-box;
+    }
+
+    #right-nav-panel.openDrawer:not([data-menu-type="character_edit"]):not([data-menu-type="create"]) > #rm_PinAndTabs {
+        display: none !important;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) > #rm_PinAndTabs {
+        padding: 2px 8px 4px;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #right-nav-panel-tabs {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 34px;
+        grid-template-areas:
+            'title close'
+            'meta meta';
+        align-items: center;
+        gap: 2px 6px;
+        min-height: 0;
+        padding: 5px 8px;
+        border: 1px solid color-mix(in srgb, var(--sb-shell-border) 72%, transparent);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--sb-shell-main-bg) 92%, transparent);
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #rm_button_selected_ch {
+        grid-area: title;
+        min-height: 30px;
+        display: flex;
+        align-items: center;
+        padding: 0 6px;
+        border-radius: 8px;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #rm_button_selected_ch h2 {
+        font-size: calc(var(--mainFontSize) * 1.02);
+        line-height: 1.15;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #result_info {
+        grid-area: meta;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) 32px 32px 32px;
+        align-items: center;
+        justify-content: stretch;
+        gap: 3px;
+        min-height: 32px;
+        padding: 0;
+        font-size: calc(var(--mainFontSize) * 0.74);
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #result_info_text {
+        min-width: 0;
+        line-height: 1.05;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #result_info .right_menu_button,
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #sb_character_editor_exit {
+        width: 32px;
+        min-width: 32px;
+        max-width: 32px;
+        height: 32px;
+        min-height: 32px;
+        max-height: 32px;
+        margin: 0;
+        padding: 0 !important;
+        border-radius: 8px;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #sb_character_editor_exit {
+        grid-area: close;
+        display: inline-flex;
     }
 
     #right-nav-panel.openDrawer:not([data-menu-type="character_edit"]):not([data-menu-type="create"]) #rm_button_selected_ch,
@@ -4971,7 +5050,7 @@ body.sb-shell-resizing * {
     #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) {
         display: grid !important;
         grid-template-columns: var(--sb-character-list-avatar-size) minmax(0, 1fr) !important;
-        align-items: center;
+        align-items: center !important;
         gap: 6px 10px;
         min-height: calc(var(--sb-character-list-avatar-size) + 18px);
         width: 100%;
@@ -4980,6 +5059,10 @@ body.sb-shell-resizing * {
         padding: 9px 8px;
         border-radius: 14px;
         box-sizing: border-box;
+    }
+
+    #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar):has(.tags_inline .tag) {
+        min-height: calc(var(--sb-character-list-avatar-size) + 46px);
     }
 
     #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) > :is(.avatar, .missing-avatar) {
@@ -5016,7 +5099,44 @@ body.sb-shell-resizing * {
         grid-column: 1;
         grid-row: auto;
         max-width: 100%;
+        max-height: 42px;
         min-width: 0;
+        margin-top: 2px;
+        overflow: hidden;
+        opacity: 0.86;
+        flex-basis: auto;
+        align-items: center;
+    }
+
+    #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) .tags_inline .tag {
+        max-width: 100%;
+    }
+
+    #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) .tags_inline .tag_name {
+        max-width: min(58vw, 16rem);
+    }
+
+    #right-nav-panel.openDrawer .char-button-group-primary {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        width: 100%;
+        max-width: 150px;
+        gap: 4px;
+    }
+
+    #right-nav-panel.openDrawer .char-button-group-primary .menu_button[data-label] {
+        width: 100%;
+        min-width: 0;
+        min-inline-size: 0;
+        padding-inline: 6px !important;
+        gap: 4px;
+        font-size: calc(var(--mainFontSize) * 0.82);
+        overflow: visible;
+    }
+
+    #right-nav-panel.openDrawer .char-button-group-primary .menu_button[data-label]::after {
+        font-size: calc(var(--mainFontSize) * 0.62);
+        margin-left: 0;
     }
 
     #right-nav-panel.openDrawer #rm_print_characters_block .avatar:not(.avatar_collage) img {
