@@ -3210,7 +3210,7 @@ body.sb-shell-resizing * {
 
 .sb-chat-delete-row {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 10px;
     padding: 10px;
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 44%, transparent);
@@ -3220,7 +3220,7 @@ body.sb-shell-resizing * {
 
 .sb-chat-delete-row input[type='checkbox'] {
     flex: 0 0 auto;
-    margin: 2px 0 0;
+    margin: 0;
 }
 
 .sb-chat-delete-row-text {
@@ -4855,6 +4855,7 @@ body.sb-shell-resizing * {
         min-height: calc(var(--sb-character-list-avatar-size) + 18px);
         width: 100%;
         min-width: 0;
+        overflow: hidden;
         padding: 9px 8px;
         border-radius: 14px;
         box-sizing: border-box;
@@ -4885,6 +4886,14 @@ body.sb-shell-resizing * {
         align-items: center;
         gap: 2px;
         width: 100%;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) .tags_inline {
+        grid-column: 1;
+        grid-row: auto;
+        max-width: 100%;
         min-width: 0;
     }
 

@@ -14,10 +14,16 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Opening Customize no longer closes an already-open Workspace or Agents shell, and opening Workspace or Agents no longer closes Customize.
 - Moving UI now keeps control of the character drawer position and size instead of being overridden by SillyBunny desktop drawer sizing.
 - Disabled the SillyBunny character drawer resize handle while Moving UI is active so the upstream drag/resize controls remain the single source of truth.
+- Preserved Launchpad highlighting when the SillyBunny shell reinitializes so Moonlit Echoes and Guided Generations toast actions open the correct Launchpad cards.
+- Center-aligned checkbox controls and label text across desktop, mobile, OpenAI/API cards, settings cards, theme toggles, chat delete rows, and Pathfinder prompt settings.
 
 ### Pathfinder And Release Metadata
 - Suppressed expected `AbortError` stack traces when Pathfinder sidecar generation is cancelled by its retrieval timeout or a closed client connection.
+- Kept Pathfinder prompt action buttons from collapsing into icon-only controls by wrapping visible button labels in spans.
 - Updated app, Horde client, bundled extension, and package metadata to 1.5.3.
+
+### Character Drawer
+- Reset character drawer tag grid placement and containment so inline tags stay inside their own character rows without overlapping adjacent entries.
 
 ## v1.5.2
 

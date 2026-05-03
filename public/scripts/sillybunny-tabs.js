@@ -9437,7 +9437,7 @@ function initAll() {
     // Group Advanced Formatting sections into collapsible drawers
     groupAdvancedFormattingIntoDrawers();
 
-    window.SillyBunnyShell = {
+    window.SillyBunnyShell = Object.assign(window.SillyBunnyShell || {}, {
         openTab(shellKey, tabId) {
             if (SB_SHELLS[shellKey]) {
                 openShell(shellKey, tabId);
@@ -9501,7 +9501,7 @@ function initAll() {
         getCompactMode() {
             return sbState.compactMode;
         },
-    };
+    });
 }
 
 // Init shell UI as soon as DOM is ready.

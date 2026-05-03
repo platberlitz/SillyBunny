@@ -434,7 +434,7 @@ h3:not(.popup h3):not(#chat h3) {
     min-height: var(--sb-control-min-height);
     line-height: 1.45;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: var(--sb-row-gap);
     margin: 0;
     min-width: 0;
@@ -452,7 +452,6 @@ h3:not(.popup h3):not(#chat h3) {
 .checkbox_label > input[type="radio"] {
     flex: 0 0 auto;
     margin: 0;
-    margin-top: 0.18em;
     accent-color: var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor)));
 }
 
@@ -479,7 +478,7 @@ h3:not(.popup h3):not(#chat h3) {
 
 :root[data-sb-compact-mode='true'] .checkbox_label > input[type="checkbox"],
 :root[data-sb-compact-mode='true'] .checkbox_label > input[type="radio"] {
-    margin-top: 0.12em;
+    margin-top: 0;
 }
 
 @media screen and (min-width: 769px) and (max-width: 1280px) and (pointer: fine) {
@@ -2454,7 +2453,7 @@ input[type='range']::-moz-range-thumb {
 #range_block_openai .checkbox_label {
     width: 100%;
     flex-wrap: nowrap;
-    align-items: flex-start;
+    align-items: center;
     justify-content: flex-start;
     gap: 10px;
 }
@@ -2466,9 +2465,8 @@ input[type='range']::-moz-range-thumb {
 #range_block_openai .checkbox_label > input[type="checkbox"],
 #range_block_openai .checkbox_label > input[type="radio"] {
     flex: 0 0 auto;
-    align-self: flex-start;
+    align-self: center;
     margin: 0;
-    margin-top: 0.18em;
 }
 
 #openai_api .checkbox_label > span,
@@ -4140,7 +4138,7 @@ input[type='range']::-moz-range-thumb {
     border-radius: var(--sb-radius-md);
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 70%, transparent);
-    align-items: flex-start;
+    align-items: center;
 }
 
 #STscriptToggles .checkbox_label > span,
@@ -4455,7 +4453,7 @@ input[type='range']::-moz-range-thumb {
     border-radius: var(--sb-radius-md);
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 74%, transparent);
-    align-items: flex-start;
+    align-items: center;
     gap: 10px;
 }
 
