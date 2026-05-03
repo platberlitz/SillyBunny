@@ -8809,73 +8809,6 @@ if (typeof window !== 'undefined') {
     window.SillyBunnyClearFrontendCache = clearFrontendCache;
 }
 
-function getCookieClearDomains(hostname) {
-    if (!hostname || hostname === 'localhost' || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) {
-        return [''];
-    }
-
-    const parts = hostname.split('.').filter(Boolean);
-    const domains = [''];
-
-    for (let index = 0; index < parts.length - 1; index++) {
-        const domain = parts.slice(index).join('.');
-        domains.push(domain, `.${domain}`);
-    }
-
-    return [...new Set(domains)];
-}
-
-function getCookieClearPaths(pathname) {
-    const paths = new Set(['/']);
-    const segments = pathname.split('/').filter(Boolean);
-    let currentPath = '';
-
-    for (const segment of segments) {
-        currentPath += `/${segment}`;
-        paths.add(currentPath);
-        paths.add(`${currentPath}/`);
-    }
-
-    return [...paths];
-}
-
-// SillyBunny: iOS WebKit keeps cookies outside cache/storage APIs, so expire them explicitly.
-function clearAllCookies() {
-    if (typeof document === 'undefined' || !document.cookie) {
-        return 0;
-    }
-
-    const cookieNames = document.cookie
-        .split(';')
-        .map(cookie => cookie.trim().split('=')[0])
-        .filter(Boolean);
-    const domains = getCookieClearDomains(window.location.hostname);
-    const paths = getCookieClearPaths(window.location.pathname);
-    const expires = 'expires=Thu, 01 Jan 1970 00:00:00 GMT';
-
-    for (const cookieName of cookieNames) {
-        let encodedName = cookieName;
-        try {
-            encodedName = encodeURIComponent(decodeURIComponent(cookieName));
-        } catch {
-            encodedName = encodeURIComponent(cookieName);
-        }
-        for (const path of paths) {
-            document.cookie = `${encodedName}=; ${expires}; max-age=0; path=${path}; SameSite=Lax`;
-
-            for (const domain of domains) {
-                if (!domain) {
-                    continue;
-                }
-
-                document.cookie = `${encodedName}=; ${expires}; max-age=0; path=${path}; domain=${domain}; SameSite=Lax`;
-            }
-        }
-    }
-
-    return cookieNames.length;
-}
-
 async function clearAllCacheAndReload() {
     const didClear = await clearFrontendCache();
 
@@ -8884,33 +8817,6 @@ async function clearAllCacheAndReload() {
     }
 
     toastr.success(t`Cache cleared. Reloading SillyBunny...`, t`Cache cleared`);
-    window.setTimeout(() => window.location.reload(), 450);
-    return true;
-}
-
-async function clearCookiesAndCacheAndReload() {
-    const confirmation = await Popup.show.confirm(
-        t`Clear cookies & cache?`,
-        t`This removes SillyBunny cookies, browser cache, temporary session data, and IndexedDB cache stores, then reloads the page. Saved settings and account data stay intact, but you may need to sign in again if your setup uses browser cookies.`,
-        {
-            okButton: t`Clear cookies & cache`,
-            cancelButton: t`Cancel`,
-        },
-    );
-
-    if (confirmation !== POPUP_RESULT.AFFIRMATIVE) {
-        return false;
-    }
-
-    const clearedCookieCount = clearAllCookies();
-    const didClear = await clearFrontendCache({ skipConfirmation: true });
-
-    if (!didClear) {
-        return false;
-    }
-
-    toastr.success(t`Cookies and cache cleared. Reloading SillyBunny...`, t`Cookies cleared`);
-    console.info(`[Cache] Expired ${clearedCookieCount} browser cookies before reload`);
     window.setTimeout(() => window.location.reload(), 450);
     return true;
 }
@@ -8961,32 +8867,6 @@ async function handleClearAllCacheButtonClick(event) {
     } catch (error) {
         console.error('Failed to clear cache', error);
         toastr.error(t`Cache could not be cleared. Check the browser console for details.`, t`Cache clear failed`);
-        button.disabled = false;
-        button.classList.remove('disabled');
-        button.removeAttribute('aria-busy');
-    }
-}
-
-async function handleClearCookiesCacheButtonClick(event) {
-    const button = /** @type {HTMLButtonElement?} */ (event.currentTarget);
-    if (!button || button.disabled) {
-        return;
-    }
-
-    button.disabled = true;
-    button.classList.add('disabled');
-    button.setAttribute('aria-busy', 'true');
-
-    try {
-        const didStartReload = await clearCookiesAndCacheAndReload();
-        if (!didStartReload) {
-            button.disabled = false;
-            button.classList.remove('disabled');
-            button.removeAttribute('aria-busy');
-        }
-    } catch (error) {
-        console.error('Failed to clear cookies and cache', error);
-        toastr.error(t`Cookies and cache could not be cleared. Check the browser console for details.`, t`Clear failed`);
         button.disabled = false;
         button.classList.remove('disabled');
         button.removeAttribute('aria-busy');
@@ -14287,7 +14167,6 @@ jQuery(async function () {
 
     $('.drawer-toggle').on('click', doNavbarIconClick);
     $('#clear_all_cache_button').on('click', handleClearAllCacheButtonClick);
-    $('#clear_cookies_cache_button').on('click', handleClearCookiesCacheButtonClick);
     $('#auto_clear_cache_on_update').on('input', function () {
         power_user.auto_clear_cache_on_update = !!$(this).prop('checked');
         saveSettingsDebounced();

@@ -3170,51 +3170,6 @@ body.sb-shell-resizing * {
     box-shadow: 0 24px 70px color-mix(in srgb, var(--SmartThemeShadowColor) 34%, transparent);
 }
 
-@supports (-webkit-touch-callout: none) {
-    .sb-chat-delete-overlay {
-        padding-top: max(16px, env(safe-area-inset-top, 0px));
-        padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
-    }
-
-    .sb-chat-delete-dialog {
-        max-height: min(720px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px));
-    }
-}
-
-@media screen and (max-width: 480px) {
-    .sb-chat-delete-overlay {
-        padding-left: 12px;
-        padding-right: 12px;
-    }
-
-    .sb-chat-delete-dialog {
-        gap: 10px;
-        padding: 12px;
-    }
-
-    .sb-chat-delete-age,
-    .sb-chat-delete-presets,
-    .sb-chat-delete-actions {
-        width: 100%;
-    }
-
-    .sb-chat-delete-presets,
-    .sb-chat-delete-actions {
-        justify-content: stretch;
-    }
-
-    .sb-chat-delete-presets .menu_button,
-    .sb-chat-delete-actions .menu_button {
-        flex: 1 1 auto;
-    }
-}
-
-.char-button-group #world_button.world_set,
-.char-button-group .chat_lorebook_button.world_set {
-    color: var(--active) !important;
-    text-shadow: 0 0 8px var(--active), 0 0 14px color-mix(in srgb, var(--active) 50%, transparent);
-}
-
 .sb-chat-delete-dialog h3,
 .sb-chat-delete-note {
     margin: 0;
