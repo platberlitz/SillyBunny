@@ -791,6 +791,18 @@ function syncCharacterDrawerLockPosition() {
         return;
     }
 
+    if (isMovingUIActive()) {
+        if (panel.dataset.sbCharacterLockInline === 'right') {
+            for (const property of ['left', 'right', 'margin-left', 'margin-right']) {
+                panel.style.removeProperty(property);
+            }
+
+            delete panel.dataset.sbCharacterLockInline;
+        }
+
+        return;
+    }
+
     if (!sbState.characterDrawer.rightLocked || isMobileViewport()) {
         if (panel.dataset.sbCharacterLockInline === 'right') {
             for (const property of ['left', 'right', 'margin-left', 'margin-right']) {
@@ -1034,6 +1046,10 @@ function canResizeDesktopShells() {
     return !isMobileViewport() && !isTouchOnlyDesktopViewport();
 }
 
+function isMovingUIActive() {
+    return document.body?.classList.contains('movingUI') ?? false;
+}
+
 function isDesktopResizableShell(shellKey) {
     return shellKey === 'left' || shellKey === 'right' || shellKey === 'characters';
 }
@@ -1258,6 +1274,15 @@ function applyDesktopShellSize(root, size) {
     root.style.setProperty('max-width', `${size.width}px`, 'important');
     root.style.setProperty('height', `${size.height}px`, 'important');
     root.style.setProperty('max-height', `${size.height}px`, 'important');
+    root.dataset.sbShellInlineSize = 'true';
+}
+
+function clearDesktopShellSize(root) {
+    root.style.removeProperty('width');
+    root.style.removeProperty('max-width');
+    root.style.removeProperty('height');
+    root.style.removeProperty('max-height');
+    delete root.dataset.sbShellInlineSize;
 }
 
 function syncDesktopShellSizing() {
@@ -1277,10 +1302,16 @@ function syncDesktopShellSizing() {
         const bounds = getDesktopShellResizeBounds(shellKey);
 
         if (isMobileViewport()) {
-            root.style.removeProperty('width');
-            root.style.removeProperty('max-width');
-            root.style.removeProperty('height');
-            root.style.removeProperty('max-height');
+            clearDesktopShellSize(root);
+            root.classList.remove('sb-shell-can-resize');
+            continue;
+        }
+
+        if (shellKey === 'characters' && isMovingUIActive()) {
+            if (root.dataset.sbShellInlineSize === 'true') {
+                clearDesktopShellSize(root);
+            }
+
             root.classList.remove('sb-shell-can-resize');
             continue;
         }
@@ -1342,6 +1373,10 @@ function bindShellResizeHandle(handle, shellKey) {
 
 function beginShellResize(shellKey, event) {
     if (!canResizeDesktopShells() || !isDesktopResizableShell(shellKey) || !isPrimaryShellResizeStart(event)) {
+        return;
+    }
+
+    if (shellKey === 'characters' && isMovingUIActive()) {
         return;
     }
 
@@ -4125,6 +4160,15 @@ function closeAllDropdowns({ except = '' } = {}) {
     document.getElementById('sb-persona-picker')?.remove();
 }
 
+function closeNonShellDropdowns({ except = '' } = {}) {
+    if (except !== 'characters') closeCharacterPanel();
+    if (except !== 'search') setUniversalSearchOpenState(false);
+    closeMobileNav();
+    closeMobileChatTools();
+    setConnectionStripOpenState(false);
+    document.getElementById('sb-persona-picker')?.remove();
+}
+
 function toggleShellPanel(shellKey, tabId = null) {
     if (!ensureShellReady(shellKey)) {
         return;
@@ -4139,7 +4183,7 @@ function toggleShellPanel(shellKey, tabId = null) {
         return;
     }
 
-    closeAllDropdowns({ except: shellKey });
+    closeNonShellDropdowns();
     window.requestAnimationFrame(() => openShell(shellKey, tabId));
 }
 
@@ -7868,9 +7912,6 @@ function openShell(shellKey, tabId = null) {
     }
 
     if (!shellRoot.classList.contains('openDrawer')) {
-        triggerDrawerToggle(shellConfig.hostToggleSelector);
-        // Open managed shells immediately so cross-shell switches do not flash
-        // through a fully closed state before the legacy drawer handler settles.
         forceDrawerState(shellRoot, true, shellConfig.hostIconSelector);
         window.requestAnimationFrame(() => {
             if (!isDrawerActuallyOpen(shellRoot)) {
@@ -8477,6 +8518,8 @@ function closeMobileNav() {
 }
 
 function injectCharacterDrawerControls() {
+    document.getElementById('right-nav-panel')?.classList.add('sb-character-drawer-root');
+
     const target = document.getElementById('CharListButtonAndHotSwaps');
     if (!(target instanceof HTMLElement)) {
         return;

@@ -2912,6 +2912,16 @@ router.post('/generate', async function (request, response) {
             }
         }
     } catch (error) {
+        if (isExpectedStreamAbort(error) || request.socket.destroyed) {
+            if (!response.headersSent && !response.writableEnded) {
+                response.status(499).end();
+            } else if (!response.writableEnded) {
+                response.end();
+            }
+
+            return;
+        }
+
         console.error('Generation failed', error);
         const message = error.code === 'ECONNREFUSED'
             ? `Connection refused: ${error.message}`

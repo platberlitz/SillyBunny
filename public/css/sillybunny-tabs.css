@@ -1287,6 +1287,15 @@ body:not(.movingUI) .drawer-content.maximized {
     transform-origin: center;
 }
 
+body.movingUI #right-nav-panel.openDrawer {
+    max-width: none !important;
+    max-height: none !important;
+}
+
+body.movingUI #right-nav-panel.openDrawer > .sb-shell-resize-handle {
+    display: none !important;
+}
+
 :root[data-sb-character-drawer-lock="right"] #right-nav-panel.openDrawer {
     left: auto !important;
     right: 0 !important;
@@ -3713,7 +3722,7 @@ body.sb-shell-resizing * {
     #user-settings-block.openDrawer,
     .sb-shell-root.fillLeft.openDrawer,
     .sb-shell-root.fillRight.openDrawer,
-    #right-nav-panel.openDrawer {
+    #right-nav-panel.sb-character-drawer-root.openDrawer {
         width: min(620px, calc(100vw - 28px)) !important;
         max-width: calc(100vw - 28px) !important;
         min-width: 0 !important;
@@ -3772,7 +3781,7 @@ body.sb-shell-resizing * {
     #user-settings-block.openDrawer,
     .sb-shell-root.fillLeft.openDrawer,
     .sb-shell-root.fillRight.openDrawer,
-    #right-nav-panel.openDrawer {
+    #right-nav-panel.sb-character-drawer-root.openDrawer {
         width: min(100vw, clamp(920px, 78vw, 1680px)) !important;
         max-width: min(100vw, calc(100vw - clamp(28px, 8vw, 160px))) !important;
         min-width: 0 !important;

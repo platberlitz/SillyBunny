@@ -54,6 +54,7 @@ These screenshots show the graphical shell UI across Workspace, Customize, Agent
 * [Project Goals](#project-goals-aka-why-we-made-this-fork)
 * [Changes Compared to SillyTavern](#changes-vs-sillytavern)
 * [Latest Update](#latest-update)
+    * [v1.5.3 (2026-05-03)](#v153-2026-05-03)
     * [v1.5.2 (2026-04-30)](#v152-2026-04-30)
     * [v1.5.1 (2026-04-29)](#v151-2026-04-29)
 * [Upstream Information](#upstream-information)
@@ -216,6 +217,23 @@ SillyBunny includes some extras by default to help you get started right away:
 ---
 
 ## Latest Update
+
+### v1.5.3 (2026-05-03)
+
+This update adds the Black Orange theme and desktop character drawer tiles, improves managed shell coexistence, restores Moving UI control over the character drawer size, and quiets expected Pathfinder sidecar aborts.
+
+**Themes And Character Drawer**
+* Added the Black Orange theme.
+* Added desktop character drawer tile styling for the SillyBunny tabs layout.
+
+**Shell And Moving UI**
+* Opening Customize no longer closes an already-open Workspace or Agents shell, and opening Workspace or Agents no longer closes Customize.
+* Moving UI now keeps control of the character drawer position and size instead of being overridden by SillyBunny desktop drawer sizing.
+* Disabled the SillyBunny character drawer resize handle while Moving UI is active so the upstream drag/resize controls remain the single source of truth.
+
+**Pathfinder And Release Metadata**
+* Suppressed expected `AbortError` stack traces when Pathfinder sidecar generation is cancelled by its retrieval timeout or a closed client connection.
+* Updated app, Horde client, bundled extension, and package metadata to 1.5.3.
 
 ### v1.5.2 (2026-04-30)
 

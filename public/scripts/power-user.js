@@ -1947,6 +1947,39 @@ function loadCharListState() {
     document.body.classList.toggle('charListGrid', power_user.charListGrid);
 }
 
+const movingUIPixelStyles = new Set(['width', 'height', 'top', 'right', 'bottom', 'left']);
+
+function normalizeMovingUIStateStyle(property, value) {
+    if (value === null || value === undefined || value === '') {
+        return '';
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value) && movingUIPixelStyles.has(property)) {
+        return `${value}px`;
+    }
+
+    if (typeof value === 'string' && movingUIPixelStyles.has(property) && /^-?\d+(?:\.\d+)?$/.test(value.trim())) {
+        return `${value.trim()}px`;
+    }
+
+    return String(value);
+}
+
+function applyMovingUIStateStyle(element, property, value) {
+    const normalizedValue = normalizeMovingUIStateStyle(property, value);
+    if (!normalizedValue) {
+        return;
+    }
+
+    element.style.setProperty(property, normalizedValue, 'important');
+}
+
+function applyMovingUIStateStyles(element, state) {
+    for (const [property, value] of Object.entries(state)) {
+        applyMovingUIStateStyle(element, property, value);
+    }
+}
+
 export function loadMovingUIState() {
     if (!isMobile()
         && power_user.movingUIState
@@ -1961,7 +1994,7 @@ export function loadMovingUIState() {
                     var elmnt = $('#' + $.escapeSelector(targetName));
                     if (elmnt.length) {
                         console.debug(`loading state for ${targetName} from ${elmntName}`);
-                        elmnt.css(elmntState);
+                        applyMovingUIStateStyles(elmnt[0], elmntState);
                         applied = true;
                     }
                 }
@@ -3271,9 +3304,10 @@ jQuery(async () => {
                         }
 
                         console.log(`scaling ${targetName} by ${scaleX}x${scaleY} to ${newWidth}x${newHeight}`);
-                        elmnt.css('height', newHeight);
-                        elmnt.css('width', newWidth);
-                        elmnt.css('inset', `${newTop}px ${newRight}px ${newBottom}px ${newLeft}px`);
+                        const element = elmnt[0];
+                        applyMovingUIStateStyle(element, 'height', newHeight);
+                        applyMovingUIStateStyle(element, 'width', newWidth);
+                        applyMovingUIStateStyle(element, 'inset', `${newTop}px ${newRight}px ${newBottom}px ${newLeft}px`);
                         applied = true;
                     }
 
