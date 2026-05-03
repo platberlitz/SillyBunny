@@ -192,6 +192,111 @@ if (cliArgs.listen) {
 
 app.use(setUserDataMiddleware);
 
+function parseCookieHeaderNames(cookieHeader) {
+    return String(cookieHeader || '')
+        .split(';')
+        .map(cookie => cookie.trim().split('=')[0]?.trim())
+        .filter(Boolean);
+}
+
+function getServerCookieClearDomains(hostname) {
+    const cleanHostname = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
+
+    if (!cleanHostname || cleanHostname === 'localhost' || cleanHostname.includes(':') || /^[\d.]+$/.test(cleanHostname)) {
+        return [''];
+    }
+
+    const parts = cleanHostname.split('.').filter(Boolean);
+    if (parts.length < 2) {
+        return [''];
+    }
+
+    const domains = new Set(['']);
+    for (let index = 0; index < parts.length - 1; index++) {
+        const domain = parts.slice(index).join('.');
+        domains.add(domain);
+        domains.add(`.${domain}`);
+    }
+
+    return [...domains];
+}
+
+function getServerCookieClearPaths(pathname) {
+    const paths = new Set(['/']);
+    const segments = String(pathname || '/').split('/').filter(Boolean);
+    let currentPath = '';
+
+    for (const segment of segments) {
+        currentPath += `/${segment}`;
+        paths.add(currentPath);
+        paths.add(`${currentPath}/`);
+    }
+
+    return [...paths];
+}
+
+function isSecureCookieRequest(request) {
+    const forwardedProto = request.get('x-forwarded-proto')?.split(',')[0]?.trim();
+    return Boolean(request.secure || request.protocol === 'https' || forwardedProto === 'https');
+}
+
+// SillyBunny: Clear cookies & cache must also expire HttpOnly cookie-session data.
+app.post('/api/cookies/clear', express.json(), (request, response) => {
+    const sessionName = getCookieSessionName();
+    const cookieNames = new Set([
+        ...parseCookieHeaderNames(request.headers.cookie),
+        sessionName,
+        `${sessionName}.sig`,
+        'session',
+        'session.sig',
+    ]);
+    const domains = getServerCookieClearDomains(request.hostname);
+    const paths = getServerCookieClearPaths(request.path);
+    const secure = isSecureCookieRequest(request);
+    let expirationAttempts = 0;
+
+    if (request.session) {
+        request.sessionOptions.overwrite = false;
+        request.session.handle = null;
+        request.session.csrfToken = null;
+        request.session = null;
+    }
+
+    for (const name of cookieNames) {
+        for (const path of paths) {
+            for (const domain of domains) {
+                const options = {
+                    path,
+                    sameSite: 'lax',
+                    httpOnly: true,
+                    expires: new Date(0),
+                };
+
+                if (secure) {
+                    options.secure = true;
+                }
+
+                if (domain) {
+                    options.domain = domain;
+                }
+
+                try {
+                    response.cookie(name, '', options);
+                    expirationAttempts++;
+                } catch (error) {
+                    console.warn(`Failed to queue cookie expiration for ${name}`, error);
+                }
+            }
+        }
+    }
+
+    return response.json({
+        success: true,
+        clearedCookieNames: cookieNames.size,
+        expirationAttempts,
+    });
+});
+
 // CSRF Protection //
 function applyCsrfTokenHeaders(res) {
     res.set({

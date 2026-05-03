@@ -1928,6 +1928,24 @@ async function confirmClearCookiesAndCache() {
     return result === true || result === 1;
 }
 
+async function clearServerCookies() {
+    const response = await fetch('/api/cookies/clear', {
+        method: 'POST',
+        headers: getRequestHeadersFromContext(),
+        cache: 'no-store',
+    });
+
+    if (!response.ok) {
+        throw new Error(`Server cookie clear failed: ${response.status} ${response.statusText}`);
+    }
+
+    try {
+        return await response.json();
+    } catch {
+        return { success: true };
+    }
+}
+
 async function handleClearCookiesAndCacheClick(event) {
     event?.preventDefault();
 
@@ -1962,9 +1980,10 @@ async function handleClearCookiesAndCacheClick(event) {
             return;
         }
 
+        const serverCookieResult = await clearServerCookies();
         const clearedCookieCount = clearAllBrowserCookies();
         globalThis.toastr?.success?.('Cookies and cache cleared. Reloading SillyBunny...', 'Cookies cleared');
-        console.info(`[Cache] Expired ${clearedCookieCount} browser cookies before reload`);
+        console.info(`[Cache] Expired ${clearedCookieCount} browser cookies and queued ${serverCookieResult?.expirationAttempts ?? 0} server cookie expirations before reload`);
         window.setTimeout(() => window.location.reload(), 450);
     } catch (error) {
         console.error('Failed to clear cookies and cache', error);

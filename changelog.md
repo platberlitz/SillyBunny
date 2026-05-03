@@ -19,6 +19,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Kept the persona chat mass-delete dialog inside iOS safe areas and tightened its narrow-screen controls so the age input and presets remain reachable on mobile Safari.
 - Bound the mobile chat mass-delete dialog to iOS WebKit's visual viewport, kept the overlay above app chrome during browser toolbar shifts, constrained scrolling to the dialog list, avoided mobile autofocus jumps, aligned checkbox rows, and rotated the SillyBunny shell cache keys so corrected styles load immediately.
 - Made active character and chat lorebook toolbar icons glow with the active accent color so linked lorebooks are easier to spot in the character editor.
+- Made Clear cookies & cache expire server-side HttpOnly session cookies as well as browser-visible cookies before reloading.
 
 ### Settings Panels And Preset Prompts
 - Settings panels (Customize, Presets, Workspace, etc.) now narrow alongside the chat when the chat width is reduced, matching standard SillyTavern behaviour.
