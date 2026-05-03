@@ -475,6 +475,7 @@ const MOBILE_MESSAGE_UPDATE_DELAY_MS = 24;
 const MOBILE_MEDIA_SCROLL_MAX_DELAY_MS = 300;
 const MOBILE_SEND_SCROLL_IMMUNITY_MS = 1500;
 const MOBILE_SEND_SCROLL_SETTLE_MS = 200;
+const MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS = 400;
 const IOS_CHAT_MANUAL_SCROLL_SUPPRESS_MS = 1400;
 const IOS_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
 const IOS_CHAT_BOTTOM_PIN_MS = 1500;
@@ -1777,8 +1778,20 @@ export async function printMessages() {
 
     // Wait for next frame to ensure batch rendering completes
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    scrollChatToBottom({ waitForFrame: true });
-    delay(debounce_timeout.short).then(() => scrollOnMediaLoad());
+    scrollLoadedChatToBottom();
+    delay(debounce_timeout.short).then(() => scrollOnMediaLoad({ force: true }));
+}
+
+function scrollLoadedChatToBottom() {
+    // SillyBunny: previous-chat taps can leave the iOS manual-scroll guard active.
+    scrollChatToBottom({ force: true });
+    scrollChatToBottom({ waitForFrame: true, force: true });
+
+    if (shouldGuardIOSChatScroll()) {
+        setTimeout(() => {
+            scrollChatToBottom({ waitForFrame: true, force: true });
+        }, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS);
+    }
 }
 
 /**
@@ -1835,7 +1848,7 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
     console.info(`Rendered ${targetChat.length - startIndex} messages in ${((performance.now() - t1) / 1000).toFixed(3)} seconds.`);
 }
 
-export function scrollOnMediaLoad() {
+export function scrollOnMediaLoad({ force = false } = {}) {
     const started = Date.now();
     const media = chatElement.find('.last_mes .mes_block img, .last_mes .mes_block video, .last_mes .mes_block audio').toArray()
         .filter(element => element instanceof HTMLElement && (isElementInViewport(element) || isElementInViewport(element.closest('.last_mes'))));
@@ -1870,7 +1883,7 @@ export function scrollOnMediaLoad() {
         }
         mediaLoaded++;
         if (mediaLoaded === media.length) {
-            scrollChatToBottom({ waitForFrame: true });
+            scrollChatToBottom({ waitForFrame: true, force });
         }
     }
 }
@@ -3243,15 +3256,16 @@ let requestId = null;
  * Scrolls the chat to the bottom if configured to do so.
  * @param {object} [options] Options
  * @param {boolean} [options.waitForFrame] If true, waits for the animation frame before scrolling
+ * @param {boolean} [options.force=false] If true, bypasses temporary iOS manual-scroll suppression
  */
-export function scrollChatToBottom({ waitForFrame } = {}) {
+export function scrollChatToBottom({ waitForFrame, force = false } = {}) {
     if (!power_user.auto_scroll_chat_to_bottom) {
         return;
     }
 
     const doScroll = () => {
         // SillyBunny: iOS WebKit can fight streaming autoscroll during touch and momentum scrolling.
-        if (shouldSuppressIOSChatAutoScroll()) {
+        if (!force && shouldSuppressIOSChatAutoScroll()) {
             requestId = null;
             return;
         }
