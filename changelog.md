@@ -16,6 +16,11 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Disabled the SillyBunny character drawer resize handle while Moving UI is active so the upstream drag/resize controls remain the single source of truth.
 - Preserved Launchpad highlighting when the SillyBunny shell reinitializes so Moonlit Echoes and Guided Generations toast actions open the correct Launchpad cards.
 - Center-aligned checkbox controls and label text across desktop, mobile, OpenAI/API cards, settings cards, theme toggles, chat delete rows, and Pathfinder prompt settings.
+- Kept the persona chat mass-delete dialog inside iOS safe areas and tightened its narrow-screen controls so the age input and presets remain reachable on mobile Safari.
+- Made active character and chat lorebook toolbar icons glow with the active accent color so linked lorebooks are easier to spot in the character editor.
+
+### Settings And Browser Storage
+- Added a dedicated Clear cookies & cache utility action that expires browser cookies before clearing cache storage, IndexedDB cache stores, and temporary session data.
 
 ### Pathfinder And Release Metadata
 - Suppressed expected `AbortError` stack traces when Pathfinder sidecar generation is cancelled by its retrieval timeout or a closed client connection.
