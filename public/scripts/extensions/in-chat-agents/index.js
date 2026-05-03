@@ -2,7 +2,7 @@ import { DiffMatchPatch } from '../../../lib.js';
 import { extension_settings, renderExtensionTemplateAsync, getContext } from '../../extensions.js';
 import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../popup.js';
 import { download, escapeHtml, escapeRegex, getSortableDelay, uuidv4 } from '../../utils.js';
-import { CLIENT_VERSION, chat, getRequestHeaders, generateQuietPrompt, normalizeContentText, saveSettingsDebounced } from '../../../script.js';
+import { CLIENT_VERSION, chat, getRequestHeaders, generateQuietPrompt, normalizeContentText, saveSettingsDebounced, substituteParams } from '../../../script.js';
 import { eventSource, event_types } from '../../events.js';
 import {
     areAgentsGloballyEnabled,
@@ -39,6 +39,7 @@ import {
 } from './agent-store.js';
 import {
     cancelAgentGeneration,
+    buildPromptDynamicMacros,
     initAgentRunner,
     isAgentGenerationActive,
     onAgentGenerationStateChanged,
@@ -360,8 +361,41 @@ function hasPromptTransform(agent) {
     );
 }
 
+function canPreviewPreGenerationPrompt(agent) {
+    return Boolean(
+        !isPathfinderAgent(agent) &&
+        ['pre', 'both'].includes(String(agent?.phase ?? '')) &&
+        String(agent?.prompt ?? '').trim(),
+    );
+}
+
 function getPromptTransformLabel(agent) {
     return getPromptTransformMode(agent) === 'append' ? 'prompt append' : 'prompt rewrite';
+}
+
+async function previewPreGenerationPrompt(agent, promptOverride = null) {
+    const prompt = String(promptOverride ?? agent?.prompt ?? '');
+    if (!prompt.trim()) {
+        toastr.warning('Enter a prompt before previewing it.');
+        return;
+    }
+
+    const previewText = substituteParams(prompt, {
+        dynamicMacros: buildPromptDynamicMacros('', null, agent, 'normal'),
+    });
+    const previewHtml = $(
+        `<div class="ica--prompt-preview">
+            <div class="ica--regex-note">Preview uses the current chat context with no generated assistant message yet. Random macros are evaluated now and may differ when the agent runs.</div>
+            <pre>${escapeHtml(previewText || '(empty after macro substitution)')}</pre>
+        </div>`,
+    );
+
+    await new Popup(previewHtml, POPUP_TYPE.TEXT, '', {
+        wide: true,
+        large: true,
+        allowVerticalScrolling: true,
+        leftAlign: true,
+    }).show();
 }
 
 function buildAgentFromTemplate(template) {
@@ -1281,6 +1315,9 @@ function renderAgentList() {
             const regexCount = getAgentRegexScripts(agent).length;
             const promptTransformEnabled = hasPromptTransform(agent);
             const promptTransformLabel = getPromptTransformLabel(agent);
+            const previewPromptButton = canPreviewPreGenerationPrompt(agent)
+                ? '<button type="button" class="ica--card-btn ica--btn-preview-prompt" title="Preview this pre-generation prompt after macro substitution"><i class="fa-solid fa-eye"></i> Preview Prompt</button>'
+                : '';
             const connectionProfileLabel = agent.connectionProfile
                 ? profileNames.get(agent.connectionProfile) || `Missing profile (${agent.connectionProfile})`
                 : '';
@@ -1313,6 +1350,7 @@ function renderAgentList() {
                         ${modelOverrideLabel ? `<span class="ica--card-pill"><i class="fa-solid fa-microchip fa-xs"></i> ${escapeHtml(modelOverrideLabel)}</span>` : ''}
                     </div>
                     <div class="ica--card-actions">
+                        ${previewPromptButton}
                         ${isPathfinderAgent(agent) ? '' : '<button type="button" class="ica--card-btn ica--btn-run" title="Manually apply this agent to the last assistant reply"><i class="fa-solid fa-robot"></i> Apply to Last Reply</button>'}
                         <button type="button" class="ica--card-btn ica--btn-edit"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
                         ${isPathfinderAgent(agent) ? '' : '<button type="button" class="ica--card-btn ica--btn-export"><i class="fa-solid fa-download"></i> Export</button>'}
@@ -1375,6 +1413,11 @@ function renderAgentList() {
                     return;
                 }
                 await runAgentOnMessage(agent.id, lastCharMessageIndex);
+            });
+
+            card.find('.ica--btn-preview-prompt').on('click', async event => {
+                stopEvent(event);
+                await previewPreGenerationPrompt(agent);
             });
 
             card.find('.ica--btn-export').on('click', event => {
@@ -1799,6 +1842,15 @@ async function openEditor(agentId = null) {
         if (refined) {
             editorEl.find('#ica--editor-prompt').val(refined);
         }
+    });
+
+    editorEl.find('#ica--editor-preview-prompt').on('click', async () => {
+        const previewAgent = {
+            ...agent,
+            name: editorEl.find('#ica--editor-name').val()?.toString().trim() || agent.name,
+            phase: editorEl.find('#ica--editor-phase').val()?.toString() || agent.phase,
+        };
+        await previewPreGenerationPrompt(previewAgent, editorEl.find('#ica--editor-prompt').val()?.toString() || '');
     });
 
     // Show popup

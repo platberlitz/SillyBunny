@@ -25,6 +25,14 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 ### Character Drawer
 - Reset character drawer tag grid placement and containment so inline tags stay inside their own character rows without overlapping adjacent entries.
 
+### In-Chat Agents
+- Prevented swipe navigation from re-running already-applied post-generation agents while preserving real new-swipe generation processing.
+- Made Cancel Agent requests persist through in-flight manual runs, added a Cancel Agent action directly to running prompt-pass toasts, and prevented cancelled manual outputs from applying after they return.
+- Added pre-generation prompt preview actions in the agent editor and eligible agent cards so macro-expanded prompts can be checked before sending.
+- Let manual agent runs start independently in Parallel mode instead of queuing them behind other manual runs.
+- Restored agent transform badges and undo/redo access after chat refreshes when the active swipe still has saved transform history.
+- Deferred post-processing for new assistant messages while an agent is already working so users can keep sending or swiping without the older agent touching the newer message.
+
 ## v1.5.2
 
 Date: 2026-04-30

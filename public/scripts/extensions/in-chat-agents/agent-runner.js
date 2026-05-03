@@ -84,6 +84,8 @@ const manualAgentRunQueue = [];
 let manualAgentRunQueueProcessing = false;
 let manualAgentRunCancelRequested = false;
 let activeManualAgentRun = null;
+let parallelManualRunCount = 0;
+let agentGenerationCancelRevision = 0;
 const promptTransformIdleResolvers = new Set();
 let generationStartChatLength = 0;
 let generationStartLastAssistantIndex = -1;
@@ -93,6 +95,7 @@ let generationStartedAt = 0;
 let lastMainGenerationEndedAt = 0;
 let currentMainGenerationType = 'normal';
 let postProcessingGenerationRunId = 0;
+let swipeNavigationPending = false;
 
 /** Track which tool names were registered by the agent system so we can cleanly unregister only our own. */
 const agentRegisteredToolNames = new Set();
@@ -107,8 +110,17 @@ let toolRecursionDepth = 0;
 const processedPostProcessingRuns = new WeakMap();
 const processedPostProcessingRunsByIndex = new Map();
 
+function escapeToastHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 export function isAgentGenerationActive() {
-    return internalPromptTransformDepth > 0 || manualAgentRunQueueProcessing || manualAgentRunQueue.length > 0;
+    return internalPromptTransformDepth > 0 || manualAgentRunQueueProcessing || manualAgentRunQueue.length > 0 || parallelManualRunCount > 0;
 }
 
 export function onAgentGenerationStateChanged(listener) {
@@ -143,6 +155,8 @@ function notifyPromptTransformIdle() {
     for (const resolve of resolvers) {
         resolve();
     }
+
+    scheduleDeferredPostProcessingFlush(0);
 }
 
 function waitForPromptTransformIdle() {
@@ -166,7 +180,8 @@ function clearManualAgentRunQueue() {
 export function cancelAgentGeneration() {
     const wasActive = isAgentGenerationActive();
     const queuedCount = clearManualAgentRunQueue();
-    manualAgentRunCancelRequested = wasActive;
+    manualAgentRunCancelRequested = true;
+    agentGenerationCancelRevision++;
 
     if (internalPromptTransformDepth > 0) {
         generationStopRequested = true;
@@ -218,7 +233,7 @@ async function processManualAgentRunQueue() {
             notifyAgentGenerationStateChanged();
 
             try {
-                const result = await executeManualAgentRun(queuedRun.agentId, queuedRun.messageIndex);
+                const result = await executeManualAgentRun(queuedRun.agentId, queuedRun.messageIndex, queuedRun.cancelRevision);
                 queuedRun.resolve(result);
             } catch (error) {
                 queuedRun.reject(error);
@@ -238,11 +253,37 @@ async function processManualAgentRunQueue() {
 
 function enqueueManualAgentRun(agentId, messageIndex) {
     const wasAlreadyActive = isAgentGenerationActive();
+    manualAgentRunCancelRequested = false;
+    if (!isGenerationInProgress) {
+        generationStopRequested = false;
+    }
+
+    const executionMode = getGlobalSettings().appendAgentsExecutionMode === 'sequential' ? 'sequential' : 'parallel';
+    const cancelRevision = agentGenerationCancelRevision;
+
+    if (executionMode === 'parallel') {
+        if (wasAlreadyActive) {
+            toastr.info('Running agent in parallel.');
+        }
+
+        parallelManualRunCount++;
+        notifyAgentGenerationStateChanged();
+
+        return (async () => {
+            try {
+                return await executeManualAgentRun(agentId, messageIndex, cancelRevision);
+            } finally {
+                parallelManualRunCount = Math.max(0, parallelManualRunCount - 1);
+                notifyAgentGenerationStateChanged();
+            }
+        })();
+    }
 
     return new Promise((resolve, reject) => {
         manualAgentRunQueue.push({
             agentId,
             messageIndex,
+            cancelRevision,
             resolve,
             reject,
         });
@@ -1206,7 +1247,7 @@ function getActiveAgentsForMessage(generationType, activationSnapshot = null) {
     return getSnapshotAgents(snapshot);
 }
 
-function buildPromptDynamicMacros(messageText = '', message = null, agent = null, generationType = 'normal') {
+export function buildPromptDynamicMacros(messageText = '', message = null, agent = null, generationType = 'normal') {
     const normalizedGenerationType = normalizeGenerationType(generationType);
     const assistantName = String(message?.name ?? '').trim();
     const agentName = String(agent?.name ?? '').trim();
@@ -1364,13 +1405,30 @@ function showPromptTransformRunningToast(agent, mode, profileId = '') {
     const agentName = agent?.name || 'In-Chat Agent';
     const modeLabel = describePromptTransformMode(mode);
     const targetLabel = describePromptTransformTarget(profileId, profileId ? 'profile' : 'main');
+    const cancelButtonClass = 'ica--toast-cancel-agent';
+    const messageHtml = `
+        <div>${escapeToastHtml(`Running ${modeLabel} via ${targetLabel}...`)}</div>
+        <button type="button" class="menu_button menu_button_icon caution ${cancelButtonClass}">
+            <i class="fa-solid fa-stop"></i>
+            <span>Cancel Agent</span>
+        </button>
+    `;
 
-    const toast = toastr.info(`Running ${modeLabel} via ${targetLabel}...`, agentName, {
+    const toast = toastr.info(messageHtml, agentName, {
         timeOut: 0,
         extendedTimeOut: 0,
-        tapToDismiss: true,
+        tapToDismiss: false,
         closeButton: true,
-        escapeHtml: true,
+        escapeHtml: false,
+        onShown() {
+            const toastElement = this instanceof HTMLElement ? this : this?.[0];
+            const cancelButton = toastElement?.querySelector?.(`.${cancelButtonClass}`);
+            cancelButton?.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                cancelAgentGeneration();
+            });
+        },
     });
 
     if (toast) {
@@ -1399,7 +1457,8 @@ function clearAllPromptTransformRunningToasts() {
     $('.toast').filter((_, element) => {
         const title = $(element).find('.toast-title').text().trim();
         const message = $(element).find('.toast-message').text().trim();
-        return title === 'In-Chat Agent' && /^Running prompt (rewrite|append) via /u.test(message);
+        return $(element).find('.ica--toast-cancel-agent').length > 0 ||
+            (title === 'In-Chat Agent' && /^Running prompt (rewrite|append) via /u.test(message));
     }).each((_, element) => toastr.clear($(element)));
 }
 
@@ -1526,6 +1585,21 @@ function updatePromptTransformHistory(message, run) {
 
     setAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY, scopedHistory);
     return true;
+}
+
+function shouldRefreshTransformHistoryUi(messageIndex, message) {
+    const numericMessageIndex = Number(messageIndex);
+    if (!Number.isInteger(numericMessageIndex) || !message || message.is_user || message.is_system) {
+        return false;
+    }
+
+    const history = getPromptTransformHistoryForText(getAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY), message.mes);
+    if (history.length === 0) {
+        return false;
+    }
+
+    const messageElement = document.querySelector(`.mes[mesid="${numericMessageIndex}"]`);
+    return Boolean(messageElement && !messageElement.querySelector('.agent-transform-badge'));
 }
 
 function getPromptTransformHistoryForText(history, currentText) {
@@ -1878,6 +1952,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
         normalizedGenerationType,
         promptTransformMode,
     );
+    const cancelRevision = agentGenerationCancelRevision;
     const runningToast = showNotifications
         ? showPromptTransformRunningToast(agent, promptTransformMode, profileId)
         : null;
@@ -1913,6 +1988,22 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
         const nextMessageText = promptTransformMode === 'append'
             ? appendPromptTransformOutput(currentMessageText, promptOutputText)
             : promptOutputText;
+        if (agentGenerationCancelRevision !== cancelRevision) {
+            return {
+                agentId: agent.id,
+                agentName: agent.name,
+                changed: false,
+                status: 'cancelled',
+                mode: promptTransformMode,
+                profileId: response.profileId,
+                runner: response.runner,
+                timestamp: new Date().toISOString(),
+                outputText: '',
+                nextMessageText: currentMessageText,
+                beforeText: currentMessageText,
+            };
+        }
+
         const changed = nextMessageText !== currentMessageText;
         if (changed && applyToMessage) {
             message.mes = nextMessageText;
@@ -2131,6 +2222,8 @@ function injectPreGenerationAgentPrompts(activeAgents, generationType) {
  * Cleans up all in-chat agent extension prompts before a new generation.
  */
 function onGenerationStarted(generationType, _options, dryRun) {
+    swipeNavigationPending = false;
+
     if (dryRun || internalPromptTransformDepth > 0) {
         return;
     }
@@ -2440,11 +2533,16 @@ async function processReceivedMessage(messageIndex, generationType, activationSn
 }
 
 async function onMessageReceived(messageIndex, generationType) {
-    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
+    if (!areAgentsGloballyEnabled()) {
         return;
     }
 
     if (!isAssistantPostProcessingGenerationType(generationType)) {
+        return;
+    }
+
+    if (internalPromptTransformDepth > 0) {
+        deferPostProcessing(Number(messageIndex), generationType, buildActivationSnapshot(generationType));
         return;
     }
 
@@ -2504,6 +2602,21 @@ function onStreamTokenReceived() {
 }
 
 async function onCharacterMessageRendered(messageIndex, generationType) {
+    const numericMessageIndex = Number(messageIndex);
+    const message = chat[numericMessageIndex];
+
+    if (swipeNavigationPending) {
+        swipeNavigationPending = false;
+        if (shouldRefreshTransformHistoryUi(numericMessageIndex, message)) {
+            scheduleMessageRefresh(numericMessageIndex, message);
+        }
+        return;
+    }
+
+    if (shouldRefreshTransformHistoryUi(numericMessageIndex, message)) {
+        scheduleMessageRefresh(numericMessageIndex, message);
+    }
+
     await onMessageReceived(messageIndex, generationType);
 }
 
@@ -2633,14 +2746,11 @@ async function onImpersonateReady(text = '') {
 }
 
 async function onMessageSwiped(data) {
-    if (internalPromptTransformDepth > 0) {
-        return;
-    }
-
     // `MESSAGE_SWIPED` fires during swipe navigation before any overswipe generation starts.
     // Re-running prompt-transform / append agents here mutates the current swipe again,
     // which makes agents like Prose Polisher fire just from browsing swipes.
     // Real swipe generations are handled later by `MESSAGE_RECEIVED`.
+    swipeNavigationPending = true;
     void data;
 }
 
@@ -2863,7 +2973,7 @@ export function initAgentRunner() {
     }
 }
 
-async function executeManualAgentRun(agentId, messageIndex) {
+async function executeManualAgentRun(agentId, messageIndex, cancelRevision = agentGenerationCancelRevision) {
     await commitOpenEditorForMessage(messageIndex);
 
     const agent = getAgentById(agentId);
@@ -2878,7 +2988,17 @@ async function executeManualAgentRun(agentId, messageIndex) {
     }
 
     const generationType = 'normal';
-    const result = await runPromptTransformAgent(agent, message, generationType, null, messageIndex);
+    const result = await runPromptTransformAgent(agent, message, generationType, null, messageIndex, {
+        applyToMessage: false,
+    });
+    if (agentGenerationCancelRevision !== cancelRevision) {
+        return null;
+    }
+
+    if (result.changed) {
+        message.mes = result.nextMessageText;
+        syncPromptTransformMessageState(message, messageIndex);
+    }
 
     if (updatePromptTransformRuns(message, [result])) {
         saveChatDebounced();

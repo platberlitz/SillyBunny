@@ -801,12 +801,27 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .ica--editor-section-actions {
     display: flex;
+    align-items: center;
     gap: 6px;
     flex-wrap: wrap;
+}
+
+.ica--prompt-preview pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: min(60vh, 520px);
+    overflow: auto;
+    margin: 10px 0 0;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 45%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #222) 25%, transparent);
 }
 
 .ica--editor-row {
