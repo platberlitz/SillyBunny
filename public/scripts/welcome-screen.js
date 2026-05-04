@@ -33,10 +33,11 @@ import { callGenericPopup, POPUP_TYPE } from './popup.js';
 import { renderTemplateAsync } from './templates.js';
 import { isAdmin } from './user.js';
 import { accountStorage } from './util/AccountStorage.js';
-import { flashHighlight, isElementInViewport, sortMoments, timestampToMoment } from './utils.js';
+import { clamp, flashHighlight, isElementInViewport, sortMoments, timestampToMoment } from './utils.js';
 
 const assistantAvatarKey = 'assistant';
 const pinnedChatsKey = 'pinnedChats';
+
 const tutorialStatusKey = 'WelcomePage_TutorialStatus';
 const welcomeDeckViewKey = 'WelcomePage_DeckView';
 const welcomeDeckCollapsedKey = 'WelcomePage_DeckCollapsed';
@@ -45,8 +46,6 @@ const DEFAULT_BUNDLED_ASSISTANT_ID = 'guide';
 const bundledAssistantNahidaAvatarKey = 'bundledAssistantNahidaAvatar';
 const DEFAULT_NEUTRAL_ASSISTANT_NAME = 'Assistant';
 
-const DEFAULT_DISPLAYED = 3;
-const MAX_RECENT_FETCH = 60;
 const AGENT_MESSAGE_EXTRA_KEY = 'inChatAgents';
 const AGENT_PROMPT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
 const STARTER_PACK_PRESET_NAME_SILLYBUNNY = 'Pura\'s Director Preset (SillyBunny)';
@@ -306,6 +305,39 @@ const WELCOME_PANEL_MODES = Object.freeze({
     compact: 'compact',
     list: 'list',
 });
+const recentChatsSettingsKey = 'recentChatsSettings';
+
+const DEFAULT_MAX_DISPLAYED = 15;
+const DEFAULT_COLLAPSED_DISPLAYED = 3;
+
+/**
+ * Gets the current recent chats settings from account storage.
+ * @returns {{ maxDisplayed: number, collapsedDisplayed: number }}
+ */
+function getRecentChatsSettings() {
+    const value = accountStorage.getItem(recentChatsSettingsKey);
+    if (value) {
+        try {
+            const parsed = JSON.parse(value);
+            return {
+                maxDisplayed: Math.max(1, parseInt(parsed.maxDisplayed) || DEFAULT_MAX_DISPLAYED),
+                collapsedDisplayed: Math.max(1, parseInt(parsed.collapsedDisplayed) || DEFAULT_COLLAPSED_DISPLAYED),
+            };
+        } catch {
+            // Ignore parse errors
+        }
+    }
+    return { maxDisplayed: DEFAULT_MAX_DISPLAYED, collapsedDisplayed: DEFAULT_COLLAPSED_DISPLAYED };
+}
+
+/**
+ * Saves recent chats settings to account storage.
+ * @param {{ maxDisplayed: number, collapsedDisplayed: number }} settings
+ */
+function saveRecentChatsSettings(settings) {
+    accountStorage.setItem(recentChatsSettingsKey, JSON.stringify(settings));
+}
+
 
 /**
  * @typedef {Pick<RecentChat, 'group' | 'avatar' | 'file_name'>} PinnedChat
@@ -345,7 +377,7 @@ class PinnedChatsManager {
 
     /**
      * Generates a key for pinned chat storage.
-     * @param {RecentChat} recentChat Recent chat data
+     * @param {Partial<RecentChat>} recentChat Recent chat data
      * @returns {string} Key for pinned chat storage
      */
     static getKey(recentChat) {
@@ -400,6 +432,28 @@ class PinnedChatsManager {
         } else {
             delete pinState[pinKey];
         }
+        this.#saveState(pinState);
+    }
+
+    /**
+     * Migrates pinned state when a chat is renamed.
+     * @param {Partial<RecentChat>} recentChat Recent chat data (with original file_name)
+     * @param {string} newFileName New file name after rename
+     */
+    static rename(recentChat, newFileName) {
+        const oldKey = this.getKey(recentChat);
+        const pinState = { ...this.getState() };
+        if (!(oldKey in pinState)) {
+            return;
+        }
+        const updatedChat = { ...recentChat, file_name: newFileName };
+        const newKey = this.getKey(updatedChat);
+        pinState[newKey] = {
+            group: recentChat.group,
+            avatar: recentChat.avatar,
+            file_name: newFileName,
+        };
+        delete pinState[oldKey];
         this.#saveState(pinState);
     }
 
@@ -916,7 +970,7 @@ function buildWelcomeTemplateData(chats) {
         chats,
         empty: !chats.length,
         version: displayVersion,
-        more: chats.length > DEFAULT_DISPLAYED,
+        more: chats.length > getRecentChatsSettings().collapsedDisplayed,
         activeDeckView,
         deckCollapsed,
         welcomePanelMode,
@@ -1017,12 +1071,13 @@ function getRecentChatItemType(item) {
 function updateRecentChatFilterView(root, { expanded = false } = {}) {
     const filter = root.dataset.recentChatFilter || 'all';
     const chatItems = Array.from(root.querySelectorAll('.recentChat'));
+    const { collapsedDisplayed } = getRecentChatsSettings();
     let matchingCount = 0;
 
     chatItems.forEach((chatItem) => {
         const chatType = getRecentChatItemType(chatItem);
         const matchesFilter = filter === 'all' || chatType === filter;
-        const hiddenByLimit = matchesFilter && !expanded && matchingCount >= DEFAULT_DISPLAYED;
+        const hiddenByLimit = matchesFilter && !expanded && matchingCount >= collapsedDisplayed;
 
         if (matchesFilter) {
             matchingCount++;
@@ -1037,7 +1092,7 @@ function updateRecentChatFilterView(root, { expanded = false } = {}) {
     });
 
     root.querySelectorAll('button.showMoreChats').forEach((button) => {
-        const hasMoreChats = matchingCount > DEFAULT_DISPLAYED;
+        const hasMoreChats = matchingCount > collapsedDisplayed;
         button.classList.toggle('displayNone', !hasMoreChats);
         button.classList.toggle('rotated', expanded && hasMoreChats);
         button.setAttribute('aria-expanded', String(expanded && hasMoreChats));
@@ -1431,6 +1486,12 @@ async function sendWelcomePanel(chats, expand = false) {
                         tab.setAttribute('aria-pressed', String(active));
                     });
                     updateRecentChatFilterView(root);
+                });
+            });
+            root.querySelectorAll('.recentChatsSettings').forEach((button) => {
+                button.addEventListener('click', async (event) => {
+                    event.stopPropagation();
+                    await openRecentChatsSettingsPopup();
                 });
             });
 
@@ -1830,6 +1891,61 @@ async function refreshWelcomeScreen({ flashChat = null } = {}) {
 }
 
 /**
+ * Opens a popup to configure recent chats settings.
+ */
+async function openRecentChatsSettingsPopup() {
+    const settings = getRecentChatsSettings();
+
+    const MIN_CHATS = 1;
+    const MAX_CHATS = 1000;
+
+    /** @type {import('./popup.js').CustomPopupInput} */
+    const maxRecentChatsInput = {
+        id: 'maxRecentChats',
+        type: 'number',
+        label: t`Max recent chats`,
+        tooltip: t`${MIN_CHATS} - ${MAX_CHATS}`,
+        defaultState: String(settings.maxDisplayed),
+        min: MIN_CHATS,
+        max: MAX_CHATS,
+        step: 1,
+    };
+
+    /** @type {import('./popup.js').CustomPopupInput} */
+    const collapsedRecentChatsInput = {
+        id: 'collapsedRecentChats',
+        type: 'number',
+        label: t`Collapsed recent chats`,
+        tooltip: t`${MIN_CHATS} - ${MAX_CHATS}`,
+        defaultState: String(settings.collapsedDisplayed),
+        min: MIN_CHATS,
+        max: MAX_CHATS,
+        step: 1,
+    };
+
+    await callGenericPopup(t`Recent Chats Settings`, POPUP_TYPE.CONFIRM, null, {
+        okButton: t`Save`,
+        cancelButton: t`Cancel`,
+        customInputs: [maxRecentChatsInput, collapsedRecentChatsInput],
+        onClose: (popup) => {
+            if (!popup.result) {
+                return;
+            }
+
+            const maxInputValue = popup.inputResults.get(maxRecentChatsInput.id)?.toString() ?? String(DEFAULT_MAX_DISPLAYED);
+            const collapsedInputValue = popup.inputResults.get(collapsedRecentChatsInput.id)?.toString() ?? String(DEFAULT_COLLAPSED_DISPLAYED);
+
+            const newMax = clamp(parseInt(maxInputValue) || DEFAULT_MAX_DISPLAYED, maxRecentChatsInput.min, maxRecentChatsInput.max);
+            const newCollapsed = clamp(parseInt(collapsedInputValue) || DEFAULT_COLLAPSED_DISPLAYED, collapsedRecentChatsInput.min, newMax);
+
+            saveRecentChatsSettings({ maxDisplayed: newMax, collapsedDisplayed: newCollapsed });
+        },
+    });
+
+    await refreshWelcomeScreen();
+}
+
+/**
  * Gets the list of recent chats from the server.
  * @returns {Promise<RecentChat[]>} List of recent chats
  *
@@ -1869,10 +1985,11 @@ function isAgentRecentChat(chatData) {
 }
 
 async function getRecentChats() {
+    const settings = getRecentChatsSettings();
     const response = await fetch('/api/chats/recent', {
         method: 'POST',
         headers: getRequestHeaders(),
-        body: JSON.stringify({ max: MAX_RECENT_FETCH, pinned: PinnedChatsManager.getAll(), metadata: shouldSeparateAgentRecentChats(), previewMessages: shouldSeparateAgentRecentChats() ? 8 : 0 }),
+        body: JSON.stringify({ max: settings.maxDisplayed, pinned: PinnedChatsManager.getAll(), metadata: shouldSeparateAgentRecentChats(), previewMessages: shouldSeparateAgentRecentChats() ? 8 : 0 }),
         cache: 'no-cache',
     });
 
@@ -1914,7 +2031,7 @@ async function getRecentChats() {
         chat.chat_name = chat.file_name.replace('.jsonl', '');
         chat.char_thumbnail = character ? getThumbnailUrl('avatar', character.avatar) : system_avatar;
         chat.is_group = !!group;
-        chat.hidden = index >= DEFAULT_DISPLAYED;
+        chat.hidden = index >= settings.collapsedDisplayed;
         chat.avatar = chat.avatar || '';
         chat.group = chat.group || '';
         chat.pinned = PinnedChatsManager.isPinned(chat);
@@ -2116,5 +2233,9 @@ export function initWelcomeScreen() {
                 setBundledAssistantStoredAvatar(assistant, newAvatar);
             }
         }
+    });
+
+    eventSource.on(event_types.CHAT_RENAMED, async ({ avatarId, groupId, oldFileName, newFileName }) => {
+        PinnedChatsManager.rename({ avatar: avatarId, group: groupId, file_name: oldFileName }, newFileName);
     });
 }

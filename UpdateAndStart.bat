@@ -59,6 +59,9 @@ if !errorlevel! neq 0 (
     echo Dependencies are up to date.
 )
 
+call bun run init
+if !errorlevel! neq 0 goto end
+
 :server_loop
 bun server.js %*
 set "_server_exit=!errorlevel!"

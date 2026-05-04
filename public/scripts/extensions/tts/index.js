@@ -1,6 +1,7 @@
 import { cancelTtsPlay, eventSource, event_types, getCurrentChatId, isStreamingEnabled, name2, saveSettingsDebounced, substituteParams } from '../../../script.js';
 import { ModuleWorkerWrapper, extension_settings, getContext, renderExtensionTemplateAsync } from '../../extensions.js';
 import { delay, escapeRegex, getBase64Async, getStringHash, onlyUnique, regexFromString } from '../../utils.js';
+import { accountStorage } from '../../util/AccountStorage.js';
 import { EdgeTtsProvider } from './edge.js';
 import { ElevenLabsTtsProvider } from './elevenlabs.js';
 import { SileroTtsProvider } from './silerotts.js';
@@ -179,7 +180,7 @@ async function onNarrateOneMessage() {
     }
 
     resetTtsPlayback();
-    processAndQueueTtsMessage(message, Number(id));
+    processAndQueueTtsMessage(message, Number(id), { manual: true });
     moduleWorker();
 }
 
@@ -200,13 +201,20 @@ async function onNarrateText(args, text) {
         ? voiceMap[DEFAULT_VOICE_MARKER]
         : voiceMap[name];
 
-    if (!voiceMapEntry || voiceMapEntry === DISABLED_VOICE_MARKER) {
+    if (voiceMapEntry === DISABLED_VOICE_MARKER) {
+        toastr.info(`TTS voice for ${name} is disabled.`);
+        await initVoiceMap(false);
+        return;
+    }
+
+    if (!voiceMapEntry) {
         toastr.info(`Specified voice for ${name} was not found. Check the TTS extension settings.`);
+        await initVoiceMap(false);
         return;
     }
 
     resetTtsPlayback();
-    processAndQueueTtsMessage({ mes: text, name: name });
+    processAndQueueTtsMessage({ mes: text, name: name }, null, { manual: true });
     await moduleWorker();
 
     // Return back to the chat voices
@@ -259,7 +267,7 @@ function isTtsProcessing() {
 }
 
 /**
- * @typedef {ChatMessage & { id?: number }} TtsMessage
+ * @typedef {ChatMessage & { id?: number, manual?: boolean, segmentText?: string, segmentType?: string }} TtsMessage
  */
 
 /**
@@ -267,12 +275,15 @@ function isTtsProcessing() {
  * (if enabled) and adds each part to the TTS job queue.
  * @param {ChatMessage} message - The message object to be processed.
  * @param {number|null} [messageId=null] - The chat message index to associate with TTS events.
+ * @param {object} [options={}] - Additional options for processing.
+ * @param {boolean} [options.manual=false] - Whether this TTS job was manually triggered (e.g., from the UI) rather than automatically from a new chat message.
  * @returns {void}
  */
-function processAndQueueTtsMessage(message, messageId = null) {
+function processAndQueueTtsMessage(message, messageId = null, { manual = false } = {}) {
     /** @type {TtsMessage} */
     const clone = structuredClone(message);
     clone.id = messageId ?? null;
+    clone.manual = manual ?? false;
 
     if (!extension_settings.tts.narrate_by_paragraphs) {
         ttsJobQueue.push(clone);
@@ -422,9 +433,10 @@ function onAudioControlClicked() {
     // Not pausing, doing a full stop to anything TTS is doing. Better UX as pause is not as useful
     if (!audioElement.paused || isTtsProcessing()) {
         resetTtsPlayback();
-    } else {
+    } else if (context?.chat?.length > 0) {
         // Default play behavior if not processing or playing is to play the last message.
-        processAndQueueTtsMessage(context.chat[context.chat.length - 1]);
+        const id = context.chat.length - 1;
+        processAndQueueTtsMessage(context.chat[id], id, { manual: true });
     }
     updateUiAudioPlayState();
 }
@@ -495,8 +507,10 @@ async function processAudioJobQueue() {
 //  TTS Control   //
 //################//
 
+/** @type {TtsMessage[]} */
 const ttsJobQueue = [];
-let currentTtsJob; // Null if nothing is currently being processed
+/** @type {TtsMessage|null} */
+let currentTtsJob = null; // Null if nothing is currently being processed
 
 function completeTtsJob() {
     console.info(`Current TTS job for ${currentTtsJob?.name} completed.`);
@@ -635,7 +649,18 @@ async function processTtsQueue() {
 
             const voiceMapEntry = voiceMap[voiceMapKey] === DEFAULT_VOICE_MARKER ? voiceMap[DEFAULT_VOICE_MARKER] : voiceMap[voiceMapKey];
 
-            if (!voiceMapEntry || voiceMapEntry === DISABLED_VOICE_MARKER) {
+            if (voiceMapEntry === DISABLED_VOICE_MARKER) {
+                const storageKey = `tts_disabled_warned_${char}`;
+                if (!accountStorage.getItem(storageKey) || currentTtsJob.manual) {
+                    accountStorage.setItem(storageKey, 'true');
+                    toastr.info(`TTS voice for ${char} is disabled.`);
+                }
+                currentTtsJob = null;
+                setTimeout(() => wrapper.update(), 0);
+                return;
+            }
+
+            if (!voiceMapEntry) {
                 throw `${char} not in voicemap. Configure character in extension settings voice map`;
             }
 
@@ -663,7 +688,6 @@ async function processTtsQueue() {
     text = substituteParams(text);
 
     if (extension_settings.tts.skip_codeblocks) {
-        text = text.replace(/^\s{4}.*$/gm, '').trim();
         text = text.replace(/```.*?```/gs, '').trim();
         text = text.replace(/~~~.*?~~~/gs, '').trim();
     }
@@ -738,6 +762,7 @@ async function processTtsQueue() {
                 mes: currentTtsJob.mes,
                 extra: currentTtsJob.extra,
                 id: currentTtsJob.id,
+                manual: currentTtsJob.manual,
             };
             ttsJobQueue.unshift(segmentJob);
         }
@@ -838,7 +863,7 @@ async function playFullConversation() {
 
     context.chat.forEach((msg, i) => {
         if (!msg.is_system && msg.mes !== '...' && msg.mes !== '') {
-            processAndQueueTtsMessage(msg, i);
+            processAndQueueTtsMessage(msg, i, { manual: false });
         }
     });
 
@@ -1178,7 +1203,7 @@ async function onMessageEvent(messageId, lastCharIndex) {
         message.id = messageId;
         ttsJobQueue.push(message);
     } else {
-        processAndQueueTtsMessage(message, messageId);
+        processAndQueueTtsMessage(message, messageId, { manual: false });
     }
 }
 
@@ -1520,7 +1545,7 @@ async function initVoiceMapInternal(unrestricted) {
     updateVoiceMap();
 }
 
-jQuery(async function () {
+export async function init() {
     // Guard against double initialization (module may be loaded via multiple URL variants)
     if (window._ttsExtensionInitialized) return;
     window._ttsExtensionInitialized = true;
@@ -1612,4 +1637,4 @@ jQuery(async function () {
     }));
 
     document.body.appendChild(audioElement);
-});
+}

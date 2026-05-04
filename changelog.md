@@ -6,6 +6,22 @@ Date: 2026-05-03
 
 This update adds the Black Orange theme and desktop character drawer tiles, improves managed shell coexistence, restores Moving UI control over the character drawer size, and quiets expected Pathfinder sidecar aborts.
 
+### PR #13 SillyTavern 1.18.0 Sync
+Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. GitHub and the local merge both reported the PR as conflict-free.
+
+- Kept SillyBunny's Bun-first defaults and port `4444` while updating Node-compatible dependency and lockfile state for the SillyTavern 1.18.0 surface.
+- Updated launcher and Electron package files for the new runtime layout.
+- Preserved fork defaults and avoided tracked `data/default-user/**` state.
+- Added account-version session handling, password/recovery hardening, trusted proxy validation, private request filtering, basic-auth rate limiting, forwarded-header helpers, cache busting, and immutable data-root override support.
+- Preserved SillyBunny session auth and HTTPS behavior while adopting compatible upstream hardening.
+- Updated OpenRouter, OpenAI, NanoGPT, MiniMax, Workers AI, Kobold/KoboldCpp, NovelAI, Stable Diffusion, tokenizer, speech, vector, and text/chat completion paths.
+- Added Workers AI vector UI controls and fixed OpenRouter PKCE browser encoding.
+- Adopted required upstream 1.18.0 UI and JavaScript compatibility changes without replacing SillyBunny's shell/navigation structure.
+- Added extension lifecycle compatibility, third-party extension warning flow, streaming display utilities, persona slash commands and events, provider settings updates, popup validation, swipe picker updates, and welcome panel templates.
+- Kept mobile and desktop parity in scope for newly merged UI controls, especially settings rows, vector controls, and extension flows.
+- Brought in or updated unit coverage for private request filtering, prompt converters, Tavern card validation, and utility behavior.
+- PR verification before merge reported passing lint, unit tests, diff whitespace checks, and Node/Bun startup smokes.
+
 ### Themes And Character Drawer
 - Added the Black Orange theme.
 - Added desktop character drawer tile styling for the SillyBunny tabs layout.
@@ -78,6 +94,13 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - `sync: align runtime init with SillyTavern 1.18`
 - `fix: make OpenAI Responses tests use default config`
 - `docs(changelog): place PR 11 notes under 1.5.3`
+- `9fe08ef chore(sync): align SillyBunny with SillyTavern 1.18 compatibility`
+- `7b6db61 sync: adopt direct SillyTavern 1.18 changes`
+- `2d9c49e sync: align 1.18 security and runtime hardening`
+- `f1f6137 sync: update 1.18 dependency locks`
+- `02bc8c3 sync: complete SillyTavern 1.18 migration`
+- `431e25c fix: preserve proxy filter startup order`
+- `sync: merge PR 13 SillyTavern 1.18.0 compatibility`
 
 ## v1.5.2
 

@@ -51,6 +51,7 @@ import EventSourceStream from './sse-stream.js';
  * @property {string} [reverse_proxy] - Optional reverse proxy URL
  * @property {string} [proxy_password] - Optional proxy password
  * @property {string} [custom_prompt_post_processing] - Optional custom prompt post-processing
+ * @property {import('../script.js').JsonSchema} [json_schema] - Optional JSON schema for structured generation
  */
 
 /** @typedef {Record<string, any> & ChatCompletionPayloadBase} ChatCompletionPayload */
@@ -528,7 +529,7 @@ export class ChatCompletionService {
         return async function* streamData() {
             let text = '';
             const swipes = [];
-            const state = { reasoning: '', image: '' };
+            const state = { reasoning: '', images: [], signature: '', toolSignatures: {} };
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) return;
@@ -619,6 +620,7 @@ export class ChatCompletionService {
             [chat_completion_sources.VERTEXAI]: 'vertexai_region',
             [chat_completion_sources.ZAI]: 'zai_endpoint',
             [chat_completion_sources.SILICONFLOW]: 'siliconflow_endpoint',
+            [chat_completion_sources.MINIMAX]: 'minimax_endpoint',
         };
 
         if (overridePayload.chat_completion_source) {
@@ -662,6 +664,9 @@ export class ChatCompletionService {
         }
         if (overridePayload.siliconflow_endpoint !== undefined) {
             settings.siliconflow_endpoint = overridePayload.siliconflow_endpoint;
+        }
+        if (overridePayload.minimax_endpoint !== undefined) {
+            settings.minimax_endpoint = overridePayload.minimax_endpoint;
         }
         if (overridePayload.custom_include_body !== undefined) {
             settings.custom_include_body = overridePayload.custom_include_body;

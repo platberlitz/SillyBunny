@@ -34,6 +34,9 @@ const isAndroid = process.platform === 'android';
 // Use shallow character data for the character list
 const useShallowCharacters = !!getConfigValue('performance.lazyLoadCharacters', false, 'boolean');
 const useDiskCache = !!getConfigValue('performance.useDiskCache', true, 'boolean');
+const BULK_MERGE_CONCURRENCY = 8;
+const EXTENSION_UNSET_VALUE = '__@@UNSET@@__';
+const forbiddenAvatarRegExp = path.sep === '/' ? /[/\x00]/ : /[/\x00\\]/;
 
 class DiskCache {
     /**
@@ -262,6 +265,68 @@ async function writeCharacterData(inputFile, data, outputFile, request, crop = u
         console.error(err);
         return false;
     }
+}
+
+function deleteUnsetSentinels(value) {
+    if (!value || typeof value !== 'object') {
+        return;
+    }
+
+    for (const key of Object.keys(value)) {
+        if (value[key] === EXTENSION_UNSET_VALUE) {
+            delete value[key];
+            continue;
+        }
+
+        deleteUnsetSentinels(value[key]);
+    }
+}
+
+function applyUnsetSentinels(target, update, prefix = '') {
+    if (!update || typeof update !== 'object') {
+        return;
+    }
+
+    for (const [key, value] of Object.entries(update)) {
+        const nextPath = prefix ? `${prefix}.${key}` : key;
+        if (value === EXTENSION_UNSET_VALUE) {
+            _.unset(target, nextPath);
+            continue;
+        }
+
+        applyUnsetSentinels(target, value, nextPath);
+    }
+}
+
+async function mergeCharacterUpdate(avatarPath, avatar, updateData, request, shouldSkip = () => false) {
+    const pngStringData = await readCharacterData(avatarPath);
+
+    if (!pngStringData) {
+        return { ok: false, error: 'Invalid character file.' };
+    }
+
+    let character = JSON.parse(pngStringData);
+
+    if (shouldSkip(character)) {
+        return { ok: false, skipped: true };
+    }
+
+    const update = structuredClone(updateData);
+    _.unset(update, 'json_data');
+    _.unset(character, 'json_data');
+
+    character = deepMerge(character, update);
+    applyUnsetSentinels(character, update);
+    deleteUnsetSentinels(character);
+
+    const validator = new TavernCardValidator(character);
+    if (!validator.validate()) {
+        return { ok: false, error: validator.lastValidationError ?? 'Validation failed' };
+    }
+
+    const targetImg = avatar.replace('.png', '');
+    await writeCharacterData(avatarPath, JSON.stringify(character), targetImg, request);
+    return { ok: true };
 }
 
 /**
@@ -1234,33 +1299,72 @@ router.post('/edit-attribute', validateAvatarUrlMiddleware, async function (requ
  * */
 router.post('/merge-attributes', getFileNameValidationFunction('avatar'), async function (request, response) {
     try {
+        if (Array.isArray(request.body.avatars)) {
+            const { avatars, data, filter } = request.body;
+
+            if (!_.isPlainObject(data)) {
+                return response.status(400).send({ message: 'No valid update data provided.' });
+            }
+
+            let targetAvatars;
+            if (avatars.length > 0) {
+                for (const avatar of avatars) {
+                    if (typeof avatar !== 'string' || forbiddenAvatarRegExp.test(avatar) || path.extname(avatar).toLowerCase() !== '.png') {
+                        return response.status(400).send({ message: `Invalid avatar filename: ${avatar}` });
+                    }
+                }
+                targetAvatars = avatars;
+            } else {
+                const files = fs.readdirSync(request.user.directories.characters);
+                targetAvatars = files.filter(file => path.extname(file).toLowerCase() === '.png');
+            }
+
+            const updated = [];
+            const skipped = [];
+            const failed = [];
+
+            const processOne = async (avatar) => {
+                const avatarPath = path.join(request.user.directories.characters, avatar);
+
+                try {
+                    let shouldSkip = () => false;
+
+                    if (filter && typeof filter.path === 'string') {
+                        shouldSkip = (character) => _.get(character, filter.path) === undefined;
+                    }
+
+                    const result = await mergeCharacterUpdate(avatarPath, avatar, data, request, shouldSkip);
+                    if (result.ok) {
+                        updated.push(avatar);
+                    } else if (result.skipped) {
+                        skipped.push(avatar);
+                    } else {
+                        console.warn(`Bulk merge failed for ${avatar}:`, result.error);
+                        failed.push(avatar);
+                    }
+                } catch (error) {
+                    console.error(`Bulk merge failed for ${avatar}:`, error);
+                    failed.push(avatar);
+                }
+            };
+
+            for (let i = 0; i < targetAvatars.length; i += BULK_MERGE_CONCURRENCY) {
+                const batch = targetAvatars.slice(i, i + BULK_MERGE_CONCURRENCY);
+                await Promise.allSettled(batch.map(processOne));
+            }
+
+            return response.send({ updated, skipped, failed });
+        }
+
         const update = request.body;
         const avatarPath = path.join(request.user.directories.characters, update.avatar);
 
-        const pngStringData = await readCharacterData(avatarPath);
-
-        if (!pngStringData) {
-            console.error('Error: invalid character file.');
-            return response.status(400).send('Error: invalid character file.');
-        }
-
-        let character = JSON.parse(pngStringData);
-
-        _.unset(update, 'json_data');
-        _.unset(character, 'json_data');
-
-        character = deepMerge(character, update);
-
-        const validator = new TavernCardValidator(character);
-        const targetImg = (update.avatar).replace('.png', '');
-
-        //Accept either V1 or V2.
-        if (validator.validate()) {
-            await writeCharacterData(avatarPath, JSON.stringify(character), targetImg, request);
+        const result = await mergeCharacterUpdate(avatarPath, update.avatar, update, request);
+        if (result.ok) {
             response.sendStatus(200);
         } else {
-            console.warn(validator.lastValidationError);
-            response.status(400).send({ message: `Validation failed for ${character.name}`, error: validator.lastValidationError });
+            console.warn(result.error);
+            response.status(400).send({ message: `Validation failed for ${update.avatar}`, error: result.error });
         }
     } catch (exception) {
         response.status(500).send({ message: 'Unexpected error while saving character.', error: exception.toString() });
