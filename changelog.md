@@ -24,6 +24,8 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Paused streaming autoscroll while iOS WebKit users touch or momentum-scroll the chat so mid-generation updates no longer snap the view away from the scroll position.
 - Reduced live reasoning render churn on iOS WebKit so reasoning-heavy DeepSeek and GLM streams no longer overwhelm the browser during generation.
 - Kept previous chat loads pinned to the bottom on iOS WebKit even when the chat list tap leaves temporary manual-scroll suppression active.
+- Extended chat manual-scroll suppression to all mobile and narrow chat surfaces so Android/Termux and iOS do not fight user scrolling during streaming or history edits.
+- Opened previous-message editors with scroll-preserving focus and removed mobile off-screen message containment so chat history stays anchored while editing.
 
 ### Settings Panels And Preset Prompts
 - Settings panels (Customize, Presets, Workspace, etc.) now narrow alongside the chat when the chat width is reduced, matching standard SillyTavern behaviour.
@@ -71,6 +73,7 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - `fix(ui): soften idle send icon contrast`
 - `fix(mobile): reduce ios reasoning stream churn`
 - `fix(mobile): keep previous chats bottom-pinned`
+- `fix(mobile): stabilize chat scrolling while editing history`
 - `sync: merge PR 11 runtime init alignment`
 - `sync: align runtime init with SillyTavern 1.18`
 - `fix: make OpenAI Responses tests use default config`

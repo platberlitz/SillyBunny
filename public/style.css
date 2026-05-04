@@ -1284,14 +1284,6 @@ body .panelControlBar {
     --swipeCounterMargin: 5px;
 }
 
-@media screen and (max-width: 1000px) {
-    /* Keep the live send/stream handoff fully laid out so mobile scroll anchoring stays calm. */
-    #chat .mes:not(.last_mes):not(:nth-last-child(-n + 2)) {
-        content-visibility: auto;
-        contain-intrinsic-size: auto 220px;
-    }
-}
-
 /* https://stackoverflow.com/a/31819499 */
 /* This has much better performance than .transform on large chats*/
 .slide {

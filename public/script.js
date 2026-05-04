@@ -476,9 +476,9 @@ const MOBILE_MEDIA_SCROLL_MAX_DELAY_MS = 300;
 const MOBILE_SEND_SCROLL_IMMUNITY_MS = 1500;
 const MOBILE_SEND_SCROLL_SETTLE_MS = 200;
 const MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS = 400;
-const IOS_CHAT_MANUAL_SCROLL_SUPPRESS_MS = 1400;
-const IOS_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
-const IOS_CHAT_BOTTOM_PIN_MS = 1500;
+const MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS = 1400;
+const MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
+const MOBILE_CHAT_BOTTOM_PIN_MS = 1500;
 const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 8;
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 let isLoadingMoreMessages = false;
@@ -499,9 +499,9 @@ let is_delete_mode = false;
 let fav_ch_checked = false;
 let scrollLock = false;
 let scrollLockImmunityUntil = 0;
-let iosChatTouchScrolling = false;
-let iosChatManualScrollSuppressedUntil = 0;
-let iosChatBottomPinUntil = 0;
+let mobileChatTouchScrolling = false;
+let mobileChatManualScrollSuppressedUntil = 0;
+let mobileChatBottomPinUntil = 0;
 export let abortStatusCheck = new AbortController();
 export let charDragDropHandler = null;
 export let chatDragDropHandler = null;
@@ -1530,8 +1530,8 @@ function shouldBatchMobileChatRendering() {
     return Boolean(isNarrowViewport || isMobile());
 }
 
-function shouldGuardIOSChatScroll() {
-    return Boolean(shouldBatchMobileChatRendering() && isIOSWebKitPlatform());
+function shouldGuardMobileChatScroll() {
+    return shouldBatchMobileChatRendering();
 }
 
 function isChatScrolledNearBottom(threshold = CHAT_SCROLL_BOTTOM_THRESHOLD_PX) {
@@ -1544,49 +1544,49 @@ function isChatScrolledNearBottom(threshold = CHAT_SCROLL_BOTTOM_THRESHOLD_PX) {
     return Math.abs(element.scrollHeight - element.clientHeight - element.scrollTop) <= threshold;
 }
 
-function markIOSChatManualScroll({ touchActive = false, suppressMs = IOS_CHAT_MANUAL_SCROLL_SUPPRESS_MS } = {}) {
-    if (!shouldGuardIOSChatScroll()) {
+function markMobileChatManualScroll({ touchActive = false, suppressMs = MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS } = {}) {
+    if (!shouldGuardMobileChatScroll()) {
         return;
     }
 
-    iosChatBottomPinUntil = 0;
+    mobileChatBottomPinUntil = 0;
 
     if (touchActive) {
-        iosChatTouchScrolling = true;
+        mobileChatTouchScrolling = true;
     }
 
-    iosChatManualScrollSuppressedUntil = Math.max(iosChatManualScrollSuppressedUntil, Date.now() + suppressMs);
+    mobileChatManualScrollSuppressedUntil = Math.max(mobileChatManualScrollSuppressedUntil, Date.now() + suppressMs);
     scrollLockImmunityUntil = 0;
 }
 
-function releaseIOSChatTouchScroll() {
-    if (!shouldGuardIOSChatScroll()) {
-        iosChatTouchScrolling = false;
+function releaseMobileChatTouchScroll() {
+    if (!shouldGuardMobileChatScroll()) {
+        mobileChatTouchScrolling = false;
         return;
     }
 
-    iosChatTouchScrolling = false;
-    markIOSChatManualScroll();
+    mobileChatTouchScrolling = false;
+    markMobileChatManualScroll();
 }
 
-function shouldSuppressIOSChatAutoScroll() {
-    if (!shouldGuardIOSChatScroll()) {
+function shouldSuppressMobileChatAutoScroll() {
+    if (!shouldGuardMobileChatScroll()) {
         return false;
     }
 
-    if (Date.now() < iosChatBottomPinUntil) {
+    if (Date.now() < mobileChatBottomPinUntil) {
         return false;
     }
 
-    if (iosChatTouchScrolling) {
+    if (mobileChatTouchScrolling) {
         return true;
     }
 
-    return Date.now() < iosChatManualScrollSuppressedUntil && !isChatScrolledNearBottom();
+    return Date.now() < mobileChatManualScrollSuppressedUntil && !isChatScrolledNearBottom();
 }
 
-function requestIOSChatBottomPin({ requireNearBottom = true, durationMs = IOS_CHAT_BOTTOM_PIN_MS } = {}) {
-    if (!shouldGuardIOSChatScroll() || iosChatTouchScrolling) {
+function requestMobileChatBottomPin({ requireNearBottom = true, durationMs = MOBILE_CHAT_BOTTOM_PIN_MS } = {}) {
+    if (!shouldGuardMobileChatScroll() || mobileChatTouchScrolling) {
         return false;
     }
 
@@ -1594,25 +1594,25 @@ function requestIOSChatBottomPin({ requireNearBottom = true, durationMs = IOS_CH
         return false;
     }
 
-    iosChatBottomPinUntil = Math.max(iosChatBottomPinUntil, Date.now() + durationMs);
+    mobileChatBottomPinUntil = Math.max(mobileChatBottomPinUntil, Date.now() + durationMs);
     return true;
 }
 
-function shouldPinIOSChatToBottom() {
-    if (!shouldGuardIOSChatScroll() || iosChatTouchScrolling) {
+function shouldPinMobileChatToBottom() {
+    if (!shouldGuardMobileChatScroll() || mobileChatTouchScrolling) {
         return false;
     }
 
-    return Date.now() < iosChatBottomPinUntil || isChatScrolledNearBottom();
+    return Date.now() < mobileChatBottomPinUntil || isChatScrolledNearBottom();
 }
 
-function pinIOSChatToBottom({ waitForFrame = true, settle = false } = {}) {
-    if (!shouldGuardIOSChatScroll()) {
+function pinMobileChatToBottom({ waitForFrame = true, settle = false } = {}) {
+    if (!shouldGuardMobileChatScroll()) {
         return;
     }
 
-    iosChatManualScrollSuppressedUntil = 0;
-    requestIOSChatBottomPin({ requireNearBottom: false });
+    mobileChatManualScrollSuppressedUntil = 0;
+    requestMobileChatBottomPin({ requireNearBottom: false });
     scrollLock = false;
     scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
 
@@ -1631,7 +1631,7 @@ function pinIOSChatToBottom({ waitForFrame = true, settle = false } = {}) {
 
     if (settle) {
         setTimeout(() => {
-            if (Date.now() < iosChatBottomPinUntil) {
+            if (Date.now() < mobileChatBottomPinUntil) {
                 pin();
             }
         }, MOBILE_SEND_SCROLL_SETTLE_MS);
@@ -1783,11 +1783,11 @@ export async function printMessages() {
 }
 
 function scrollLoadedChatToBottom() {
-    // SillyBunny: previous-chat taps can leave the iOS manual-scroll guard active.
+    // SillyBunny: previous-chat taps can leave the mobile manual-scroll guard active.
     scrollChatToBottom({ force: true });
     scrollChatToBottom({ waitForFrame: true, force: true });
 
-    if (shouldGuardIOSChatScroll()) {
+    if (shouldGuardMobileChatScroll()) {
         setTimeout(() => {
             scrollChatToBottom({ waitForFrame: true, force: true });
         }, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS);
@@ -2367,7 +2367,7 @@ function applyMessageBlockUpdate(messageId, message, { rerenderMessage = true } 
         return;
     }
 
-    const shouldPinIOSBottom = shouldPinIOSChatToBottom();
+    const shouldPinMobileBottom = shouldPinMobileChatToBottom();
 
     if (rerenderMessage) {
         const text = message?.extra?.display_text ?? message.mes;
@@ -2380,8 +2380,8 @@ function applyMessageBlockUpdate(messageId, message, { rerenderMessage = true } 
     addCopyToCodeBlocks(messageElement);
     appendMediaToMessage(message, messageElement);
 
-    if (shouldPinIOSBottom) {
-        pinIOSChatToBottom({ waitForFrame: true, settle: true });
+    if (shouldPinMobileBottom) {
+        pinMobileChatToBottom({ waitForFrame: true, settle: true });
     }
 }
 
@@ -2924,7 +2924,7 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
         }
         return chat.length - 1;
     })();
-    const shouldPinIOSBottom = !insertAfter && !insertBefore && scroll && shouldPinIOSChatToBottom();
+    const shouldPinMobileBottom = !insertAfter && !insertBefore && scroll && shouldPinMobileChatToBottom();
 
     let messageElement;
 
@@ -2957,8 +2957,8 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
     if (showSwipes) refreshSwipeButtons();
     // Don't scroll if not inserting last
     if (!insertAfter && !insertBefore && scroll) {
-        if (shouldPinIOSBottom) {
-            pinIOSChatToBottom({ waitForFrame: true, settle: true });
+        if (shouldPinMobileBottom) {
+            pinMobileChatToBottom({ waitForFrame: true, settle: true });
         } else {
             scrollChatToBottom({ waitForFrame: true });
         }
@@ -3256,7 +3256,7 @@ let requestId = null;
  * Scrolls the chat to the bottom if configured to do so.
  * @param {object} [options] Options
  * @param {boolean} [options.waitForFrame] If true, waits for the animation frame before scrolling
- * @param {boolean} [options.force=false] If true, bypasses temporary iOS manual-scroll suppression
+ * @param {boolean} [options.force=false] If true, bypasses temporary mobile manual-scroll suppression
  */
 export function scrollChatToBottom({ waitForFrame, force = false } = {}) {
     if (!power_user.auto_scroll_chat_to_bottom) {
@@ -3264,8 +3264,8 @@ export function scrollChatToBottom({ waitForFrame, force = false } = {}) {
     }
 
     const doScroll = () => {
-        // SillyBunny: iOS WebKit can fight streaming autoscroll during touch and momentum scrolling.
-        if (!force && shouldSuppressIOSChatAutoScroll()) {
+        // SillyBunny: mobile browsers can fight streaming autoscroll during touch and momentum scrolling.
+        if (!force && shouldSuppressMobileChatAutoScroll()) {
             requestId = null;
             return;
         }
@@ -4172,7 +4172,7 @@ class StreamingProcessor {
     async onProgressStreaming(messageId, text, isFinal) {
         const isImpersonate = this.type == 'impersonate';
         const isContinue = this.type == 'continue';
-        const shouldPinIOSBottom = !isImpersonate && shouldPinIOSChatToBottom();
+        const shouldPinMobileBottom = !isImpersonate && shouldPinMobileChatToBottom();
 
         if (!isImpersonate && !isContinue && Array.isArray(this.swipes) && this.swipes.length > 0) {
             for (let i = 0; i < this.swipes.length; i++) {
@@ -4278,8 +4278,8 @@ class StreamingProcessor {
             this.setFirstSwipe(messageId);
         }
 
-        if (shouldPinIOSBottom) {
-            pinIOSChatToBottom({ waitForFrame: true, settle: isFinal });
+        if (shouldPinMobileBottom) {
+            pinMobileChatToBottom({ waitForFrame: true, settle: isFinal });
         } else if (!scrollLock) {
             scrollChatToBottom({ waitForFrame: true });
         }
@@ -5008,7 +5008,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             //do nothing? why does this check exist?
         } else if (type !== 'quiet' && type !== 'swipe' && !isImpersonate && !dryRun && !depth && chat.length) {
             if (type === 'regenerate') {
-                requestIOSChatBottomPin();
+                requestMobileChatBottomPin();
             }
             deleteItemizedPromptForMessage(chat.length - 1);
             chat.length = chat.length - 1;
@@ -9593,13 +9593,30 @@ export async function messageEdit(editMessageId) {
         $editTextArea.height(editTextArea.scrollHeight);
     }
 
-    $editTextArea.trigger('focus');
+    if (shouldGuardMobileChatScroll()) {
+        markMobileChatManualScroll();
+    }
+
+    const shouldRestoreChatScroll = shouldGuardMobileChatScroll() || Number(this_edit_mes_id) === chat.length - 1;
+    const restoreChatScroll = () => {
+        if (shouldRestoreChatScroll) {
+            chatElement.scrollTop(chatScrollPosition);
+        }
+    };
+
+    try {
+        editTextArea.focus({ preventScroll: true });
+    } catch {
+        editTextArea.focus();
+    }
 
     // Sets the cursor at the end of the text
     editTextArea.setSelectionRange(text.length, text.length);
+    restoreChatScroll();
 
-    if (Number(this_edit_mes_id) === chat.length - 1) {
-        chatElement.scrollTop(chatScrollPosition);
+    if (shouldRestoreChatScroll) {
+        requestAnimationFrame(restoreChatScroll);
+        setTimeout(restoreChatScroll, MOBILE_SEND_SCROLL_SETTLE_MS);
     }
 
     updateEditArrowClasses();
@@ -13357,22 +13374,22 @@ jQuery(async function () {
     }
 
     const chatElementScroll = document.getElementById('chat');
-    const markIOSChatTouchScrollStart = () => markIOSChatManualScroll({ touchActive: true });
-    const markIOSChatTouchScrollMove = () => markIOSChatManualScroll();
-    const markIOSChatWheelScroll = () => markIOSChatManualScroll();
-    const markIOSViewportScroll = () => {
-        if (iosChatTouchScrolling || Date.now() < iosChatManualScrollSuppressedUntil) {
-            markIOSChatManualScroll({ suppressMs: IOS_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS });
+    const markMobileChatTouchScrollStart = () => markMobileChatManualScroll({ touchActive: true });
+    const markMobileChatTouchScrollMove = () => markMobileChatManualScroll();
+    const markMobileChatWheelScroll = () => markMobileChatManualScroll();
+    const markMobileViewportScroll = () => {
+        if (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil) {
+            markMobileChatManualScroll({ suppressMs: MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS });
         }
     };
 
-    chatElementScroll.addEventListener('touchstart', markIOSChatTouchScrollStart, { passive: true });
-    chatElementScroll.addEventListener('touchmove', markIOSChatTouchScrollMove, { passive: true });
-    chatElementScroll.addEventListener('touchend', releaseIOSChatTouchScroll, { passive: true });
-    chatElementScroll.addEventListener('touchcancel', releaseIOSChatTouchScroll, { passive: true });
-    chatElementScroll.addEventListener('wheel', markIOSChatWheelScroll, { passive: true });
-    window.visualViewport?.addEventListener('scroll', markIOSViewportScroll, { passive: true });
-    window.visualViewport?.addEventListener('resize', markIOSViewportScroll, { passive: true });
+    chatElementScroll.addEventListener('touchstart', markMobileChatTouchScrollStart, { passive: true });
+    chatElementScroll.addEventListener('touchmove', markMobileChatTouchScrollMove, { passive: true });
+    chatElementScroll.addEventListener('touchend', releaseMobileChatTouchScroll, { passive: true });
+    chatElementScroll.addEventListener('touchcancel', releaseMobileChatTouchScroll, { passive: true });
+    chatElementScroll.addEventListener('wheel', markMobileChatWheelScroll, { passive: true });
+    window.visualViewport?.addEventListener('scroll', markMobileViewportScroll, { passive: true });
+    window.visualViewport?.addEventListener('resize', markMobileViewportScroll, { passive: true });
 
     const chatScrollHandler = function () {
         if (power_user.waifuMode) {
@@ -13380,8 +13397,8 @@ jQuery(async function () {
             return;
         }
 
-        if (iosChatTouchScrolling || Date.now() < iosChatManualScrollSuppressedUntil) {
-            markIOSChatManualScroll();
+        if (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil) {
+            markMobileChatManualScroll();
         }
 
         if (Date.now() < scrollLockImmunityUntil) {
