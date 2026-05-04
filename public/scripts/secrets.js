@@ -513,8 +513,8 @@ const getVerifierKey = (source) => `${getCurrentUserHandle()}_${source}_code_ver
  * @returns {string} Code challenge
  */
 const generateChallenge = (codeVerifier) => {
-    return sha256.arrayBuffer(codeVerifier)
-        .toBase64()
+    const hashBytes = sha256.array(codeVerifier);
+    return btoa(String.fromCharCode(...hashBytes))
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=+$/, '');

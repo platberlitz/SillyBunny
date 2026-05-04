@@ -6,6 +6,8 @@ import path from 'node:path';
 import util from 'node:util';
 import dns from 'node:dns';
 import process from 'node:process';
+import http from 'node:http';
+import https from 'node:https';
 
 import cors from 'cors';
 import { csrfSync } from 'csrf-sync';
@@ -39,6 +41,7 @@ import {
     getSessionCookieExpires,
     verifySecuritySettings,
     loginPageMiddleware,
+    migratePublicOverrides,
 } from './users.js';
 
 import getWebpackServeMiddleware from './middleware/webpack-serve.js';
@@ -49,8 +52,11 @@ import getWhitelistMiddleware from './middleware/whitelist.js';
 import accessLoggerMiddleware, { getAccessLogPath, migrateAccessLog } from './middleware/accessLogWriter.js';
 import multerMonkeyPatch from './middleware/multerMonkeyPatch.js';
 import initRequestProxy from './request-proxy.js';
+import initPrivateRequestFilter from './private-request-filter.js';
+import cacheBuster from './middleware/cacheBuster.js';
 import corsProxyMiddleware from './middleware/corsProxy.js';
 import hostWhitelistMiddleware from './middleware/hostWhitelist.js';
+import userCssMiddleware from './middleware/userCss.js';
 import {
     getVersion,
     color,
@@ -88,6 +94,10 @@ if (!cliArgs.enableIPv6 && !cliArgs.enableIPv4) {
     console.error('error: You can\'t disable all internet protocols: at least IPv6 or IPv4 must be enabled.');
     process.exit(1);
 }
+
+// Set keep-alive preference for all HTTP/HTTPS requests.
+http.globalAgent = new http.Agent({ keepAlive: cliArgs.enableKeepAlive });
+https.globalAgent = new https.Agent({ keepAlive: cliArgs.enableKeepAlive });
 
 const app = express();
 app.use(helmet({
@@ -383,6 +393,7 @@ app.get('/login', loginPageMiddleware);
 // Host frontend assets
 const webpackMiddleware = getWebpackServeMiddleware();
 app.use(webpackMiddleware);
+app.use('/user.css', cacheBuster, userCssMiddleware);
 app.use(express.static(path.join(serverDirectory, 'public'), {}));
 
 // Public API
@@ -444,6 +455,7 @@ async function preSetupTasks() {
 
     startupDirectories = await getUserDirectoriesList();
     await migrateGroupChatsMetadataFormat(startupDirectories);
+    await migratePublicOverrides();
     await checkForNewContent(startupDirectories, PRESET_CONTENT_TYPES);
     migrateFlatSecrets(startupDirectories);
     cleanUploads();
@@ -479,6 +491,15 @@ async function preSetupTasks() {
 
     // Add request proxy.
     initRequestProxy({ enabled: cliArgs.requestProxyEnabled, url: cliArgs.requestProxyUrl, bypass: cliArgs.requestProxyBypass });
+    initPrivateRequestFilter({
+        listen: cliArgs.listen,
+        enabled: cliArgs.requestProxyEnabled || getConfigValue('privateAddressWhitelist.enabled', false, 'boolean'),
+        privateAddressWhitelist: getConfigValue('privateAddressWhitelist.allowedRanges', []),
+        logBlocked: getConfigValue('privateAddressWhitelist.log.blockedRequests', true, 'boolean'),
+        logAllowed: getConfigValue('privateAddressWhitelist.log.allowedRequests', false, 'boolean'),
+        allowUnresolvedHosts: getConfigValue('privateAddressWhitelist.allowUnresolvedHosts', false, 'boolean'),
+        enableKeepAlive: cliArgs.enableKeepAlive,
+    });
 
     // Wait for frontend libs to compile
     await webpackMiddleware.runWebpackCompiler({ pruneCache: true });
