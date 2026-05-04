@@ -366,7 +366,7 @@ if (!cliArgs.disableCsrf) {
 
 // Static files
 // Host index page
-app.get('/', (request, response) => {
+app.get('/', cacheBuster.middleware, (request, response) => {
     if (shouldRedirectToLogin(request)) {
         const query = request.url.split('?')[1];
         const redirectUrl = query ? `/login?${query}` : '/login';
@@ -393,7 +393,7 @@ app.get('/login', loginPageMiddleware);
 // Host frontend assets
 const webpackMiddleware = getWebpackServeMiddleware();
 app.use(webpackMiddleware);
-app.use('/user.css', cacheBuster, userCssMiddleware);
+app.use(userCssMiddleware);
 app.use(express.static(path.join(serverDirectory, 'public'), {}));
 
 // Public API

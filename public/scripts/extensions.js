@@ -123,6 +123,29 @@ const defaultUrl = 'http://localhost:5100';
  * @param {string} url URL to check
  * @returns {boolean} True if the URL matches the official pattern
  */
+export const EMPTY_AUTHOR = Object.freeze({
+    name: '',
+    url: '',
+});
+
+export function getAuthorFromUrl(url) {
+    const result = structuredClone(EMPTY_AUTHOR);
+
+    try {
+        const parsedUrl = new URL(url);
+        const pathSegments = parsedUrl.pathname.split('/').filter(s => s.length > 0);
+
+        if (parsedUrl.host === 'github.com' && pathSegments.length >= 2) {
+            result.name = pathSegments[0];
+            result.url = `${parsedUrl.protocol}//${parsedUrl.hostname}/${result.name}`;
+        }
+    } catch (error) {
+        console.debug('Error parsing URL:', error);
+    }
+
+    return result;
+}
+
 export const isOfficialExtension = (url) => {
     try {
         return /^https:\/\/github\.com\/SillyTavern\/(.+)$/i.test(new URL(url).href);

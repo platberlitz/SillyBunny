@@ -545,7 +545,7 @@ async function authorizeOpenRouter() {
  * Checks if the OpenRouter authorization code is present in the URL, and if so, exchanges it for an API key.
  * @returns {Promise<void>}
  */
-async function checkOpenRouterAuth() {
+export async function checkOpenRouterAuth() {
     const params = new URLSearchParams(location.search);
     const source = params.get('source');
     if (source === 'openrouter') {

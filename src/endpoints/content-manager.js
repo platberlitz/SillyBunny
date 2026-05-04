@@ -53,6 +53,8 @@ export const CONTENT_TYPES = {
     QUICK_REPLIES: 'quick_replies',
     SYSPROMPT: 'sysprompt',
     REASONING: 'reasoning',
+    ERROR_PAGE: 'error_page',
+    STYLESHEET: 'stylesheet',
 };
 
 export const PRESET_CONTENT_TYPES = Object.freeze([
@@ -82,19 +84,40 @@ function isPresetContentType(type) {
 }
 
 /**
+ * @enum {string}
+ */
+export const CONTENT_SCOPE = {
+    USER: 'user',
+    GLOBAL: 'global',
+};
+
+/**
+ * Gets the scope of a content type.
+ * @param {CONTENT_TYPES} type Content type
+ * @returns {CONTENT_SCOPE} Resolved content scope
+ */
+function getScopeByType(type) {
+    const globalTypes = [
+        CONTENT_TYPES.ERROR_PAGE,
+        CONTENT_TYPES.STYLESHEET,
+    ];
+    return globalTypes.includes(type) ? CONTENT_SCOPE.GLOBAL : CONTENT_SCOPE.USER;
+}
+
+/**
  * Gets the default presets from the content directory.
  * @param {import('../users.js').UserDirectoryList} directories User directories
  * @returns {object[]} Array of default presets
  */
 export function getDefaultPresets(directories) {
     try {
-        const contentIndex = getContentIndex();
+        const contentIndex = getContentIndex(CONTENT_SCOPE.USER);
         const presets = [];
 
         for (const contentItem of contentIndex) {
             if (isPresetContentType(contentItem.type)) {
                 contentItem.name = path.parse(contentItem.filename).name;
-                contentItem.folder = getTargetByType(contentItem.type, directories);
+                contentItem.folder = getUserTargetByType(contentItem.type, directories);
                 presets.push(contentItem);
             }
         }
@@ -128,23 +151,16 @@ export function getDefaultPresetFile(filename) {
 }
 
 /**
- * Seeds content for a user.
+ * Seeds content from a content index into a target location.
  * @param {ContentItem[]} contentIndex Content index
- * @param {import('../users.js').UserDirectoryList} directories User directories
- * @param {string[]} forceCategories List of categories to force check (even if content check is skipped)
- * @returns {Promise<boolean>} Whether any content was added
+ * @param {string} contentLogPath Path to the content log file
+ * @param {(type: string) => string | null} resolveTarget Function to resolve the target directory for a content type
+ * @param {string[]} [forceCategories] List of categories to force check (even if content check is skipped)
+ * @returns {boolean} Whether any content was added
  */
-async function seedContentForUser(contentIndex, directories, forceCategories) {
+function seedContent(contentIndex, contentLogPath, resolveTarget, forceCategories) {
     let anyContentAdded = false;
-
-    if (!fs.existsSync(directories.root)) {
-        fs.mkdirSync(directories.root, { recursive: true });
-    }
-
-    const contentLogPath = path.join(directories.root, 'content.log');
     const contentLog = getContentLog(contentLogPath);
-
-    removeObsoleteContent(contentLog, directories);
 
     for (const contentItem of contentIndex) {
         const hasLoggedContent = contentLog.includes(contentItem.filename);
@@ -166,7 +182,7 @@ async function seedContentForUser(contentIndex, directories, forceCategories) {
             continue;
         }
 
-        const contentTarget = getTargetByType(contentItem.type, directories);
+        const contentTarget = resolveTarget(contentItem.type);
 
         if (!contentTarget) {
             console.warn(`Content file ${contentItem.filename} has unknown type ${contentItem.type}`);
@@ -187,6 +203,7 @@ async function seedContentForUser(contentIndex, directories, forceCategories) {
             continue;
         }
 
+        fs.mkdirSync(contentTarget, { recursive: true });
         fs.cpSync(contentPath, targetPath, { recursive: true, force: false });
         setPermissionsSync(targetPath);
         console.info(`Content file ${contentItem.filename} copied to ${contentTarget}`);
@@ -210,7 +227,7 @@ function removeObsoleteContent(contentLog, directories) {
             continue;
         }
 
-        const contentTarget = getTargetByType(contentItem.type, directories);
+        const contentTarget = getUserTargetByType(contentItem.type, directories);
 
         if (!contentTarget) {
             continue;
@@ -229,6 +246,35 @@ function removeObsoleteContent(contentLog, directories) {
 }
 
 /**
+ * Seeds content for a user.
+ * @param {ContentItem[]} contentIndex Content index
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ * @param {string[]} forceCategories List of categories to force check (even if content check is skipped)
+ * @returns {Promise<boolean>} Whether any content was added
+ */
+async function seedContentForUser(contentIndex, directories, forceCategories) {
+    if (!fs.existsSync(directories.root)) {
+        fs.mkdirSync(directories.root, { recursive: true });
+    }
+
+    const contentLogPath = path.join(directories.root, 'content.log');
+    const contentLog = getContentLog(contentLogPath);
+    removeObsoleteContent(contentLog, directories);
+    writeFileAtomicSync(contentLogPath, contentLog.join('\n'));
+    return seedContent(contentIndex, contentLogPath, (type) => getUserTargetByType(type, directories), forceCategories);
+}
+
+/**
+ * Seeds global content that is not user-specific, such as error pages.
+ * @param {ContentItem[]} contentIndex Content index
+ * @returns {Promise<boolean>} Whether any content was added
+ */
+async function seedGlobalContent(contentIndex) {
+    const contentLogPath = path.join(globalThis.DATA_ROOT, 'content.log');
+    return seedContent(contentIndex, contentLogPath, getGlobalTargetByType);
+}
+
+/**
  * Checks for new content and seeds it for all users.
  * @param {import('../users.js').UserDirectoryList[]} directoriesList List of user directories
  * @param {string[]} forceCategories List of categories to force check (even if content check is skipped)
@@ -241,16 +287,19 @@ export async function checkForNewContent(directoriesList, forceCategories = []) 
             return;
         }
 
-        const forceCategorySet = new Set(forceCategories ?? []);
-        const contentIndex = getContentIndex().filter(item => (
-            !contentCheckSkip || forceCategorySet.size === 0 || forceCategorySet.has(item.type)
-        ));
+        const userContentIndex = getContentIndex(CONTENT_SCOPE.USER);
+        const globalContentIndex = getContentIndex(CONTENT_SCOPE.GLOBAL);
         let anyContentAdded = false;
 
-        for (const directories of directoriesList) {
-            const seedResult = await seedContentForUser(contentIndex, directories, forceCategories);
+        const globalSeedResult = await seedGlobalContent(globalContentIndex);
+        if (globalSeedResult) {
+            anyContentAdded = true;
+        }
 
-            if (seedResult) {
+        for (const directories of directoriesList) {
+            const userSeedResult = await seedContentForUser(userContentIndex, directories, forceCategories);
+
+            if (userSeedResult) {
                 anyContentAdded = true;
             }
         }
@@ -267,9 +316,10 @@ export async function checkForNewContent(directoriesList, forceCategories = []) 
 
 /**
  * Gets combined content index from the content and scaffold directories.
+ * @param {CONTENT_SCOPE} scope Scope of content to get
  * @returns {ContentItem[]} Array of content index
  */
-function getContentIndex() {
+function getContentIndex(scope = CONTENT_SCOPE.USER) {
     const result = [];
 
     if (fs.existsSync(scaffoldIndexPath)) {
@@ -278,6 +328,7 @@ function getContentIndex() {
         if (Array.isArray(scaffoldIndex)) {
             scaffoldIndex.forEach((item) => {
                 item.folder = scaffoldDirectory;
+                item.scope = getScopeByType(item.type);
             });
             result.push(...scaffoldIndex);
         }
@@ -289,22 +340,24 @@ function getContentIndex() {
         if (Array.isArray(contentIndex)) {
             contentIndex.forEach((item) => {
                 item.folder = contentDirectory;
+                item.scope = getScopeByType(item.type);
             });
             result.push(...contentIndex);
         }
     }
 
-    return result;
+    return result.filter((item) => item.scope === scope);
 }
 
 /**
  * Gets content by type and format.
  * @param {string} type Type of content
  * @param {'json'|'string'|'raw'} format Format of content
+ * @param {CONTENT_SCOPE} scope Scope of content to get
  * @returns {string[]|Buffer[]} Array of content
  */
-export function getContentOfType(type, format) {
-    const contentIndex = getContentIndex();
+export function getContentOfType(type, format, scope = CONTENT_SCOPE.USER) {
+    const contentIndex = getContentIndex(scope);
     const indexItems = contentIndex.filter((item) => item.type === type && item.folder);
     const files = [];
     for (const item of indexItems) {
@@ -338,7 +391,7 @@ export function getContentOfType(type, format) {
  * @param {import('../users.js').UserDirectoryList} directories User directories
  * @returns {string | null} Target directory
  */
-function getTargetByType(type, directories) {
+export function getUserTargetByType(type, directories) {
     switch (type) {
         case CONTENT_TYPES.SETTINGS:
             return directories.root;
@@ -376,6 +429,22 @@ function getTargetByType(type, directories) {
             return directories.sysprompt;
         case CONTENT_TYPES.REASONING:
             return directories.reasoning;
+        default:
+            return null;
+    }
+}
+
+/**
+ * Gets the target directory for global content types.
+ * @param {CONTENT_TYPES} type Content type
+ * @returns {string | null} Target directory
+ */
+export function getGlobalTargetByType(type) {
+    switch (type) {
+        case CONTENT_TYPES.ERROR_PAGE:
+            return path.join(globalThis.DATA_ROOT, '_errors');
+        case CONTENT_TYPES.STYLESHEET:
+            return path.join(globalThis.DATA_ROOT, '_css');
         default:
             return null;
     }

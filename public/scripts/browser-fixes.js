@@ -146,6 +146,10 @@ function applyBrowserFixes() {
         };
 
         const fixFunkyPositioning = () => {
+            if (isFirefox() && isEditableFocusTarget(document.activeElement)) {
+                return;
+            }
+
             const currentViewportHeight = Math.round(viewport?.height || window.innerHeight || 0);
             const viewportDelta = Math.abs(currentViewportHeight - lastViewportHeight);
 
