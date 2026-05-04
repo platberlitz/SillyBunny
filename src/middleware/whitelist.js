@@ -6,7 +6,7 @@ import Handlebars from 'handlebars';
 import ipMatching from 'ip-matching';
 import isDocker from 'is-docker';
 
-import { getIpFromRequest } from '../express-common.js';
+import { filterValidIpPatterns, getIpFromRequest, getRealOrForwardedIp } from '../express-common.js';
 import { color, getConfigValue, safeReadFileSync } from '../util.js';
 
 const whitelistPath = path.join(process.cwd(), './whitelist.txt');
@@ -24,28 +24,7 @@ if (fs.existsSync(whitelistPath)) {
     }
 }
 
-/**
- * Validates and filters the whitelist, removing any invalid entries.
- * @param {string[]} entries - The whitelist entries to validate
- * @returns {string[]} The filtered list of valid whitelist entries
- */
-function validateWhitelist(entries) {
-    const validEntries = [];
-
-    for (const entry of entries) {
-        try {
-            // This will throw if the entry is not a valid IP or CIDR
-            ipMatching.getMatch(entry);
-            validEntries.push(entry);
-        } catch (e) {
-            console.warn(`Whitelist ${color.red('Warning')}: Ignoring invalid entry ${color.yellow(entry)} - ${e.message}`);
-        }
-    }
-
-    return validEntries;
-}
-
-whitelist = validateWhitelist(whitelist);
+whitelist = filterValidIpPatterns(whitelist, (entry, message) => `${color.red('Warning')}: Ignoring invalid whitelist entry ${color.yellow(entry)} - ${message}`);
 
 /**
  * Get the client IP address from the request headers.
@@ -57,19 +36,7 @@ function getForwardedIp(req) {
         return undefined;
     }
 
-    // Check if X-Real-IP is available
-    if (req.headers['x-real-ip']) {
-        return req.headers['x-real-ip'].toString();
-    }
-
-    // Check for X-Forwarded-For and parse if available
-    if (req.headers['x-forwarded-for']) {
-        const ipList = req.headers['x-forwarded-for'].toString().split(',').map(ip => ip.trim());
-        return ipList[0];
-    }
-
-    // If none of the headers are available, return undefined
-    return undefined;
+    return getRealOrForwardedIp(req);
 }
 
 /**

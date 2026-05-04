@@ -60,6 +60,9 @@ jobs:
       - name: Run npm install
         run: npm ci --ignore-scripts
 
+      - name: Install test lint dependencies
+        run: npm ci --ignore-scripts --prefix tests
+
       - name: Run ESLint
         # Action ESLint
         # https://github.com/marketplace/actions/action-eslint

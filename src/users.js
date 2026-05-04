@@ -14,12 +14,14 @@ import archiver from 'archiver';
 import _ from 'lodash';
 import { sync as writeFileAtomicSync } from 'write-file-atomic';
 import sanitize from 'sanitize-filename';
+import ipMatching from 'ip-matching';
 
 import { USER_DIRECTORY_TEMPLATE, DEFAULT_USER, PUBLIC_DIRECTORIES, SETTINGS_FILE, UPLOADS_DIRECTORY } from './constants.js';
 import { getConfigValue, color, delay, generateTimestamp, invalidateFirefoxCache, isPathUnderParent } from './util.js';
 import { allowKeysExposure, readSecret, writeSecret, SECRETS_FILE } from './endpoints/secrets.js';
 import { getContentOfType } from './endpoints/content-manager.js';
 import { serverDirectory } from './server-directory.js';
+import { filterValidIpPatterns, getIpFromRequest } from './express-common.js';
 
 export const KEY_PREFIX = 'user:';
 const AVATAR_PREFIX = 'avatar:';
@@ -27,6 +29,7 @@ const ENABLE_ACCOUNTS = getConfigValue('enableUserAccounts', false, 'boolean');
 const AUTHELIA_AUTH = getConfigValue('sso.autheliaAuth', false, 'boolean');
 const AUTHENTIK_AUTH = getConfigValue('sso.authentikAuth', false, 'boolean');
 const PER_USER_BASIC_AUTH = getConfigValue('perUserBasicAuth', false, 'boolean');
+const TRUSTED_PROXIES = getConfigValue('sso.trustedProxies', ['::1', '127.0.0.1']);
 const ANON_CSRF_SECRET = crypto.randomBytes(64).toString('base64');
 
 /**
@@ -795,6 +798,32 @@ async function authentikUserLogin(request) {
 }
 
 /**
+ * Checks if an SSO header can be trusted based on the request IP and the configured trusted proxies.
+ * @param {string} ip Request socket IP
+ * @returns {boolean} Whether the request came from a trusted proxy
+ */
+function isRequestFromTrustedProxy(ip) {
+    if (!Array.isArray(TRUSTED_PROXIES)) {
+        console.warn(color.yellow('sso.trustedProxies is not an array. Please check your config.yaml. SSO auto-login will not work.'));
+        return false;
+    }
+
+    if (TRUSTED_PROXIES.length === 1 && TRUSTED_PROXIES[0] === '*') {
+        console.warn(color.yellow('sso.trustedProxies is set to accept all IPs. This is not recommended for production environments.'));
+        return true;
+    }
+
+    if (!ip || ip === 'unknown') {
+        return false;
+    }
+
+    const formatWarning = (entry, message) => `SSO trusted proxy ${color.red('Warning')}: Ignoring invalid entry ${color.yellow(entry)} - ${message}`;
+    const trustedProxies = filterValidIpPatterns(TRUSTED_PROXIES, formatWarning);
+
+    return trustedProxies.some(entry => ipMatching.matches(ip, ipMatching.getMatch(entry)));
+}
+
+/**
  * Tries auto-login with a given header.
  * @param {import('express').Request} request Request object
  * @param {string} [header='Remote-User'] The header to use for the trusted user
@@ -810,6 +839,12 @@ async function headerUserLogin(request, header = 'Remote-User') {
         return false;
     }
     console.debug(`Attempting auto-login for user from header ${header}: ${remoteUser}`);
+
+    const ip = getIpFromRequest(request);
+    if (!isRequestFromTrustedProxy(ip)) {
+        console.warn(color.yellow(`Received ${header} header from untrusted IP ${ip}. Ignoring for auto-login.`));
+        return false;
+    }
 
     const userHandles = await getAllUserHandles();
     for (const userHandle of userHandles) {

@@ -6,6 +6,8 @@ import path from 'node:path';
 import util from 'node:util';
 import dns from 'node:dns';
 import process from 'node:process';
+import http from 'node:http';
+import https from 'node:https';
 
 import cors from 'cors';
 import { csrfSync } from 'csrf-sync';
@@ -49,6 +51,7 @@ import getWhitelistMiddleware from './middleware/whitelist.js';
 import accessLoggerMiddleware, { getAccessLogPath, migrateAccessLog } from './middleware/accessLogWriter.js';
 import multerMonkeyPatch from './middleware/multerMonkeyPatch.js';
 import initRequestProxy from './request-proxy.js';
+import initPrivateRequestFilter from './private-request-filter.js';
 import corsProxyMiddleware from './middleware/corsProxy.js';
 import hostWhitelistMiddleware from './middleware/hostWhitelist.js';
 import {
@@ -88,6 +91,9 @@ if (!cliArgs.enableIPv6 && !cliArgs.enableIPv4) {
     console.error('error: You can\'t disable all internet protocols: at least IPv6 or IPv4 must be enabled.');
     process.exit(1);
 }
+
+http.globalAgent = new http.Agent({ keepAlive: cliArgs.enableKeepAlive });
+https.globalAgent = new https.Agent({ keepAlive: cliArgs.enableKeepAlive });
 
 const app = express();
 app.use(helmet({
@@ -477,8 +483,25 @@ async function preSetupTasks() {
         exitProcess();
     });
 
+    const requestFilterOptions = {
+        listen: cliArgs.listen,
+        enabled: !!getConfigValue('privateAddressWhitelist.enabled', false, 'boolean'),
+        privateAddressWhitelist: getConfigValue('privateAddressWhitelist.allowedRanges', ['127.0.0.0/8', '::1/128']),
+        logBlocked: !!getConfigValue('privateAddressWhitelist.log.blockedRequests', true, 'boolean'),
+        logAllowed: !!getConfigValue('privateAddressWhitelist.log.allowedRequests', false, 'boolean'),
+        allowUnresolvedHosts: !!getConfigValue('privateAddressWhitelist.allowUnresolvedHosts', false, 'boolean'),
+        enableKeepAlive: cliArgs.enableKeepAlive,
+    };
+    initPrivateRequestFilter(requestFilterOptions);
+
     // Add request proxy.
-    initRequestProxy({ enabled: cliArgs.requestProxyEnabled, url: cliArgs.requestProxyUrl, bypass: cliArgs.requestProxyBypass });
+    initRequestProxy({
+        enabled: cliArgs.requestProxyEnabled,
+        url: cliArgs.requestProxyUrl,
+        bypass: cliArgs.requestProxyBypass,
+        enableKeepAlive: cliArgs.enableKeepAlive,
+        privateRequestFilterEnabled: requestFilterOptions.enabled,
+    });
 
     // Wait for frontend libs to compile
     await webpackMiddleware.runWebpackCompiler({ pruneCache: true });
