@@ -212,6 +212,8 @@ export const CHAT_COMPLETION_SOURCES = {
     OPENAI_RESPONSES: 'openai_responses',
     ZAI: 'zai',
     SILICONFLOW: 'siliconflow',
+    MINIMAX: 'minimax',
+    WORKERS_AI: 'workers_ai',
 };
 
 /**
@@ -556,6 +558,11 @@ export const ZAI_ENDPOINT = {
 };
 
 export const SILICONFLOW_ENDPOINT = {
+    GLOBAL: 'global',
+    CN: 'cn',
+};
+
+export const MINIMAX_ENDPOINT = {
     GLOBAL: 'global',
     CN: 'cn',
 };

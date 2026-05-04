@@ -1,5 +1,5 @@
-import { DOMPurify, moment } from '../lib.js';
-import { event_types, eventSource, getRequestHeaders } from '../script.js';
+import { DOMPurify, moment, sha256 } from '../lib.js';
+import { event_types, eventSource, getRequestHeaders, saveSettings } from '../script.js';
 import { t } from './i18n.js';
 import { chat_completion_sources } from './openai.js';
 import { callGenericPopup, Popup, POPUP_RESULT, POPUP_TYPE } from './popup.js';
@@ -12,7 +12,9 @@ import { SlashCommandParser } from './slash-commands/SlashCommandParser.js';
 import { SlashCommandScope } from './slash-commands/SlashCommandScope.js';
 import { renderTemplateAsync } from './templates.js';
 import { textgen_types } from './textgen-settings.js';
-import { copyText, isTrueBoolean } from './utils.js';
+import { getCurrentUserHandle } from './user.js';
+import { copyText, isTrueBoolean, uuidv4 } from './utils.js';
+import { accountStorage } from './util/AccountStorage.js';
 
 export const SECRET_KEYS = {
     HORDE: 'api_key_horde',
@@ -76,6 +78,7 @@ export const SECRET_KEYS = {
     POLLINATIONS: 'api_key_pollinations',
     VOLCENGINE_APP_ID: 'volcengine_app_id',
     VOLCENGINE_ACCESS_KEY: 'volcengine_access_key',
+    WORKERS_AI: 'api_key_workers_ai',
 };
 
 const FRIENDLY_NAMES = {
@@ -129,7 +132,7 @@ const FRIENDLY_NAMES = {
     [SECRET_KEYS.LINGVA_URL]: 'Lingva Endpoint (e.g. https://lingva.ml/api/v1)',
     [SECRET_KEYS.ONERING_URL]: 'OneRingTranslator Endpoint (e.g. http://127.0.0.1:4990/translate)',
     [SECRET_KEYS.DEEPLX_URL]: 'DeepLX Endpoint (e.g. http://127.0.0.1:1188/translate)',
-    [SECRET_KEYS.MINIMAX]: 'MiniMax TTS',
+    [SECRET_KEYS.MINIMAX]: 'MiniMax',
     [SECRET_KEYS.MINIMAX_GROUP_ID]: 'MiniMax Group ID',
     [SECRET_KEYS.MOONSHOT]: 'Moonshot AI',
     [SECRET_KEYS.COMETAPI]: 'CometAPI',
@@ -140,6 +143,7 @@ const FRIENDLY_NAMES = {
     [SECRET_KEYS.POLLINATIONS]: 'Pollinations',
     [SECRET_KEYS.VOLCENGINE_APP_ID]: 'Volcengine App ID',
     [SECRET_KEYS.VOLCENGINE_ACCESS_KEY]: 'Volcengine Access Key',
+    [SECRET_KEYS.WORKERS_AI]: 'Cloudflare Workers AI',
 };
 
 const INPUT_MAP = {
@@ -184,6 +188,8 @@ const INPUT_MAP = {
     [SECRET_KEYS.SILICONFLOW]: '#api_key_siliconflow',
     [SECRET_KEYS.COMFY_RUNPOD]: '#api_key_comfy_runpod',
     [SECRET_KEYS.POLLINATIONS]: '#api_key_pollinations',
+    [SECRET_KEYS.MINIMAX]: '#api_key_minimax',
+    [SECRET_KEYS.WORKERS_AI]: '#api_key_workers_ai',
 };
 
 const getLabel = () => moment().format('L LT');
@@ -495,6 +501,26 @@ export async function renameSecret(key, id, label) {
 }
 
 /**
+ * Generates a storage key for the PKCE code verifier for a given source.
+ * @param {string} source Source for which to generate the storage key (e.g. 'openrouter')
+ * @returns {string} The storage key for the PKCE code verifier for a given source.
+ */
+const getVerifierKey = (source) => `${getCurrentUserHandle()}_${source}_code_verifier`;
+
+/**
+ * Generates a code challenge for PKCE authentication flows.
+ * @param {string} codeVerifier Code verifier to transform
+ * @returns {string} Code challenge
+ */
+const generateChallenge = (codeVerifier) => {
+    return sha256.arrayBuffer(codeVerifier)
+        .toBase64()
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+};
+
+/**
  * Redirects the user to authorize OpenRouter.
  */
 async function authorizeOpenRouter() {
@@ -505,8 +531,13 @@ async function authorizeOpenRouter() {
         }
     }
 
+    const codeVerifier = uuidv4() + uuidv4();
+    const codeChallenge = generateChallenge(codeVerifier);
+    accountStorage.setItem(getVerifierKey('openrouter'), codeVerifier);
+    await saveSettings();
+
     const redirectUrl = new URL('/callback/openrouter', window.location.origin);
-    const openRouterUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(redirectUrl.toString())}`;
+    const openRouterUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(redirectUrl.toString())}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
     location.href = openRouterUrl;
 }
 
@@ -519,11 +550,27 @@ async function checkOpenRouterAuth() {
     const source = params.get('source');
     if (source === 'openrouter') {
         const query = new URLSearchParams(params.get('query'));
-        const code = query.get('code');
         try {
+            const code = query.get('code');
+            if (!code) {
+                throw new Error('OpenRouter authorization code not found in URL');
+            }
+
+            const codeVerifier = accountStorage.getItem(getVerifierKey('openrouter'));
+            if (!codeVerifier) {
+                throw new Error('OpenRouter code verifier not found in accountStorage');
+            }
+
             const response = await fetch('https://openrouter.ai/api/v1/auth/keys', {
                 method: 'POST',
-                body: JSON.stringify({ code }),
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    code: code,
+                    code_verifier: codeVerifier,
+                    code_challenge_method: 'S256',
+                }),
             });
 
             if (!response.ok) {
@@ -539,18 +586,22 @@ async function checkOpenRouterAuth() {
 
             if (secret_state[SECRET_KEYS.OPENROUTER]) {
                 toastr.success('OpenRouter token saved');
-                // Remove the code from the URL
-                const currentUrl = window.location.href;
-                const urlWithoutSearchParams = currentUrl.split('?')[0];
-                window.history.pushState({}, '', urlWithoutSearchParams);
             } else {
                 throw new Error('OpenRouter token not saved');
             }
         } catch (err) {
             toastr.error('Could not verify OpenRouter token. Please try again.');
-            return;
+            console.error('OpenRouter OAuth error:', err);
+        } finally {
+            // Remove the code from the URL
+            const currentUrl = window.location.href;
+            const urlWithoutSearchParams = currentUrl.split('?')[0];
+            window.history.pushState({}, '', urlWithoutSearchParams);
         }
     }
+
+    // Clean-up any code verifiers that might be left in accountStorage from abandoned auth flows
+    accountStorage.removeItem(getVerifierKey('openrouter'));
 }
 
 /**

@@ -17,6 +17,7 @@ import {
     OPENROUTER_HEADERS,
     VERTEX_SAFETY,
     SILICONFLOW_ENDPOINT,
+    MINIMAX_ENDPOINT,
     ZAI_ENDPOINT,
 } from '../../constants.js';
 import {
@@ -89,6 +90,9 @@ const API_ZAI_COMMON = 'https://api.z.ai/api/paas/v4';
 const API_ZAI_CODING = 'https://api.z.ai/api/coding/paas/v4';
 const API_SILICONFLOW = 'https://api.siliconflow.com/v1';
 const API_SILICONFLOW_CN = 'https://api.siliconflow.cn/v1';
+const API_MINIMAX = 'https://api.minimax.io/v1';
+const API_MINIMAX_CN = 'https://api.minimaxi.com/v1';
+const API_WORKERS_AI = 'https://api.cloudflare.com/client/v4/accounts';
 const API_OPENROUTER = 'https://openrouter.ai/api/v1';
 
 /**
@@ -1620,6 +1624,87 @@ async function sendChutesRequest(request, response) {
 }
 
 /**
+ * Sends a request to MiniMax.
+ * @param {express.Request} request Express request
+ * @param {express.Response} response Express response
+ */
+async function sendMinimaxRequest(request, response) {
+    const apiUrl = request.body.minimax_endpoint === MINIMAX_ENDPOINT.CN
+        ? API_MINIMAX_CN : API_MINIMAX;
+    const apiKey = readSecret(request.user.directories, SECRET_KEYS.MINIMAX, request.body.secret_id);
+
+    if (!apiKey) {
+        console.warn('MiniMax key is missing.');
+        return response.status(400).send({ error: true });
+    }
+
+    const controller = new AbortController();
+    request.socket.removeAllListeners('close');
+    request.socket.on('close', function () {
+        controller.abort();
+    });
+
+    try {
+        // MiniMax does not allow consecutive messages with the same role.
+        const messages = postProcessPrompt(request.body.messages, PROMPT_PROCESSING_TYPE.MERGE_TOOLS, getPromptNames(request));
+
+        let bodyParams = {};
+
+        if (Array.isArray(request.body.tools) && request.body.tools.length > 0) {
+            bodyParams['tools'] = request.body.tools;
+            bodyParams['tool_choice'] = request.body.tool_choice;
+        }
+
+        const requestBody = {
+            'messages': messages,
+            'model': request.body.model,
+            'temperature': request.body.temperature,
+            'max_tokens': request.body.model === 'M2-her' ? Math.min(request.body.max_tokens, 2048) : request.body.max_tokens,
+            'stream': request.body.stream,
+            'top_p': request.body.top_p,
+            'stop': request.body.stop,
+            ...bodyParams,
+        };
+
+        const config = {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + apiKey,
+            },
+            body: JSON.stringify(requestBody),
+            signal: controller.signal,
+        };
+
+        console.debug('MiniMax request:', summarizeLlmPayloadForLog(requestBody));
+
+        const generateResponse = await fetch(apiUrl + '/chat/completions', config);
+
+        if (request.body.stream) {
+            return forwardFetchResponse(generateResponse, response);
+        }
+
+        if (!generateResponse.ok) {
+            const errorText = await generateResponse.text();
+            console.warn('MiniMax returned error: ', errorText);
+            const errorJson = tryParse(errorText) ?? { error: true };
+            return response.status(500).send(errorJson);
+        }
+
+        const generateResponseJson = await generateResponse.json();
+        console.debug('MiniMax response:', summarizeLlmPayloadForLog(generateResponseJson));
+        return response.send(generateResponseJson);
+    } catch (error) {
+        console.error('Error communicating with MiniMax: ', error);
+        if (!response.headersSent) {
+            response.send({ error: true });
+        } else {
+            response.end();
+        }
+    }
+}
+
+/**
  * Sends a chat completion request to Azure OpenAI.
  * @param {express.Request} request Express request object (contains request.body with all generate_data)
  * @param {express.Response} response Express response object
@@ -1913,6 +1998,49 @@ router.post('/status', async function (request, statusResponse) {
             apiKey = readSecret(request.user.directories, SECRET_KEYS.SILICONFLOW);
             headers = {};
             queryParams = { type: 'text', sub_type: 'chat' };
+        } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.WORKERS_AI) {
+            apiKey = readSecret(request.user.directories, SECRET_KEYS.WORKERS_AI, request.body.secret_id);
+
+            if (!apiKey) {
+                console.warn('Cloudflare Workers AI API key is missing.');
+                return statusResponse.status(400).send({ error: true });
+            }
+
+            try {
+                const accountId = String(request.body.workers_ai_account_id || '').trim();
+                if (!accountId) {
+                    console.warn('Cloudflare Workers AI Account ID is missing.');
+                    return statusResponse.status(400).send({ error: true });
+                }
+
+                const modelsUrl = new URL(`${API_WORKERS_AI}/${encodeURIComponent(accountId)}/ai/models/search`);
+                modelsUrl.searchParams.set('task', 'Text Generation');
+                modelsUrl.searchParams.set('per_page', '1000');
+
+                const response = await fetch(modelsUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + apiKey,
+                    },
+                });
+
+                if (response.ok) {
+                    /** @type {any} */
+                    const data = await response.json();
+                    const models = Array.isArray(data?.result)
+                        ? data.result.map(model => ({ ...model, id: model.name }))
+                        : [];
+
+                    console.debug('Available Cloudflare Workers AI models:', models.map(m => m.id));
+                    return statusResponse.send({ data: models });
+                } else {
+                    console.warn('Cloudflare Workers AI models endpoint failed:', response.status, response.statusText);
+                    return statusResponse.status(response.status).send({ error: true });
+                }
+            } catch (error) {
+                console.error('Error fetching Cloudflare Workers AI models:', error);
+                return statusResponse.status(500).send({ error: true });
+            }
         } else {
             console.warn('This chat completion source is not supported yet.');
             return statusResponse.status(400).send({ error: true });
@@ -2512,6 +2640,7 @@ router.post('/generate', async function (request, response) {
             case CHAT_COMPLETION_SOURCES.AIMLAPI: return await sendAimlapiRequest(request, response);
             case CHAT_COMPLETION_SOURCES.XAI: return await sendXaiRequest(request, response);
             case CHAT_COMPLETION_SOURCES.CHUTES: return await sendChutesRequest(request, response);
+            case CHAT_COMPLETION_SOURCES.MINIMAX: return await sendMinimaxRequest(request, response);
             case CHAT_COMPLETION_SOURCES.ELECTRONHUB: return await sendElectronHubRequest(request, response);
             case CHAT_COMPLETION_SOURCES.AZURE_OPENAI: return await sendAzureOpenAIRequest(request, response);
             case CHAT_COMPLETION_SOURCES.OPENAI_RESPONSES: return await sendOpenAIResponsesRequest(request, response);
@@ -2788,6 +2917,24 @@ router.post('/generate', async function (request, response) {
             if (request.body.json_schema) {
                 setJsonObjectFormat(bodyParams, request.body.messages, request.body.json_schema);
             }
+        } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.WORKERS_AI) {
+            apiKey = readSecret(request.user.directories, SECRET_KEYS.WORKERS_AI, request.body.secret_id);
+            const accountId = String(request.body.workers_ai_account_id || '').trim();
+            if (!accountId) {
+                console.warn('Cloudflare Workers AI Account ID is missing.');
+                return response.status(400).send({ error: true });
+            }
+            apiUrl = `${API_WORKERS_AI}/${encodeURIComponent(accountId)}/ai/v1`;
+            headers = {};
+            bodyParams = {
+                repetition_penalty: request.body.repetition_penalty,
+            };
+            if (request.body.json_schema) {
+                bodyParams['response_format'] = {
+                    type: 'json_schema',
+                    json_schema: request.body.json_schema.value,
+                };
+            }
         } else {
             console.warn('This chat completion source is not supported yet.');
             return response.status(400).send({ error: true });
@@ -3003,6 +3150,39 @@ multimodalModels.post('/nanogpt', async (_req, res) => {
 
         const multimodalModels = data.data.filter(m => m?.capabilities?.vision).map(m => m.id);
         return res.json(multimodalModels);
+    } catch (error) {
+        console.error(error);
+        return res.sendStatus(500);
+    }
+});
+
+multimodalModels.post('/workers_ai', async (req, res) => {
+    try {
+        const key = readSecret(req.user.directories, SECRET_KEYS.WORKERS_AI);
+        const accountId = String(req.body.workers_ai_account_id || '').trim();
+
+        if (!key || !accountId) {
+            return res.json([]);
+        }
+
+        const apiUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/models/search?task=Text+Generation&per_page=1000`;
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + key },
+        });
+
+        if (!response.ok) {
+            return res.json([]);
+        }
+
+        /** @type {any} */
+        const data = await response.json();
+        const models = Array.isArray(data?.result)
+            ? data.result
+                .filter(m => Array.isArray(m.properties) && m.properties.some(p => p.property_id === 'vision' && p.value === 'true'))
+                .map(m => m.name)
+            : [];
+        return res.json(models);
     } catch (error) {
         console.error(error);
         return res.sendStatus(500);

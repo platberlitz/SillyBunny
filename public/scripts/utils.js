@@ -2069,6 +2069,31 @@ export function setValueByPath(obj, path, value) {
 }
 
 /**
+ * Deletes a value from an object by a path.
+ * @param {object} obj Object to delete value from
+ * @param {string} path Key path
+ * @returns {void}
+ */
+export function deleteValueByPath(obj, path) {
+    const keyParts = path.split('.');
+    let currentObject = obj;
+
+    for (let i = 0; i < keyParts.length - 1; i++) {
+        const part = keyParts[i];
+
+        if (!currentObject || typeof currentObject !== 'object') {
+            return;
+        }
+
+        currentObject = currentObject[part];
+    }
+
+    if (currentObject && typeof currentObject === 'object') {
+        delete currentObject[keyParts[keyParts.length - 1]];
+    }
+}
+
+/**
  * Flashes the given HTML element via CSS flash animation for a defined period
  * @param {JQuery<HTMLElement>} element - The element to flash
  * @param {number} timespan - A number in milliseconds how the flash should last (default is 2000ms.  Multiples of 1000ms work best, as they end with the flash animation being at 100% opacity)
