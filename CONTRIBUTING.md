@@ -78,7 +78,7 @@ When a new, stable upstream SillyTavern version releases:
 
 - Prioritize synchronizing to `staging` over new features and bug fixes.
 - Check for code compatibility with the new version release.
-- Remove any SillyBunny features or patches in favour of those that have been properly implemented upstream.
+- Remove and migrate any SillyBunny features or patches if they have been properly implemented upstream.
 - Resolve merge conflicts carefully, ensuring that upstream changes do not overwrite SillyBunny's custom UI modifications, Bun-specific optimizations, or additional features.
 - Verify that any new upstream UI elements (such as new settings, menus, or buttons) integrate correctly into the fork's modified DOM structure.
 - Review the upstream changelog to identify any newly added dependencies or modifications to metadata/state formats.
