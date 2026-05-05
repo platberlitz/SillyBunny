@@ -269,7 +269,7 @@ import { initScrapers } from './scripts/scrapers.js';
 import { initCustomSelectedSamplers, validateDisabledSamplers } from './scripts/samplerSelect.js';
 import { DragAndDropHandler } from './scripts/dragdrop.js';
 import { INTERACTABLE_CONTROL_CLASS, initKeyboard } from './scripts/keyboard.js';
-import { initDynamicStyles } from './scripts/dynamic-styles.js';
+import { loadStylesheetAsync, initDynamicStyles } from './scripts/dynamic-styles.js';
 import { initInputMarkdown } from './scripts/input-md-formatting.js';
 import { AbortReason } from './scripts/util/AbortReason.js';
 import { initSystemPrompts } from './scripts/sysprompt.js';
@@ -303,6 +303,12 @@ import { compressRequest, setRequestCompressionConfig } from './scripts/request-
 import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker } from './scripts/swipe-picker.js';
 import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
 import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
+
+const DEFERRED_STARTUP_STYLESHEETS = Object.freeze([
+    { href: 'css/rm-groups.css', id: 'deferred-rm-groups-css' },
+    { href: 'css/group-avatars.css', id: 'deferred-group-avatars-css' },
+    { href: 'css/macros.css', id: 'deferred-macros-css' },
+]);
 
 // API OBJECT FOR EXTERNAL WIRING
 globalThis.SillyTavern = {
@@ -823,6 +829,23 @@ function registerSillyBunnyServiceWorker() {
     window.addEventListener('load', register, { once: true });
 }
 
+function scheduleDeferredStartupStylesheets() {
+    const loadStylesheets = () => {
+        for (const stylesheet of DEFERRED_STARTUP_STYLESHEETS) {
+            loadStylesheetAsync(stylesheet.href, { id: stylesheet.id }).catch(error => {
+                console.warn('Failed to load deferred stylesheet:', stylesheet.href, error);
+            });
+        }
+    };
+
+    if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(loadStylesheets, { timeout: 2500 });
+        return;
+    }
+
+    window.setTimeout(loadStylesheets, 800);
+}
+
 //MARK: firstLoadInit
 async function firstLoadInit() {
     const scheduleStartupLoaderCleanup = (reason) => {
@@ -911,6 +934,7 @@ async function firstLoadInit() {
         initDynamicStyles();
         initTags();
         initBookmarks();
+        scheduleDeferredStartupStylesheets();
         await releaseStartupLoader('startup loader release');
         await getUserAvatars(true, user_avatar);
         await getCharacters();

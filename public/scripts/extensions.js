@@ -9,6 +9,7 @@ import { addLocaleData, getCurrentLocale, t } from './i18n.js';
 import { debounce_timeout } from './constants.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { SimpleMutex } from './util/SimpleMutex.js';
+import { loadStylesheetAsync, prefetchAsset } from './dynamic-styles.js';
 
 export {
     getApiUrl,
@@ -106,6 +107,7 @@ const getApiUrl = () => extension_settings.apiUrl;
 const sortManifestsByOrder = (a, b) => parseInt(a.loading_order) - parseInt(b.loading_order) || String(a.display_name).localeCompare(String(b.display_name));
 const sortManifestsByName = (a, b) => String(a.display_name).localeCompare(String(b.display_name)) || parseInt(a.loading_order) - parseInt(b.loading_order);
 let connectedToApi = false;
+let extensionPrefetchToken = 0;
 
 /**
  * Holds manifest data for each extension.
@@ -117,6 +119,16 @@ let manifests = {};
  * Default URL for the Extras API.
  */
 const defaultUrl = 'http://localhost:5100';
+const extensionSecondaryPrefetchAssets = Object.freeze({
+    gallery: [
+        { path: 'nanogallery2.woff.min.css', as: 'style' },
+        { path: 'jquery.nanogallery2.min.js', as: 'script' },
+    ],
+    tts: [
+        { path: 'kokoro-worker.js', as: 'script' },
+        { path: 'lib/kokoro.web.js', as: 'script' },
+    ],
+});
 
 /**
  * Checks if the extension is officially supported by its URL pattern.
@@ -164,6 +176,55 @@ function getExtensionAssetVersion() {
 
 function getExtensionAssetUrl(name, assetPath) {
     return `/scripts/extensions/${name}/${assetPath}?v=${getExtensionAssetVersion()}`;
+}
+
+function scheduleIdleTask(callback, timeout = 4000) {
+    if ('requestIdleCallback' in window) {
+        return window.requestIdleCallback(callback, { timeout });
+    }
+
+    return window.setTimeout(callback, Math.min(timeout, 1000));
+}
+
+function prefetchExtensionAsset(name, assetPath, as) {
+    if (!assetPath) {
+        return;
+    }
+
+    try {
+        prefetchAsset(getExtensionAssetUrl(name, assetPath), { as });
+    } catch (error) {
+        console.debug('Could not prefetch extension asset', name, assetPath, error);
+    }
+}
+
+function scheduleExtensionAssetPrefetch() {
+    const connection = navigator.connection;
+    if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) {
+        return;
+    }
+
+    const token = ++extensionPrefetchToken;
+
+    scheduleIdleTask(() => {
+        if (token !== extensionPrefetchToken) {
+            return;
+        }
+
+        for (const [name, manifest] of Object.entries(manifests)) {
+            if (extension_settings.disabledExtensions.includes(name)) {
+                continue;
+            }
+
+            prefetchExtensionAsset(name, manifest.js, 'script');
+            prefetchExtensionAsset(name, manifest.css, 'style');
+
+            const secondaryAssets = extensionSecondaryPrefetchAssets[name] ?? [];
+            for (const asset of secondaryAssets) {
+                prefetchExtensionAsset(name, asset.path, asset.as);
+            }
+        }
+    });
 }
 
 export function cancelDebouncedMetadataSave() {
@@ -1172,25 +1233,10 @@ function addExtensionStyle(name, manifest) {
         return Promise.resolve();
     }
 
-    return new Promise((resolve, reject) => {
-        const url = getExtensionAssetUrl(name, manifest.css);
-        const id = sanitizeSelector(`${name}-css`);
+    const url = getExtensionAssetUrl(name, manifest.css);
+    const id = sanitizeSelector(`${name}-css`);
 
-        if ($(`link[id="${id}"]`).length === 0) {
-            const link = document.createElement('link');
-            link.id = id;
-            link.rel = 'stylesheet';
-            link.type = 'text/css';
-            link.href = url;
-            link.onload = function () {
-                resolve();
-            };
-            link.onerror = function (e) {
-                reject(e);
-            };
-            document.head.appendChild(link);
-        }
-    });
+    return loadStylesheetAsync(url, { id }).then(() => undefined);
 }
 
 /**
@@ -2169,6 +2215,8 @@ export async function loadExtensionSettings(settings, versionChanged, enableAuto
     } else if (removedCount > 0) {
         saveSettingsDebounced();
     }
+
+    scheduleExtensionAssetPrefetch();
 
     maybeShowMoonlitEchoesMovedNotice();
     void maybeShowGuidedGenerationsForkNotice();
