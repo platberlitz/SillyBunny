@@ -463,7 +463,7 @@ export const default_avatar = 'img/ai4.png';
 const SILLYBUNNY_FRONTEND_ICON_STORAGE_KEY = 'sb-frontend-icon';
 const SILLYBUNNY_FRONTEND_ICON_DEFAULT = 'pixel';
 const SILLYBUNNY_FRONTEND_ICONS = Object.freeze({
-    pixel: 'img/sillybunny-pixel-logo.png',
+    pixel: 'img/sillybunny-pixel-logo-og.png',
     badge: 'img/sillybunny-badge.svg',
 });
 

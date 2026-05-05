@@ -101,7 +101,7 @@
     --sb-proxy-label-size: calc(var(--mainFontSize) * var(--sb-proxy-label-scale-base));
     --sb-proxy-underline-inset: var(--sb-proxy-underline-inset-base);
     --sb-proxy-underline-bottom: var(--sb-proxy-underline-bottom-base);
-    --sb-mobile-toggle-size: max(44px, calc(var(--sb-mobile-toggle-size-base) * var(--sb-mobile-button-scale)));
+    --sb-mobile-toggle-size: clamp(34px, calc(var(--sb-mobile-toggle-size-base) * var(--sb-mobile-button-scale)), 56px);
     --sb-home-toggle-min-width: max(44px, calc(var(--sb-home-toggle-min-width-base) * var(--sb-mobile-button-scale)));
     --sb-topbar-compact-icon-size: calc(var(--mainFontSize) * var(--sb-topbar-compact-icon-scale-base));
     --sb-topbar-primary-min-height: max(var(--sb-proxy-button-height), var(--sb-mobile-toggle-size));
@@ -113,7 +113,7 @@
     --sb-mobile-tools-gap: calc(var(--sb-mobile-tools-gap-base) * var(--sb-topbar-scale-active));
     --sb-mobile-tools-header-gap: calc(var(--sb-mobile-tools-header-gap-base) * var(--sb-topbar-scale-active));
     --sb-mobile-tools-actions-gap: calc(var(--sb-mobile-tools-actions-gap-base) * var(--sb-topbar-scale-active));
-    --sb-mobile-tools-button-size: max(44px, calc(var(--sb-mobile-tools-button-size-base) * var(--sb-topbar-scale-active) * var(--sb-mobile-button-scale)));
+    --sb-mobile-tools-button-size: clamp(34px, calc(44px * var(--sb-topbar-scale-active) * var(--sb-mobile-button-scale)), 56px);
     --sb-mobile-tools-button-radius: calc(var(--sb-mobile-tools-button-radius-base) * var(--sb-topbar-scale-active) * var(--sb-mobile-button-scale));
     --sb-mobile-tools-field-height: max(44px, calc(var(--sb-mobile-tools-field-height-base) * var(--sb-topbar-scale-active)));
     --sb-mobile-tools-field-padding-x: calc(var(--sb-mobile-tools-field-padding-x-base) * var(--sb-topbar-scale-active));

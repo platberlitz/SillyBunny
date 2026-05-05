@@ -4754,11 +4754,11 @@ input[type='range']::-moz-range-thumb {
     #rightSendForm > div:not(.mes_stop),
     #send_form .mes_stop,
     #options_button {
-        width: var(--sb-mobile-touch-target);
-        min-width: var(--sb-mobile-touch-target);
-        height: var(--sb-mobile-touch-target);
-        min-height: var(--sb-mobile-touch-target);
-        max-height: var(--sb-mobile-touch-target);
+        width: var(--bottomFormBlockSize);
+        min-width: var(--bottomFormBlockSize);
+        height: var(--bottomFormBlockSize);
+        min-height: var(--bottomFormBlockSize);
+        max-height: var(--bottomFormBlockSize);
     }
 
     #send_textarea {
