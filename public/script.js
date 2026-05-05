@@ -115,6 +115,12 @@ import {
     initOpenAI,
     reconnectOpenAi,
 } from './scripts/openai.js';
+import {
+    extractOocBlocksForDisplay,
+    hasTextOrArrayPayload,
+    restoreOocBlocksForDisplay,
+    stripOocBlocksFromContext,
+} from './scripts/ooc-blocks.js';
 
 import {
     generateNovelWithStreaming,
@@ -2081,6 +2087,8 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
         return '';
     }
 
+    const oocBlocks = [];
+
     const resolvedMessageId = messageId !== null && messageId !== undefined && messageId !== ''
         ? Number(messageId)
         : NaN;
@@ -2159,6 +2167,10 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
 
     if (power_user.auto_fix_generated_markdown) {
         mes = fixMarkdown(mes, true);
+    }
+
+    if (!isSystem && !isReasoning) {
+        mes = extractOocBlocksForDisplay(mes, oocBlocks);
     }
 
     if (!isSystem && power_user.encode_tags) {
@@ -2248,11 +2260,25 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
         ADD_TAGS: ['custom-style'],
         ...sanitizerOverrides,
     };
+    mes = restoreOocBlocksForDisplay(mes, oocBlocks);
     mes = encodeStyleTags(mes);
     mes = DOMPurify.sanitize(mes, config);
     mes = decodeStyleTags(mes, { prefix: '.mes_text ' });
 
     return mes;
+}
+
+/**
+ * Checks whether a prompt message still carries non-text payload after OOC text is removed.
+ * @param {object} chatItem Message history item.
+ * @returns {boolean} True if the prompt item should remain in context.
+ */
+function hasPromptPayload(chatItem) {
+    return hasTextOrArrayPayload(chatItem?.mes, [
+        chatItem?.extra?.media,
+        chatItem?.extra?.files,
+        chatItem?.extra?.tool_invocations,
+    ]);
 }
 
 /**
@@ -5175,10 +5201,11 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
 
         return {
             ...chatItem,
-            mes: regexedMessage,
+            mes: stripOocBlocksFromContext(regexedMessage),
             index,
         };
     }));
+    coreChat = coreChat.filter(hasPromptPayload);
 
     const promptReasoning = new PromptReasoning();
     for (let i = coreChat.length - 1; i >= 0; i--) {

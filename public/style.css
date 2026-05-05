@@ -577,6 +577,41 @@ input[type='checkbox']:focus-visible {
     color: var(--SmartThemeQuoteColor);
 }
 
+#chat .mes_text .ooc_block {
+    color: var(--SmartThemeBodyColor);
+    border: 1px solid color-mix(in srgb, var(--color-primary, var(--SmartThemeQuoteColor)) 45%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--color-primary, var(--SmartThemeQuoteColor)) 10%, transparent);
+    margin: 0.5em 0;
+    overflow: hidden;
+}
+
+#chat .mes_text .ooc_block summary {
+    box-sizing: border-box;
+    color: var(--color-primary, var(--SmartThemeQuoteColor));
+    cursor: pointer;
+    font-weight: 700;
+    line-height: 1.35;
+    min-height: 44px;
+    padding: 0.75em;
+    user-select: none;
+}
+
+#chat .mes_text .ooc_block summary:focus-visible {
+    outline: 2px solid var(--color-focus-ring, var(--SmartThemeQuoteColor));
+    outline-offset: -3px;
+}
+
+#chat .mes_text .ooc_block summary::marker {
+    color: var(--color-primary, var(--SmartThemeQuoteColor));
+}
+
+#chat .mes_text .ooc_block .ooc_content {
+    border-top: 1px solid color-mix(in srgb, var(--color-primary, var(--SmartThemeQuoteColor)) 28%, transparent);
+    padding: 0.5em 0.65em 0.65em;
+    white-space: normal;
+}
+
 .mes_reasoning q {
     color: hsl(from var(--SmartThemeQuoteColor) h calc(s * var(--reasoning-saturation)) l);
 }
@@ -1513,8 +1548,6 @@ body.hideAllSwipeButtons :is(.swipe_left, .swipe_right),
 }
 
 img[src*="sillybunny-pixel-logo.png"] {
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
     object-fit: contain;
 }
 
