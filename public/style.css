@@ -114,6 +114,22 @@
     --mainFontSize: calc(var(--fontScale) * 15px);
     --mainFontFamily: 'Figtree', 'Noto Sans', sans-serif;
     --monoFontFamily: 'Red Hat Mono', 'Noto Sans Mono', 'Courier New', Consolas, monospace;
+    --sb-type-caption: calc(var(--mainFontSize) * 0.72);
+    --sb-type-meta: calc(var(--mainFontSize) * 0.78);
+    --sb-type-control: calc(var(--mainFontSize) * 0.86);
+    --sb-type-body: var(--mainFontSize);
+    --sb-type-title: calc(var(--mainFontSize) * 1.08);
+    --sb-type-headline: calc(var(--mainFontSize) * 1.35);
+    --sb-type-display: calc(var(--mainFontSize) * 1.62);
+    --sb-line-compact: 1.2;
+    --sb-line-title: 1.18;
+    --sb-line-body: 1.55;
+    --sb-line-prose: 1.65;
+    --sb-weight-body: 400;
+    --sb-weight-control: 600;
+    --sb-weight-title: 700;
+    --sb-tracking-label: 0.06em;
+    --sb-tracking-kicker: 0.1em;
     /* Compatibility aliases for older imported themes and extension-style presets. */
     --mainFont: var(--mainFontFamily);
     --headerFont: var(--mainFontFamily);

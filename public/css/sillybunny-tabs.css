@@ -881,19 +881,22 @@ body:not(.movingUI) .drawer-content.maximized {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: calc(var(--mainFontSize) * 0.86);
+    font-size: var(--sb-type-control);
+    font-weight: var(--sb-weight-title);
+    line-height: var(--sb-line-title);
 }
 
 .sb-chat-file-head small,
 .sb-chat-file-meta small {
     opacity: 0.62;
-    font-size: calc(var(--mainFontSize) * 0.7);
+    font-size: var(--sb-type-caption);
+    line-height: var(--sb-line-compact);
 }
 
 .sb-chat-file-preview {
     opacity: 0.76;
-    line-height: 1.35;
-    font-size: calc(var(--mainFontSize) * 0.76);
+    font-size: var(--sb-type-meta);
+    line-height: var(--sb-line-body);
 }
 
 .sb-chat-files-empty {
@@ -908,7 +911,8 @@ body:not(.movingUI) .drawer-content.maximized {
 .sb-chat-files-empty p {
     margin-top: 4px;
     opacity: 0.7;
-    font-size: calc(var(--mainFontSize) * 0.76);
+    font-size: var(--sb-type-meta);
+    line-height: var(--sb-line-body);
 }
 
 #sb-mobile-chat-tools {
@@ -982,7 +986,7 @@ body:not(.movingUI) .drawer-content.maximized {
 
 .sb-mobile-chat-section-title {
     font-size: var(--sb-mobile-tools-section-title-size);
-    letter-spacing: 0.12em;
+    letter-spacing: var(--sb-tracking-kicker);
     text-transform: uppercase;
     opacity: 0.66;
 }
@@ -997,26 +1001,27 @@ body:not(.movingUI) .drawer-content.maximized {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: calc(var(--mainFontSize) * 1);
-    font-weight: 800;
-    letter-spacing: 0.03em;
+    font-size: var(--sb-type-body);
+    font-weight: var(--sb-weight-title);
+    line-height: var(--sb-line-title);
+    letter-spacing: 0;
 }
 
 .sb-brand-title.is-chat {
-    font-size: calc(var(--mainFontSize) * 0.92);
-    font-weight: 700;
-    letter-spacing: 0.015em;
+    font-size: var(--sb-type-control);
+    font-weight: var(--sb-weight-title);
+    letter-spacing: 0;
 }
 
 .sb-brand-subtitle {
-    font-size: calc(var(--mainFontSize) * 0.72);
-    letter-spacing: 0.16em;
+    font-size: var(--sb-type-caption);
+    letter-spacing: var(--sb-tracking-kicker);
     text-transform: uppercase;
     opacity: 0.7;
 }
 
 .sb-brand-badge {
-    font-size: calc(var(--mainFontSize) * 0.68);
+    font-size: var(--sb-type-caption);
     opacity: 0.72;
     white-space: nowrap;
 }
@@ -1052,7 +1057,7 @@ body:not(.movingUI) .drawer-content.maximized {
 
 .sb-proxy-button span {
     font-size: var(--sb-proxy-label-size);
-    font-weight: 600;
+    font-weight: var(--sb-weight-control);
     white-space: nowrap;
     transition: transform 180ms ease, opacity 180ms ease;
 }
@@ -1724,9 +1729,9 @@ body.sb-shell-resizing * {
 }
 
 .sb-shell-kicker {
-    font-size: calc(var(--mainFontSize) * 0.7);
-    font-weight: 700;
-    letter-spacing: 0.14em;
+    font-size: var(--sb-type-caption);
+    font-weight: var(--sb-weight-title);
+    letter-spacing: var(--sb-tracking-kicker);
     text-transform: uppercase;
     opacity: 0.74;
     text-align: left;
@@ -1734,8 +1739,9 @@ body.sb-shell-resizing * {
 
 .sb-shell-title {
     margin: 0;
-    font-size: calc(var(--mainFontSize) * 1.45);
-    line-height: 1.08;
+    font-size: var(--sb-type-headline);
+    font-weight: var(--sb-weight-title);
+    line-height: var(--sb-line-title);
     text-align: left;
 }
 
@@ -1746,15 +1752,17 @@ body.sb-shell-resizing * {
 }
 
 .sb-shell-subtitle {
-    font-size: calc(var(--mainFontSize) * 0.88);
-    line-height: 1.45;
+    font-size: var(--sb-type-control);
+    line-height: var(--sb-line-body);
     opacity: 0.9;
+    max-width: 68ch;
 }
 
 .sb-shell-description {
-    font-size: calc(var(--mainFontSize) * 0.78);
-    line-height: 1.5;
+    font-size: var(--sb-type-meta);
+    line-height: var(--sb-line-body);
     opacity: 0.66;
+    max-width: 72ch;
 }
 
 .sb-shell-search {
@@ -1798,8 +1806,8 @@ body.sb-shell-resizing * {
 
 .sb-shell-search-note {
     margin: 0 2px;
-    font-size: calc(var(--mainFontSize) * 0.72);
-    line-height: 1.5;
+    font-size: var(--sb-type-caption);
+    line-height: var(--sb-line-body);
     opacity: 0.72;
     text-wrap: balance;
     max-width: 72ch;
@@ -1828,8 +1836,8 @@ body.sb-shell-resizing * {
 }
 
 .sb-agent-state-label {
-    font-size: calc(var(--mainFontSize) * 0.68);
-    letter-spacing: 0.08em;
+    font-size: var(--sb-type-caption);
+    letter-spacing: var(--sb-tracking-label);
     text-transform: uppercase;
     opacity: 0.68;
 }
@@ -1842,7 +1850,7 @@ body.sb-shell-resizing * {
 }
 
 .sb-agent-state-value {
-    line-height: 1.45;
+    line-height: var(--sb-line-body);
 }
 
 .sb-agent-state-list {
@@ -2130,7 +2138,9 @@ body.sb-shell-resizing * {
 
 .sb-admin-card-copy strong {
     display: block;
-    font-size: calc(var(--mainFontSize) * 0.92);
+    font-size: var(--sb-type-control);
+    font-weight: var(--sb-weight-title);
+    line-height: var(--sb-line-title);
 }
 
 .sb-server-card {
@@ -2155,15 +2165,15 @@ body.sb-shell-resizing * {
 }
 
 .sb-server-stat-label {
-    font-size: calc(var(--mainFontSize) * 0.68);
-    letter-spacing: 0.08em;
+    font-size: var(--sb-type-caption);
+    letter-spacing: var(--sb-tracking-label);
     text-transform: uppercase;
     opacity: 0.68;
 }
 
 .sb-server-stat-value {
-    font-size: calc(var(--mainFontSize) * 0.82);
-    line-height: 1.4;
+    font-size: var(--sb-type-control);
+    line-height: var(--sb-line-body);
     overflow-wrap: anywhere;
 }
 
@@ -2175,9 +2185,9 @@ body.sb-shell-resizing * {
     min-height: 32px;
     padding: 0 12px;
     border-radius: 999px;
-    font-size: calc(var(--mainFontSize) * 0.7);
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    font-size: var(--sb-type-caption);
+    font-weight: var(--sb-weight-title);
+    letter-spacing: var(--sb-tracking-label);
     text-transform: uppercase;
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 8%, transparent);
     color: var(--SmartThemeBodyColor);
@@ -2206,8 +2216,8 @@ body.sb-shell-resizing * {
     border-radius: var(--sb-radius-md, 16px);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 72%, transparent);
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
-    font-size: calc(var(--mainFontSize) * 0.76);
-    line-height: 1.5;
+    font-size: var(--sb-type-meta);
+    line-height: var(--sb-line-body);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
