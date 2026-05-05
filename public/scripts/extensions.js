@@ -946,7 +946,7 @@ async function activateExtensions() {
         const isDisabled = extension_settings.disabledExtensions.includes(name);
 
         if (meetsModuleRequirements && meetsExtensionDeps && meetsClientMinimumVersion && !isDisabled) {
-            try {
+            const activateExtension = async () => {
                 console.debug('Activating extension', name);
                 activatingExtensionDedupKeys.add(extensionKey);
                 const promise = addExtensionLocale(name, manifest).finally(() =>
@@ -965,9 +965,21 @@ async function activateExtensions() {
                     .finally(() => {
                         activatingExtensionDedupKeys.delete(extensionKey);
                     });
-                promises.push(promise);
-            } catch (error) {
-                console.error('Could not activate extension', name, error);
+            };
+
+            const hasDependencies = Array.isArray(extensionDependencies) && extensionDependencies.length > 0;
+
+            if (hasDependencies) {
+                await Promise.allSettled(promises);
+                try {
+                    await activateExtension();
+                } catch (error) {
+                    console.error('Could not activate extension', name, error);
+                }
+            } else {
+                promises.push(activateExtension().catch(error => {
+                    console.error('Could not activate extension', name, error);
+                }));
             }
         } else if (!meetsModuleRequirements && !isDisabled) {
             console.warn(t`Extension "${name}" did not load. Missing required Extras module(s): "${missingModules.join(', ')}"`);

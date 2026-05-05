@@ -119,6 +119,8 @@
         "debug": "bun --inspect server.js",
         "start:global": "bun server.js --global",
         "start:no-csrf": "bun server.js --disableCsrf",
+        "build:frontend": "node scripts/build-frontend-assets.js",
+        "perf:frontend": "node scripts/measure-frontend-performance.js",
         "postinstall": "node post-install.js || bun post-install.js",
         "lint": "eslint \"src/**/*.js\" \"public/**/*.js\" \"scripts/**/*.js\" ./*.js",
         "lint:fix": "eslint \"src/**/*.js\" \"public/**/*.js\" \"scripts/**/*.js\" ./*.js --fix",
@@ -158,6 +160,9 @@
         "@types/yargs": "^17.0.33",
         "@types/yauzl": "^2.10.3",
         "eslint": "^8.57.1",
-        "eslint-plugin-jsdoc": "^48.10.0"
+        "eslint-plugin-jest": "^27.9.0",
+        "eslint-plugin-jsdoc": "^48.10.0",
+        "eslint-plugin-playwright": "^2.10.2",
+        "terser": "^5.46.2"
     }
 }

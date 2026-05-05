@@ -1,6 +1,8 @@
 const SB_SW_CACHE_VERSION = 'sillybunny-cache-v20260501g';
 const SB_STATIC_CACHE = `${SB_SW_CACHE_VERSION}-static`;
 const SB_SHELL_CACHE = `${SB_SW_CACHE_VERSION}-shell`;
+const SB_FRONTEND_ASSET_PREFIX = '/frontend-assets/';
+const SB_HASHED_FRONTEND_ASSET_RE = /-[a-f0-9]{8,}\.[a-z0-9]+$/i;
 
 const SB_STALE_WHILE_REVALIDATE_PREFIXES = Object.freeze([
     '/lib/',
@@ -21,6 +23,14 @@ function isSameOrigin(url) {
 
 function shouldStaleWhileRevalidate(url) {
     return SB_STALE_WHILE_REVALIDATE_PREFIXES.some(prefix => url.pathname.startsWith(prefix));
+}
+
+function isFrontendAsset(url) {
+    return url.pathname.startsWith(SB_FRONTEND_ASSET_PREFIX);
+}
+
+function shouldCacheFirst(url) {
+    return isFrontendAsset(url) && SB_HASHED_FRONTEND_ASSET_RE.test(url.pathname);
 }
 
 function shouldNetworkFirst(url) {
@@ -59,6 +69,21 @@ async function staleWhileRevalidate(request) {
         });
 
     return cachedResponse || freshResponse;
+}
+
+async function cacheFirst(request) {
+    const cache = await caches.open(SB_STATIC_CACHE);
+    const cachedResponse = await cache.match(request);
+
+    if (cachedResponse) {
+        return cachedResponse;
+    }
+
+    const response = await fetch(request);
+    await putCache(cache, request, response).catch((error) => {
+        console.debug('SillyBunny service worker skipped immutable cache update.', error);
+    });
+    return response;
 }
 
 async function networkFirst(request) {
@@ -105,6 +130,15 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(request.url);
 
     if (!isSameOrigin(url)) {
+        return;
+    }
+
+    if (isFrontendAsset(url) && !shouldCacheFirst(url)) {
+        return;
+    }
+
+    if (shouldCacheFirst(url)) {
+        event.respondWith(cacheFirst(request));
         return;
     }
 

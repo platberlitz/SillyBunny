@@ -111,8 +111,8 @@
     /*base variable calculated in rems*/
     --fontScale: 1;
     --mainFontSize: calc(var(--fontScale) * 15px);
-    --mainFontFamily: 'Figtree', 'Noto Sans', sans-serif;
-    --monoFontFamily: 'Red Hat Mono', 'Noto Sans Mono', 'Courier New', Consolas, monospace;
+    --mainFontFamily: 'Figtree', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', sans-serif;
+    --monoFontFamily: 'Noto Sans Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
     /* Compatibility aliases for older imported themes and extension-style presets. */
     --mainFont: var(--mainFontFamily);
     --headerFont: var(--mainFontFamily);
@@ -1278,6 +1278,7 @@ body .panelControlBar {
     /* Keep the live send/stream handoff fully laid out so mobile scroll anchoring stays calm. */
     #chat .mes:not(.last_mes):not(:nth-last-child(-n + 2)) {
         content-visibility: auto;
+        contain: layout style paint;
         contain-intrinsic-size: auto 220px;
     }
 }
