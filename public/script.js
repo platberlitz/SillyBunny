@@ -466,6 +466,7 @@ const SILLYBUNNY_FRONTEND_ICONS = Object.freeze({
     pixel: 'img/sillybunny-pixel-logo-og.png',
     badge: 'img/sillybunny-badge.svg',
 });
+let appliedSillyBunnyFrontendIconId = '';
 
 function normalizeSillyBunnyFrontendIcon(iconId) {
     return Object.hasOwn(SILLYBUNNY_FRONTEND_ICONS, String(iconId)) ? String(iconId) : SILLYBUNNY_FRONTEND_ICON_DEFAULT;
@@ -493,18 +494,25 @@ function applySillyBunnyFrontendIcon(iconId = getStoredSillyBunnyFrontendIcon())
     const normalizedIconId = normalizeSillyBunnyFrontendIcon(iconId);
     const src = SILLYBUNNY_FRONTEND_ICONS[normalizedIconId];
     const absoluteSrc = `/${src}`;
+    const iconAlreadyApplied = appliedSillyBunnyFrontendIconId === normalizedIconId;
     system_avatar = src;
 
     document.documentElement.dataset.sbFrontendIcon = normalizedIconId;
 
     for (const image of document.querySelectorAll('img[data-sb-frontend-icon]')) {
-        image.setAttribute('src', absoluteSrc);
+        if (image.getAttribute('src') !== absoluteSrc) {
+            image.setAttribute('src', absoluteSrc);
+        }
     }
 
-    for (const link of document.querySelectorAll('link[rel~="icon"]')) {
-        link.setAttribute('href', absoluteSrc);
-        link.setAttribute('type', normalizedIconId === 'badge' ? 'image/svg+xml' : 'image/png');
+    if (!iconAlreadyApplied) {
+        for (const link of document.querySelectorAll('link[rel~="icon"]')) {
+            link.setAttribute('href', absoluteSrc);
+            link.setAttribute('type', normalizedIconId === 'badge' ? 'image/svg+xml' : 'image/png');
+        }
     }
+
+    appliedSillyBunnyFrontendIconId = normalizedIconId;
 }
 
 window.SillyBunnyFrontendIcon = Object.assign(window.SillyBunnyFrontendIcon || {}, {

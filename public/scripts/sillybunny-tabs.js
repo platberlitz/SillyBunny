@@ -1864,10 +1864,16 @@ function setShellTheme(themeId, { persist = true } = {}) {
 
 function applyFrontendIcon(iconId = sbState.frontendIcon) {
     const normalizedIconId = normalizeFrontendIcon(iconId);
+    const iconController = window.SillyBunnyFrontendIcon;
+
+    if (iconController?.apply) {
+        iconController.apply(normalizedIconId);
+        return;
+    }
+
     const iconSrc = getFrontendIconSrc(normalizedIconId);
 
     document.documentElement.dataset.sbFrontendIcon = normalizedIconId;
-    window.SillyBunnyFrontendIcon?.apply?.(normalizedIconId);
 
     for (const image of document.querySelectorAll('img[data-sb-frontend-icon]')) {
         image.setAttribute('src', iconSrc);
