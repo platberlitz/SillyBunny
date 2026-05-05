@@ -17,10 +17,15 @@ const budgets = Object.freeze({
     extensionLargeAssetBytes: 2_250 * 1024,
 });
 
+// Local user CSS is intentionally gitignored and may be absent in CI.
+const optionalPublicAssets = new Set([
+    'css/user.css',
+]);
+
 const indexHtml = fs.readFileSync(indexPath, 'utf8');
 
 function stripQuery(value) {
-    return String(value).split('?')[0];
+    return String(value).split(/[?#]/)[0];
 }
 
 function getAttribute(tag, name) {
@@ -30,9 +35,20 @@ function getAttribute(tag, name) {
 
 function getPublicFileSize(url) {
     const cleanUrl = stripQuery(url).replace(/^\/+/, '');
-    const filePath = path.join(publicRoot, cleanUrl);
+    const filePath = path.resolve(publicRoot, cleanUrl);
+    const isPublicPath = filePath === publicRoot || filePath.startsWith(`${publicRoot}${path.sep}`);
 
-    if (!filePath.startsWith(publicRoot) || !fs.existsSync(filePath)) {
+    if (!isPublicPath) {
+        fail(`Asset path escapes public directory: ${url}`);
+        return 0;
+    }
+
+    if (!fs.existsSync(filePath)) {
+        if (optionalPublicAssets.has(cleanUrl)) {
+            return 0;
+        }
+
+        fail(`Referenced asset is missing: ${url}`);
         return 0;
     }
 
