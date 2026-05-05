@@ -11944,7 +11944,10 @@ function openAlternateGreetings() {
         }
 
         field.focus({ preventScroll: true });
-        field.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        field.scrollIntoView({
+            block: 'nearest',
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        });
     });
 }
 

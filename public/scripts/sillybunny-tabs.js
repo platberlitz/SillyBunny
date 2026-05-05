@@ -1034,6 +1034,10 @@ function isMobileViewport() {
     return window.matchMedia(SB_MOBILE_MEDIA_QUERY).matches;
 }
 
+function prefersReducedMotion() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 function isTouchOnlyDesktopViewport() {
     const hasHover = window.matchMedia('(hover: hover), (any-hover: hover)').matches;
     const hasFinePointer = window.matchMedia('(pointer: fine), (any-pointer: fine)').matches;
@@ -1309,6 +1313,7 @@ function syncDesktopShellSizing() {
         if (isMobileViewport()) {
             clearDesktopShellSize(root);
             root.classList.remove('sb-shell-can-resize');
+            syncShellResizeHandleValue(shellKey, null);
             continue;
         }
 
@@ -1318,6 +1323,7 @@ function syncDesktopShellSizing() {
             }
 
             root.classList.remove('sb-shell-can-resize');
+            syncShellResizeHandleValue(shellKey, null);
             continue;
         }
 
@@ -1343,6 +1349,7 @@ function syncDesktopShellSizing() {
 
         applyDesktopShellSize(root, sizeToApply);
         root.classList.toggle('sb-shell-can-resize', resizingEnabled);
+        syncShellResizeHandleValue(shellKey, sizeToApply);
     }
 
     syncCharacterDrawerLockPosition();
@@ -1366,6 +1373,7 @@ function isPrimaryShellResizeStart(event) {
 
 function bindShellResizeHandle(handle, shellKey) {
     stopProxyPointerPropagation(handle);
+    configureShellResizeHandle(handle, shellKey);
     handle.addEventListener('pointerdown', event => beginShellResize(shellKey, event));
     handle.addEventListener('mousedown', event => {
         if (event.defaultPrevented || sbState.shellSizing.activeResize) {
@@ -1374,6 +1382,94 @@ function bindShellResizeHandle(handle, shellKey) {
 
         beginShellResize(shellKey, event);
     });
+    handle.addEventListener('keydown', event => handleShellResizeKeydown(shellKey, event));
+}
+
+function configureShellResizeHandle(handle, shellKey) {
+    const bounds = getDesktopShellResizeBounds(shellKey);
+    const currentSize = getShellSizeOverride(shellKey) ?? {
+        width: bounds.defaultWidth,
+        height: bounds.defaultHeight,
+    };
+    const label = shellKey === 'characters' ? 'Characters' : getShellConfig(shellKey)?.title || 'panel';
+
+    handle.setAttribute('role', 'separator');
+    handle.setAttribute('aria-orientation', 'horizontal');
+    handle.setAttribute('aria-label', `Resize ${label} panel`);
+    handle.setAttribute('aria-valuemin', String(bounds.minWidth));
+    handle.setAttribute('aria-valuemax', String(bounds.maxWidth));
+    handle.setAttribute('aria-valuenow', String(Math.round(currentSize.width)));
+    handle.setAttribute('aria-valuetext', `${Math.round(currentSize.width)} pixels wide, ${Math.round(currentSize.height)} pixels tall`);
+    handle.tabIndex = canResizeDesktopShells() ? 0 : -1;
+}
+
+function syncShellResizeHandleValue(shellKey, size) {
+    const root = getResizableShellRoot(shellKey);
+    const shellState = getShellState(shellKey);
+    const handle = shellState?.resizeHandle ?? root?.querySelector(':scope > .sb-shell-resize-handle, .sb-shell-resize-handle');
+    if (!(handle instanceof HTMLElement)) {
+        return;
+    }
+
+    if (!size) {
+        configureShellResizeHandle(handle, shellKey);
+        return;
+    }
+
+    configureShellResizeHandle(handle, shellKey);
+    handle.setAttribute('aria-valuenow', String(Math.round(size.width)));
+    handle.setAttribute('aria-valuetext', `${Math.round(size.width)} pixels wide, ${Math.round(size.height)} pixels tall`);
+}
+
+function handleShellResizeKeydown(shellKey, event) {
+    if (!canResizeDesktopShells() || !isDesktopResizableShell(shellKey)) {
+        return;
+    }
+
+    const root = getResizableShellRoot(shellKey);
+    if (!(root instanceof HTMLElement) || !root.classList.contains('openDrawer')) {
+        return;
+    }
+
+    const bounds = getDesktopShellResizeBounds(shellKey);
+    const currentRect = root.getBoundingClientRect();
+    const currentSize = clampShellSize({
+        width: currentRect.width || bounds.defaultWidth,
+        height: currentRect.height || bounds.defaultHeight,
+    }, bounds);
+
+    if (!currentSize) {
+        return;
+    }
+
+    const step = event.shiftKey ? 72 : 24;
+    let nextSize = currentSize;
+
+    if (event.key === 'ArrowLeft') {
+        nextSize = { ...currentSize, width: currentSize.width - step };
+    } else if (event.key === 'ArrowRight') {
+        nextSize = { ...currentSize, width: currentSize.width + step };
+    } else if (event.key === 'ArrowUp') {
+        nextSize = { ...currentSize, height: currentSize.height - step };
+    } else if (event.key === 'ArrowDown') {
+        nextSize = { ...currentSize, height: currentSize.height + step };
+    } else if (event.key === 'Home') {
+        nextSize = { ...currentSize, width: bounds.minWidth };
+    } else if (event.key === 'End') {
+        nextSize = { ...currentSize, width: bounds.maxWidth };
+    } else {
+        return;
+    }
+
+    const clampedSize = clampShellSize(nextSize, bounds);
+    if (!clampedSize) {
+        return;
+    }
+
+    event.preventDefault();
+    setShellSizeOverride(shellKey, clampedSize);
+    applyDesktopShellSize(root, clampedSize);
+    syncShellResizeHandleValue(shellKey, clampedSize);
 }
 
 function beginShellResize(shellKey, event) {
@@ -1457,6 +1553,7 @@ function beginShellResize(shellKey, event) {
 
         sbState.shellSizing.overrides[getShellSizingKey(shellKey)] = nextSize;
         applyDesktopShellSize(root, nextSize);
+        syncShellResizeHandleValue(shellKey, nextSize);
     };
 
     const onPointerUp = endEvent => {
@@ -1467,6 +1564,7 @@ function beginShellResize(shellKey, event) {
         const activeSize = getShellSizeOverride(shellKey) ?? startSize;
         cleanup();
         setShellSizeOverride(shellKey, activeSize);
+        syncShellResizeHandleValue(shellKey, activeSize);
         syncDesktopShellSizing();
     };
 
@@ -4338,9 +4436,6 @@ function ensureCharacterResizeHandle() {
     handle = createElement('div', {
         className: 'sb-shell-resize-handle',
         attrs: {
-            role: 'separator',
-            'aria-orientation': 'both',
-            'aria-label': 'Resize Characters panel',
             title: 'Resize Characters panel',
         },
     });
@@ -8103,7 +8198,7 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
     activeTab.button?.scrollIntoView({
         block: 'nearest',
         inline: 'nearest',
-        behavior: focusButton ? 'smooth' : 'auto',
+        behavior: focusButton && !prefersReducedMotion() ? 'smooth' : 'auto',
     });
     shellState.updateNavScrollIndicators?.();
 
@@ -8233,7 +8328,7 @@ function buildShell(shellKey) {
     const scrollNavByPage = direction => {
         nav.scrollBy({
             left: direction * Math.max(nav.clientWidth * 0.72, 160),
-            behavior: 'smooth',
+            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
         });
     };
 
@@ -8271,7 +8366,6 @@ function buildShell(shellKey) {
     const resizeHandle = createElement('div', {
         className: 'sb-shell-resize-handle',
         attrs: {
-            'aria-hidden': 'true',
             title: `Resize ${shellConfig.title}`,
         },
     });
@@ -9480,6 +9574,7 @@ function togglePersonaPicker() {
     const existing = document.getElementById('sb-persona-picker');
     if (existing) {
         existing.remove();
+        document.getElementById('sb-persona-bubble')?.focus({ preventScroll: true });
         return;
     }
 
@@ -9488,7 +9583,13 @@ function togglePersonaPicker() {
 
     const { personas, currentAvatarId } = getCurrentPersonaSelection(context);
     const personaDescriptions = context?.powerUserSettings?.persona_descriptions ?? {};
-    const picker = createElement('div', { id: 'sb-persona-picker' });
+    const picker = createElement('div', {
+        id: 'sb-persona-picker',
+        attrs: {
+            role: 'listbox',
+            'aria-label': 'Choose persona',
+        },
+    });
 
     const keys = Object.keys(personas).filter(avatarId => {
         const name = personas[avatarId];
@@ -9498,7 +9599,7 @@ function togglePersonaPicker() {
     });
 
     if (!keys.length) {
-        const empty = createElement('div', { className: 'sb-persona-option' });
+        const empty = createElement('div', { className: 'sb-persona-option-empty' });
         empty.textContent = 'No personas defined';
         picker.appendChild(empty);
     } else {
@@ -9514,6 +9615,9 @@ function togglePersonaPicker() {
     if (bubble instanceof HTMLElement) {
         document.body.appendChild(picker);
         positionPersonaPicker(picker, bubble);
+        const activeOption = picker.querySelector('.sb-persona-option.is-active');
+        const firstOption = picker.querySelector('.sb-persona-option');
+        (activeOption ?? firstOption)?.focus({ preventScroll: true });
     }
 }
 
@@ -9543,9 +9647,66 @@ function positionPersonaPicker(picker, bubble) {
     });
 }
 
+function closePersonaPicker({ restoreFocus = false } = {}) {
+    const picker = document.getElementById('sb-persona-picker');
+    if (picker) {
+        picker.remove();
+    }
+
+    if (restoreFocus) {
+        document.getElementById('sb-persona-bubble')?.focus({ preventScroll: true });
+    }
+}
+
+function focusPersonaOption(picker, offset) {
+    const options = Array.from(picker.querySelectorAll('.sb-persona-option'));
+    const currentIndex = options.indexOf(document.activeElement);
+    const nextIndex = currentIndex === -1
+        ? 0
+        : (currentIndex + offset + options.length) % options.length;
+    options[nextIndex]?.focus({ preventScroll: true });
+}
+
+async function selectPersonaOption(option, picker, avatarId, context) {
+    picker.querySelectorAll('.sb-persona-option').forEach(element => {
+        element.classList.toggle('is-active', element === option);
+        element.setAttribute('aria-selected', String(element === option));
+    });
+    closePersonaPicker();
+    const execSlash = context?.executeSlashCommandsWithOptions;
+    let switched = false;
+    if (typeof execSlash === 'function') {
+        try {
+            await execSlash(`/persona-set ${quoteSlashCommandArgument(avatarId)}`);
+            switched = true;
+        } catch (error) {
+            console.warn('[SillyBunny] Persona switch via slash command failed, falling back to DOM selection.', error);
+        }
+    }
+
+    if (!switched) {
+        // Fallback: try clicking the DOM avatar
+        const avatarBlock = document.getElementById('user_avatar_block');
+        const domAvatar = avatarBlock?.querySelector(`.avatar-container[title="${CSS.escape(avatarId)}"]`);
+        if (domAvatar instanceof HTMLElement) {
+            domAvatar.click();
+        } else {
+            openShell('right', 'persona');
+        }
+    }
+
+    updatePersonaBubble();
+    document.getElementById('sb-persona-bubble')?.focus({ preventScroll: true });
+}
+
 function addPersonaOption(picker, avatarId, name, title, isActive, context) {
-    const option = createElement('div', {
+    const option = createElement('button', {
         className: `sb-persona-option${isActive ? ' is-active' : ''}`,
+        attrs: {
+            type: 'button',
+            role: 'option',
+            'aria-selected': String(isActive),
+        },
     });
 
     const img = createElement('img', {
@@ -9571,30 +9732,24 @@ function addPersonaOption(picker, avatarId, name, title, isActive, context) {
         option.append(img, label);
     }
 
-    option.addEventListener('click', async () => {
-        picker.remove();
-        const execSlash = context?.executeSlashCommandsWithOptions;
-        let switched = false;
-        if (typeof execSlash === 'function') {
-            try {
-                await execSlash(`/persona-set ${quoteSlashCommandArgument(avatarId)}`);
-                switched = true;
-            } catch (error) {
-                console.warn('[SillyBunny] Persona switch via slash command failed, falling back to DOM selection.', error);
-            }
+    option.addEventListener('click', () => { void selectPersonaOption(option, picker, avatarId, context); });
+    option.addEventListener('keydown', event => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            focusPersonaOption(picker, 1);
+        } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+            event.preventDefault();
+            focusPersonaOption(picker, -1);
+        } else if (event.key === 'Home') {
+            event.preventDefault();
+            picker.querySelector('.sb-persona-option')?.focus({ preventScroll: true });
+        } else if (event.key === 'End') {
+            event.preventDefault();
+            Array.from(picker.querySelectorAll('.sb-persona-option')).at(-1)?.focus({ preventScroll: true });
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            closePersonaPicker({ restoreFocus: true });
         }
-
-        if (!switched) {
-            // Fallback: try clicking the DOM avatar
-            const avatarBlock = document.getElementById('user_avatar_block');
-            const domAvatar = avatarBlock?.querySelector(`.avatar-container[title="${CSS.escape(avatarId)}"]`);
-            if (domAvatar instanceof HTMLElement) {
-                domAvatar.click();
-            } else {
-                openShell('right', 'persona');
-            }
-        }
-        updatePersonaBubble();
     });
 
     picker.appendChild(option);
