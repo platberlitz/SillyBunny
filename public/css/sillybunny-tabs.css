@@ -46,7 +46,7 @@
     --sb-proxy-label-scale-base: 0.76;
     --sb-proxy-underline-inset-base: 12px;
     --sb-proxy-underline-bottom-base: 5px;
-    --sb-mobile-toggle-size-base: 40px;
+    --sb-mobile-toggle-size-base: 44px;
     --sb-home-toggle-min-width-base: 92px;
     --sb-topbar-compact-icon-scale-base: 0.84;
     --sb-mobile-tools-padding-top-base: 10px;
@@ -101,8 +101,8 @@
     --sb-proxy-label-size: calc(var(--mainFontSize) * var(--sb-proxy-label-scale-base));
     --sb-proxy-underline-inset: var(--sb-proxy-underline-inset-base);
     --sb-proxy-underline-bottom: var(--sb-proxy-underline-bottom-base);
-    --sb-mobile-toggle-size: calc(var(--sb-mobile-toggle-size-base) * var(--sb-mobile-button-scale));
-    --sb-home-toggle-min-width: calc(var(--sb-home-toggle-min-width-base) * var(--sb-mobile-button-scale));
+    --sb-mobile-toggle-size: max(44px, calc(var(--sb-mobile-toggle-size-base) * var(--sb-mobile-button-scale)));
+    --sb-home-toggle-min-width: max(44px, calc(var(--sb-home-toggle-min-width-base) * var(--sb-mobile-button-scale)));
     --sb-topbar-compact-icon-size: calc(var(--mainFontSize) * var(--sb-topbar-compact-icon-scale-base));
     --sb-topbar-primary-min-height: max(var(--sb-proxy-button-height), var(--sb-mobile-toggle-size));
     --sb-topbar-primary-height: max(calc(var(--sb-topbar-primary-height-base) * var(--sb-topbar-scale-active)), var(--sb-topbar-primary-min-height));
@@ -113,9 +113,9 @@
     --sb-mobile-tools-gap: calc(var(--sb-mobile-tools-gap-base) * var(--sb-topbar-scale-active));
     --sb-mobile-tools-header-gap: calc(var(--sb-mobile-tools-header-gap-base) * var(--sb-topbar-scale-active));
     --sb-mobile-tools-actions-gap: calc(var(--sb-mobile-tools-actions-gap-base) * var(--sb-topbar-scale-active));
-    --sb-mobile-tools-button-size: calc(var(--sb-mobile-tools-button-size-base) * var(--sb-topbar-scale-active) * var(--sb-mobile-button-scale));
+    --sb-mobile-tools-button-size: max(44px, calc(var(--sb-mobile-tools-button-size-base) * var(--sb-topbar-scale-active) * var(--sb-mobile-button-scale)));
     --sb-mobile-tools-button-radius: calc(var(--sb-mobile-tools-button-radius-base) * var(--sb-topbar-scale-active) * var(--sb-mobile-button-scale));
-    --sb-mobile-tools-field-height: calc(var(--sb-mobile-tools-field-height-base) * var(--sb-topbar-scale-active));
+    --sb-mobile-tools-field-height: max(44px, calc(var(--sb-mobile-tools-field-height-base) * var(--sb-topbar-scale-active)));
     --sb-mobile-tools-field-padding-x: calc(var(--sb-mobile-tools-field-padding-x-base) * var(--sb-topbar-scale-active));
     --sb-mobile-tools-field-icon-size: calc(var(--mainFontSize) * var(--sb-mobile-tools-field-icon-scale-base) * var(--sb-topbar-scale-active));
     --sb-mobile-tools-input-height: calc(var(--sb-mobile-tools-input-height-base) * var(--sb-topbar-scale-active));
@@ -144,22 +144,22 @@
     --sb-chatbar-gap-base: 4px;
     --sb-chatbar-padding-y-base: 3px;
     --sb-chatbar-padding-x-base: 5px;
-    --sb-chatbar-button-size-base: 26px;
-    --sb-chatbar-field-height-base: 26px;
+    --sb-chatbar-button-size-base: 30px;
+    --sb-chatbar-field-height-base: 30px;
     --sb-chatbar-field-padding-x-base: 7px;
     --sb-chatbar-input-font-scale-base: 0.66;
     --sb-proxy-button-padding-x-base: 11px;
-    --sb-proxy-button-height-base: 34px;
+    --sb-proxy-button-height-base: 40px;
     --sb-proxy-button-min-width-base: 88px;
     --sb-proxy-button-gap-base: 6px;
-    --sb-mobile-toggle-size-base: 34px;
+    --sb-mobile-toggle-size-base: 44px;
     --sb-home-toggle-min-width-base: 78px;
     --sb-mobile-tools-padding-top-base: 7px;
     --sb-mobile-tools-padding-x-base: 7px;
     --sb-mobile-tools-padding-bottom-base: 8px;
     --sb-mobile-tools-gap-base: 6px;
-    --sb-mobile-tools-button-size-base: 26px;
-    --sb-mobile-tools-field-height-base: 26px;
+    --sb-mobile-tools-button-size-base: 30px;
+    --sb-mobile-tools-field-height-base: 30px;
     --sb-shell-panel-bottom-padding: clamp(30px, 4vh, 52px);
 }
 
@@ -1373,6 +1373,12 @@ body.movingUI #right-nav-panel.openDrawer > .sb-shell-resize-handle {
 .sb-shell-root.sb-shell-resize-active .sb-shell-resize-handle,
 #right-nav-panel.sb-shell-resize-active > .sb-shell-resize-handle,
 .sb-shell-resize-handle:hover {
+    opacity: 1;
+}
+
+.sb-shell-resize-handle:focus-visible {
+    outline: 2px solid var(--color-focus-ring, var(--color-primary, var(--sb-accent)));
+    outline-offset: 3px;
     opacity: 1;
 }
 
@@ -3036,7 +3042,7 @@ body.sb-shell-resizing * {
     border-radius: var(--sb-radius-xl, 22px);
     background: var(--sb-composer-surface-bg, var(--sb-chat-surface-bg, color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, var(--SmartThemeChatTintColor) 8%)));
     box-shadow: 0 10px 26px color-mix(in srgb, var(--SmartThemeShadowColor) 12%, transparent);
-    min-height: calc(34px * var(--sb-bottom-bar-scale));
+    min-height: max(44px, calc(34px * var(--sb-bottom-bar-scale)));
     overflow: hidden;
 }
 
@@ -3047,7 +3053,8 @@ body.sb-shell-resizing * {
 #sb-bottom-chat-select {
     flex: 1;
     min-width: 0;
-    height: calc(28px * var(--sb-bottom-bar-scale));
+    height: max(44px, calc(28px * var(--sb-bottom-bar-scale)));
+    min-height: max(44px, calc(28px * var(--sb-bottom-bar-scale)));
     margin: 0;
     padding: 0 calc(12px * var(--sb-bottom-bar-scale));
     box-sizing: border-box;
@@ -3081,7 +3088,8 @@ body.sb-shell-resizing * {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: calc(28px * var(--sb-bottom-bar-scale));
+    min-width: max(44px, calc(28px * var(--sb-bottom-bar-scale)));
+    min-height: max(44px, calc(28px * var(--sb-bottom-bar-scale)));
     margin: 0;
     padding: calc(4px * var(--sb-bottom-bar-scale)) calc(8px * var(--sb-bottom-bar-scale));
     box-sizing: border-box;
@@ -3108,22 +3116,22 @@ body.sb-shell-resizing * {
         gap: calc(4px * var(--sb-bottom-bar-scale));
         margin: 0 max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left));
         padding: calc(4px * var(--sb-bottom-bar-scale)) calc(6px * var(--sb-bottom-bar-scale));
-        min-height: calc(42px * var(--sb-bottom-bar-scale));
+        min-height: max(52px, calc(42px * var(--sb-bottom-bar-scale)));
         border-radius: calc(14px * var(--sb-bottom-bar-scale));
     }
 
     #sb-bottom-chat-select {
         flex: 1 1 72px;
-        height: calc(34px * var(--sb-bottom-bar-scale));
-        min-height: calc(34px * var(--sb-bottom-bar-scale));
+        height: max(44px, calc(34px * var(--sb-bottom-bar-scale)));
+        min-height: max(44px, calc(34px * var(--sb-bottom-bar-scale)));
         padding: 0 calc(8px * var(--sb-bottom-bar-scale));
         font-size: calc(var(--mainFontSize) * 0.78 * var(--sb-bottom-bar-scale));
         border-radius: calc(11px * var(--sb-bottom-bar-scale));
     }
 
     .sb-bottom-chat-btn {
-        min-width: calc(34px * var(--sb-bottom-bar-scale));
-        min-height: calc(34px * var(--sb-bottom-bar-scale));
+        min-width: max(44px, calc(34px * var(--sb-bottom-bar-scale)));
+        min-height: max(44px, calc(34px * var(--sb-bottom-bar-scale)));
         padding: 0 calc(6px * var(--sb-bottom-bar-scale));
         border-radius: calc(9px * var(--sb-bottom-bar-scale));
         font-size: calc(var(--mainFontSize) * 0.78 * var(--sb-bottom-bar-scale));
@@ -3134,22 +3142,22 @@ body.sb-shell-resizing * {
     #sb-bottom-chat-bar {
         gap: calc(3px * var(--sb-bottom-bar-scale));
         padding: calc(3px * var(--sb-bottom-bar-scale)) calc(5px * var(--sb-bottom-bar-scale));
-        min-height: calc(38px * var(--sb-bottom-bar-scale));
+        min-height: max(52px, calc(38px * var(--sb-bottom-bar-scale)));
         border-radius: calc(13px * var(--sb-bottom-bar-scale));
     }
 
     #sb-bottom-chat-select {
         flex-basis: 58px;
-        height: calc(30px * var(--sb-bottom-bar-scale));
-        min-height: calc(30px * var(--sb-bottom-bar-scale));
+        height: max(44px, calc(30px * var(--sb-bottom-bar-scale)));
+        min-height: max(44px, calc(30px * var(--sb-bottom-bar-scale)));
         padding: 0 calc(6px * var(--sb-bottom-bar-scale));
         font-size: calc(var(--mainFontSize) * 0.72 * var(--sb-bottom-bar-scale));
         border-radius: calc(10px * var(--sb-bottom-bar-scale));
     }
 
     .sb-bottom-chat-btn {
-        min-width: calc(30px * var(--sb-bottom-bar-scale));
-        min-height: calc(30px * var(--sb-bottom-bar-scale));
+        min-width: max(44px, calc(30px * var(--sb-bottom-bar-scale)));
+        min-height: max(44px, calc(30px * var(--sb-bottom-bar-scale)));
         padding: 0 calc(5px * var(--sb-bottom-bar-scale));
         font-size: calc(var(--mainFontSize) * 0.72 * var(--sb-bottom-bar-scale));
     }
@@ -3339,10 +3347,10 @@ body.sb-shell-resizing * {
 
 /* Persona quick-access bubble */
 #sb-persona-bubble {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    min-height: 32px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     aspect-ratio: 1;
     border-radius: 50%;
     border: 2px solid color-mix(in srgb, var(--SmartThemeBorderColor) 50%, transparent);
@@ -3361,20 +3369,20 @@ body.sb-shell-resizing * {
 
 @media screen and (max-width: 768px) {
     #sb-persona-bubble {
-        width: 34px;
-        height: 34px;
-        min-width: 34px;
-        min-height: 34px;
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
         border-width: 1px;
     }
 }
 
 @media screen and (max-width: 420px) {
     #sb-persona-bubble {
-        width: 30px;
-        height: 30px;
-        min-width: 30px;
-        min-height: 30px;
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
     }
 }
 
@@ -3397,23 +3405,44 @@ body.sb-shell-resizing * {
 }
 
 .sb-persona-option {
+    appearance: none;
+    width: 100%;
+    border: 0;
+    background: transparent;
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 6px 10px;
     border-radius: 8px;
     cursor: pointer;
+    text-align: left;
     transition: background-color 150ms ease;
     font-size: calc(var(--mainFontSize) * 0.85);
     color: var(--SmartThemeBodyColor);
+    min-height: 44px;
 }
 
-.sb-persona-option:hover {
+.sb-persona-option:hover,
+.sb-persona-option:focus-visible {
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent);
+}
+
+.sb-persona-option:focus-visible {
+    outline: 2px solid var(--color-focus-ring, var(--color-primary, var(--sb-accent)));
+    outline-offset: 2px;
 }
 
 .sb-persona-option.is-active {
     background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 20%, transparent);
+}
+
+.sb-persona-option-empty {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor) 64%, transparent);
+    font-size: calc(var(--mainFontSize) * 0.85);
 }
 
 .sb-persona-option-avatar {
@@ -3921,8 +3950,8 @@ body.sb-shell-resizing * {
         --sb-chatbar-field-radius-base: 12px;
         --sb-chatbar-field-icon-scale-base: 0.60;
         --sb-chatbar-input-font-scale-base: 0.66;
-        --sb-mobile-toggle-size-base: 34px;
-        --sb-home-toggle-min-width-base: 34px;
+        --sb-mobile-toggle-size-base: 44px;
+        --sb-home-toggle-min-width-base: 44px;
         --sb-proxy-underline-inset-base: 8px;
         --sb-proxy-underline-bottom-base: 4px;
     }
@@ -5305,5 +5334,15 @@ body.sb-shell-resizing * {
 
     .sb-search-hit {
         animation: none;
+    }
+
+    .sb-bottom-chat-btn,
+    #sb-bottom-chat-select,
+    #sb-persona-bubble,
+    #sb-persona-picker,
+    .sb-persona-option,
+    .sb-shell-resize-handle {
+        animation: none !important;
+        transition-duration: 0.01ms !important;
     }
 }
