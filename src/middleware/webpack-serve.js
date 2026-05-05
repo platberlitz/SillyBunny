@@ -5,7 +5,6 @@ import getPublicLibConfig, {
     getPublicLibCacheInfo,
     prunePublicLibCache,
 } from '../../webpack.config.js';
-import { isBunRuntime } from '../runtime.js';
 
 export default function getWebpackServeMiddleware({ forceDist = false } = {}) {
     const resolvePublicLibConfig = ({ forceDist: overrideForceDist = forceDist, pruneCache = false } = {}) =>
@@ -86,7 +85,7 @@ export default function getWebpackServeMiddleware({ forceDist = false } = {}) {
         const publicLibConfig = resolvePublicLibConfig({ forceDist: overrideForceDist });
         const compiledOutputPath = getCompiledOutputPath(publicLibConfig);
 
-        if (isBunRuntime() && compiledOutputPath && fs.existsSync(compiledOutputPath)) {
+        if (compiledOutputPath && fs.existsSync(compiledOutputPath)) {
             console.log();
             console.log('Reusing precompiled frontend libraries...');
             activePublicLibConfig = publicLibConfig;
@@ -96,7 +95,7 @@ export default function getWebpackServeMiddleware({ forceDist = false } = {}) {
             return Promise.resolve();
         }
 
-        const temporaryOutputPath = path.join(cacheInfo.webpackRoot, cacheInfo.cacheVersion, `output.${process.pid}.${Date.now()}.tmp`);
+        const temporaryOutputPath = path.join(cacheInfo.webpackRoot, cacheInfo.cacheVersion, 'output.tmp');
         const temporaryOutputFilePath = path.join(temporaryOutputPath, cacheInfo.outputFile);
         const temporaryPublicLibConfig = getPublicLibConfig({
             forceDist: overrideForceDist,

@@ -27,20 +27,20 @@ function getPublicLibInputsSignature() {
 
     hashFileIfPresent(hasher, path.join(serverDirectory, 'public', 'lib.js'));
     hashFileIfPresent(hasher, path.join(serverDirectory, 'package.json'));
+    hashFileIfPresent(hasher, path.join(serverDirectory, 'package-lock.json'));
     hashFileIfPresent(hasher, path.join(serverDirectory, 'bun.lock'));
 
     return hasher.digest('hex');
 }
 
 /**
- * Generate a cache version string based on the application version, Git revision, and Webpack version.
+ * Generate a cache version string based on the application version, Webpack version, runtime, and public lib inputs.
  * @returns {string} The cache version string.
  */
 function getWebpackCacheVersion() {
     return crypto.createHash('shake256', { outputLength: 8 })
         .update(JSON.stringify([
             appVersion.pkgVersion,
-            appVersion.gitRevision,
             webpack.version,
             isBunRuntime() ? BUN_LIB_BUNDLE_SIGNATURE : 'default',
             getPublicLibInputsSignature(),

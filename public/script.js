@@ -539,8 +539,6 @@ const messageTemplate = $('#message_template .mes');
 export const chatElement = $('#chat');
 const MOBILE_CHAT_RENDER_MEDIA_QUERY = '(max-width: 1000px)';
 const MOBILE_CHAT_RENDER_BATCH_SIZE = 8;
-const SB_CHAT_VIRTUALIZATION_MIN_MESSAGES = 160;
-const SB_CHAT_VIRTUALIZATION_PLACEHOLDER_HEIGHT = 180;
 const MOBILE_MESSAGE_UPDATE_DELAY_MS = 24;
 const MOBILE_MEDIA_SCROLL_MAX_DELAY_MS = 300;
 const MOBILE_SEND_SCROLL_IMMUNITY_MS = 1500;
@@ -1969,50 +1967,11 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
         applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });
     }
 
-    applyExperimentalChatVirtualization(targetChat.length);
     refreshSwipeButtons(false, fade);
     applyStylePins();
     updateEditArrowClasses();
 
     console.info(`Rendered ${targetChat.length - startIndex} messages in ${((performance.now() - t1) / 1000).toFixed(3)} seconds.`);
-}
-
-function applyExperimentalChatVirtualization(messageCount = chat.length) {
-    const chatNode = chatElement[0];
-    const enabled = Boolean(power_user?.experimental_chat_virtualization)
-        && messageCount >= SB_CHAT_VIRTUALIZATION_MIN_MESSAGES
-        && CSS.supports?.('content-visibility', 'auto');
-
-    if (!chatNode) {
-        return;
-    }
-
-    if (!enabled) {
-        document.body.classList.remove('sb-chat-virtualization-enabled');
-        chatNode.classList.remove('sb-chat-virtualization-active');
-    }
-    const shouldMeasureHeights = enabled && !chatNode.classList.contains('sb-chat-virtualization-active');
-
-    // SillyBunny prototype: keep .mes nodes mounted for extension compatibility and let
-    // the browser skip off-screen layout/paint. This does not assume fixed message heights.
-    for (const message of chatNode.querySelectorAll('.mes')) {
-        if (!(message instanceof HTMLElement)) {
-            continue;
-        }
-
-        if (enabled) {
-            const measuredHeight = shouldMeasureHeights ? Math.ceil(message.getBoundingClientRect().height) : 0;
-            const placeholderHeight = Math.max(SB_CHAT_VIRTUALIZATION_PLACEHOLDER_HEIGHT, measuredHeight || 0);
-            message.style.setProperty('--sb-virtual-message-height', `${placeholderHeight}px`);
-        } else {
-            message.style.removeProperty('--sb-virtual-message-height');
-        }
-    }
-
-    if (enabled) {
-        document.body.classList.add('sb-chat-virtualization-enabled');
-        chatNode.classList.add('sb-chat-virtualization-active');
-    }
 }
 
 export function scrollOnMediaLoad({ force = false } = {}) {
@@ -3169,7 +3128,6 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
         ? insertedElement
         : Array.from(chatNode?.querySelectorAll('.mes') ?? []).at(-1);
     lastMessageElement?.classList.add('last_mes');
-    applyExperimentalChatVirtualization(chat.length);
 
     if (showSwipes) refreshSwipeButtons();
     // Don't scroll if not inserting last

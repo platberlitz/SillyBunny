@@ -511,7 +511,7 @@ async function preSetupTasks() {
     });
 
     // Wait for frontend libs to compile
-    await webpackMiddleware.runWebpackCompiler({ pruneCache: true });
+    await webpackMiddleware.runWebpackCompiler();
 }
 
 async function runDeferredStartupTasks() {
