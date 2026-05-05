@@ -1532,15 +1532,19 @@ async function resolveCharacterChatForLoad(characterId, { allowCreate = false, a
     }
 
     const persistedChat = String(character.chat || '').trim();
-    const existingChats = await getExistingCharacterChats(characterId);
-    const persistedExists = persistedChat && existingChats.some(chatInfo => chatInfo.file_name === `${persistedChat}.jsonl`);
-    if (persistedChat && !persistedExists && allowMissingPersisted) {
+    if (persistedChat && allowMissingPersisted) {
         character.chat = persistedChat;
         return { chatName: persistedChat, created: true };
     }
 
-    const latestChat = persistedExists ? '' : existingChats[0]?.file_name?.replace('.jsonl', '') || '';
-    const nextChatName = persistedExists ? persistedChat : (latestChat || (allowCreate ? `${character.name} - ${humanizedDateTime()}` : ''));
+    if (persistedChat) {
+        character.chat = persistedChat;
+        return { chatName: persistedChat, created: false };
+    }
+
+    const existingChats = await getExistingCharacterChats(characterId);
+    const latestChat = existingChats[0]?.file_name?.replace('.jsonl', '') || '';
+    const nextChatName = latestChat || (allowCreate ? `${character.name} - ${humanizedDateTime()}` : '');
 
     if (nextChatName && nextChatName !== persistedChat) {
         await updateRemoteChatName(characterId, nextChatName);
@@ -1550,7 +1554,7 @@ async function resolveCharacterChatForLoad(characterId, { allowCreate = false, a
 
     return {
         chatName: nextChatName,
-        created: Boolean(!persistedExists && !latestChat && allowCreate && nextChatName),
+        created: Boolean(!latestChat && allowCreate && nextChatName),
     };
 }
 
