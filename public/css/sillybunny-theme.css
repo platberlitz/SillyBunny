@@ -275,6 +275,17 @@ body::before {
     scroll-padding-bottom: 8px;
 }
 
+/*
+ * Experimental SillyBunny chat rendering prototype. The setting is off by
+ * default because extensions may read message layout directly. This keeps .mes
+ * nodes mounted and relies on browser content-visibility instead of fixed-height
+ * virtualization or DOM removal.
+ */
+body.sb-chat-virtualization-enabled #chat.sb-chat-virtualization-active .mes {
+    content-visibility: auto;
+    contain-intrinsic-size: auto var(--sb-virtual-message-height, 180px);
+}
+
 #top-bar {
     position: relative;
     isolation: isolate;

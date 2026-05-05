@@ -5732,6 +5732,11 @@
                                     <input id="auto_scroll_chat_to_bottom" type="checkbox" />
                                     <small data-i18n="Auto-scroll Chat">Auto-scroll Chat</small>
                                 </label>
+                                <label class="checkbox_label" for="experimental_chat_virtualization" title="Experimental prototype. Keeps messages in the DOM but asks the browser to skip off-screen rendering. Some extensions that inspect message layout may be affected.">
+                                    <input id="experimental_chat_virtualization" type="checkbox" />
+                                    <small>Experimental chat rendering</small>
+                                    <i class="fa-solid fa-flask" title="Prototype. Off by default because extensions may depend on full message layout."></i>
+                                </label>
                                 <label class="checkbox_label" for="auto_save_msg_edits" title="Save edits to messages without confirmation as you type." data-i18n="[title]Save edits to messages without confirmation as you type">
                                     <input id="auto_save_msg_edits" type="checkbox" />
                                     <small data-i18n="Auto-save Message Edits">Auto-save Message Edits</small>

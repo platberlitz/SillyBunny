@@ -18,6 +18,7 @@ const contentDirectory = path.join(serverDirectory, 'default/content');
 const scaffoldDirectory = path.join(serverDirectory, 'default/scaffold');
 const contentIndexPath = path.join(contentDirectory, 'index.json');
 const scaffoldIndexPath = path.join(scaffoldDirectory, 'index.json');
+const DEFAULT_PRESET_DELETIONS_FILE = 'default-preset-deletions.json';
 
 const WHITELIST_GENERIC_URL_DOWNLOAD_SOURCES = getConfigValue('whitelistImportDomains', []);
 const USER_AGENT = 'SillyTavern';
@@ -83,6 +84,126 @@ function isPresetContentType(type) {
     return PRESET_CONTENT_TYPES.includes(type);
 }
 
+function getDefaultPresetDeletionPath(directories) {
+    return path.join(directories.root, DEFAULT_PRESET_DELETIONS_FILE);
+}
+
+function getDefaultPresetDeletionKey(contentItem) {
+    return `${contentItem.type}::${contentItem.filename}`;
+}
+
+function normalizePresetDeletionData(data) {
+    const normalized = { version: 1, deleted: {} };
+
+    if (!data || typeof data !== 'object') {
+        return normalized;
+    }
+
+    const source = data.deleted && typeof data.deleted === 'object' ? data.deleted : data;
+
+    if (Array.isArray(source)) {
+        for (const item of source) {
+            if (!item || typeof item !== 'object' || !item.type || !item.filename) {
+                continue;
+            }
+
+            normalized.deleted[getDefaultPresetDeletionKey(item)] = {
+                type: String(item.type),
+                filename: String(item.filename),
+                deletedAt: Number(item.deletedAt) || Date.now(),
+            };
+        }
+
+        return normalized;
+    }
+
+    for (const [key, value] of Object.entries(source)) {
+        if (value === true) {
+            const [type, filename] = key.split('::');
+            if (type && filename) {
+                normalized.deleted[key] = { type, filename, deletedAt: Date.now() };
+            }
+            continue;
+        }
+
+        if (!value || typeof value !== 'object' || !value.type || !value.filename) {
+            continue;
+        }
+
+        normalized.deleted[getDefaultPresetDeletionKey(value)] = {
+            type: String(value.type),
+            filename: String(value.filename),
+            deletedAt: Number(value.deletedAt) || Date.now(),
+        };
+    }
+
+    return normalized;
+}
+
+export function getDefaultPresetDeletions(directories) {
+    try {
+        const deletionPath = getDefaultPresetDeletionPath(directories);
+        if (!fs.existsSync(deletionPath)) {
+            return { version: 1, deleted: {} };
+        }
+
+        return normalizePresetDeletionData(JSON.parse(fs.readFileSync(deletionPath, 'utf8')));
+    } catch (error) {
+        console.warn('Failed to read default preset deletions', error);
+        return { version: 1, deleted: {} };
+    }
+}
+
+function writeDefaultPresetDeletions(directories, deletions) {
+    const normalized = normalizePresetDeletionData(deletions);
+    const deletionPath = getDefaultPresetDeletionPath(directories);
+
+    fs.mkdirSync(path.dirname(deletionPath), { recursive: true });
+    writeFileAtomicSync(deletionPath, `${JSON.stringify(normalized, null, 4)}\n`, 'utf8');
+}
+
+export function isDefaultPresetDeleted(directories, contentItem) {
+    if (!contentItem || !isPresetContentType(contentItem.type)) {
+        return false;
+    }
+
+    const deletions = getDefaultPresetDeletions(directories);
+    return Object.hasOwn(deletions.deleted, getDefaultPresetDeletionKey(contentItem));
+}
+
+export function recordDefaultPresetDeletion(directories, contentItem) {
+    if (!contentItem || !isPresetContentType(contentItem.type)) {
+        return false;
+    }
+
+    const deletions = getDefaultPresetDeletions(directories);
+    const key = getDefaultPresetDeletionKey(contentItem);
+    deletions.deleted[key] = {
+        type: contentItem.type,
+        filename: contentItem.filename,
+        deletedAt: Date.now(),
+    };
+    writeDefaultPresetDeletions(directories, deletions);
+    return true;
+}
+
+export function clearDefaultPresetDeletion(directories, contentItem) {
+    if (!contentItem || !isPresetContentType(contentItem.type)) {
+        return false;
+    }
+
+    const deletions = getDefaultPresetDeletions(directories);
+    const key = getDefaultPresetDeletionKey(contentItem);
+
+    if (!Object.hasOwn(deletions.deleted, key)) {
+        return false;
+    }
+
+    delete deletions.deleted[key];
+    writeDefaultPresetDeletions(directories, deletions);
+    return true;
+}
+
 /**
  * @enum {string}
  */
@@ -109,16 +230,23 @@ function getScopeByType(type) {
  * @param {import('../users.js').UserDirectoryList} directories User directories
  * @returns {object[]} Array of default presets
  */
-export function getDefaultPresets(directories) {
+export function getDefaultPresets(directories, { includeDeleted = true } = {}) {
     try {
         const contentIndex = getContentIndex(CONTENT_SCOPE.USER);
         const presets = [];
 
         for (const contentItem of contentIndex) {
             if (isPresetContentType(contentItem.type)) {
-                contentItem.name = path.parse(contentItem.filename).name;
-                contentItem.folder = getUserTargetByType(contentItem.type, directories);
-                presets.push(contentItem);
+                if (!includeDeleted && isDefaultPresetDeleted(directories, contentItem)) {
+                    continue;
+                }
+
+                presets.push({
+                    ...contentItem,
+                    name: path.parse(contentItem.filename).name,
+                    folder: getUserTargetByType(contentItem.type, directories),
+                    sourceFolder: contentItem.folder,
+                });
             }
         }
 
@@ -127,6 +255,63 @@ export function getDefaultPresets(directories) {
         console.warn('Failed to get default presets', err);
         return [];
     }
+}
+
+/**
+ * Finds a bundled default preset by target folder and display name.
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ * @param {object} options Lookup options
+ * @param {string} options.folder Target folder
+ * @param {string} options.name Preset name without extension
+ * @returns {ContentItem|null} Default preset item
+ */
+export function findDefaultPreset(directories, { folder, name }) {
+    if (!folder || !name) {
+        return null;
+    }
+
+    const defaultPresets = getDefaultPresets(directories, { includeDeleted: true });
+    return defaultPresets.find(preset => preset.folder === folder && preset.name === name) || null;
+}
+
+/**
+ * Restores bundled default preset files for a user.
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ * @param {string[]|null} types Content types to restore, or null for all preset types
+ * @returns {{restored: string[], failed: {filename: string, error: string}[]}}
+ */
+export function restoreDefaultPresetFiles(directories, types = null) {
+    const allowedTypes = Array.isArray(types) && types.length ? new Set(types) : null;
+    const defaultPresets = getDefaultPresets(directories, { includeDeleted: true })
+        .filter(preset => !allowedTypes || allowedTypes.has(preset.type));
+    const restored = [];
+    const failed = [];
+
+    for (const preset of defaultPresets) {
+        try {
+            const sourceFolder = preset.sourceFolder || contentDirectory;
+            const sourcePath = path.join(sourceFolder, preset.filename);
+            const targetFolder = preset.folder;
+            const targetPath = path.join(targetFolder, path.parse(preset.filename).base);
+
+            if (!targetFolder || !fs.existsSync(sourcePath)) {
+                throw new Error('Default preset source is missing.');
+            }
+
+            fs.mkdirSync(targetFolder, { recursive: true });
+            fs.cpSync(sourcePath, targetPath, { recursive: true, force: true });
+            setPermissionsSync(targetPath);
+            clearDefaultPresetDeletion(directories, preset);
+            restored.push(preset.filename);
+        } catch (error) {
+            failed.push({
+                filename: preset.filename,
+                error: error.message || String(error),
+            });
+        }
+    }
+
+    return { restored, failed };
 }
 
 /**
@@ -261,7 +446,15 @@ async function seedContentForUser(contentIndex, directories, forceCategories) {
     const contentLog = getContentLog(contentLogPath);
     removeObsoleteContent(contentLog, directories);
     writeFileAtomicSync(contentLogPath, contentLog.join('\n'));
-    return seedContent(contentIndex, contentLogPath, (type) => getUserTargetByType(type, directories), forceCategories);
+    const filteredContentIndex = contentIndex.filter(contentItem => {
+        if (!isPresetContentType(contentItem.type)) {
+            return true;
+        }
+
+        return !isDefaultPresetDeleted(directories, contentItem);
+    });
+
+    return seedContent(filteredContentIndex, contentLogPath, (type) => getUserTargetByType(type, directories), forceCategories);
 }
 
 /**

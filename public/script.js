@@ -539,6 +539,8 @@ const messageTemplate = $('#message_template .mes');
 export const chatElement = $('#chat');
 const MOBILE_CHAT_RENDER_MEDIA_QUERY = '(max-width: 1000px)';
 const MOBILE_CHAT_RENDER_BATCH_SIZE = 8;
+const SB_CHAT_VIRTUALIZATION_MIN_MESSAGES = 160;
+const SB_CHAT_VIRTUALIZATION_PLACEHOLDER_HEIGHT = 180;
 const MOBILE_MESSAGE_UPDATE_DELAY_MS = 24;
 const MOBILE_MEDIA_SCROLL_MAX_DELAY_MS = 300;
 const MOBILE_SEND_SCROLL_IMMUNITY_MS = 1500;
@@ -1109,7 +1111,12 @@ function getCharacterBlock(item, id) {
     // Populate the template
     const template = $('#character_template .character_select').clone();
     template.attr({ 'data-chid': id, 'id': `CharID${id}` });
-    template.find('img').attr('src', this_avatar).attr('alt', item.name);
+    template.find('img').attr({
+        src: this_avatar,
+        alt: item.name,
+        loading: 'lazy',
+        decoding: 'async',
+    });
     template.find('.avatar').attr('title', `[Character] ${item.name}\nFile: ${item.avatar}`);
     template.find('.ch_name').text(item.name).attr('title', `[Character] ${item.name}`);
     if (power_user.show_card_avatar_urls) {
@@ -1469,13 +1476,7 @@ export async function getCharacters() {
         for (let i = 0; i < getData.length; i++) {
             characters[i] = getData[i];
             characters[i].name = DOMPurify.sanitize(characters[i].name);
-
-            // For dropped-in cards
-            if (!characters[i].chat) {
-                characters[i].chat = `${characters[i].name} - ${humanizedDateTime()}`;
-            }
-
-            characters[i].chat = String(characters[i].chat);
+            characters[i].chat = characters[i].chat ? String(characters[i].chat) : '';
         }
 
         if (previousAvatar) {
@@ -1498,6 +1499,56 @@ export async function getCharacters() {
             await Popup.show.text(t`Character data length limit reached`, t`To resolve this, set "performance.lazyLoadCharacters" to "true" in config.yaml and restart the server.`);
         }
     }
+}
+
+async function getExistingCharacterChats(characterId) {
+    const character = characters[characterId];
+    if (!character?.avatar) {
+        return [];
+    }
+
+    const response = await fetch('/api/characters/chats', {
+        method: 'POST',
+        headers: getRequestHeaders(),
+        body: JSON.stringify({ avatar_url: character.avatar }),
+    });
+
+    if (!response.ok) {
+        return [];
+    }
+
+    const data = await response.json();
+    if (typeof data === 'object' && data?.error === true) {
+        return [];
+    }
+
+    const chats = Object.values(data);
+    chats.sort((a, b) => sortMoments(timestampToMoment(a.last_mes), timestampToMoment(b.last_mes)));
+    return chats.filter(chatInfo => typeof chatInfo?.file_name === 'string');
+}
+
+async function resolveCharacterChatForLoad(characterId, { allowCreate = false } = {}) {
+    const character = characters[characterId];
+    if (!character) {
+        return { chatName: '', created: false };
+    }
+
+    const persistedChat = String(character.chat || '').trim();
+    const existingChats = await getExistingCharacterChats(characterId);
+    const persistedExists = persistedChat && existingChats.some(chatInfo => chatInfo.file_name === `${persistedChat}.jsonl`);
+    const latestChat = persistedExists ? '' : existingChats[0]?.file_name?.replace('.jsonl', '') || '';
+    const nextChatName = persistedExists ? persistedChat : (latestChat || (allowCreate ? `${character.name} - ${humanizedDateTime()}` : ''));
+
+    if (nextChatName && nextChatName !== persistedChat) {
+        await updateRemoteChatName(characterId, nextChatName);
+    } else {
+        character.chat = nextChatName;
+    }
+
+    return {
+        chatName: nextChatName,
+        created: Boolean(!persistedExists && !latestChat && allowCreate && nextChatName),
+    };
 }
 
 async function delChat(chatfile) {
@@ -1890,7 +1941,9 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
         const shouldYieldBetweenBatches = batchSize < messages.length;
 
         for (let offset = 0; offset < messages.length; offset += batchSize) {
-            const newMessageElements = messages.slice(offset, offset + batchSize).map((message, batchOffset) => {
+            const batchMessages = messages.slice(offset, offset + batchSize);
+            const fragment = document.createDocumentFragment();
+            const newMessageElements = batchMessages.map((message, batchOffset) => {
                 const i = startIndex + offset + batchOffset;
                 const messageElement = updateMessageElement(message, { messageId: i });
 
@@ -1903,7 +1956,10 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
             }
 
             //Append each batch in one DOM update.
-            chatElement.append(newMessageElements);
+            for (const messageElement of newMessageElements) {
+                fragment.appendChild(messageElement);
+            }
+            chatElement[0].appendChild(fragment);
 
             if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
                 await waitForNextFrame();
@@ -1913,11 +1969,50 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
         applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });
     }
 
+    applyExperimentalChatVirtualization(targetChat.length);
     refreshSwipeButtons(false, fade);
     applyStylePins();
     updateEditArrowClasses();
 
     console.info(`Rendered ${targetChat.length - startIndex} messages in ${((performance.now() - t1) / 1000).toFixed(3)} seconds.`);
+}
+
+function applyExperimentalChatVirtualization(messageCount = chat.length) {
+    const chatNode = chatElement[0];
+    const enabled = Boolean(power_user?.experimental_chat_virtualization)
+        && messageCount >= SB_CHAT_VIRTUALIZATION_MIN_MESSAGES
+        && CSS.supports?.('content-visibility', 'auto');
+
+    if (!chatNode) {
+        return;
+    }
+
+    if (!enabled) {
+        document.body.classList.remove('sb-chat-virtualization-enabled');
+        chatNode.classList.remove('sb-chat-virtualization-active');
+    }
+    const shouldMeasureHeights = enabled && !chatNode.classList.contains('sb-chat-virtualization-active');
+
+    // SillyBunny prototype: keep .mes nodes mounted for extension compatibility and let
+    // the browser skip off-screen layout/paint. This does not assume fixed message heights.
+    for (const message of chatNode.querySelectorAll('.mes')) {
+        if (!(message instanceof HTMLElement)) {
+            continue;
+        }
+
+        if (enabled) {
+            const measuredHeight = shouldMeasureHeights ? Math.ceil(message.getBoundingClientRect().height) : 0;
+            const placeholderHeight = Math.max(SB_CHAT_VIRTUALIZATION_PLACEHOLDER_HEIGHT, measuredHeight || 0);
+            message.style.setProperty('--sb-virtual-message-height', `${placeholderHeight}px`);
+        } else {
+            message.style.removeProperty('--sb-virtual-message-height');
+        }
+    }
+
+    if (enabled) {
+        document.body.classList.add('sb-chat-virtualization-enabled');
+        chatNode.classList.add('sb-chat-virtualization-active');
+    }
 }
 
 export function scrollOnMediaLoad({ force = false } = {}) {
@@ -2725,8 +2820,12 @@ export function appendMediaToMessage(mes, messageElement, scrollBehavior = SCROL
         template.attr('data-index', index);
 
         const image = template.find('.mes_img');
-        image.attr('src', attachment.url);
-        image.attr('title', attachment.title || mes.extra.title || '');
+        image.attr({
+            src: attachment.url,
+            title: attachment.title || mes.extra.title || '',
+            loading: 'lazy',
+            decoding: 'async',
+        });
         mediaPromises.push(new Promise((resolve) => {
             function onLoad() {
                 image.removeAttr('alt');
@@ -2761,8 +2860,11 @@ export function appendMediaToMessage(mes, messageElement, scrollBehavior = SCROL
         template.attr('data-index', index);
 
         const video = template.find('.mes_video');
-        video.attr('src', attachment.url);
-        video.attr('title', attachment.title || mes.extra.title || '');
+        video.attr({
+            src: attachment.url,
+            title: attachment.title || mes.extra.title || '',
+            preload: 'metadata',
+        });
         mediaPromises.push(new Promise((resolve) => {
             function onLoad() {
                 resolve();
@@ -3033,6 +3135,7 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
     const shouldPinMobileBottom = !insertAfter && !insertBefore && scroll && shouldPinMobileChatToBottom();
 
     let messageElement;
+    let insertedElement = null;
 
     if (type === 'swipe') {
         // Forbidden black magic
@@ -3042,8 +3145,10 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
         //This keeps listeners intact.
         messageElement = chatElement.find(`[mesid="${messageId}"]`);
         updateMessageElement(mes, { messageId, messageElement, adjustMediaScroll: scroll ? SCROLL_BEHAVIOR.ADJUST : SCROLL_BEHAVIOR.NONE });
+        insertedElement = messageElement[0] ?? null;
     } else {
         messageElement = updateMessageElement(mes, { messageId, adjustMediaScroll: scroll ? SCROLL_BEHAVIOR.ADJUST : SCROLL_BEHAVIOR.NONE });
+        insertedElement = messageElement[0] ?? null;
         if (typeof insertAfter === 'number' && insertAfter >= 0) {
             const target = chatElement.find(`.mes[mesid="${insertAfter}"]`);
             $(messageElement).insertAfter(target);
@@ -3057,8 +3162,14 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
 
 
     //last_mes should always be updated.
-    chatElement.find('.mes').removeClass('last_mes');
-    chatElement.find('.mes').last().addClass('last_mes');
+    const chatNode = chatElement[0];
+    chatNode?.querySelector('.mes.last_mes')?.classList.remove('last_mes');
+    const canUseInsertedAsLast = type !== 'swipe' && !insertAfter && !insertBefore && insertedElement instanceof HTMLElement;
+    const lastMessageElement = canUseInsertedAsLast
+        ? insertedElement
+        : Array.from(chatNode?.querySelectorAll('.mes') ?? []).at(-1);
+    lastMessageElement?.classList.add('last_mes');
+    applyExperimentalChatVirtualization(chat.length);
 
     if (showSwipes) refreshSwipeButtons();
     // Don't scroll if not inserting last
@@ -3140,7 +3251,12 @@ export function updateMessageElement(mes, { messageId = chat.length - 1, message
         messageElement[0].style.setProperty('--mes-avatar-original-url', originalAvatarCssUrl);
     }
 
-    messageElement.find('.avatar img').attr('src', originalAvatarImg).attr('data-thumbnail-src', avatarImg);
+    messageElement.find('.avatar img').attr({
+        src: originalAvatarImg,
+        'data-thumbnail-src': avatarImg,
+        decoding: 'async',
+        loading: messageId > 8 ? 'lazy' : 'eager',
+    });
     messageElement.find('.ch_name .name_text').text(mes.name);
     messageElement.find('.timestamp').text(timestamp).attr('title', `${mes.extra?.api ? mes.extra.api + ' - ' : ''}${mes.extra?.model ?? ''}`);
     messageElement.find('.mesIDDisplay').text(`#${messageId}`);
@@ -8485,7 +8601,12 @@ export function buildAvatarList(block, entities, { templateId = 'inline_avatar_t
 
         avatarTemplate.attr('data-type', entity.type);
         avatarTemplate.attr('data-chid', id);
-        avatarTemplate.find('img').attr('src', this_avatar).attr('alt', entity.item.name);
+        avatarTemplate.find('img').attr({
+            src: this_avatar,
+            alt: entity.item.name,
+            loading: 'lazy',
+            decoding: 'async',
+        });
         avatarTemplate.attr('title', `[Character] ${entity.item.name}\nFile: ${entity.item.avatar}`);
         if (highlightFavs) {
             avatarTemplate.toggleClass('is_fav', entity.item.fav || entity.item.fav == 'true');
@@ -8503,7 +8624,11 @@ export function buildAvatarList(block, entities, { templateId = 'inline_avatar_t
             avatarTemplate.attr('title', `[Group] ${entity.item.name}`);
         } else if (entity.type === 'persona') {
             avatarTemplate.attr({ 'data-pid': id, 'data-chid': null });
-            avatarTemplate.find('img').attr('src', getThumbnailUrl('persona', entity.item.avatar));
+            avatarTemplate.find('img').attr({
+                src: getThumbnailUrl('persona', entity.item.avatar),
+                loading: 'lazy',
+                decoding: 'async',
+            });
             avatarTemplate.attr('title', `[Persona] ${entity.item.name}\nFile: ${entity.item.avatar}`);
         }
 
@@ -8552,6 +8677,7 @@ export async function unshallowCharacter(characterId) {
 export async function getChat() {
     try {
         await unshallowCharacter(this_chid);
+        const resolvedChat = await resolveCharacterChatForLoad(this_chid, { allowCreate: true });
 
         const response = await fetch('/api/chats/get', {
             method: 'POST',
@@ -8559,7 +8685,7 @@ export async function getChat() {
             cache: 'no-cache',
             body: JSON.stringify({
                 ch_name: characters[this_chid].name,
-                file_name: characters[this_chid].chat,
+                file_name: resolvedChat.chatName,
                 avatar_url: characters[this_chid].avatar,
             }),
         });
@@ -8583,7 +8709,7 @@ export async function getChat() {
         if (!chat_metadata.integrity) {
             chat_metadata.integrity = uuidv4();
         }
-        await getChatResult();
+        await getChatResult({ emitCreated: resolvedChat.created });
         eventSource.emit(event_types.CHAT_LOADED, { detail: { id: this_chid, character: characters[this_chid] } });
 
         // Focus on the textarea if not already focused on a visible text input
@@ -8599,7 +8725,7 @@ export async function getChat() {
     }
 }
 
-async function getChatResult() {
+async function getChatResult({ emitCreated = false } = {}) {
     name2 = characters[this_chid].name;
     let freshChat = false;
     if (chat.length === 0) {
@@ -8616,7 +8742,7 @@ async function getChatResult() {
     select_selected_character(this_chid);
 
     await eventSource.emit(event_types.CHAT_CHANGED, (getCurrentChatId()));
-    if (freshChat) await eventSource.emit(event_types.CHAT_CREATED);
+    if (freshChat && emitCreated) await eventSource.emit(event_types.CHAT_CREATED);
 
     if (chat.length === 1) {
         const chat_id = (chat.length - 1);

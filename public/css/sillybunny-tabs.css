@@ -259,7 +259,6 @@ body.sb-topbar-compact #sb-chatbar-layer {
     width: 100%;
     transform: translate(var(--sb-topbar-offset-x, 0px), var(--sb-topbar-offset-y, 0px));
     transition: transform 180ms ease;
-    will-change: transform;
     contain: layout style;
 }
 
@@ -548,7 +547,7 @@ body.sb-topbar-compact #sb-chatbar-layer {
     min-height: 0 !important;
     line-height: 1;
     box-sizing: border-box;
-    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
+    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, opacity 160ms ease;
 }
 
 .sb-chatbar-button::before,
@@ -587,6 +586,15 @@ body.sb-topbar-compact #sb-chatbar-layer {
 .sb-chatbar-button.is-active {
     border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 42%, var(--sb-shell-border) 58%);
     box-shadow: 0 8px 16px color-mix(in srgb, var(--SmartThemeShadowColor) 14%, transparent);
+}
+
+.sb-chatbar-button:focus-visible,
+.sb-connection-strip-connect:focus-visible,
+.sb-bottom-chat-btn:focus-visible,
+.sb-mobile-chat-close:focus-visible {
+    outline: none;
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 46%, var(--sb-shell-border) 54%);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 70%, transparent);
 }
 
 #sb-chatbar-visibility-toggle {
@@ -741,7 +749,7 @@ body.sb-topbar-compact #sb-chatbar-layer {
     font: inherit;
     white-space: nowrap;
     cursor: pointer;
-    transition: transform 160ms ease, border-color 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
+    transition: transform 160ms ease, border-color 160ms ease, opacity 160ms ease;
 }
 
 .sb-connection-strip-connect::before {
@@ -1059,7 +1067,7 @@ body:not(.movingUI) .drawer-content.maximized {
     color: var(--SmartThemeBodyColor);
     background: transparent;
     cursor: pointer;
-    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
+    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, opacity 180ms ease;
     opacity: 0.82;
 }
 
@@ -1092,6 +1100,13 @@ body:not(.movingUI) .drawer-content.maximized {
 .sb-proxy-button:hover {
     opacity: 1;
     transform: translateY(-1px);
+}
+
+.sb-proxy-button:focus-visible {
+    outline: none;
+    opacity: 1;
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 42%, var(--sb-shell-border) 58%);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 64%, transparent);
 }
 
 .sb-proxy-button.is-open,
@@ -1573,7 +1588,7 @@ body.sb-shell-resizing * {
     flex-shrink: 1;
     min-width: 0;
     overflow: hidden;
-    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
 }
 
 .sb-shell-tab:hover {
@@ -1979,6 +1994,27 @@ body.sb-shell-resizing * {
     display: flex;
 }
 
+.sb-search-result-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sb-search-result-group + .sb-search-result-group {
+    padding-top: 4px;
+    border-top: 1px solid color-mix(in srgb, var(--sb-shell-border) 64%, transparent);
+}
+
+.sb-search-result-group-label {
+    padding: 0 4px;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor) 72%, transparent);
+    font-size: var(--sb-type-caption);
+    font-weight: var(--sb-weight-title);
+    letter-spacing: var(--sb-tracking-kicker);
+    line-height: var(--sb-line-compact);
+    text-transform: uppercase;
+}
+
 .sb-search-result,
 .sb-search-empty {
     border-radius: var(--sb-radius-md, 16px);
@@ -2017,8 +2053,26 @@ body.sb-shell-resizing * {
     transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
 }
 
-.sb-search-result:hover {
+.sb-search-result:hover,
+.sb-search-result.is-active,
+.sb-search-result:focus-visible {
     transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 42%, var(--sb-shell-border) 58%);
+}
+
+.sb-search-result.is-active,
+.sb-search-result:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 58%, transparent);
+}
+
+.sb-search-result.is-active::before,
+.sb-search-result:focus-visible::before {
+    background: color-mix(
+        in srgb,
+        rgb(from var(--SmartThemeChatTintColor) r g b / 1) 88%,
+        rgb(from var(--SmartThemeBodyColor) r g b / 1) 12%
+    );
 }
 
 .sb-search-result span,
@@ -2888,7 +2942,7 @@ body.sb-shell-resizing * {
     color: var(--SmartThemeBodyColor);
     font: inherit;
     cursor: pointer;
-    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
 }
 
 :root[data-sb-compact-mode='true'] .sb-theme-option {
@@ -2913,6 +2967,13 @@ body.sb-shell-resizing * {
 
 .sb-theme-option.is-selected {
     box-shadow: 0 14px 28px color-mix(in srgb, var(--SmartThemeShadowColor) 16%, transparent);
+}
+
+.sb-theme-option:focus-visible,
+.sb-compact-mode-option:focus-visible {
+    outline: none;
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 46%, var(--sb-shell-border) 54%);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 62%, transparent);
 }
 
 .sb-theme-option.is-selected::before {
@@ -3021,7 +3082,7 @@ body.sb-shell-resizing * {
     color: var(--SmartThemeBodyColor);
     cursor: pointer;
     box-sizing: border-box;
-    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
 }
 
 .sb-compact-mode-option::before {

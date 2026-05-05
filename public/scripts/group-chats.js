@@ -813,7 +813,11 @@ function updateGroupSpeakerControls() {
             const hasUnreadDm = Boolean(unreadState[getGroupDmUnreadKey(group.id, avatarId)]);
             item.toggleClass('selected', avatarId === selectedGroupSpeakerAvatar);
             item.toggleClass('has-unread-dm', hasUnreadDm);
-            item.append($('<img alt="">').attr('src', getThumbnailUrl('avatar', avatarId)));
+            item.append($('<img alt="">').attr({
+                src: getThumbnailUrl('avatar', avatarId),
+                loading: 'lazy',
+                decoding: 'async',
+            }));
             item.append($('<span></span>').text(character.name));
             if (hasUnreadDm) {
                 item.attr('title', `${character.name}: unread DM — tap to open`);
@@ -1170,10 +1174,8 @@ async function validateGroup(group) {
         }
     }
 
-    if ((!Array.isArray(group.chats) || !group.chats.length) && !group.chat_id) {
-        const freshChatId = humanizedDateTime();
-        group.chat_id = freshChatId;
-        group.chats = [freshChatId];
+    if (!Array.isArray(group.chats)) {
+        group.chats = [];
         dirty = true;
     }
 
@@ -1199,10 +1201,21 @@ export async function getGroupChat(groupId, reload = false) {
     await validateGroup(group);
     await unshallowGroupMembers(groupId);
 
+    let createdChat = false;
+
+    if (!group.chat_id) {
+        const freshChatId = humanizedDateTime();
+        group.chat_id = freshChatId;
+        group.chats = Array.isArray(group.chats) ? group.chats : [];
+        group.chats.push(freshChatId);
+        await editGroup(group.id, true, false);
+        createdChat = true;
+    }
+
     const chat_id = group.chat_id;
     const data = await loadGroupChat(chat_id);
     const metadata = data?.[0]?.chat_metadata ?? {};
-    const freshChat = !metadata.tainted && (!Array.isArray(data) || !data.length);
+    const freshChat = createdChat && !metadata.tainted && (!Array.isArray(data) || !data.length);
 
     // Remove chat file header if present
     if (Array.isArray(data) && data.length && Object.hasOwn(data[0], 'chat_metadata')) {
@@ -1789,7 +1802,11 @@ function getGroupAvatar(group) {
         const groupAvatar = $(`#group_avatars_template .collage_${avatarCount}`).clone();
 
         for (let i = 0; i < avatarCount; i++) {
-            groupAvatar.find(`.img_${i + 1}`).attr('src', memberAvatars[i]);
+            groupAvatar.find(`.img_${i + 1}`).attr({
+                src: memberAvatars[i],
+                loading: 'lazy',
+                decoding: 'async',
+            });
         }
 
         groupAvatar.attr('title', `[Group] ${group.name}`);
@@ -1803,7 +1820,11 @@ function getGroupAvatar(group) {
 
     // default avatar
     const groupAvatar = $('#group_avatars_template .collage_1').clone();
-    groupAvatar.find('.img_1').attr('src', group.avatar_url || system_avatar);
+    groupAvatar.find('.img_1').attr({
+        src: group.avatar_url || system_avatar,
+        loading: 'lazy',
+        decoding: 'async',
+    });
     groupAvatar.attr('title', `[Group] ${group.name}`);
     return groupAvatar;
 }
