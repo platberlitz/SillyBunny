@@ -8,9 +8,9 @@
     --sb-radius-lg: 22px;
     --sb-radius-xl: 28px;
     --sb-radius-button: 14px;
-    --sb-transition-fast: 180ms ease;
-    --sb-transition: 240ms ease;
-    --sb-transition-slow: 360ms ease;
+    --sb-transition-fast: 180ms cubic-bezier(0.22, 1, 0.36, 1);
+    --sb-transition: 240ms cubic-bezier(0.22, 1, 0.36, 1);
+    --sb-transition-slow: 360ms cubic-bezier(0.22, 1, 0.36, 1);
     --sb-icon-control-size: 2rem;
     --sb-icon-control-radius: 10px;
     --sb-inline-drawer-icon-size: 2rem;
@@ -57,8 +57,8 @@
     --sb-shell-main-bg: color-mix(in srgb, var(--SmartThemeBlurTintColor) 93%, transparent);
     --sb-shell-nav-bg: color-mix(in srgb, var(--SmartThemeBlurTintColor) 88%, transparent);
     --sb-shell-header-bg: color-mix(in srgb, var(--SmartThemeBlurTintColor) 90%, transparent);
-    --sb-shell-header-glow: color-mix(in srgb, var(--SmartThemeQuoteColor) 18%, transparent);
-    --sb-shell-tab-active-bg: linear-gradient(135deg, color-mix(in srgb, var(--SmartThemeQuoteColor) 18%, transparent), color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent));
+    --sb-shell-header-glow: color-mix(in srgb, var(--SmartThemeQuoteColor) 8%, transparent);
+    --sb-shell-tab-active-bg: color-mix(in srgb, var(--SmartThemeBodyColor) 7%, var(--SmartThemeBlurTintColor) 93%);
     --sb-shell-border: color-mix(in srgb, var(--SmartThemeBorderColor) 96%, transparent);
     --sb-shell-shadow: 0 32px 90px color-mix(in srgb, var(--SmartThemeShadowColor) 34%, transparent);
     --sb-chat-surface-source: color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, var(--SmartThemeChatTintColor) 8%);
@@ -71,7 +71,7 @@
     --sb-composer-input-bg: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-composer-surface-base));
     --sb-card-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 6%, var(--SmartThemeBlurTintColor)), color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, transparent));
     --sb-button-bg: color-mix(in srgb, var(--SmartThemeBlurTintColor) 84%, transparent);
-    --sb-button-hover: color-mix(in srgb, var(--SmartThemeQuoteColor) 14%, transparent);
+    --sb-button-hover: color-mix(in srgb, var(--SmartThemeQuoteColor) 8%, var(--SmartThemeBodyColor) 4%);
     --sb-topbar-surface-bg: var(--sb-fixed-surface-bg);
     --sb-chatbar-surface-bg: var(--sb-fixed-surface-bg);
     --sb-mobile-overlay-bg: color-mix(in srgb, var(--sb-shell-main-bg) 96%, transparent);
@@ -80,6 +80,12 @@
     --sb-positive-bg: color-mix(in srgb, var(--SmartThemeQuoteColor) 22%, transparent);
     --sb-muted-fg: color-mix(in srgb, var(--SmartThemeBodyColor) 74%, transparent);
     --sb-muted-bg: color-mix(in srgb, var(--SmartThemeBodyColor) 7%, transparent);
+    --sb-state-favorite: color-mix(in srgb, var(--color-warning, var(--warning, #facc15)) 82%, var(--SmartThemeBodyColor) 18%);
+    --sb-state-favorite-bg: color-mix(in srgb, var(--sb-state-favorite) 14%, var(--sb-button-bg));
+    --sb-state-favorite-border: color-mix(in srgb, var(--sb-state-favorite) 40%, var(--sb-shell-border));
+    --sb-state-attention: color-mix(in srgb, var(--color-danger, var(--danger, #fb7185)) 86%, var(--SmartThemeBodyColor) 14%);
+    --sb-state-attention-bg: color-mix(in srgb, var(--sb-state-attention) 18%, transparent);
+    --sb-state-attention-border: color-mix(in srgb, var(--sb-state-attention) 44%, transparent);
     --sb-on-accent: rgb(0, 0, 0);
     --sb-on-solid-accent: var(--sb-on-accent);
     --sb-warning-fg: color-mix(in srgb, var(--warning, #ff6b6b) 72%, var(--SmartThemeBodyColor) 28%);
@@ -115,6 +121,16 @@
     --sb-chat-composer-edge-gap: 6px;
     --sb-icon-control-size: 1.85rem;
     --sb-inline-drawer-icon-size: 1.85rem;
+}
+
+@media (pointer: coarse), screen and (max-width: 760px) {
+    :root,
+    :root[data-sb-compact-mode='true'] {
+        --sb-control-min-height: var(--sb-mobile-touch-target);
+        --sb-control-icon-physical-size: var(--sb-mobile-touch-target);
+        --sb-icon-control-size: var(--sb-mobile-touch-target);
+        --sb-inline-drawer-icon-size: var(--sb-mobile-touch-target);
+    }
 }
 
 @supports (color: rgb(from black r g b / 1)) {
@@ -330,9 +346,10 @@ h3:not(.popup h3):not(#chat h3),
 
 .standoutHeader,
 h3:not(.popup h3):not(#chat h3) {
-    border-left: 3px solid color-mix(in srgb, var(--color-primary, var(--sb-accent)) 82%, transparent);
-    padding-left: 12px;
-    padding-right: 12px;
+    border: 1px solid color-mix(in srgb, var(--sb-shell-border) 74%, transparent);
+    border-radius: var(--sb-radius-md);
+    padding: 10px 14px;
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
     box-sizing: border-box;
 }
 
@@ -350,8 +367,8 @@ h3:not(.popup h3):not(#chat h3) {
 
 .inline-drawer-header:hover {
     background: var(--color-surface-hover, color-mix(in srgb, var(--SmartThemeBlurTintColor) 84%, var(--SmartThemeBodyColor) 16%));
-    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 34%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 16%, transparent);
+    border-color: color-mix(in srgb, var(--sb-shell-border) 94%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--SmartThemeBodyColor) 8%, transparent);
 }
 
 .menu_button,
@@ -1323,14 +1340,18 @@ body.bubblechat .mes[is_user='true']::before {
 }
 
 .mes[is_user='true'] .mes_block {
-    border-left: 2px solid color-mix(in srgb, var(--color-primary, var(--sb-accent)) 60%, transparent);
-    padding-left: 10px;
+    box-sizing: border-box;
+    border: 1px solid color-mix(in srgb, var(--color-primary, var(--sb-accent)) 24%, transparent);
+    border-radius: var(--sb-radius-md);
+    padding: 10px 12px;
+    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 4%, transparent);
 }
 
 body.flatchat .mes[is_user='true'] .mes_block,
 body.bubblechat .mes[is_user='true'] .mes_block {
-    border-left: 0;
-    padding-left: 10px;
+    border: 0;
+    padding: 0 0 0 10px;
+    background: transparent;
 }
 
 @media screen and (max-width: 1000px) {
@@ -2362,9 +2383,9 @@ input[type='range']::-moz-range-thumb {
 }
 
 #model_openai_favorite_toggle.is-favorite {
-    color: #f4c95d;
-    border-color: color-mix(in srgb, #f4c95d 48%, var(--sb-shell-border));
-    background: color-mix(in srgb, #f4c95d 16%, var(--sb-button-bg));
+    color: var(--sb-state-favorite);
+    border-color: var(--sb-state-favorite-border);
+    background: var(--sb-state-favorite-bg);
 }
 
 #openai_model_picker_hint {
