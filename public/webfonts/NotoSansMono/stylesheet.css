@@ -1,6 +1,6 @@
 /* noto-sans-mono-100 - cyrillic_cyrillic-ext_greek_greek-ext_latin_latin-ext_vietnamese */
 @font-face {
-    font-display: swap;
+    font-display: optional;
     font-family: 'Noto Sans Mono';
     font-style: normal;
     font-weight: 100;
@@ -10,7 +10,7 @@
 
 /* noto-sans-mono-200 - cyrillic_cyrillic-ext_greek_greek-ext_latin_latin-ext_vietnamese */
 @font-face {
-    font-display: swap;
+    font-display: optional;
     font-family: 'Noto Sans Mono';
     font-style: normal;
     font-weight: 200;
@@ -20,7 +20,7 @@
 
 /* noto-sans-mono-300 - cyrillic_cyrillic-ext_greek_greek-ext_latin_latin-ext_vietnamese */
 @font-face {
-    font-display: swap;
+    font-display: optional;
     font-family: 'Noto Sans Mono';
     font-style: normal;
     font-weight: 300;
@@ -30,7 +30,7 @@
 
 /* noto-sans-mono-regular - cyrillic_cyrillic-ext_greek_greek-ext_latin_latin-ext_vietnamese */
 @font-face {
-    font-display: swap;
+    font-display: optional;
     font-family: 'Noto Sans Mono';
     font-style: normal;
     font-weight: 400;
@@ -40,7 +40,7 @@
 
 /* noto-sans-mono-500 - cyrillic_cyrillic-ext_greek_greek-ext_latin_latin-ext_vietnamese */
 @font-face {
-    font-display: swap;
+    font-display: optional;
     font-family: 'Noto Sans Mono';
     font-style: normal;
     font-weight: 500;
@@ -50,7 +50,7 @@
 
 /* noto-sans-mono-600 - cyrillic_cyrillic-ext_greek_greek-ext_latin_latin-ext_vietnamese */
 @font-face {
-    font-display: swap;
+    font-display: optional;
     font-family: 'Noto Sans Mono';
     font-style: normal;
     font-weight: 600;
@@ -60,7 +60,7 @@
 
 /* noto-sans-mono-700 - cyrillic_cyrillic-ext_greek_greek-ext_latin_latin-ext_vietnamese */
 @font-face {
-    font-display: swap;
+    font-display: optional;
     font-family: 'Noto Sans Mono';
     font-style: normal;
     font-weight: 700;
@@ -70,7 +70,7 @@
 
 /* noto-sans-mono-800 - cyrillic_cyrillic-ext_greek_greek-ext_latin_latin-ext_vietnamese */
 @font-face {
-    font-display: swap;
+    font-display: optional;
     font-family: 'Noto Sans Mono';
     font-style: normal;
     font-weight: 800;
@@ -80,7 +80,7 @@
 
 /* noto-sans-mono-900 - cyrillic_cyrillic-ext_greek_greek-ext_latin_latin-ext_vietnamese */
 @font-face {
-    font-display: swap;
+    font-display: optional;
     font-family: 'Noto Sans Mono';
     font-style: normal;
     font-weight: 900;
