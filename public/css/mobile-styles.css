@@ -94,12 +94,12 @@
     }
 
     #right-nav-panel #CharListButtonAndHotSwaps :is(#rm_button_characters, #sb-character-right-lock, #sb-character-back-to-list, #sb-character-mobile-close) {
-        width: 36px;
-        min-width: 36px;
-        max-width: 36px;
-        height: 36px;
-        min-height: 36px;
-        max-height: 36px;
+        width: var(--sb-mobile-touch-target, 44px);
+        min-width: var(--sb-mobile-touch-target, 44px);
+        max-width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+        max-height: var(--sb-mobile-touch-target, 44px);
         margin: 0;
         padding: 0 !important;
         box-sizing: border-box;
@@ -1746,11 +1746,11 @@
 
     .group_speaker_controls {
         display: grid !important;
-        grid-template-columns: minmax(0, 1fr) repeat(4, 32px) !important;
+        grid-template-columns: minmax(0, 1fr) repeat(4, var(--sb-mobile-touch-target, 44px)) !important;
         grid-template-areas: "avatars speak dm chat auto" !important;
-        gap: 4px !important;
+        gap: 5px !important;
         align-items: center !important;
-        min-height: 40px !important;
+        min-height: calc(var(--sb-mobile-touch-target, 44px) + 8px) !important;
         padding: 4px 6px !important;
         margin-bottom: 2px !important;
         border-radius: 9px !important;
@@ -1771,7 +1771,7 @@
         text-overflow: ellipsis !important;
         white-space: nowrap !important;
         font-size: 14px !important;
-        line-height: 32px !important;
+        line-height: var(--sb-mobile-touch-target, 44px) !important;
         pointer-events: none !important;
     }
 
@@ -1782,8 +1782,8 @@
         justify-content: space-evenly !important;
         gap: 0 !important;
         min-width: 0 !important;
-        min-height: 32px !important;
-        max-height: 32px !important;
+        min-height: var(--sb-mobile-touch-target, 44px) !important;
+        max-height: var(--sb-mobile-touch-target, 44px) !important;
         overflow-x: auto !important;
         overflow-y: hidden !important;
         scrollbar-width: none !important;
@@ -1804,15 +1804,15 @@
     }
 
     .group_speaker_avatar {
-        width: 30px !important;
-        min-width: 30px !important;
-        max-width: 30px !important;
+        width: var(--sb-mobile-touch-target, 44px) !important;
+        min-width: var(--sb-mobile-touch-target, 44px) !important;
+        max-width: var(--sb-mobile-touch-target, 44px) !important;
         margin-inline: 1px !important;
-        height: 30px !important;
-        min-height: 30px !important;
-        max-height: 30px !important;
-        flex: 0 0 30px !important;
-        padding: 1px !important;
+        height: var(--sb-mobile-touch-target, 44px) !important;
+        min-height: var(--sb-mobile-touch-target, 44px) !important;
+        max-height: var(--sb-mobile-touch-target, 44px) !important;
+        flex: 0 0 var(--sb-mobile-touch-target, 44px) !important;
+        padding: 4px !important;
         gap: 0 !important;
         justify-content: center !important;
         border-radius: 999px !important;
@@ -1820,8 +1820,8 @@
     }
 
     .group_speaker_avatar img {
-        width: 26px !important;
-        height: 26px !important;
+        width: 34px !important;
+        height: 34px !important;
     }
 
     .group-dm-unread-dot {
@@ -1835,8 +1835,8 @@
     }
 
     .group_speaker_avatar.has-unread-dm {
-        border-color: #ff3b3b !important;
-        box-shadow: 0 0 0 1px color-mix(in srgb, #ff3b3b 42%, transparent) !important;
+        border-color: var(--sb-state-attention, var(--color-danger, #fb7185)) !important;
+        box-shadow: 0 0 0 1px var(--sb-state-attention-border, color-mix(in srgb, var(--color-danger, #fb7185) 42%, transparent)) !important;
         animation: none !important;
     }
 
@@ -1858,12 +1858,12 @@
     #group_speaker_dm_consolidate,
     #group_speaker_auto_dm,
     .group_speaker_toggle {
-        width: 32px !important;
-        min-width: 32px !important;
-        max-width: 32px !important;
-        height: 32px !important;
-        min-height: 32px !important;
-        max-height: 32px !important;
+        width: var(--sb-mobile-touch-target, 44px) !important;
+        min-width: var(--sb-mobile-touch-target, 44px) !important;
+        max-width: var(--sb-mobile-touch-target, 44px) !important;
+        height: var(--sb-mobile-touch-target, 44px) !important;
+        min-height: var(--sb-mobile-touch-target, 44px) !important;
+        max-height: var(--sb-mobile-touch-target, 44px) !important;
         padding: 0 !important;
         margin: 0 !important;
         display: inline-flex !important;

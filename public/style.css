@@ -2784,7 +2784,10 @@ textarea::placeholder {
     width: 100%;
     margin: 5px 0;
     height: fit-content;
-    transition: all 0.5s ease;
+    transition:
+        border-color var(--sb-transition-fast, 180ms cubic-bezier(0.22, 1, 0.36, 1)),
+        background-color var(--sb-transition-fast, 180ms cubic-bezier(0.22, 1, 0.36, 1)),
+        box-shadow var(--sb-transition-fast, 180ms cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 .text_pole:hover {
@@ -7215,7 +7218,7 @@ body:not(.movingUI) .drawer-content.maximized {
     padding: 10px 1em;
     margin: 1em 0;
     border-radius: 10px;
-    border-left: 5px solid;
+    border: 1px solid;
     background-color: var(--SmartThemeBlurTintColor);
     color: var(--SmartThemeBodyColor);
     backdrop-filter: blur(calc(var(--SmartThemeBlurStrength)));
@@ -7486,8 +7489,8 @@ body:not(.movingUI) .drawer-content.maximized {
 }
 
 .group_speaker_avatar.has-unread-dm {
-    border-color: #ff3b3b;
-    box-shadow: 0 0 0 1px color-mix(in srgb, #ff3b3b 42%, transparent);
+    border-color: var(--sb-state-attention, var(--color-danger, #fb7185));
+    box-shadow: 0 0 0 1px var(--sb-state-attention-border, color-mix(in srgb, var(--color-danger, #fb7185) 42%, transparent));
 }
 
 .group_speaker_avatar.has-unread-dm::after {
@@ -7496,8 +7499,8 @@ body:not(.movingUI) .drawer-content.maximized {
     inset: -4px;
     z-index: -1;
     border-radius: inherit;
-    background: color-mix(in srgb, #ff3b3b 24%, transparent);
-    box-shadow: 0 0 10px color-mix(in srgb, #ff3b3b 55%, transparent);
+    background: var(--sb-state-attention-bg, color-mix(in srgb, var(--color-danger, #fb7185) 24%, transparent));
+    box-shadow: 0 0 10px color-mix(in srgb, var(--sb-state-attention, var(--color-danger, #fb7185)) 42%, transparent);
     opacity: 0.78;
     pointer-events: none;
     transform: scale(1);
@@ -7678,9 +7681,11 @@ body:not(.movingUI) .drawer-content.maximized {
     min-height: 10px;
     padding: 0;
     border-radius: 50%;
-    background: #ff3b3b;
+    background: var(--sb-state-attention, var(--color-danger, #fb7185));
     border: 2px solid var(--SmartThemeBlurTintColor);
-    box-shadow: 0 0 0 1px color-mix(in srgb, #ff3b3b 65%, transparent), 0 0 7px color-mix(in srgb, #ff3b3b 75%, transparent);
+    box-shadow:
+        0 0 0 1px var(--sb-state-attention-border, color-mix(in srgb, var(--color-danger, #fb7185) 65%, transparent)),
+        0 0 7px color-mix(in srgb, var(--sb-state-attention, var(--color-danger, #fb7185)) 58%, transparent);
     pointer-events: none;
 }
 

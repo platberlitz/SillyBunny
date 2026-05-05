@@ -200,15 +200,15 @@ const SB_SHELLS = Object.freeze({
         proxyIcon: 'fa-bars',
         proxyLabel: 'Workspace',
         title: 'Workspace',
-        subtitle: 'Back end modifications, model setup, presets, lorebooks, and formatting tools live here.',
-        searchPlaceholder: 'Quick find presets, samplers, lorebooks...',
+        subtitle: 'Set up models, prompts, lore, and helpers, then get back to the scene.',
+        searchPlaceholder: 'Find presets, samplers, lore, or tools...',
         storageKey: SB_STORAGE_KEYS.leftTab,
         defaultTabId: 'presets',
         baseTab: {
             id: 'presets',
             label: 'Presets',
             icon: 'fa-sliders',
-            description: 'Change presets, edit system prompts, and modify other output settings here.',
+            description: 'Choose presets and tune the prompts that shape each reply.',
         },
         embeddedTabs: [
             {
@@ -216,21 +216,21 @@ const SB_SHELLS = Object.freeze({
                 drawerId: 'sys-settings-button',
                 label: 'API',
                 icon: 'fa-plug',
-                description: 'Connect providers, select models, and manage backend-specific options here.',
+                description: 'Connect a provider, pick a model, and test the connection.',
             },
             {
                 id: 'advanced-formatting',
                 drawerId: 'advanced-formatting-button',
                 label: 'Formatting',
                 icon: 'fa-text-height',
-                description: 'Tune context and instruction formatting tools here.',
+                description: 'Adjust how context, instructions, and reasoning are formatted.',
             },
             {
                 id: 'world-info',
                 drawerId: 'WI-SP-button',
                 label: 'World Info',
                 icon: 'fa-book-atlas',
-                description: 'Edit and access lorebooks and world entries here.',
+                description: 'Manage lorebooks and world details for the current story.',
             },
         ],
         customTabs: [
@@ -238,7 +238,7 @@ const SB_SHELLS = Object.freeze({
                 id: 'sampling',
                 label: 'Sampling',
                 icon: 'fa-wave-square',
-                description: 'Control model sampling, seeds, and banned logits/tokens here.',
+                description: 'Tune generation style, randomness, seeds, and token controls.',
                 searchPlaceholder: 'Search temperature, top p, repetition penalty, or backend samplers',
                 searchExamples: ['temperature', 'top p', 'repetition penalty'],
             },
@@ -246,7 +246,7 @@ const SB_SHELLS = Object.freeze({
                 id: 'agents',
                 label: 'Agents',
                 icon: 'fa-robot',
-                description: 'Configure in-chat agent helpers.',
+                description: 'Manage helpers that can assist during the conversation.',
             },
         ],
     },
@@ -4406,15 +4406,6 @@ function closeAllDropdowns({ except = '' } = {}) {
     document.getElementById('sb-persona-picker')?.remove();
 }
 
-function closeNonShellDropdowns({ except = '' } = {}) {
-    if (except !== 'characters') closeCharacterPanel();
-    if (except !== 'search') setUniversalSearchOpenState(false);
-    closeMobileNav();
-    closeMobileChatTools();
-    setConnectionStripOpenState(false);
-    document.getElementById('sb-persona-picker')?.remove();
-}
-
 function toggleShellPanel(shellKey, tabId = null) {
     if (!ensureShellReady(shellKey)) {
         return;
@@ -4429,7 +4420,7 @@ function toggleShellPanel(shellKey, tabId = null) {
         return;
     }
 
-    closeNonShellDropdowns();
+    closeAllDropdowns({ except: shellKey });
     window.requestAnimationFrame(() => openShell(shellKey, tabId));
 }
 
