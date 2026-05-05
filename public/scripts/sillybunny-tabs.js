@@ -20,6 +20,7 @@ const SB_STORAGE_KEYS = Object.freeze({
     mobileButtonScale: 'sb-mobile-button-scale',
     settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
     compactMode: 'sb-compact-mode',
+    frontendIcon: 'sb-frontend-icon',
 });
 
 const SB_SHORTCUT_TARGETS = Object.freeze([
@@ -40,6 +41,21 @@ const SB_SHORTCUT_DEFAULTS = Object.freeze({
     left: 'left:agents',
     right: 'action:search',
 });
+const SB_FRONTEND_ICON_DEFAULT = 'pixel';
+const SB_FRONTEND_ICONS = Object.freeze([
+    {
+        id: 'pixel',
+        label: 'Pixel',
+        description: 'Classic square icon.',
+        src: 'img/sillybunny-pixel-logo.png',
+    },
+    {
+        id: 'badge',
+        label: 'Badge',
+        description: 'Clean badge icon.',
+        src: 'img/sillybunny-badge.svg',
+    },
+]);
 const SB_ACCOUNT_STORAGE_READY_MARKER = '__migrated';
 const SB_INLINE_DRAWER_CUSTOM_PERSISTENCE_SELECTOR = '.sb-openai-settings-drawer, .sb-openai-settings-subdrawer, [id$="prompt_manager_drawer"]';
 
@@ -359,6 +375,7 @@ const sbState = {
     landingPageSyncFrame: 0,
     inlineDrawerAutoClose: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.settingsDrawerAutoClose), false),
     theme: normalizeTheme(safeGetItem(SB_STORAGE_KEYS.theme)),
+    frontendIcon: normalizeFrontendIcon(safeGetItem(SB_STORAGE_KEYS.frontendIcon)),
     surfaceTransparency: normalizeSurfaceTransparency(safeGetItem(SB_STORAGE_KEYS.surfaceTransparency)),
     compactMode: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), false),
     bottomBarScale: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.bottomBarScale)),
@@ -479,6 +496,21 @@ const sbState = {
 
 function normalizeTheme(themeId) {
     return SB_THEMES.some(theme => theme.id === themeId) ? themeId : 'clean-minimal';
+}
+
+function normalizeFrontendIcon(iconId) {
+    const normalizedIconId = normalizeText(iconId);
+    return SB_FRONTEND_ICONS.some(icon => icon.id === normalizedIconId) ? normalizedIconId : SB_FRONTEND_ICON_DEFAULT;
+}
+
+function getFrontendIconConfig(iconId = sbState.frontendIcon) {
+    const normalizedIconId = normalizeFrontendIcon(iconId);
+    return SB_FRONTEND_ICONS.find(icon => icon.id === normalizedIconId) || SB_FRONTEND_ICONS[0];
+}
+
+function getFrontendIconSrc(iconId = sbState.frontendIcon, { absolute = true } = {}) {
+    const src = getFrontendIconConfig(iconId).src;
+    return absolute ? `/${src}` : src;
 }
 
 function normalizeTopbarLabelPart(value, fallback = '') {
@@ -648,6 +680,7 @@ function restorePersistedTopbarState() {
     sbState.topbarScale.mobile = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.topbarScaleMobile));
     sbState.bottomBarScale = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.bottomBarScale));
     sbState.mobileButtonScale = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.mobileButtonScale));
+    sbState.frontendIcon = normalizeFrontendIcon(safeGetItem(SB_STORAGE_KEYS.frontendIcon));
     sbState.topbarLabel.desktopParts = safeGetItem(SB_STORAGE_KEYS.topbarLabelDesktopParts) === null
         ? ['char']
         : normalizeTopbarLabelParts(safeGetItem(SB_STORAGE_KEYS.topbarLabelDesktopParts), []);
@@ -1827,6 +1860,36 @@ function setShellTheme(themeId, { persist = true } = {}) {
 
     updateThemePickerUi();
     updateThemeBadge();
+}
+
+function applyFrontendIcon(iconId = sbState.frontendIcon) {
+    const normalizedIconId = normalizeFrontendIcon(iconId);
+    const iconSrc = getFrontendIconSrc(normalizedIconId);
+
+    document.documentElement.dataset.sbFrontendIcon = normalizedIconId;
+    window.SillyBunnyFrontendIcon?.apply?.(normalizedIconId);
+
+    for (const image of document.querySelectorAll('img[data-sb-frontend-icon]')) {
+        image.setAttribute('src', iconSrc);
+    }
+
+    for (const link of document.querySelectorAll('link[rel~="icon"]')) {
+        link.setAttribute('href', iconSrc);
+        link.setAttribute('type', normalizedIconId === 'badge' ? 'image/svg+xml' : 'image/png');
+    }
+}
+
+function setFrontendIconPreference(iconId, { persist = true } = {}) {
+    const nextIconId = normalizeFrontendIcon(iconId);
+
+    sbState.frontendIcon = nextIconId;
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.frontendIcon, nextIconId);
+    }
+
+    applyFrontendIcon(nextIconId);
+    updateThemePickerUi();
 }
 
 function setSurfaceTransparency(value, { persist = true } = {}) {
@@ -7588,6 +7651,50 @@ function createCompactModeSettingsGroup() {
     return group;
 }
 
+function createFrontendIconSettingsGroup() {
+    const group = createElement('section', {
+        className: 'sb-theme-slider-group sb-frontend-icon-group',
+    });
+    const header = createElement('div', { className: 'sb-frontend-icon-header' });
+    const title = createElement('strong', { text: 'Frontend Icon' });
+    const description = createElement('p', {
+        className: 'sb-theme-slider-caption',
+        text: 'Choose which SillyBunny icon appears in the app chrome, splash screen, and Home panel.',
+    });
+    const options = createElement('div', { className: 'sb-frontend-icon-options' });
+
+    header.append(title, description);
+
+    for (const icon of SB_FRONTEND_ICONS) {
+        const button = createElement('button', {
+            className: 'sb-theme-option sb-frontend-icon-option',
+            attrs: {
+                type: 'button',
+                'data-sb-frontend-icon-option': icon.id,
+            },
+        });
+        const preview = createElement('img', {
+            className: 'sb-frontend-icon-preview',
+            attrs: {
+                src: icon.src,
+                alt: '',
+                loading: 'lazy',
+            },
+        });
+        const copy = createElement('span', { className: 'sb-frontend-icon-copy' });
+        const label = createElement('span', { className: 'sb-theme-option-label', text: icon.label });
+        const meta = createElement('span', { className: 'sb-theme-option-meta', text: icon.description });
+
+        copy.append(label, meta);
+        button.append(preview, copy);
+        button.addEventListener('click', () => setFrontendIconPreference(icon.id));
+        options.appendChild(button);
+    }
+
+    group.append(header, options);
+    return group;
+}
+
 function updateShortcutButton(side) {
     const buttonId = side === 'left' ? 'sb-shortcut-left' : 'sb-shortcut-right';
     const button = document.getElementById(buttonId);
@@ -7744,6 +7851,7 @@ function injectThemePicker() {
     });
     const topbarLabelSettingsGroup = createTopbarLabelSettingsGroup();
     const compactModeSettingsGroup = createCompactModeSettingsGroup();
+    const frontendIconSettingsGroup = createFrontendIconSettingsGroup();
     const shortcutSettingsGroup = createShortcutSettingsGroup();
     header.append(title, description);
 
@@ -7768,7 +7876,7 @@ function injectThemePicker() {
     getMessageStyleSelect()?.addEventListener('change', updateThemePickerUi);
     document.addEventListener('sb:chat-style-updated', updateThemePickerUi);
 
-    card.append(header, optionRow, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
+    card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
     themeBlock.prepend(card);
     updateThemePickerUi();
 }
@@ -7788,6 +7896,13 @@ function updateThemePickerUi() {
     for (const button of document.querySelectorAll('[data-sb-theme-option]')) {
         const themeId = button.getAttribute('data-sb-theme-option');
         const isActive = themeId === sbState.theme;
+        button.classList.toggle('is-selected', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+    }
+
+    for (const button of document.querySelectorAll('[data-sb-frontend-icon-option]')) {
+        const iconId = button.getAttribute('data-sb-frontend-icon-option');
+        const isActive = iconId === sbState.frontendIcon;
         button.classList.toggle('is-selected', isActive);
         button.setAttribute('aria-pressed', String(isActive));
     }
@@ -9807,6 +9922,7 @@ function initAll() {
     injectCharacterDrawerControls();
     bindCharacterEditorExitButton();
     setShellTheme(sbState.theme, { persist: false });
+    setFrontendIconPreference(sbState.frontendIcon, { persist: false });
     setSurfaceTransparency(sbState.surfaceTransparency, { persist: false });
     setCompactMode(sbState.compactMode, { persist: false });
     setCharacterDrawerRightLock(sbState.characterDrawer.rightLocked, { persist: false });
@@ -9865,6 +9981,9 @@ function initAll() {
         applyTheme(themeId) {
             setShellTheme(themeId);
         },
+        setFrontendIcon(iconId) {
+            setFrontendIconPreference(iconId);
+        },
         setSurfaceTransparency(value) {
             setSurfaceTransparency(value);
         },
@@ -9898,6 +10017,9 @@ function initAll() {
         },
         getTheme() {
             return sbState.theme;
+        },
+        getFrontendIcon() {
+            return sbState.frontendIcon;
         },
         getSurfaceTransparency() {
             return sbState.surfaceTransparency;

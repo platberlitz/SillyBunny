@@ -2365,21 +2365,27 @@ input[type='range']::-moz-range-thumb {
 
 #openai_model_picker {
     display: flex;
-    align-items: stretch;
+    align-items: center;
     gap: 10px;
 }
 
 #openai_model_picker #model_openai_select,
 #openai_model_picker .select2-container {
     flex: 1 1 auto;
+    min-width: 0;
 }
 
 #model_openai_favorite_toggle {
-    width: 48px;
-    min-width: 48px;
+    flex: 0 0 46px;
+    width: 46px;
+    min-width: 46px;
+    min-height: 46px;
+    padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    align-self: center;
+    line-height: 1;
 }
 
 #model_openai_favorite_toggle.is-favorite {
@@ -2656,7 +2662,7 @@ input[type='range']::-moz-range-thumb {
 #openai_api .openai_logit_bias_preset_form,
 #openai_settings .openai_logit_bias_preset_form {
     flex-wrap: wrap;
-    align-items: stretch;
+    align-items: center;
     gap: 8px;
 }
 
@@ -4593,8 +4599,10 @@ input[type='range']::-moz-range-thumb {
     }
 
     #model_openai_favorite_toggle {
+        flex-basis: 44px;
         width: 44px;
         min-width: 44px;
+        min-height: 44px;
     }
 
     #AdvancedFormatting .sb-reasoning-toggle-grid,

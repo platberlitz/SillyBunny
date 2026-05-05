@@ -6413,7 +6413,7 @@ body:not(.movingUI) .drawer-content.maximized {
     flex-direction: row;
     width: 100%;
     gap: 5px;
-    align-items: baseline;
+    align-items: center;
 }
 
 #openai_logit_bias_new_entry {

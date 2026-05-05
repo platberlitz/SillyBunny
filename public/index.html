@@ -19,7 +19,7 @@
     </style>
     <link rel="preload" as="style" href="style.css">
     <link rel="modulepreload" href="script.js">
-    <link rel="preload" as="script" href="scripts/sillybunny-tabs.js?v=20260503e">
+    <link rel="preload" as="script" href="scripts/sillybunny-tabs.js?v=20260505a">
     <link rel="manifest" crossorigin="use-credentials" href="manifest.json">
     <link href="webfonts/Figtree/stylesheet.css?v=20260422b" rel="stylesheet">
     <link href="webfonts/NotoSans/stylesheet.css" rel="stylesheet">
@@ -50,8 +50,8 @@
     <link rel="stylesheet" type="text/css" href="css/extensions-panel.css?v=20260425a">
     <link rel="stylesheet" type="text/css" href="css/select2-overrides.css">
     <link rel="stylesheet" type="text/css" href="css/mobile-styles.css?v=20260501b" media="(max-width: 768px)">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260503b">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260503i">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260505a">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260505a">
     <link rel="stylesheet" type="text/css" href="css/macros.css">
     <link rel="stylesheet" type="text/css" href="css/user.css">
     <!-- Scripts are loaded at the end of the body to improve page load speed -->
@@ -3103,8 +3103,18 @@
                                 <h4 data-i18n="OpenAI Model">OpenAI Model</h4>
                                 <div id="openai_model_picker">
                                     <select id="model_openai_select">
+                                        <optgroup label="GPT-5.5">
+                                            <option value="gpt-5.5">gpt-5.5</option>
+                                            <option value="gpt-5.5-2026-04-23">gpt-5.5-2026-04-23</option>
+                                            <option value="gpt-5.5-pro">gpt-5.5-pro</option>
+                                        </optgroup>
                                         <optgroup label="GPT-5.4">
                                             <option value="gpt-5.4">gpt-5.4</option>
+                                            <option value="gpt-5.4-2026-03-05">gpt-5.4-2026-03-05</option>
+                                            <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+                                            <option value="gpt-5.4-mini-2026-03-17">gpt-5.4-mini-2026-03-17</option>
+                                            <option value="gpt-5.4-nano">gpt-5.4-nano</option>
+                                            <option value="gpt-5.4-nano-2026-03-17">gpt-5.4-nano-2026-03-17</option>
                                         </optgroup>
                                         <optgroup label="GPT-5.3">
                                             <option value="gpt-5.3-chat-latest">gpt-5.3-chat-latest</option>
@@ -3224,11 +3234,12 @@
                             <div>
                                 <h4 data-i18n="Model ID">Model ID</h4>
                                 <div class="flex-container">
-                                    <input id="claude_model_id" class="text_pole wide100p" value="" autocomplete="off" data-i18n="[placeholder]Example: claude-sonnet-4-5" placeholder="Example: claude-sonnet-4-5">
+                                    <input id="claude_model_id" class="text_pole wide100p" value="" autocomplete="off" data-i18n="[placeholder]Example: claude-opus-4-7" placeholder="Example: claude-opus-4-7">
                                 </div>
                                 <h4 data-i18n="Available Models">Available Models</h4>
                                 <select id="model_claude_select">
                                     <optgroup label="Versions">
+                                        <option value="claude-opus-4-7">claude-opus-4-7</option>
                                         <option value="claude-opus-4-6">claude-opus-4-6</option>
                                         <option value="claude-opus-4-5">claude-opus-4-5</option>
                                         <option value="claude-opus-4-5-20251101">claude-opus-4-5-20251101</option>
@@ -4070,8 +4081,9 @@
                             <h4 data-i18n="Available Models">Available Models</h4>
                             <select id="model_zai_select">
                                 <optgroup label="GLM Models">
-                                    <option value="glm-5-turbo">glm-5-turbo</option>
                                     <option value="glm-5.1">glm-5.1</option>
+                                    <option value="glm-5-turbo">glm-5-turbo</option>
+                                    <option value="glm-5v-turbo">glm-5v-turbo</option>
                                     <option value="glm-5">glm-5</option>
                                     <option value="glm-4.7">glm-4.7</option>
                                     <option value="glm-4.7-flash">glm-4.7-flash</option>
@@ -8695,7 +8707,7 @@
     <script type="module" src="lib/eventemitter.js"></script>
     <script type="module" src="scripts/i18n.js"></script>
     <script type="module" src="script.js"></script>
-    <script src="scripts/sillybunny-tabs.js?v=20260503e" defer></script>
+    <script src="scripts/sillybunny-tabs.js?v=20260505a" defer></script>
     <script>
         window.addEventListener('load', (event) => {
             const documentHeight = () => {

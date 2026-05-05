@@ -513,7 +513,7 @@ const default_settings = {
     cometapi_model: 'gpt-4o',
     moonshot_model: 'kimi-latest',
     fireworks_model: 'accounts/fireworks/models/kimi-k2-instruct',
-    zai_model: 'glm-4.6',
+    zai_model: 'glm-5.1',
     zai_endpoint: ZAI_ENDPOINT.COMMON,
     workers_ai_model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     workers_ai_account_id: '',
@@ -4244,7 +4244,7 @@ export async function createGenerationParameters(settings, model, type, messages
         if (/gpt-5-chat-latest/.test(model)) {
             delete generate_data.tools;
             delete generate_data.tool_choice;
-        } else if (/gpt-5\.(1|2|3|4)/.test(model) && !/chat-latest/.test(model)) {
+        } else if (/gpt-5\.\d/.test(model) && !/chat-latest/.test(model)) {
             delete generate_data.frequency_penalty;
             delete generate_data.presence_penalty;
             delete generate_data.logit_bias;
@@ -6373,6 +6373,7 @@ function getZaiMaxContext(model, isUnlocked) {
     const contextMap = {
         'glm-5.1': max_200k,
         'glm-5-turbo': max_200k,
+        'glm-5v-turbo': max_200k,
         'glm-5': max_200k,
         'glm-4.7': max_200k,
         'glm-4.7-flash': max_200k,
@@ -6915,7 +6916,7 @@ async function onModelChange() {
     if (oai_settings.chat_completion_source == chat_completion_sources.CLAUDE) {
         if (maxContextUnlocked) {
             $('#openai_max_context').attr('max', unlocked_max);
-        } else if (/^claude-(sonnet-4-5|sonnet-4-6|opus-4-6)/.test(value)) {
+        } else if (/^claude-(sonnet-4-5|sonnet-4-6|opus-4-6|opus-4-7)/.test(value)) {
             $('#openai_max_context').attr('max', max_1mil);
         } else if (/^claude-(3|opus|haiku|sonnet)/.test(value)) {
             $('#openai_max_context').attr('max', max_200k);
@@ -7554,6 +7555,7 @@ export function isImageInliningSupported() {
         'kimi-k2.5',
         'kimi-latest',
         // Z.AI (GLM)
+        'glm-5v-turbo',
         'glm-4.5v',
         'glm-4.6v',
         'autoglm-phone',
@@ -7641,6 +7643,7 @@ export function isVideoInliningSupported() {
         'gemini-exp-1206',
         'gemini-3',
         // Z.AI (GLM)
+        'glm-5v-turbo',
         'glm-4.5v',
         'glm-4.6v',
     ];

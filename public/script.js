@@ -460,10 +460,64 @@ export let characters = [];
 export let this_chid;
 let saveCharactersPage = 0;
 export const default_avatar = 'img/ai4.png';
-export const system_avatar = 'img/sillybunny-pixel-logo.png';
+const SILLYBUNNY_FRONTEND_ICON_STORAGE_KEY = 'sb-frontend-icon';
+const SILLYBUNNY_FRONTEND_ICON_DEFAULT = 'pixel';
+const SILLYBUNNY_FRONTEND_ICONS = Object.freeze({
+    pixel: 'img/sillybunny-pixel-logo.png',
+    badge: 'img/sillybunny-badge.svg',
+});
+
+function normalizeSillyBunnyFrontendIcon(iconId) {
+    return Object.hasOwn(SILLYBUNNY_FRONTEND_ICONS, String(iconId)) ? String(iconId) : SILLYBUNNY_FRONTEND_ICON_DEFAULT;
+}
+
+function getStoredSillyBunnyFrontendIcon() {
+    try {
+        return normalizeSillyBunnyFrontendIcon(localStorage.getItem(SILLYBUNNY_FRONTEND_ICON_STORAGE_KEY));
+    } catch {
+        return SILLYBUNNY_FRONTEND_ICON_DEFAULT;
+    }
+}
+
+export function getSillyBunnyFrontendIconSrc({ absolute = false } = {}) {
+    const src = SILLYBUNNY_FRONTEND_ICONS[getStoredSillyBunnyFrontendIcon()];
+    return absolute ? `/${src}` : src;
+}
+
+export let system_avatar = getSillyBunnyFrontendIconSrc();
 export const comment_avatar = 'img/quill.png';
 export const default_user_avatar = 'img/user-default.png';
 export let CLIENT_VERSION = 'SillyBunny:v1.5.3:platberlitz'; // For Horde header
+
+function applySillyBunnyFrontendIcon(iconId = getStoredSillyBunnyFrontendIcon()) {
+    const normalizedIconId = normalizeSillyBunnyFrontendIcon(iconId);
+    const src = SILLYBUNNY_FRONTEND_ICONS[normalizedIconId];
+    const absoluteSrc = `/${src}`;
+    system_avatar = src;
+
+    document.documentElement.dataset.sbFrontendIcon = normalizedIconId;
+
+    for (const image of document.querySelectorAll('img[data-sb-frontend-icon]')) {
+        image.setAttribute('src', absoluteSrc);
+    }
+
+    for (const link of document.querySelectorAll('link[rel~="icon"]')) {
+        link.setAttribute('href', absoluteSrc);
+        link.setAttribute('type', normalizedIconId === 'badge' ? 'image/svg+xml' : 'image/png');
+    }
+}
+
+window.SillyBunnyFrontendIcon = Object.assign(window.SillyBunnyFrontendIcon || {}, {
+    getId: getStoredSillyBunnyFrontendIcon,
+    getSrc: ({ absolute = true } = {}) => getSillyBunnyFrontendIconSrc({ absolute }),
+    apply: applySillyBunnyFrontendIcon,
+});
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => applySillyBunnyFrontendIcon(), { once: true });
+} else {
+    applySillyBunnyFrontendIcon();
+}
 let optionsPopper = Popper.createPopper(document.getElementById('options_button'), document.getElementById('options'), {
     placement: 'top-start',
 });
@@ -773,10 +827,11 @@ async function firstLoadInit() {
     initLoaderOverlay.classList.add('splash-screen');
 
     const splashLogo = document.createElement('img');
-    splashLogo.src = '/img/sillybunny-pixel-logo.png';
+    splashLogo.src = getSillyBunnyFrontendIconSrc({ absolute: true });
     splashLogo.alt = 'SillyBunny';
     splashLogo.className = 'splash-logo';
     splashLogo.ariaLabel = t`SillyBunny Badge`;
+    splashLogo.dataset.sbFrontendIcon = 'true';
 
     const splashMessage = document.createElement('h2');
     splashMessage.className = 'splash-message';

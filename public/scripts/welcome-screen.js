@@ -1449,7 +1449,7 @@ async function sendWelcomePanel(chats, expand = false) {
             return;
         }
         const templateData = buildWelcomeTemplateData(chats);
-        const template = await renderTemplateAsync('/scripts/templates/welcomePanelOnboarding.html?v=20260421a', templateData, true, true, true);
+        const template = await renderTemplateAsync('/scripts/templates/welcomePanelOnboarding.html?v=20260505a', templateData, true, true, true);
         const fragment = document.createRange().createContextualFragment(template);
         const nextPanel = fragment.querySelector('.welcomePanel');
         fragment.querySelectorAll('.welcomePanel').forEach((root) => {
@@ -1664,6 +1664,7 @@ async function sendWelcomePanel(chats, expand = false) {
                 updateRecentChatFilterView(root);
             }
         });
+        window.SillyBunnyFrontendIcon?.apply?.();
         if (expand) {
             chatElement.querySelectorAll('button.showMoreChats').forEach((button) => {
                 if (button instanceof HTMLButtonElement) {

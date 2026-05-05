@@ -47,6 +47,12 @@ Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. 
 - Settings panels (Customize, Presets, Workspace, etc.) now narrow alongside the chat when the chat width is reduced, matching standard SillyTavern behaviour.
 - Toggling a prompt on or off inside a preset no longer jumps the scroll position back to the top; the panel stays at the user's current scroll position.
 
+### UI Icons And Provider Models
+- Added a Shell Style option to switch the frontend between the SillyBunny pixel icon and badge icon, including the splash screen, Home panel logo, favicon, and future system avatar messages.
+- Aligned the Reverse Proxy preset row, Prompt Manager undo action, and OpenAI model favorite button with their neighboring dropdowns on desktop and mobile layouts.
+- Added current OpenAI `gpt-5.5` and `gpt-5.5-pro`, Claude `claude-opus-4-7`, and Z.AI `glm-5.1` / `glm-5v-turbo` model choices to the backend dropdowns.
+- Updated related OpenAI, Claude, and Z.AI capability handling so context, reasoning, media inlining, and Claude sampling rules stay in step with the added models.
+
 ### Settings And Browser Storage
 - Added a dedicated Clear cookies & cache utility action, wired through the cache-busted SillyBunny shell script so stale browser cache does not leave the button inert.
 
@@ -101,6 +107,8 @@ Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. 
 - `02bc8c3 sync: complete SillyTavern 1.18 migration`
 - `431e25c fix: preserve proxy filter startup order`
 - `sync: merge PR 13 SillyTavern 1.18.0 compatibility`
+- `5ebc574 fix: improve mobile UI accessibility polish (#16)`
+- `feat(ui): add frontend icon selector and model updates`
 
 ## v1.5.2
 
