@@ -2,6 +2,169 @@
 let dynamicStyleSheet = null;
 /** @type {CSSStyleSheet} */
 let dynamicExtensionStyleSheet = null;
+/** @type {Map<string, Promise<HTMLLinkElement>>} */
+const asyncStylesheetPromises = new Map();
+/** @type {Set<string>} */
+const prefetchedAssets = new Set();
+
+function getAbsoluteAssetUrl(href) {
+    try {
+        return new URL(href, document.baseURI).href;
+    } catch {
+        return String(href);
+    }
+}
+
+function findStylesheetLink(absoluteHref, id = '') {
+    if (id) {
+        const existingById = document.getElementById(id);
+        if (existingById instanceof HTMLLinkElement) {
+            return existingById;
+        }
+    }
+
+    return Array.from(document.querySelectorAll('link[rel~="stylesheet"]'))
+        .find(link => link instanceof HTMLLinkElement && getAbsoluteAssetUrl(link.href) === absoluteHref) ?? null;
+}
+
+function waitForStylesheetLink(link, media = 'all') {
+    return new Promise((resolve, reject) => {
+        if (isStylesheetLoaded(link)) {
+            if (link.media === 'print') {
+                link.media = media;
+            }
+            resolve(link);
+            return;
+        }
+
+        link.addEventListener('load', () => {
+            if (link.media === 'print') {
+                link.media = media;
+            }
+            resolve(link);
+        }, { once: true });
+
+        link.addEventListener('error', reject, { once: true });
+    });
+}
+
+function isStylesheetLoaded(link) {
+    return Boolean(
+        link.sheet
+        || link.dataset.loaded === 'true'
+        || Array.from(document.styleSheets).some(sheet => sheet.href === link.href),
+    );
+}
+
+/**
+ * Loads a stylesheet without making it part of the parser-blocking path.
+ * The stylesheet uses a media swap so it can load without blocking first render.
+ *
+ * @param {string} href Stylesheet URL
+ * @param {object} [options] Optional configuration
+ * @param {string} [options.id] Link element id
+ * @param {string} [options.media='all'] Final media query
+ * @returns {Promise<HTMLLinkElement>}
+ */
+export function loadStylesheetAsync(href, { id = '', media = 'all' } = {}) {
+    const absoluteHref = getAbsoluteAssetUrl(href);
+    const existing = findStylesheetLink(absoluteHref, id);
+
+    if (existing) {
+        return waitForStylesheetLink(existing, media);
+    }
+
+    if (asyncStylesheetPromises.has(absoluteHref)) {
+        return asyncStylesheetPromises.get(absoluteHref);
+    }
+
+    const promise = new Promise((resolve, reject) => {
+        const stylesheet = document.createElement('link');
+        let settled = false;
+
+        const finish = () => {
+            if (settled) {
+                return;
+            }
+
+            settled = true;
+            stylesheet.dataset.loaded = 'true';
+            stylesheet.media = media;
+            resolve(stylesheet);
+        };
+
+        if (id) {
+            stylesheet.id = id;
+        }
+
+        stylesheet.rel = 'stylesheet';
+        stylesheet.type = 'text/css';
+        stylesheet.href = href;
+        stylesheet.media = 'print';
+        stylesheet.onload = finish;
+        stylesheet.onerror = reject;
+
+        document.head.appendChild(stylesheet);
+
+        if (isStylesheetLoaded(stylesheet)) {
+            finish();
+        }
+    }).catch(error => {
+        asyncStylesheetPromises.delete(absoluteHref);
+        throw error;
+    });
+
+    asyncStylesheetPromises.set(absoluteHref, promise);
+    return promise;
+}
+
+/**
+ * Queues a low-priority preload/prefetch hint for future assets.
+ *
+ * @param {string} href Asset URL
+ * @param {object} [options] Optional configuration
+ * @param {string} [options.as='fetch'] Fetch destination
+ * @param {'prefetch'|'preload'|'modulepreload'} [options.rel='prefetch'] Link relation
+ * @param {string} [options.type] MIME type
+ * @returns {HTMLLinkElement|null}
+ */
+export function prefetchAsset(href, { as = 'fetch', rel = 'prefetch', type = '' } = {}) {
+    const absoluteHref = getAbsoluteAssetUrl(href);
+    const key = `${rel}:${as}:${absoluteHref}`;
+
+    if (prefetchedAssets.has(key)) {
+        return null;
+    }
+
+    prefetchedAssets.add(key);
+
+    const existing = Array.from(document.querySelectorAll(`link[rel="${rel}"]`))
+        .find(link => link instanceof HTMLLinkElement && getAbsoluteAssetUrl(link.href) === absoluteHref);
+
+    if (existing instanceof HTMLLinkElement) {
+        return existing;
+    }
+
+    const link = document.createElement('link');
+    link.rel = rel;
+    link.href = href;
+
+    if (rel !== 'modulepreload') {
+        link.as = as;
+    }
+
+    if (type) {
+        link.type = type;
+    }
+
+    document.head.appendChild(link);
+    return link;
+}
+
+window.SillyBunnyAssets = Object.assign(window.SillyBunnyAssets ?? {}, {
+    loadStylesheetAsync,
+    prefetchAsset,
+});
 
 /**
  * An observer that will check if any new stylesheets are added to the head

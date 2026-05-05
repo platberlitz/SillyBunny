@@ -125,6 +125,7 @@
         "init": "node src/server-init.js || bun src/server-init.js",
         "lint": "eslint \"src/**/*.js\" \"public/**/*.js\" \"scripts/**/*.js\" ./*.js",
         "lint:fix": "eslint \"src/**/*.js\" \"public/**/*.js\" \"scripts/**/*.js\" ./*.js --fix",
+        "check:frontend-budgets": "node scripts/check-frontend-budgets.js",
         "plugins:update": "bun plugins.js update",
         "plugins:install": "bun plugins.js install"
     },

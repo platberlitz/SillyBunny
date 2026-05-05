@@ -41,6 +41,17 @@ const SB_SHORTCUT_DEFAULTS = Object.freeze({
     left: 'left:agents',
     right: 'action:search',
 });
+const SB_PANEL_STYLESHEETS = Object.freeze({
+    'left:world-info': [
+        { href: 'css/world-info.css?v=20260425b', id: 'deferred-world-info-css' },
+    ],
+    'left:advanced-formatting': [
+        { href: 'css/macros.css', id: 'deferred-macros-css' },
+    ],
+    'right:extensions': [
+        { href: 'css/extensions-panel.css?v=20260425a', id: 'deferred-extensions-panel-css' },
+    ],
+});
 const SB_FRONTEND_ICON_DEFAULT = 'pixel';
 const SB_FRONTEND_ICONS = Object.freeze([
     {
@@ -4669,6 +4680,8 @@ function toggleShellPanel(shellKey, tabId = null) {
         return;
     }
 
+    preloadPanelStylesheets(shellKey, tabId);
+
     if (tabId ? isShellTabOpen(shellKey, tabId) : isShellOpen(shellKey)) {
         if (wasShellJustOpened(shellKey)) {
             return;
@@ -4680,6 +4693,21 @@ function toggleShellPanel(shellKey, tabId = null) {
 
     closeAllDropdowns({ except: shellKey });
     window.requestAnimationFrame(() => openShell(shellKey, tabId));
+}
+
+function preloadPanelStylesheets(shellKey, tabId = null) {
+    const key = `${shellKey}:${tabId || ''}`;
+    const stylesheets = SB_PANEL_STYLESHEETS[key];
+
+    if (!stylesheets || !window.SillyBunnyAssets?.loadStylesheetAsync) {
+        return;
+    }
+
+    for (const stylesheet of stylesheets) {
+        window.SillyBunnyAssets.loadStylesheetAsync(stylesheet.href, { id: stylesheet.id }).catch(error => {
+            console.warn('Failed to load panel stylesheet:', stylesheet.href, error);
+        });
+    }
 }
 
 function isLandingPageVisible() {
@@ -8488,6 +8516,8 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
     if (!shellState || !shellState.tabs.has(tabId)) {
         return;
     }
+
+    preloadPanelStylesheets(shellKey, tabId);
 
     const previousTab = shellState.tabs.get(shellState.activeTabId);
     shellState.activeTabId = tabId;
