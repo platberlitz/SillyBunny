@@ -1525,7 +1525,7 @@ async function getExistingCharacterChats(characterId) {
     return chats.filter(chatInfo => typeof chatInfo?.file_name === 'string');
 }
 
-async function resolveCharacterChatForLoad(characterId, { allowCreate = false } = {}) {
+async function resolveCharacterChatForLoad(characterId, { allowCreate = false, allowMissingPersisted = false } = {}) {
     const character = characters[characterId];
     if (!character) {
         return { chatName: '', created: false };
@@ -1534,6 +1534,11 @@ async function resolveCharacterChatForLoad(characterId, { allowCreate = false } 
     const persistedChat = String(character.chat || '').trim();
     const existingChats = await getExistingCharacterChats(characterId);
     const persistedExists = persistedChat && existingChats.some(chatInfo => chatInfo.file_name === `${persistedChat}.jsonl`);
+    if (persistedChat && !persistedExists && allowMissingPersisted) {
+        character.chat = persistedChat;
+        return { chatName: persistedChat, created: true };
+    }
+
     const latestChat = persistedExists ? '' : existingChats[0]?.file_name?.replace('.jsonl', '') || '';
     const nextChatName = persistedExists ? persistedChat : (latestChat || (allowCreate ? `${character.name} - ${humanizedDateTime()}` : ''));
 
@@ -8632,10 +8637,10 @@ export async function unshallowCharacter(characterId) {
     await getOneCharacter(avatar);
 }
 
-export async function getChat() {
+export async function getChat({ allowMissingPersisted = false } = {}) {
     try {
         await unshallowCharacter(this_chid);
-        const resolvedChat = await resolveCharacterChatForLoad(this_chid, { allowCreate: true });
+        const resolvedChat = await resolveCharacterChatForLoad(this_chid, { allowCreate: true, allowMissingPersisted });
 
         const response = await fetch('/api/chats/get', {
             method: 'POST',
@@ -12996,7 +13001,7 @@ export async function doNewChat({ deleteCurrentChat = false } = {}) {
         const newChatName = `${name2} - ${humanizedDateTime()}`;
         characters[this_chid].chat = newChatName;
         $('#selected_chat_pole').val(newChatName);
-        await getChat();
+        await getChat({ allowMissingPersisted: true });
         await updateRemoteChatName(this_chid, newChatName);
         if (deleteCurrentChat) await delChat(chat_file_for_del + '.jsonl');
     }
