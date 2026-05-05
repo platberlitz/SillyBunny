@@ -1556,14 +1556,14 @@
 /* Final mobile chat-bar guardrails: keep controls compact and square. */
 @media screen and (max-width: 768px) {
     :root {
-        --bottomFormBlockSize: calc(var(--sb-mobile-touch-target, 44px) * var(--sb-bottom-bar-scale, 1));
-        --bottomFormIconSize: calc(20px * var(--sb-bottom-bar-scale, 1));
+        --bottomFormBlockSize: clamp(34px, calc(var(--sb-mobile-touch-target, 44px) * var(--sb-bottom-bar-scale, 1)), 58px);
+        --bottomFormIconSize: clamp(16px, calc(20px * var(--sb-bottom-bar-scale, 1)), 25px);
         --sb-mobile-composer-input-height: 46px;
     }
 
     :root[data-sb-compact-mode='true'] {
-        --bottomFormBlockSize: calc(var(--sb-mobile-touch-target, 44px) * var(--sb-bottom-bar-scale, 1));
-        --bottomFormIconSize: calc(18px * var(--sb-bottom-bar-scale, 1));
+        --bottomFormBlockSize: clamp(32px, calc(var(--sb-mobile-touch-target, 44px) * var(--sb-bottom-bar-scale, 1)), 54px);
+        --bottomFormIconSize: clamp(15px, calc(18px * var(--sb-bottom-bar-scale, 1)), 23px);
         --sb-mobile-composer-input-height: 42px;
     }
 

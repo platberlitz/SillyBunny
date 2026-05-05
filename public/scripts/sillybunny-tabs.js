@@ -47,7 +47,7 @@ const SB_FRONTEND_ICONS = Object.freeze([
         id: 'pixel',
         label: 'Pixel',
         description: 'Classic square icon.',
-        src: 'img/sillybunny-pixel-logo.png',
+        src: 'img/sillybunny-pixel-logo-og.png',
     },
     {
         id: 'badge',
