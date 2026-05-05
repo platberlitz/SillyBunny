@@ -109,6 +109,26 @@ function registerPresetManagers() {
     });
 }
 
+function injectRestoreDefaultPresetButtons() {
+    $('[data-preset-manager-restore]').each((_, element) => {
+        const apiId = $(element).data('preset-manager-restore');
+        if (!apiId || $(element).siblings(`[data-preset-manager-restore-defaults="${apiId}"]`).length) {
+            return;
+        }
+
+        const button = $('<div></div>', {
+            class: 'menu_button menu_button_icon',
+            title: t`Restore default presets`,
+            'aria-label': t`Restore default presets`,
+            'data-i18n': '[title]Restore default presets',
+            'data-preset-manager-restore-defaults': apiId,
+            html: '<i class="fa-solid fa-box-open" aria-hidden="true"></i>',
+        });
+
+        $(element).after(button);
+    });
+}
+
 class PresetManager {
     constructor(select, apiId) {
         this.select = select;
@@ -464,7 +484,7 @@ class PresetManager {
      * @param {object} [options] Options for saving the preset
      * @param {boolean} [options.skipUpdate=false] If true, skips updating the preset list after saving.
      */
-    async savePreset(name, settings, { skipUpdate = false } = {}) {
+    async savePreset(name, settings, { skipUpdate = false, restoreDefault = false } = {}) {
         if (this.apiId === 'instruct' && settings) {
             await checkForSystemPromptInInstructTemplate(name, settings);
         }
@@ -478,11 +498,15 @@ class PresetManager {
         const response = await fetch('/api/presets/save', {
             method: 'POST',
             headers: getRequestHeaders(),
-            body: JSON.stringify({ preset, name, apiId: this.apiId }),
+            body: JSON.stringify({ preset, name, apiId: this.apiId, restoreDefault }),
         });
 
         if (!response.ok) {
-            toastr.error(t`Check the server connection and reload the page to prevent data loss.`, t`Preset could not be saved`);
+            const responseData = await response.json().catch(() => ({}));
+            const errorMessage = responseData?.isDeletedDefault
+                ? t`This bundled default was deleted. Use Restore default presets to bring it back.`
+                : t`Check the server connection and reload the page to prevent data loss.`;
+            toastr.error(errorMessage, t`Preset could not be saved`);
             console.error('Preset could not be saved', response);
             throw new Error('Preset could not be saved');
         }
@@ -910,6 +934,59 @@ class PresetManager {
     }
 
     /**
+     * Restores all bundled default presets for this API.
+     * @returns {Promise<any>} Restore result from the server
+     */
+    async restoreDefaultPresets() {
+        const response = await fetch('/api/presets/restore-defaults', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            body: JSON.stringify({ apiId: this.apiId }),
+        });
+
+        if (!response.ok) {
+            const errorToast = !this.isAdvancedFormatting() ? t`Failed to restore default presets` : t`Failed to restore default templates`;
+            toastr.error(errorToast);
+            return null;
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Adds restored presets to the select and in-memory preset list without selecting them.
+     * @param {string[]} filenames Restored preset filenames
+     */
+    async refreshRestoredDefaultOptions(filenames = []) {
+        const { preset_names, presets } = this.getPresetList();
+        const names = filenames
+            .map(filename => String(filename || '').replace(/\.[^.]+$/, '').split(/[\\/]/).pop())
+            .filter(Boolean);
+
+        for (const name of names) {
+            if (this.findPreset(name) !== undefined) {
+                continue;
+            }
+
+            const data = await this.getDefaultPreset(name);
+            if (!data?.isDefault || !data.preset || Object.keys(data.preset).length === 0) {
+                continue;
+            }
+
+            if (this.isKeyedApi()) {
+                presets.push(data.preset);
+                preset_names.push(name);
+                $(this.select).append($('<option></option>', { value: name, text: name }));
+            } else if (!Object.hasOwn(preset_names, name)) {
+                const value = presets.length;
+                presets.push(data.preset);
+                preset_names[name] = value;
+                $(this.select).append($('<option></option>', { value, text: name }));
+            }
+        }
+    }
+
+    /**
      * Reads a preset extension field from the preset.
      * @param {object} options
      * @param {string} [options.name] Name of the preset. If not provided, uses the currently selected preset name.
@@ -1057,6 +1134,7 @@ async function waitForConnection() {
 export async function initPresetManager() {
     eventSource.on(event_types.CHAT_CHANGED, autoSelectPreset);
     registerPresetManagers();
+    injectRestoreDefaultPresetButtons();
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'preset',
         callback: presetCommandCallback,
@@ -1303,7 +1381,7 @@ export async function initPresetManager() {
             }
 
             await presetManager.deletePreset();
-            await presetManager.savePreset(name, data.preset);
+            await presetManager.savePreset(name, data.preset, { restoreDefault: true });
             const option = presetManager.findPreset(name);
             presetManager.selectPreset(option);
             const successToast = !presetManager.isAdvancedFormatting() ? t`Default preset restored` : t`Default template restored`;
@@ -1322,6 +1400,35 @@ export async function initPresetManager() {
             const successToast = !presetManager.isAdvancedFormatting() ? t`Preset restored` : t`Template restored`;
             toastr.success(successToast);
         }
+    });
+
+    $(document).on('click', '[data-preset-manager-restore-defaults]', async function () {
+        const apiId = $(this).data('preset-manager-restore-defaults');
+        const presetManager = getPresetManager(apiId);
+
+        if (!presetManager) {
+            console.warn(`Preset Manager not found for API: ${apiId}`);
+            return;
+        }
+
+        const noun = presetManager.isAdvancedFormatting() ? t`templates` : t`presets`;
+        const confirm = await Popup.show.confirm(
+            t`Restore default presets?`,
+            t`Deleted bundled default ${noun} for this section will be restored. Custom ${noun} are kept.`,
+        );
+
+        if (!confirm) {
+            return;
+        }
+
+        const result = await presetManager.restoreDefaultPresets();
+        if (!result) {
+            return;
+        }
+
+        await presetManager.refreshRestoredDefaultOptions(result.restored);
+        toastr.success(t`Restored ${result.restored.length} default ${noun}.`);
+        saveSettingsDebounced();
     });
 
     $('#af_master_import').on('click', () => {

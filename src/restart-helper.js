@@ -16,6 +16,26 @@ function isProcessAlive(pid) {
     }
 }
 
+function buildVisibleWindowsCommand(command, cwd) {
+    const quoted = command.map(value => `"${String(value).replace(/"/g, '\\"')}"`).join(' ');
+    const title = 'SillyBunny Server';
+    return [
+        'cmd.exe',
+        [
+            '/d',
+            '/s',
+            '/c',
+            'start',
+            `"${title}"`,
+            '/D',
+            `"${cwd}"`,
+            'cmd.exe',
+            '/k',
+            quoted,
+        ],
+    ];
+}
+
 async function waitForParentExit(pid) {
     while (isProcessAlive(pid)) {
         await delay(250);
@@ -28,6 +48,7 @@ async function main() {
     const command = Array.isArray(payload?.command) ? payload.command : [];
     const cwd = String(payload?.cwd ?? process.cwd());
     const envPatch = payload?.envPatch && typeof payload.envPatch === 'object' ? payload.envPatch : {};
+    const visibleRelaunch = Boolean(payload?.visibleRelaunch);
 
     if (!Number.isFinite(parentPid) || command.length < 2) {
         process.exit(1);
@@ -36,11 +57,16 @@ async function main() {
     await waitForParentExit(parentPid);
     await delay(800);
 
-    const child = spawn(command[0], command.slice(1), {
+    const relaunch = visibleRelaunch && process.platform === 'win32'
+        ? buildVisibleWindowsCommand(command, cwd)
+        : [command[0], command.slice(1)];
+
+    const child = spawn(relaunch[0], relaunch[1], {
         cwd,
         detached: true,
-        stdio: 'ignore',
+        stdio: visibleRelaunch && process.platform === 'win32' ? ['ignore', 'inherit', 'inherit'] : 'ignore',
         env: { ...process.env, ...envPatch },
+        windowsHide: false,
     });
 
     child.unref();

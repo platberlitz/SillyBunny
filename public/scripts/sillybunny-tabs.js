@@ -58,10 +58,16 @@ const SB_FRONTEND_ICONS = Object.freeze([
 ]);
 const SB_ACCOUNT_STORAGE_READY_MARKER = '__migrated';
 const SB_INLINE_DRAWER_CUSTOM_PERSISTENCE_SELECTOR = '.sb-openai-settings-drawer, .sb-openai-settings-subdrawer, [id$="prompt_manager_drawer"]';
+const SB_STORAGE_PREFIX = 'sb-';
+const SB_STORAGE_WRITE_DEBOUNCE_MS = 120;
 
 let sbInlineDrawerPersistenceObserver = null;
 let sbInlineDrawerPersistenceQueued = false;
 let sbChatScriptModulePromise = null;
+let sbStorageFlushTimer = 0;
+let sbStorageFlushEventsBound = false;
+const sbStorageCache = new Map();
+const sbStoragePendingWrites = new Map();
 
 function getShortcutTarget(side) {
     const stored = safeGetItem(side === 'left' ? SB_STORAGE_KEYS.shortcutLeft : SB_STORAGE_KEYS.shortcutRight);
@@ -103,21 +109,105 @@ function activateShortcutTarget(target) {
     }
 }
 
+function isSillyBunnyStorageKey(key) {
+    return typeof key === 'string' && key.startsWith(SB_STORAGE_PREFIX);
+}
+
+function scheduleSbStorageFlush() {
+    if (sbStorageFlushTimer) {
+        return;
+    }
+
+    sbStorageFlushTimer = window.setTimeout(flushSbStorageWrites, SB_STORAGE_WRITE_DEBOUNCE_MS);
+}
+
+function flushSbStorageWrites() {
+    if (sbStorageFlushTimer) {
+        window.clearTimeout(sbStorageFlushTimer);
+        sbStorageFlushTimer = 0;
+    }
+
+    if (!sbStoragePendingWrites.size) {
+        return;
+    }
+
+    const pendingWrites = Array.from(sbStoragePendingWrites.entries());
+    sbStoragePendingWrites.clear();
+
+    for (const [key, write] of pendingWrites) {
+        try {
+            if (write?.remove) {
+                localStorage.removeItem(key);
+            } else {
+                localStorage.setItem(key, write.value);
+            }
+        } catch {
+            // Keep the previous safe localStorage semantics: storage failures are non-fatal.
+        }
+    }
+}
+
+function bindSbStorageFlushEvents() {
+    if (sbStorageFlushEventsBound || typeof window === 'undefined') {
+        return;
+    }
+
+    window.addEventListener('pagehide', flushSbStorageWrites);
+    window.addEventListener('beforeunload', flushSbStorageWrites);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            flushSbStorageWrites();
+        }
+    });
+    sbStorageFlushEventsBound = true;
+}
+
 function safeGetItem(key) {
-    try { return localStorage.getItem(key); } catch { return null; }
+    if (!isSillyBunnyStorageKey(key)) {
+        try { return localStorage.getItem(key); } catch { return null; }
+    }
+
+    if (sbStorageCache.has(key)) {
+        return sbStorageCache.get(key);
+    }
+
+    try {
+        const value = localStorage.getItem(key);
+        sbStorageCache.set(key, value);
+        return value;
+    } catch {
+        return null;
+    }
 }
 
 function safeSetItem(key, value) {
-    try { localStorage.setItem(key, value); } catch {
-        // Ignore storage write failures.
+    if (!isSillyBunnyStorageKey(key)) {
+        try { localStorage.setItem(key, value); } catch {
+            // Ignore storage write failures.
+        }
+        return;
     }
+
+    const stringValue = String(value);
+    sbStorageCache.set(key, stringValue);
+    sbStoragePendingWrites.set(key, { value: stringValue, remove: false });
+    scheduleSbStorageFlush();
 }
 
 function safeRemoveItem(key) {
-    try { localStorage.removeItem(key); } catch {
-        // Ignore storage removal failures.
+    if (!isSillyBunnyStorageKey(key)) {
+        try { localStorage.removeItem(key); } catch {
+            // Ignore storage removal failures.
+        }
+        return;
     }
+
+    sbStorageCache.set(key, null);
+    sbStoragePendingWrites.set(key, { remove: true });
+    scheduleSbStorageFlush();
 }
+
+bindSbStorageFlushEvents();
 
 const SB_IDLE_BRAND_LABEL = 'SillyBunny';
 const SB_MOBILE_MEDIA_QUERY = '(max-width: 768px)';
@@ -409,6 +499,7 @@ const sbState = {
         results: null,
         expanded: false,
         dismissBound: false,
+        activeIndex: -1,
     },
     shellSizing: {
         overrides: {
@@ -1018,6 +1109,7 @@ function setUniversalSearchOpenState(isOpen, { focusInput = false } = {}) {
     root?.setAttribute('aria-expanded', String(nextOpenState));
     if (input instanceof HTMLInputElement) {
         input.tabIndex = nextOpenState ? 0 : -1;
+        input.setAttribute('aria-expanded', String(nextOpenState));
     }
 
     if (!nextOpenState) {
@@ -1048,6 +1140,8 @@ function clearUniversalSearch({ blur = false } = {}) {
         searchState.results.classList.remove('is-visible');
     }
 
+    searchState.activeIndex = -1;
+    searchState.input?.removeAttribute('aria-activedescendant');
     setUniversalSearchOpenState(false);
 }
 
@@ -4730,10 +4824,14 @@ function buildUniversalSearchRow() {
             autocomplete: 'off',
             enterkeyhint: 'search',
             spellcheck: 'false',
+            role: 'combobox',
+            'aria-expanded': 'false',
+            'aria-controls': 'sb-universal-search-results',
         },
     });
     const panel = createElement('div', { className: 'sb-universal-search-panel' });
     const searchResults = createElement('div', {
+        id: 'sb-universal-search-results',
         className: 'sb-search-results',
         attrs: {
             role: 'listbox',
@@ -4771,8 +4869,22 @@ function buildUniversalSearchRow() {
     });
 
     searchInput.addEventListener('keydown', event => {
+        const resultButtons = Array.from(searchResults.querySelectorAll('.sb-search-result'));
+
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            if (!resultButtons.length) {
+                return;
+            }
+
+            const direction = event.key === 'ArrowDown' ? 1 : -1;
+            const nextIndex = (sbState.universalSearch.activeIndex + direction + resultButtons.length) % resultButtons.length;
+            setUniversalSearchActiveIndex(nextIndex);
+            return;
+        }
+
         if (event.key === 'Enter') {
-            const firstMatch = searchResults.querySelector('.sb-search-result');
+            const firstMatch = resultButtons[sbState.universalSearch.activeIndex] ?? resultButtons[0];
             if (firstMatch instanceof HTMLButtonElement) {
                 event.preventDefault();
                 firstMatch.click();
@@ -5802,6 +5914,7 @@ async function requestServerAdmin(endpoint, body = {}) {
             : data?.error || data?.message || text || `Request failed with status ${response.status}.`;
         const error = new Error(message);
         error.status = response.status;
+        error.data = data;
         throw error;
     }
 
@@ -5869,6 +5982,18 @@ function setServerAdminButtonLabel(button, isBusy, busyLabel) {
     }
 
     button.textContent = isBusy ? busyLabel : button.dataset.idleLabel;
+}
+
+function describeAutoStashState(result) {
+    if (!result?.stashed) {
+        return '';
+    }
+
+    if (result?.stashPopWarning) {
+        return result.stashPopWarning;
+    }
+
+    return 'Local tracked and untracked changes were auto-stashed and restored.';
 }
 
 function getThumbnailSettingsFromRefs(refs = getServerAdminRefs()) {
@@ -6486,15 +6611,22 @@ async function handleServerAdminUpdate() {
 
         if (!result?.updated) {
             renderServerAdminStatus(nextStatus);
-            setServerAdminMessage(refs.updateNote, result?.message || 'Already up to date.', 'good');
+            const stashMessage = describeAutoStashState(result);
+            setServerAdminMessage(refs.updateNote, [result?.message || 'Already up to date.', stashMessage].filter(Boolean).join('\n'), stashMessage ? 'warn' : 'good');
+            if (stashMessage) {
+                toastr.info(stashMessage, 'Auto-stash');
+            }
             toastr.success(result?.message || 'Already up to date.', 'Server update');
             return;
         }
 
         renderServerAdminStatus(nextStatus);
 
+        const stashMessage = describeAutoStashState(result);
         if (result?.stashPopWarning) {
-            toastr.warning(result.stashPopWarning, 'Auto-stash warning', { timeOut: 10000 });
+            toastr.warning(stashMessage, 'Auto-stash warning', { timeOut: 10000 });
+        } else if (stashMessage) {
+            toastr.info(stashMessage, 'Auto-stash');
         }
 
         if (result?.install?.stdout || result?.install?.stderr) {
@@ -6522,7 +6654,11 @@ async function handleServerAdminUpdate() {
     } catch (error) {
         console.error('Failed to update SillyBunny.', error);
         state.busy = false;
-        setServerAdminMessage(refs.updateNote, error.message || 'Failed to update SillyBunny.', 'danger');
+        const stashMessage = describeAutoStashState(error?.data);
+        if (stashMessage) {
+            toastr.warning(stashMessage, 'Auto-stash warning', { timeOut: 10000 });
+        }
+        setServerAdminMessage(refs.updateNote, [error.message || 'Failed to update SillyBunny.', stashMessage].filter(Boolean).join('\n'), 'danger');
         toastr.error(error.message || 'Failed to update SillyBunny.', 'Server update');
     } finally {
         setServerAdminButtonLabel(refs.updateButton, false, 'Updating…');
@@ -8174,6 +8310,8 @@ function renderUniversalSearchResults(query) {
     }
 
     results.replaceChildren();
+    searchState.activeIndex = -1;
+    searchState.input?.removeAttribute('aria-activedescendant');
 
     if (!searchState.expanded) {
         results.classList.remove('is-visible');
@@ -8189,37 +8327,61 @@ function renderUniversalSearchResults(query) {
     }
 
     const matches = collectGlobalSearchMatches(trimmedQuery);
-
+    const groupedMatches = new Map();
     for (const match of matches) {
-        const button = createElement('button', {
-            className: 'sb-search-result',
+        const groupLabel = `${match.shellLabel} · ${match.tabLabel}`;
+        if (!groupedMatches.has(groupLabel)) {
+            groupedMatches.set(groupLabel, []);
+        }
+        groupedMatches.get(groupLabel).push(match);
+    }
+
+    for (const [groupLabel, groupMatches] of groupedMatches.entries()) {
+        const group = createElement('div', {
+            className: 'sb-search-result-group',
             attrs: {
-                type: 'button',
+                role: 'group',
+                'aria-label': groupLabel,
             },
         });
-        const detailText = normalizeText(match.displayText) === normalizeText(match.sectionLabel)
-            ? `Jump straight to this item in ${match.tabLabel}.`
-            : match.displayText;
-        const sectionDisplay = match.sectionLabel === match.tabLabel
-            ? match.displayText || match.tabLabel
-            : match.sectionLabel;
+        group.appendChild(createElement('div', { className: 'sb-search-result-group-label', text: groupLabel }));
 
-        button.appendChild(createElement('strong', { text: sectionDisplay }));
+        for (const match of groupMatches) {
+            const button = createElement('button', {
+                className: 'sb-search-result',
+                attrs: {
+                    type: 'button',
+                    role: 'option',
+                    id: `sb-search-result-${results.querySelectorAll('.sb-search-result').length}`,
+                    'aria-selected': 'false',
+                },
+            });
+            const detailText = normalizeText(match.displayText) === normalizeText(match.sectionLabel)
+                ? `Jump straight to this item in ${match.tabLabel}.`
+                : match.displayText;
+            const sectionDisplay = match.sectionLabel === match.tabLabel
+                ? match.displayText || match.tabLabel
+                : match.sectionLabel;
 
-        if (sectionDisplay !== match.displayText) {
-            button.appendChild(createElement('span', { text: detailText }));
+            button.appendChild(createElement('strong', { text: sectionDisplay }));
+
+            if (sectionDisplay !== match.displayText) {
+                button.appendChild(createElement('span', { text: detailText }));
+            }
+
+            button.appendChild(createElement('small', {
+                text: typeof match.action === 'function' ? 'Quick action' : 'Jump to setting',
+            }));
+
+            button.addEventListener('click', () => {
+                clearUniversalSearch({ blur: true });
+                revealSearchMatch(match.shellKey, match);
+            });
+
+            group.appendChild(button);
         }
 
-        button.appendChild(createElement('small', {
-            text: `${match.shellLabel} · ${match.tabLabel}`,
-        }));
-
-        button.addEventListener('click', () => {
-            clearUniversalSearch({ blur: true });
-            revealSearchMatch(match.shellKey, match);
-        });
-
-        results.appendChild(button);
+        results.appendChild(group);
     }
 
     if (!results.childElementCount) {
@@ -8231,6 +8393,35 @@ function renderUniversalSearchResults(query) {
     }
 
     results.classList.add('is-visible');
+    setUniversalSearchActiveIndex(results.querySelector('.sb-search-result') ? 0 : -1);
+}
+
+function setUniversalSearchActiveIndex(index) {
+    const searchState = getUniversalSearchState();
+    const results = searchState.results;
+    const input = searchState.input;
+
+    if (!(results instanceof HTMLElement)) {
+        return;
+    }
+
+    const buttons = Array.from(results.querySelectorAll('.sb-search-result'));
+    searchState.activeIndex = buttons.length ? Math.min(Math.max(index, 0), buttons.length - 1) : -1;
+
+    for (let i = 0; i < buttons.length; i++) {
+        const button = buttons[i];
+        const active = i === searchState.activeIndex;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-selected', String(active));
+        if (active) {
+            input?.setAttribute('aria-activedescendant', button.id);
+            button.scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    if (searchState.activeIndex === -1) {
+        input?.removeAttribute('aria-activedescendant');
+    }
 }
 
 function expandHiddenAccordions(target) {
