@@ -341,7 +341,7 @@ hr {
 .standoutHeader,
 h3:not(.popup h3):not(#chat h3),
 .inline-drawer-header {
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
 }
 
 .standoutHeader,
@@ -351,6 +351,9 @@ h3:not(.popup h3):not(#chat h3) {
     padding: 10px 14px;
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
     box-sizing: border-box;
+    font-size: var(--sb-type-title);
+    font-weight: var(--sb-weight-title);
+    line-height: var(--sb-line-title);
 }
 
 .inline-drawer-header {
@@ -389,7 +392,7 @@ h3:not(.popup h3):not(#chat h3) {
     box-sizing: border-box;
     min-width: var(--sb-control-min-height);
     min-height: var(--sb-control-min-height);
-    line-height: 1.2;
+    line-height: var(--sb-line-compact);
 }
 
 .menu_button,
@@ -400,6 +403,9 @@ h3:not(.popup h3):not(#chat h3) {
     gap: 6px;
     margin-block: 0;
     min-width: var(--sb-control-min-height);
+    font-size: var(--sb-type-control);
+    font-weight: var(--sb-weight-control);
+    letter-spacing: 0;
 }
 
 .menu_button > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img),
@@ -449,7 +455,8 @@ h3:not(.popup h3):not(#chat h3) {
 
 .checkbox_label {
     min-height: var(--sb-control-min-height);
-    line-height: 1.45;
+    font-size: var(--sb-type-control);
+    line-height: var(--sb-line-body);
     display: flex;
     align-items: center;
     gap: var(--sb-row-gap);
@@ -482,7 +489,8 @@ h3:not(.popup h3):not(#chat h3) {
 
 .floating_prompt_radio_group label {
     min-height: var(--sb-control-min-height);
-    line-height: 1.45;
+    font-size: var(--sb-type-control);
+    line-height: var(--sb-line-body);
     display: flex;
     align-items: center;
     gap: var(--sb-row-gap);
@@ -501,7 +509,7 @@ h3:not(.popup h3):not(#chat h3) {
 
 .floating_prompt_radio_group label > span,
 .floating_prompt_radio_group label > small {
-    line-height: 1.45;
+    line-height: var(--sb-line-body);
     min-width: 0;
     white-space: normal;
     overflow-wrap: anywhere;
@@ -509,7 +517,7 @@ h3:not(.popup h3):not(#chat h3) {
 
 .checkbox_label small,
 .checkbox_label span {
-    line-height: 1.45;
+    line-height: var(--sb-line-body);
     min-width: 0;
     white-space: normal;
     overflow-wrap: anywhere;
@@ -631,7 +639,8 @@ h3:not(.popup h3):not(#chat h3) {
 .standoutHeader > strong,
 .standoutHeader > span {
     min-width: 0;
-    line-height: 1.25;
+    font-weight: var(--sb-weight-title);
+    line-height: var(--sb-line-title);
 }
 
 .custom-drawer-icon,
@@ -668,7 +677,8 @@ input.text_pole {
     border-radius: var(--sb-radius-button);
     color: var(--SmartThemeBodyColor);
     caret-color: var(--color-primary, var(--sb-accent));
-    line-height: 1.45;
+    font-size: var(--sb-type-control);
+    line-height: var(--sb-line-body);
     transition: border-color var(--sb-transition-fast), box-shadow var(--sb-transition-fast), background-color var(--sb-transition-fast);
 }
 
