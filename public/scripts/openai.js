@@ -81,6 +81,7 @@ import { ToolManager } from './tool-calling.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { COMETAPI_IGNORE_PATTERNS, IGNORE_SYMBOL, MEDIA_DISPLAY, MEDIA_TYPE } from './constants.js';
 import { syncOpenRouterProvidersForModel, updateOpenRouterProvidersWarning } from './textgen-models.js';
+import { hasTextOrArrayPayload, stripOocBlocksFromContext } from './ooc-blocks.js';
 
 export {
     openai_messages_count,
@@ -136,6 +137,14 @@ const SERVER_CHAT_COMPLETION_CONFIG_DEFAULTS = Object.freeze({
     }),
 });
 const OPENAI_SETTINGS_DRAWER_STATE_KEY_PREFIX = 'OpenAIDrawerState:';
+
+function hasPromptPayload(chatItem) {
+    return hasTextOrArrayPayload(chatItem?.content, [
+        chatItem?.media,
+        chatItem?.invocations,
+    ]);
+}
+
 const serverChatCompletionConfigState = {
     loaded: false,
     busy: false,
@@ -684,7 +693,7 @@ function setOpenAIMessages(chat) {
         }
 
         // remove caret return (waste of tokens)
-        content = content.replace(/\r/gm, '');
+        content = stripOocBlocksFromContext(content.replace(/\r/gm, ''));
 
         const name = chat[j].name;
         const media = chat[j]?.extra?.media;
@@ -711,11 +720,14 @@ function setOpenAIMessages(chat) {
             });
         }
 
-        messages[i] = { 'role': role, 'content': content, name: name, 'media': media, 'mediaDisplay': mediaDisplay, 'mediaIndex': mediaIndex, 'invocations': invocations, 'signature': signature, 'reasoning': reasoning };
+        const message = { 'role': role, 'content': content, name: name, 'media': media, 'mediaDisplay': mediaDisplay, 'mediaIndex': mediaIndex, 'invocations': invocations, 'signature': signature, 'reasoning': reasoning };
+        if (hasPromptPayload(message)) {
+            messages[i] = message;
+        }
         j++;
     }
 
-    return messages;
+    return messages.filter(Boolean);
 }
 
 /**
