@@ -76,6 +76,8 @@ const SB_MOBILE_NAV_OPEN_GRACE_MS = 450;
 let sbInlineDrawerPersistenceObserver = null;
 let sbInlineDrawerPersistenceQueued = false;
 let sbChatScriptModulePromise = null;
+let sbMobileExtensionSyncObserver = null;
+let sbMobileExtensionSyncFrame = 0;
 let sbStorageFlushTimer = 0;
 let sbStorageFlushEventsBound = false;
 const sbStorageCache = new Map();
@@ -9670,6 +9672,128 @@ function getInlineDrawers(root = document) {
     return drawers;
 }
 
+function isExtensionSettingsDrawer(drawer) {
+    return drawer instanceof HTMLElement
+        && drawer.closest('#rm_extensions_block')
+        && drawer.closest('.extension_container');
+}
+
+function getMobileExtensionRootLabel(root) {
+    if (!(root instanceof HTMLElement)) {
+        return 'Extension settings';
+    }
+
+    const labelSource = root.querySelector('.extension_name, .inline-drawer-header, .inline-drawer-toggle, h1, h2, h3, h4, strong, b')
+        ?? root;
+    const label = String(labelSource.textContent ?? '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return clampText(label || root.id.replace(/[-_]+/g, ' ') || 'Extension settings', 48);
+}
+
+function getMobileExtensionDirectRoots() {
+    const hosts = [
+        document.getElementById('extensions_settings'),
+        document.getElementById('extensions_settings2'),
+    ].filter(element => element instanceof HTMLElement);
+
+    return hosts.flatMap(host => Array.from(host.children))
+        .filter(root => root instanceof HTMLElement)
+        .filter(root => !root.classList.contains('sb-mobile-extension-summary'))
+        .filter(root => root.id !== 'assets_container')
+        .filter(root => root.textContent?.trim())
+        .filter(root => !root.classList.contains('extension_container') || !root.querySelector(':scope > .inline-drawer'));
+}
+
+function setMobileExtensionRootExpanded(root, expanded) {
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+
+    const summary = root.previousElementSibling instanceof HTMLButtonElement
+        && root.previousElementSibling.classList.contains('sb-mobile-extension-summary')
+        ? root.previousElementSibling
+        : null;
+
+    root.hidden = !expanded;
+    root.dataset.sbMobileExtensionExpanded = String(expanded);
+    root.setAttribute('aria-hidden', String(!expanded));
+
+    if ('inert' in root) {
+        root.inert = !expanded;
+    }
+
+    if (summary) {
+        summary.setAttribute('aria-expanded', String(expanded));
+        summary.classList.toggle('is-expanded', expanded);
+    }
+}
+
+function queueMobileExtensionDrawerStateSync() {
+    if (sbMobileExtensionSyncFrame) {
+        return;
+    }
+
+    sbMobileExtensionSyncFrame = window.requestAnimationFrame(() => {
+        sbMobileExtensionSyncFrame = 0;
+        syncMobileExtensionDrawerState();
+    });
+}
+
+function ensureMobileExtensionSyncObserver() {
+    const root = document.getElementById('rm_extensions_block');
+    if (!(root instanceof HTMLElement) || sbMobileExtensionSyncObserver) {
+        return;
+    }
+
+    sbMobileExtensionSyncObserver = new MutationObserver(() => queueMobileExtensionDrawerStateSync());
+    sbMobileExtensionSyncObserver.observe(root, { childList: true, subtree: true });
+}
+
+function ensureMobileExtensionSummaries() {
+    ensureMobileExtensionSyncObserver();
+
+    for (const root of getMobileExtensionDirectRoots()) {
+        if (!(root instanceof HTMLElement)) {
+            continue;
+        }
+
+        root.classList.add('sb-mobile-extension-direct-root');
+
+        const existingSummary = root.previousElementSibling instanceof HTMLButtonElement
+            && root.previousElementSibling.classList.contains('sb-mobile-extension-summary')
+            ? root.previousElementSibling
+            : null;
+
+        if (existingSummary) {
+            const label = existingSummary.querySelector('.sb-mobile-extension-summary-label');
+            if (label instanceof HTMLElement) {
+                label.textContent = getMobileExtensionRootLabel(root);
+            }
+            continue;
+        }
+
+        const summary = createElement('button', {
+            className: 'sb-mobile-extension-summary',
+            attrs: {
+                type: 'button',
+                'aria-expanded': 'false',
+            },
+        });
+        summary.innerHTML = `
+            <span class="sb-mobile-extension-summary-label"></span>
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        `;
+        summary.querySelector('.sb-mobile-extension-summary-label').textContent = getMobileExtensionRootLabel(root);
+        summary.addEventListener('click', () => {
+            setMobileExtensionRootExpanded(root, root.hidden);
+        });
+
+        root.before(summary);
+    }
+}
+
 function bindInlineDrawerPersistence(root = document) {
     for (const drawer of getInlineDrawers(root)) {
         if (!(drawer instanceof HTMLElement) || !shouldPersistInlineDrawer(drawer)) {
@@ -9677,7 +9801,9 @@ function bindInlineDrawerPersistence(root = document) {
         }
 
         const storedExpanded = getStoredInlineDrawerExpanded(drawer);
-        if (storedExpanded !== null) {
+        if (isExtensionSettingsDrawer(drawer) && isMobileViewport()) {
+            setInlineDrawerExpanded(drawer, false);
+        } else if (storedExpanded !== null) {
             setInlineDrawerExpanded(drawer, storedExpanded);
         }
 
@@ -9749,6 +9875,42 @@ function applyDefaultDrawerStates() {
     ensureInlineDrawerPersistenceObserver();
 }
 
+function syncMobileExtensionDrawerState() {
+    ensureMobileExtensionSummaries();
+
+    if (!isMobileViewport()) {
+        for (const root of getMobileExtensionDirectRoots()) {
+            root.hidden = false;
+            root.removeAttribute('aria-hidden');
+            delete root.dataset.sbMobileExtensionExpanded;
+
+            if ('inert' in root) {
+                root.inert = false;
+            }
+        }
+
+        return;
+    }
+
+    for (const drawer of getInlineDrawers(document.getElementById('rm_extensions_block') ?? document)) {
+        if (isExtensionSettingsDrawer(drawer)) {
+            setInlineDrawerExpanded(drawer, false);
+        }
+    }
+
+    for (const root of getMobileExtensionDirectRoots()) {
+        if (root.dataset.sbMobileExtensionExpanded !== 'true') {
+            setMobileExtensionRootExpanded(root, false);
+        }
+    }
+}
+
+document.addEventListener('sb:shell-tab-activated', event => {
+    if (event?.detail?.shellKey === 'right' && event.detail.tabId === 'extensions') {
+        queueMobileExtensionDrawerStateSync();
+    }
+});
+
 function syncMobileViewportState() {
     if (!isMobileViewport()) {
         closeMobileNav();
@@ -9762,6 +9924,7 @@ function syncMobileViewportState() {
     scheduleTopbarContextRefresh(0);
     syncMobileModalState();
     syncMobileCharacterListMode();
+    syncMobileExtensionDrawerState();
 }
 
 function reinitSelect2AfterShell() {
