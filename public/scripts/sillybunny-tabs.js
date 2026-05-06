@@ -71,6 +71,7 @@ const SB_ACCOUNT_STORAGE_READY_MARKER = '__migrated';
 const SB_INLINE_DRAWER_CUSTOM_PERSISTENCE_SELECTOR = '.sb-openai-settings-drawer, .sb-openai-settings-subdrawer, [id$="prompt_manager_drawer"]';
 const SB_STORAGE_PREFIX = 'sb-';
 const SB_STORAGE_WRITE_DEBOUNCE_MS = 120;
+const SB_MOBILE_NAV_OPEN_GRACE_MS = 450;
 
 let sbInlineDrawerPersistenceObserver = null;
 let sbInlineDrawerPersistenceQueued = false;
@@ -521,6 +522,12 @@ const sbState = {
     },
     characterDrawer: {
         rightLocked: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.characterDrawerRightLocked), false),
+    },
+    mobileModal: {
+        syncFrame: 0,
+    },
+    mobileNav: {
+        lastOpenedAt: 0,
     },
     chatbar: {
         desktop: null,
@@ -3816,6 +3823,8 @@ function setMobileChatToolsOpenState(shouldOpen) {
         refs.overlay.inert = !isOpen;
     }
 
+    queueMobileModalStateSync();
+
     if (isOpen) {
         scheduleChatbarRefresh(0);
     }
@@ -4481,6 +4490,167 @@ function isDrawerActuallyOpen(drawerRootOrId) {
         && el.getClientRects().length > 0;
 }
 
+function isMobileOverlayActuallyOpen(overlayRootOrId, openClass) {
+    const el = getDrawerRoot(overlayRootOrId);
+
+    if (!(el instanceof HTMLElement) || !el.classList.contains(openClass)) {
+        return false;
+    }
+
+    const isExplicitlyHidden = el.hidden || el.getAttribute('aria-hidden') === 'true';
+    if (isExplicitlyHidden) {
+        return false;
+    }
+
+    const styles = getComputedStyle(el);
+    return styles.display !== 'none'
+        && styles.visibility !== 'hidden'
+        && styles.pointerEvents !== 'none'
+        && el.getClientRects().length > 0;
+}
+
+function getMobileModalRootCandidates() {
+    const chatTools = getChatbarState().mobileTools?.overlay ?? document.getElementById('sb-mobile-chat-tools');
+    return [
+        document.getElementById(getShellConfig('left').rootPanelId),
+        document.getElementById(getShellConfig('right').rootPanelId),
+        document.getElementById('right-nav-panel'),
+        document.getElementById('sb-mobile-nav'),
+        chatTools,
+    ].filter(element => element instanceof HTMLElement);
+}
+
+function isMobileModalRootOpen(root) {
+    if (!(root instanceof HTMLElement)) {
+        return false;
+    }
+
+    if (root.id === 'sb-mobile-nav') {
+        return isMobileOverlayActuallyOpen(root, 'sb-nav-open');
+    }
+
+    if (root.id === 'sb-mobile-chat-tools') {
+        return isMobileOverlayActuallyOpen(root, 'sb-chat-tools-open');
+    }
+
+    return isDrawerActuallyOpen(root);
+}
+
+function getActiveMobileModalRoots() {
+    if (!isMobileViewport()) {
+        return [];
+    }
+
+    return getMobileModalRootCandidates().filter(root => isMobileModalRootOpen(root));
+}
+
+function setElementInertForMobileModal(element, shouldInert) {
+    if (!(element instanceof HTMLElement)) {
+        return;
+    }
+
+    if (shouldInert) {
+        if (!element.hasAttribute('data-sb-mobile-modal-prev-aria-hidden')) {
+            element.setAttribute(
+                'data-sb-mobile-modal-prev-aria-hidden',
+                element.getAttribute('aria-hidden') ?? '',
+            );
+        }
+
+        element.setAttribute('aria-hidden', 'true');
+        if ('inert' in element) {
+            element.inert = true;
+        }
+        return;
+    }
+
+    const previousAriaHidden = element.getAttribute('data-sb-mobile-modal-prev-aria-hidden');
+    if (previousAriaHidden !== null) {
+        if (previousAriaHidden) {
+            element.setAttribute('aria-hidden', previousAriaHidden);
+        } else {
+            element.removeAttribute('aria-hidden');
+        }
+        element.removeAttribute('data-sb-mobile-modal-prev-aria-hidden');
+    }
+
+    if ('inert' in element) {
+        element.inert = false;
+    }
+}
+
+function setMobileModalRootA11y(root, isActiveRoot) {
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+
+    const hasManagedAriaState = root.id === 'sb-mobile-nav' || root.id === 'sb-mobile-chat-tools';
+
+    if (isActiveRoot) {
+        if (hasManagedAriaState) {
+            root.setAttribute('aria-hidden', 'false');
+            if ('inert' in root) {
+                root.inert = false;
+            }
+            return;
+        }
+
+        if (!root.hasAttribute('data-sb-mobile-modal-root-prev-aria-hidden')) {
+            root.setAttribute(
+                'data-sb-mobile-modal-root-prev-aria-hidden',
+                root.getAttribute('aria-hidden') ?? '',
+            );
+        }
+
+        root.setAttribute('aria-hidden', 'false');
+        if ('inert' in root) {
+            root.inert = false;
+        }
+        return;
+    }
+
+    if (hasManagedAriaState) {
+        return;
+    }
+
+    const previousAriaHidden = root.getAttribute('data-sb-mobile-modal-root-prev-aria-hidden');
+    if (previousAriaHidden !== null) {
+        if (previousAriaHidden) {
+            root.setAttribute('aria-hidden', previousAriaHidden);
+        } else {
+            root.removeAttribute('aria-hidden');
+        }
+        root.removeAttribute('data-sb-mobile-modal-root-prev-aria-hidden');
+    }
+}
+
+function syncMobileModalState() {
+    const activeRoots = getActiveMobileModalRoots();
+    const hasActiveMobileModal = activeRoots.length > 0;
+    const activeRootSet = new Set(activeRoots);
+    const shouldInertTopBar = activeRoots.some(root => root.id !== 'sb-mobile-nav');
+
+    document.body?.classList.toggle('sb-mobile-modal-open', hasActiveMobileModal);
+
+    for (const root of getMobileModalRootCandidates()) {
+        setMobileModalRootA11y(root, activeRootSet.has(root));
+    }
+
+    setElementInertForMobileModal(document.getElementById('sheld'), hasActiveMobileModal);
+    setElementInertForMobileModal(document.getElementById('top-bar'), shouldInertTopBar);
+}
+
+function queueMobileModalStateSync() {
+    if (sbState.mobileModal.syncFrame) {
+        return;
+    }
+
+    sbState.mobileModal.syncFrame = window.requestAnimationFrame(() => {
+        sbState.mobileModal.syncFrame = 0;
+        syncMobileModalState();
+    });
+}
+
 function forceDrawerState(drawerRootOrId, shouldOpen, drawerIconOrSelector = null) {
     const el = typeof drawerRootOrId === 'string'
         ? document.getElementById(drawerRootOrId)
@@ -4489,6 +4659,7 @@ function forceDrawerState(drawerRootOrId, shouldOpen, drawerIconOrSelector = nul
     el.classList.toggle('openDrawer', Boolean(shouldOpen));
     el.classList.toggle('closedDrawer', !shouldOpen);
     syncDrawerIconState(drawerIconOrSelector, shouldOpen);
+    queueMobileModalStateSync();
 }
 
 function isShellOpen(shellKey) {
@@ -4594,6 +4765,7 @@ function closeCharacterPanel() {
     }
 
     syncChatbarVisibilityState();
+    queueMobileModalStateSync();
 }
 
 function ensureCharacterResizeHandle() {
@@ -4659,6 +4831,7 @@ function toggleCharacterPanel() {
 
         syncChatbarVisibilityState();
         syncDesktopShellSizing();
+        queueMobileModalStateSync();
     });
 }
 
@@ -8752,10 +8925,12 @@ function buildShell(shellKey) {
             activeTab?.onActivate?.();
             dispatchShellTabActivated(shellKey, activeTab);
             updateNavScrollIndicators();
+            queueMobileModalStateSync();
             return;
         }
 
         shellState.tabs.get(shellState.activeTabId)?.onDeactivate?.();
+        queueMobileModalStateSync();
     }).observe(shellRoot, { attributes: true, attributeFilter: ['class'] });
 
     const basePanel = createShellPanel(shellConfig.baseTab);
@@ -9121,6 +9296,14 @@ function buildMobileNav() {
             return;
         }
 
+        if (!event.isTrusted) {
+            return;
+        }
+
+        if (performance.now() - sbState.mobileNav.lastOpenedAt < SB_MOBILE_NAV_OPEN_GRACE_MS) {
+            return;
+        }
+
         // Don't close if clicking the hamburger button itself
         if (target.closest('#sb-hamburger')) {
             return;
@@ -9150,6 +9333,10 @@ function setMobileNavOpenState(isOpen) {
         return;
     }
 
+    if (shouldOpen) {
+        sbState.mobileNav.lastOpenedAt = performance.now();
+    }
+
     overlay.hidden = !shouldOpen;
     overlay.classList.toggle('sb-nav-open', shouldOpen);
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
@@ -9163,6 +9350,8 @@ function setMobileNavOpenState(isOpen) {
     button.innerHTML = shouldOpen
         ? '<i class="fa-solid fa-xmark" aria-hidden="true"></i>'
         : '<i class="fa-solid fa-bars" aria-hidden="true"></i>';
+
+    queueMobileModalStateSync();
 }
 
 function toggleMobileNav() {
@@ -9523,6 +9712,7 @@ function syncMobileViewportState() {
     syncChatbarVisibilityState();
     updateTopBarBrand();
     scheduleTopbarContextRefresh(0);
+    syncMobileModalState();
 }
 
 function reinitSelect2AfterShell() {
