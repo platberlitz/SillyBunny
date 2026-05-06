@@ -5634,6 +5634,276 @@ body.sb-shell-resizing * {
     }
 }
 
+/* SillyBunny mobile character library: compact list wins on phones; gallery is opt-in. */
+@media screen and (max-width: 1000px) {
+    body.sb-mobile-character-list #right-nav-panel.openDrawer:not([data-menu-type='character_edit']):not([data-menu-type='create']) > #CharListButtonAndHotSwaps {
+        grid-template-columns: minmax(0, 1fr) var(--sb-mobile-touch-target, 44px);
+        gap: 6px;
+        min-height: 46px;
+        padding: 4px 8px;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer:not([data-menu-type='character_edit']):not([data-menu-type='create']) > #CharListButtonAndHotSwaps > .flexFlowColumn.flex-container,
+    body.sb-mobile-character-list #right-nav-panel.openDrawer:not([data-menu-type='character_edit']):not([data-menu-type='create']) #HotSwapWrapper,
+    body.sb-mobile-character-list #right-nav-panel.openDrawer:not([data-menu-type='character_edit']):not([data-menu-type='create']) #sb-character-right-lock,
+    body.sb-mobile-character-list #right-nav-panel.openDrawer:not([data-menu-type='character_edit']):not([data-menu-type='create']) #sb-character-back-to-list {
+        display: none !important;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer:not([data-menu-type='character_edit']):not([data-menu-type='create']) #sb-character-mobile-close {
+        grid-column: 2;
+        display: inline-flex !important;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #rm_characters_block {
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #charListFixedTop {
+        position: sticky;
+        top: 0;
+        z-index: 6;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 6px 0 8px;
+        background: var(--sb-shell-surface);
+        border-bottom: 1px solid color-mix(in srgb, var(--sb-shell-border) 74%, transparent);
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #rm_button_bar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) repeat(3, var(--sb-mobile-touch-target, 44px));
+        gap: 6px;
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+        order: 2;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #character_sort_order {
+        grid-column: 1;
+        grid-row: 1;
+        width: 100%;
+        min-width: 0;
+        height: var(--sb-mobile-touch-target, 44px);
+        margin: 0;
+        font-size: max(16px, calc(var(--mainFontSize) * 0.86));
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #rm_button_create,
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #character_import_button,
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #external_import_button,
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #rm_button_group_chats,
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #rm_button_search,
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #charListGridToggle,
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #bulkEditButton,
+    body.sb-mobile-character-list #right-nav-panel.openDrawer .bulkEditOptionElement {
+        width: var(--sb-mobile-touch-target, 44px) !important;
+        min-width: var(--sb-mobile-touch-target, 44px) !important;
+        max-width: var(--sb-mobile-touch-target, 44px) !important;
+        height: var(--sb-mobile-touch-target, 44px) !important;
+        min-height: var(--sb-mobile-touch-target, 44px) !important;
+        max-height: var(--sb-mobile-touch-target, 44px) !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        justify-self: stretch;
+        border-radius: 10px;
+        box-sizing: border-box;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #rm_button_create {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #character_import_button {
+        grid-column: 3;
+        grid-row: 1;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #external_import_button {
+        display: none !important;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #rm_button_group_chats {
+        display: none !important;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #rm_button_search {
+        grid-column: 4;
+        grid-row: 1;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #rm_buttons_container {
+        display: none !important;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #form_character_search_form {
+        order: 1;
+        margin: 0;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #character_search_bar {
+        width: 100%;
+        min-height: 46px;
+        height: 46px;
+        margin: 0;
+        padding-inline: 12px;
+        font-size: max(16px, var(--mainFontSize));
+        border-radius: 12px;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer .rm_tag_controls {
+        order: 3;
+        max-height: 44px;
+        overflow: hidden;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer .rm_tag_controls .tags {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer .rm_tag_controls .tags::-webkit-scrollbar {
+        display: none;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer .rm_tag_controls .tag {
+        min-width: 44px;
+        min-height: 44px;
+        max-height: 44px;
+        margin: 0;
+        padding-inline: 8px;
+        white-space: nowrap;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #rm_print_characters_pagination {
+        position: sticky;
+        bottom: 0;
+        z-index: 5;
+        display: grid;
+        grid-template-columns: var(--sb-mobile-touch-target, 44px) var(--sb-mobile-touch-target, 44px) minmax(0, 1fr);
+        gap: 6px;
+        align-items: center;
+        order: 4;
+        padding: 6px 0;
+        background: var(--sb-shell-surface);
+        border-top: 1px solid color-mix(in srgb, var(--sb-shell-border) 62%, transparent);
+        border-bottom: 0;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #charListGridToggle {
+        grid-column: 1;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #bulkEditButton {
+        grid-column: 2;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #bulkSelectedCount {
+        grid-column: 3;
+        width: auto !important;
+        max-width: none !important;
+        justify-self: stretch;
+        padding-inline: 8px !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #rm_print_characters_pagination .paginationjs {
+        grid-column: 1 / -1;
+        display: flex;
+        max-height: 44px;
+        overflow: hidden;
+    }
+
+    body.sb-mobile-character-list #right-nav-panel.openDrawer #rm_print_characters_block {
+        order: 3;
+    }
+
+    body.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block,
+    body.charListGrid.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+        padding: 6px 0 14px !important;
+    }
+
+    body.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar),
+    body.charListGrid.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) {
+        --sb-character-list-avatar-size: 48px;
+        display: grid !important;
+        grid-template-columns: var(--sb-character-list-avatar-size) minmax(0, 1fr) !important;
+        gap: 4px 10px !important;
+        align-items: center !important;
+        width: 100% !important;
+        min-height: 62px !important;
+        padding: 7px 8px !important;
+        border-radius: 10px !important;
+    }
+
+    body.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) > :is(.avatar, .missing-avatar),
+    body.charListGrid.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) > :is(.avatar, .missing-avatar) {
+        grid-column: 1 !important;
+        grid-row: 1 / -1 !important;
+        width: var(--sb-character-list-avatar-size) !important;
+        min-width: var(--sb-character-list-avatar-size) !important;
+        max-width: var(--sb-character-list-avatar-size) !important;
+        height: var(--sb-character-list-avatar-size) !important;
+        min-height: var(--sb-character-list-avatar-size) !important;
+        max-height: var(--sb-character-list-avatar-size) !important;
+        flex: 0 0 var(--sb-character-list-avatar-size) !important;
+        margin: 0 !important;
+    }
+
+    body.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) > :is(.character_select_container, .group_select_container),
+    body.charListGrid.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) > :is(.character_select_container, .group_select_container) {
+        grid-column: 2 !important;
+        grid-row: 1 / -1 !important;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: center;
+        gap: 1px;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    body.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block :is(.ch_name, .group_select_counter, .bogus_folder_counter),
+    body.charListGrid.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block :is(.ch_name, .group_select_counter, .bogus_folder_counter) {
+        font-size: calc(var(--mainFontSize) * 0.9) !important;
+        line-height: 1.16 !important;
+        text-align: left !important;
+    }
+
+    body.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block :is(.character_name_block_sub_line, .ch_description, .group_select_block_list),
+    body.charListGrid.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block :is(.character_name_block_sub_line, .ch_description, .group_select_block_list) {
+        max-height: 1.25em;
+        font-size: calc(var(--mainFontSize) * 0.76) !important;
+        line-height: 1.22 !important;
+        opacity: 0.78;
+        text-align: left !important;
+    }
+
+    body.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block .tags_inline,
+    body.charListGrid.sb-mobile-character-list:not(.sb-mobile-character-gallery) #right-nav-panel.openDrawer #rm_print_characters_block .tags_inline {
+        display: none !important;
+    }
+
+    body.sb-mobile-character-list.sb-mobile-character-gallery #right-nav-panel.openDrawer #rm_print_characters_block {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .sb-proxy-button,
     .sb-shell-tab,
