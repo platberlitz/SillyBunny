@@ -305,6 +305,8 @@ import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-
 import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
 
 const DEFERRED_STARTUP_STYLESHEETS = Object.freeze([
+    { href: 'css/bright.min.css', id: 'deferred-highlight-theme-css' },
+    { href: 'css/cropper.min.css', id: 'deferred-cropper-css' },
     { href: 'css/rm-groups.css', id: 'deferred-rm-groups-css' },
     { href: 'css/group-avatars.css', id: 'deferred-group-avatars-css' },
     { href: 'css/macros.css', id: 'deferred-macros-css' },
