@@ -6342,7 +6342,7 @@ function renderServerAdminStatus(data) {
         className: 'text_pole',
         attrs: { style: 'width: 100%; max-width: 200px;' },
     });
-    const currentBranch = repository?.branch || version?.gitBranch || 'Unknown';
+    const currentBranch = repository?.displayBranch || repository?.branch || version?.gitBranch || 'Unknown';
     const currentOption = createElement('option', { attrs: { value: currentBranch, selected: 'selected' } });
     currentOption.textContent = currentBranch;
     branchSelect.appendChild(currentOption);
@@ -6904,7 +6904,7 @@ async function handleServerAdminBranchSwitch(selectElement) {
     }
 
     const targetBranch = selectElement.value;
-    const currentBranch = state.lastStatusData?.repository?.branch || '';
+    const currentBranch = state.lastStatusData?.repository?.displayBranch || state.lastStatusData?.repository?.branch || '';
 
     if (targetBranch === currentBranch) {
         return;
