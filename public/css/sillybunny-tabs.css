@@ -6130,8 +6130,15 @@ body.sb-shell-resizing * {
         padding: 0 !important;
     }
 
-    #user-settings-block.openDrawer #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label[for='extensions_notify_updates'] {
+    #user-settings-block.openDrawer #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label[for='extensions_notify_updates'],
+    #user-settings-block.openDrawer #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > .checkbox_label[for='extensions_notify_updates'] {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        width: 100% !important;
         min-height: 46px !important;
+        padding: 8px 10px !important;
+        box-sizing: border-box !important;
     }
 
     #user-settings-block.openDrawer .sb-shell-close {

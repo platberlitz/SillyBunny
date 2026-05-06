@@ -9683,13 +9683,31 @@ function getMobileExtensionRootLabel(root) {
         return 'Extension settings';
     }
 
-    const labelSource = root.querySelector('.extension_name, .inline-drawer-header, .inline-drawer-toggle, h1, h2, h3, h4, strong, b')
+    const containerLabel = {
+        'extension_settings_GuidedGenerations-Extension': 'Guided Generations',
+        'bpt-settings': 'Bunny Preset Tools',
+        'qig-settings': 'Quick Image Gen',
+        qr_container: 'Quick Reply',
+        translation_container: 'Chat Translation',
+        regex_container: 'Regex',
+        vectors_container: 'Vector Storage',
+        'ChatCompletionTabs-drawer': 'Chat Completion Tabs',
+    }[root.id];
+
+    const normalizedId = root.id
+        .replace(/^extension_settings_/, '')
+        .replace(/[-_]+container$/i, '')
+        .replace(/[-_]+settings$/i, '')
+        .replace(/[-_]+/g, ' ')
+        .trim();
+
+    const labelSource = root.querySelector(':scope > .inline-drawer-header, :scope > .inline-drawer-toggle, :scope > .extension_name, :scope > h1, :scope > h2, :scope > h3, :scope > h4')
         ?? root;
     const label = String(labelSource.textContent ?? '')
         .replace(/\s+/g, ' ')
         .trim();
 
-    return clampText(label || root.id.replace(/[-_]+/g, ' ') || 'Extension settings', 48);
+    return clampText(containerLabel || normalizedId || label || 'Extension settings', 48);
 }
 
 function getMobileExtensionDirectRoots() {
@@ -9794,6 +9812,23 @@ function ensureMobileExtensionSummaries() {
     }
 }
 
+function resetMobileExtensionSummaries() {
+    for (const summary of document.querySelectorAll('#extensions_settings > .sb-mobile-extension-summary, #extensions_settings2 > .sb-mobile-extension-summary')) {
+        summary.remove();
+    }
+
+    for (const root of getMobileExtensionDirectRoots()) {
+        root.hidden = false;
+        root.removeAttribute('aria-hidden');
+        root.classList.remove('sb-mobile-extension-direct-root');
+        delete root.dataset.sbMobileExtensionExpanded;
+
+        if ('inert' in root) {
+            root.inert = false;
+        }
+    }
+}
+
 function bindInlineDrawerPersistence(root = document) {
     for (const drawer of getInlineDrawers(root)) {
         if (!(drawer instanceof HTMLElement) || !shouldPersistInlineDrawer(drawer)) {
@@ -9876,21 +9911,12 @@ function applyDefaultDrawerStates() {
 }
 
 function syncMobileExtensionDrawerState() {
-    ensureMobileExtensionSummaries();
-
     if (!isMobileViewport()) {
-        for (const root of getMobileExtensionDirectRoots()) {
-            root.hidden = false;
-            root.removeAttribute('aria-hidden');
-            delete root.dataset.sbMobileExtensionExpanded;
-
-            if ('inert' in root) {
-                root.inert = false;
-            }
-        }
-
+        resetMobileExtensionSummaries();
         return;
     }
+
+    ensureMobileExtensionSummaries();
 
     for (const drawer of getInlineDrawers(document.getElementById('rm_extensions_block') ?? document)) {
         if (isExtensionSettingsDrawer(drawer)) {
