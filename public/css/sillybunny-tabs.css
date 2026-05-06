@@ -5977,6 +5977,169 @@ body.sb-shell-resizing * {
     }
 }
 
+/* SillyBunny mobile settings/extensions forms: keep dense extension UIs touch-safe. */
+@media screen and (max-width: 1000px) {
+    #user-settings-block.openDrawer #rm_extensions_block {
+        min-height: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .extensions_block {
+        gap: 10px !important;
+    }
+
+    #user-settings-block.openDrawer #extensions_settings,
+    #user-settings-block.openDrawer #extensions_settings2 {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .extension_container {
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .sb-mobile-extension-summary {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 10px !important;
+        width: 100% !important;
+        min-height: 48px !important;
+        margin: 0 !important;
+        padding: 10px 12px !important;
+        border-radius: 12px !important;
+        border: 1px solid color-mix(in srgb, var(--sb-shell-border) 74%, transparent) !important;
+        background: color-mix(in srgb, var(--SmartThemeBodyColor) 5%, transparent) !important;
+        color: var(--SmartThemeBodyColor) !important;
+        box-sizing: border-box !important;
+        text-align: left !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .sb-mobile-extension-summary-label {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 700;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .sb-mobile-extension-summary i {
+        flex: 0 0 auto;
+        transition: transform 160ms ease;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .sb-mobile-extension-summary.is-expanded i {
+        transform: rotate(180deg);
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .sb-mobile-extension-direct-root[hidden] {
+        display: none !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .inline-drawer {
+        border-radius: 12px !important;
+        overflow: hidden !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .inline-drawer-toggle,
+    #user-settings-block.openDrawer #rm_extensions_block .inline-drawer-header {
+        min-height: 48px !important;
+        margin: 0 !important;
+        padding: 10px 12px !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .inline-drawer-content {
+        padding: 10px !important;
+        overflow: hidden !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block :is(button, .menu_button, .menu_button_icon, input[type='button'], input[type='submit'], input[type='reset'], select, textarea),
+    #user-settings-block.openDrawer #rm_extensions_block input:not([type='checkbox']):not([type='radio']) {
+        min-height: 46px !important;
+        height: auto !important;
+        max-height: none !important;
+        box-sizing: border-box !important;
+        font-size: max(16px, var(--mainFontSize)) !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+        width: 100% !important;
+        min-width: 0 !important;
+        padding: 10px 12px !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block :is(input[type='checkbox'], input[type='radio']) {
+        width: 22px !important;
+        min-width: 22px !important;
+        height: 22px !important;
+        min-height: 22px !important;
+        margin: 0 !important;
+        flex: 0 0 22px !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block label {
+        min-width: 0 !important;
+        line-height: 1.35 !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block label:has(input[type='checkbox']),
+    #user-settings-block.openDrawer #rm_extensions_block label:has(input[type='radio']),
+    #user-settings-block.openDrawer #rm_extensions_block .checkbox_label,
+    #user-settings-block.openDrawer #rm_extensions_block .qig-row:has(input[type='checkbox']),
+    #user-settings-block.openDrawer #rm_extensions_block .qig-row:has(input[type='radio']) {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        width: 100% !important;
+        min-height: 46px !important;
+        margin: 0 !important;
+        padding: 8px 10px !important;
+        border-radius: 10px !important;
+        box-sizing: border-box !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .qig-row {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 96px), 1fr)) !important;
+        gap: 8px !important;
+        align-items: end !important;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .qig-row > * {
+        min-width: 0 !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block #qig-profile-del {
+        width: 46px !important;
+        min-width: 46px !important;
+        min-height: 46px !important;
+        padding: 0 !important;
+    }
+
+    #user-settings-block.openDrawer #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label[for='extensions_notify_updates'] {
+        min-height: 46px !important;
+    }
+
+    #user-settings-block.openDrawer .sb-shell-close {
+        width: 44px !important;
+        min-width: 44px !important;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .sb-proxy-button,
     .sb-shell-tab,
