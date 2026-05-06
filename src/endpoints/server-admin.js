@@ -7,9 +7,17 @@ import express from 'express';
 import yaml from 'yaml';
 import { sync as writeFileAtomicSync } from 'write-file-atomic';
 import { sync as commandExistsSync } from 'command-exists';
-import { CheckRepoActions, default as simpleGit } from 'simple-git';
+import simpleGit from 'simple-git';
 
 import { APP_NAME, formatRuntimeLabel, isBunRuntime, isNativeTermuxEnvironment } from '../runtime.js';
+import {
+    getBranchDisplayNames,
+    getRemoteBranchesFromSummary,
+    getStatusDisplayBranch,
+    isRuntimeBranch,
+    isGitRepository,
+    resolveRemoteBranchName,
+} from '../server-admin-git.js';
 import { getServerLogSnapshot } from '../server-log-buffer.js';
 import { serverDirectory } from '../server-directory.js';
 import { requireAdminMiddleware } from '../users.js';
@@ -415,6 +423,7 @@ async function getRepositoryStatus() {
         trackingBranch: '',
         currentCommit: '',
         remoteCommit: '',
+        displayBranch: '',
         ahead: 0,
         behind: 0,
         hasLocalChanges: false,
@@ -432,7 +441,7 @@ async function getRepositoryStatus() {
     status.supported = true;
 
     const git = simpleGit({ baseDir: serverDirectory, ...GIT_OPTIONS });
-    const isRepo = await git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT).catch(() => false);
+    const isRepo = await isGitRepository(git);
 
     if (!isRepo) {
         status.message = 'This install is not running from a Git repository.';
@@ -454,6 +463,7 @@ async function getRepositoryStatus() {
 
     const trackingBranch = toTrimmedString(await git.revparse(['--abbrev-ref', '@{u}']).catch(() => ''));
     status.trackingBranch = trackingBranch;
+    status.displayBranch = getStatusDisplayBranch(status.branch, trackingBranch);
 
     if (!trackingBranch) {
         status.message = 'This branch is not tracking an upstream remote.';
@@ -840,7 +850,7 @@ router.post('/branches', requireAdminMiddleware, async (_request, response) => {
         }
 
         const git = simpleGit({ baseDir: serverDirectory, ...GIT_OPTIONS });
-        const isRepo = await git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT).catch(() => false);
+        const isRepo = await isGitRepository(git);
 
         if (!isRepo) {
             return response.status(400).json({ error: 'This install is not running from a Git repository.' });
@@ -848,16 +858,17 @@ router.post('/branches', requireAdminMiddleware, async (_request, response) => {
 
         // Get current branch
         const currentBranch = toTrimmedString(await git.revparse(['--abbrev-ref', 'HEAD']).catch(() => ''));
+        const trackingBranch = toTrimmedString(await git.revparse(['--abbrev-ref', '@{u}']).catch(() => ''));
+        const displayBranch = getStatusDisplayBranch(currentBranch, trackingBranch);
 
         // Get all remote branches
+        await git.fetch(['--all', '--prune']);
         const branchSummary = await git.branch(['-r']);
-        const branches = Object.keys(branchSummary.branches)
-            .filter(branch => !branch.includes('HEAD'))
-            .map(branch => branch.replace(/^origin\//, ''))
-            .filter((branch, index, self) => self.indexOf(branch) === index); // Remove duplicates
+        const branches = getBranchDisplayNames(getRemoteBranchesFromSummary(branchSummary));
 
         response.json({
             currentBranch,
+            displayBranch,
             branches,
         });
     } catch (error) {
@@ -880,7 +891,7 @@ router.post('/switch-branch', requireAdminMiddleware, async (request, response) 
         }
 
         const git = simpleGit({ baseDir: serverDirectory, ...GIT_OPTIONS });
-        const isRepo = await git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT).catch(() => false);
+        const isRepo = await isGitRepository(git);
 
         if (!isRepo) {
             return response.status(400).json({ error: 'This install is not running from a Git repository.' });
@@ -903,8 +914,18 @@ router.post('/switch-branch', requireAdminMiddleware, async (request, response) 
             await git.stash(['push', '-u', '-m', `Auto-stash before switching to ${branch}`]);
         }
 
-        // Switch branch
-        await git.checkout(branch);
+        await git.fetch(['--all', '--prune']);
+        const branchSummary = await git.branch(['-r']);
+        const remoteBranches = getRemoteBranchesFromSummary(branchSummary);
+        const remoteBranch = resolveRemoteBranchName(remoteBranches, branch);
+        const currentBranch = toTrimmedString(await git.revparse(['--abbrev-ref', 'HEAD']).catch(() => ''));
+
+        if (remoteBranch && isRuntimeBranch(currentBranch)) {
+            await git.raw(['checkout', '-B', currentBranch, remoteBranch]);
+            await git.raw(['branch', `--set-upstream-to=${remoteBranch}`, currentBranch]);
+        } else {
+            await git.checkout(branch);
+        }
 
         // Try to pop stash if we stashed
         let stashRestored = false;
