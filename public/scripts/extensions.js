@@ -72,7 +72,7 @@ const extensionLoadErrors = new Set();
 
 // SillyBunny: extensions append settings UI into shared columns; keep that surface resilient.
 const extensionSettingsHostIds = ['extensions_settings', 'extensions_settings2'];
-const ignoredExtensionSettingsSelectors = [];
+const ignoredExtensionSettingsSelectors = ['.sb-mobile-extension-summary'];
 const ignoredExtensionSettingsSelector = ignoredExtensionSettingsSelectors.join(', ');
 const LEGACY_MOONLIT_ECHOES_SETTINGS_KEY = 'SillyTavernMoonlitEchoesTheme';
 const SILLYBUNNY_MOONLIT_ECHOES_EXTENSION_NAME = 'third-party/SillyBunny-MoonlitEchoesTheme';
