@@ -529,6 +529,10 @@ const sbState = {
     mobileNav: {
         lastOpenedAt: 0,
     },
+    mobileCharacterList: {
+        gallery: false,
+        toggleBound: false,
+    },
     chatbar: {
         desktop: null,
         sidebar: null,
@@ -4675,6 +4679,46 @@ function isCharacterPanelOpen() {
     return isDrawerActuallyOpen('right-nav-panel');
 }
 
+function syncMobileCharacterListMode() {
+    const panel = document.getElementById('right-nav-panel');
+    const toggle = document.getElementById('charListGridToggle');
+    const shouldUseMobileList = isMobileViewport()
+        && panel instanceof HTMLElement
+        && panel.classList.contains('openDrawer');
+    const isGallery = shouldUseMobileList && sbState.mobileCharacterList.gallery;
+
+    document.body?.classList.toggle('sb-mobile-character-list', shouldUseMobileList);
+    document.body?.classList.toggle('sb-mobile-character-gallery', isGallery);
+
+    if (toggle instanceof HTMLElement) {
+        toggle.setAttribute('aria-pressed', String(isGallery));
+        toggle.title = isGallery ? 'Use compact character list' : 'Use character gallery';
+        toggle.dataset.i18n = isGallery ? '[title]Use compact character list' : '[title]Use character gallery';
+        toggle.classList.toggle('fa-table-cells-large', !isGallery);
+        toggle.classList.toggle('fa-list-ul', isGallery);
+    }
+}
+
+function bindMobileCharacterListModeToggle() {
+    if (sbState.mobileCharacterList.toggleBound) {
+        return;
+    }
+
+    document.addEventListener('click', event => {
+        const toggle = event.target instanceof Element ? event.target.closest('#charListGridToggle') : null;
+        if (!(toggle instanceof HTMLElement) || !isMobileViewport()) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        sbState.mobileCharacterList.gallery = !sbState.mobileCharacterList.gallery;
+        syncMobileCharacterListMode();
+    }, true);
+
+    sbState.mobileCharacterList.toggleBound = true;
+}
+
 function hasActiveCharacterChat(context = getSillyTavernContext()) {
     if (context?.groupId) {
         return true;
@@ -4766,6 +4810,7 @@ function closeCharacterPanel() {
 
     syncChatbarVisibilityState();
     queueMobileModalStateSync();
+    syncMobileCharacterListMode();
 }
 
 function ensureCharacterResizeHandle() {
@@ -4832,6 +4877,7 @@ function toggleCharacterPanel() {
         syncChatbarVisibilityState();
         syncDesktopShellSizing();
         queueMobileModalStateSync();
+        syncMobileCharacterListMode();
     });
 }
 
@@ -8926,11 +8972,13 @@ function buildShell(shellKey) {
             dispatchShellTabActivated(shellKey, activeTab);
             updateNavScrollIndicators();
             queueMobileModalStateSync();
+            syncMobileCharacterListMode();
             return;
         }
 
         shellState.tabs.get(shellState.activeTabId)?.onDeactivate?.();
         queueMobileModalStateSync();
+        syncMobileCharacterListMode();
     }).observe(shellRoot, { attributes: true, attributeFilter: ['class'] });
 
     const basePanel = createShellPanel(shellConfig.baseTab);
@@ -9713,6 +9761,7 @@ function syncMobileViewportState() {
     updateTopBarBrand();
     scheduleTopbarContextRefresh(0);
     syncMobileModalState();
+    syncMobileCharacterListMode();
 }
 
 function reinitSelect2AfterShell() {
@@ -10337,6 +10386,7 @@ function initAll() {
     buildMobileNav();
     buildMobileChatTools();
     injectCharacterDrawerControls();
+    bindMobileCharacterListModeToggle();
     bindCharacterEditorExitButton();
     setShellTheme(sbState.theme, { persist: false });
     setFrontendIconPreference(sbState.frontendIcon, { persist: false });
