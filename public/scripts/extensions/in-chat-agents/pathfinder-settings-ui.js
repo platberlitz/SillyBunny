@@ -15,6 +15,7 @@ import {
 import {
     setLorebookEnabled,
     listConnectionProfiles,
+    normalizeAutoSummaryInterval,
 } from './pathfinder/tree-store.js';
 import { buildTreeFromMetadata } from './pathfinder/tree-builder.js';
 import { syncToolAgentRegistrations } from './agent-runner.js';
@@ -22,6 +23,9 @@ import { getPrompt, savePrompt } from './pathfinder/prompts/prompt-store.js';
 import { getDefaultPrompts } from './pathfinder/prompts/default-prompts.js';
 import { clearFeed, getFeedItems } from './pathfinder/activity-feed.js';
 import { getSummaryMemoryState, onSummaryMemoryChanged, saveSummaryMemoryContent } from './pathfinder/summary-memory-store.js';
+import { sidecarGenerate } from './pathfinder/llm-sidecar.js';
+import { createSummaryMemoryEntry } from './pathfinder/tools/summarize.js';
+import { getContextualLorebookDetails } from './pathfinder/pathfinder-tool-bridge.js';
 
 const MODULE_NAME = 'in-chat-agents';
 const PATHFINDER_LOG_PREFIX = '[Pathfinder]';
@@ -45,8 +49,12 @@ function ensureEnabledLorebooks(settings) {
     return settings.enabledLorebooks;
 }
 
+export function normalizeSummaryIntervalInput(value) {
+    return normalizeAutoSummaryInterval(value);
+}
+
 function formatLorebookSourceLabel(sourceTypes) {
-    const orderedTypes = ['character', 'chat', 'global'];
+    const orderedTypes = ['character', 'group', 'chat', 'persona', 'attached', 'global'];
     const labels = orderedTypes.filter(type => sourceTypes.has(type));
     return labels.join(', ') || 'global';
 }
@@ -69,7 +77,7 @@ function upsertLorebook(lorebooksByName, name, data = {}) {
 
     if (data.type) {
         book.sourceTypes.add(data.type);
-        if (data.type === 'character' || data.type === 'chat') {
+        if (data.type !== 'global') {
             book.attached = true;
         }
     }
@@ -202,19 +210,23 @@ async function getAvailableLorebooks() {
         }
     }
 
-    // Get character lorebook if available
-    if (ctx.characters && ctx.characterId !== undefined) {
-        const char = ctx.characters[ctx.characterId];
-        if (char?.data?.extensions?.world) {
-            const charBook = char.data.extensions.world;
-            upsertLorebook(lorebooksByName, charBook, { type: 'character' });
+    for (const source of getContextualLorebookDetails()) {
+        upsertLorebook(lorebooksByName, source.name, { type: source.type || 'attached' });
+        const book = lorebooksByName.get(source.name);
+        if (book && Array.isArray(source.types)) {
+            for (const type of source.types) {
+                book.sourceTypes.add(type);
+            }
         }
-    }
 
-    // Also check chat-attached lorebooks
-    if (ctx.chat_metadata?.world_info) {
-        const chatBook = ctx.chat_metadata.world_info;
-        upsertLorebook(lorebooksByName, chatBook, { type: 'chat' });
+        if (book?.entries === '?') {
+            try {
+                const bookData = await loadWorldInfo(source.name);
+                book.entries = bookData?.entries ? Object.keys(bookData.entries).length : '?';
+            } catch {
+                // Keep unknown count for contextual books that are not importable as standalone lorebooks.
+            }
+        }
     }
 
     const lorebooks = Array.from(lorebooksByName.values()).map(book => ({
@@ -330,6 +342,10 @@ function setPathfinderToolEnabled(toolName, enabled) {
 }
 
 function isPathfinderToolEnabled(toolName) {
+    if (!Array.isArray(currentAgent?.tools)) {
+        return false;
+    }
+
     const tool = currentAgent?.tools?.find(t => t.name === toolName);
     return tool?.enabled !== false;
 }
@@ -360,7 +376,7 @@ function loadSettingsIntoUI() {
     settingsEl.find('#pf--mandatory-tools').prop('checked', s.mandatoryTools || false);
     settingsEl.find('#pf--auto-use-attached').prop('checked', s.autoUseAttachedLorebook || false);
     settingsEl.find('#pf--auto-summary').prop('checked', s.autoSummary || false);
-    settingsEl.find('#pf--auto-summary-interval').val(s.autoSummaryInterval || 20);
+    settingsEl.find('#pf--auto-summary-interval').val(s.autoSummaryInterval ?? 20);
 
     settingsEl.find('#pf--enable-summarize-tool').prop('checked', isPathfinderToolEnabled('Pathfinder_Summarize'));
 
@@ -426,6 +442,7 @@ function renderSummaryMemoryEditor() {
 
     textarea.prop('disabled', !hasSummary);
     settingsEl.find('#pf--summary-save').prop('disabled', !hasSummary);
+    settingsEl.find('#pf--summary-create').toggle(!hasSummary).prop('disabled', hasSummary);
 
     indicator.removeClass('pf--summary-indicator-missing pf--summary-indicator-not-injected pf--summary-indicator-injected');
     if (!hasSummary) {
@@ -446,6 +463,88 @@ function renderSummaryMemoryEditor() {
     const updated = summary.updatedAt ? `Updated ${formatSummaryTimestamp(summary.updatedAt)}` : 'Not saved yet';
     const injected = summary.injectedAt ? `Last injected ${formatSummaryTimestamp(summary.injectedAt)}${summary.injectedMode ? ` via ${summary.injectedMode}` : ''}` : 'Not injected by retrieval yet';
     meta.text(`${title} — ${location}. ${updated}. ${injected}.`);
+}
+
+function getRecentChatForSummary(maxMessages = 24) {
+    const ctx = getContext();
+    const messages = Array.isArray(ctx?.chat) ? ctx.chat : [];
+
+    return messages
+        .filter(message => message && !message.is_system && String(message.mes ?? '').trim())
+        .slice(-maxMessages)
+        .map(message => {
+            const name = message.is_user ? 'User' : (String(message.name ?? '').trim() || 'Assistant');
+            return `${name}: ${String(message.mes ?? '').trim()}`;
+        })
+        .join('\n\n');
+}
+
+function extractJsonObject(text) {
+    const raw = String(text ?? '').trim();
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(raw);
+    } catch {
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) {
+            return null;
+        }
+
+        try {
+            return JSON.parse(match[0]);
+        } catch {
+            return null;
+        }
+    }
+}
+
+function parseGeneratedSummary(rawSummary) {
+    const parsed = extractJsonObject(rawSummary);
+    if (parsed && typeof parsed === 'object') {
+        return {
+            title: String(parsed.title || 'Recent scene summary').trim(),
+            content: String(parsed.content || '').trim(),
+            significance: String(parsed.significance || 'medium').trim().toLowerCase(),
+            arc: String(parsed.arc || '').trim(),
+        };
+    }
+
+    return {
+        title: 'Recent scene summary',
+        content: String(rawSummary || '').trim(),
+        significance: 'medium',
+        arc: '',
+    };
+}
+
+async function createManualSummaryMemory() {
+    const recentChat = getRecentChatForSummary();
+    if (!recentChat) {
+        throw new Error('No recent chat messages are available to summarize.');
+    }
+
+    const prompt = `Summarize the recent roleplay/chat into durable Pathfinder memory.
+
+Return only a compact JSON object with this shape:
+{"title":"short event title","content":"5-8 sentence useful memory summary","significance":"low|medium|high|critical","arc":"optional arc name"}
+
+Recent chat:
+${recentChat}`;
+
+    const rawSummary = await sidecarGenerate(
+        prompt,
+        'You create concise long-term memory summaries for creative roleplay. Preserve names, changed state, unresolved threads, and why the scene matters. Return valid JSON only.',
+    );
+    const summary = parseGeneratedSummary(rawSummary);
+
+    if (!summary.content) {
+        throw new Error('The sidecar model returned an empty summary.');
+    }
+
+    return await createSummaryMemoryEntry(summary);
 }
 
 /**
@@ -585,7 +684,7 @@ function bindEvents() {
 
     settingsEl.find('#pf--auto-summary-interval').on('change', function () {
         const s = getPathfinderSettings();
-        s.autoSummaryInterval = Math.max(2, Math.min(200, parseInt($(this).val()) || 20));
+        s.autoSummaryInterval = normalizeSummaryIntervalInput($(this).val());
         setPathfinderSettings(s);
         logPathfinder('Auto summary interval changed.', { autoSummaryInterval: s.autoSummaryInterval });
         updateAgentSettings();
@@ -599,6 +698,27 @@ function bindEvents() {
             setTimeout(() => status.text(''), 3000);
         } catch (err) {
             status.text(`Save failed: ${err.message}`).removeClass('success').addClass('error');
+        }
+    });
+
+    settingsEl.find('#pf--summary-create').on('click', async () => {
+        const status = settingsEl.find('#pf--summary-save-status');
+        const button = settingsEl.find('#pf--summary-create');
+        button.prop('disabled', true);
+        status.text('Creating summary...').removeClass('success error');
+
+        try {
+            const result = await createManualSummaryMemory();
+            setPathfinderToolEnabled('Pathfinder_Summarize', true);
+            settingsEl.find('#pf--enable-summarize-tool').prop('checked', true);
+            await updateAgentSettings();
+            syncToolAgentRegistrations();
+            renderSummaryMemoryEditor();
+            status.text(`Created UID ${result.uid}`).removeClass('error').addClass('success');
+            setTimeout(() => status.text(''), 3000);
+        } catch (err) {
+            button.prop('disabled', false);
+            status.text(`Create failed: ${err.message}`).removeClass('success').addClass('error');
         }
     });
 

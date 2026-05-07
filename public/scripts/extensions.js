@@ -3,12 +3,13 @@ import { DOMPurify, Popper } from '../lib.js';
 import { eventSource, event_types, saveSettings, saveSettingsDebounced, getRequestHeaders, animation_duration, CLIENT_VERSION } from '../script.js';
 import { POPUP_RESULT, POPUP_TYPE, Popup, callGenericPopup } from './popup.js';
 import { renderTemplate, renderTemplateAsync } from './templates.js';
-import { delay, equalsIgnoreCaseAndAccents, isSubsetOf, sanitizeSelector, setValueByPath, versionCompare } from './utils.js';
+import { delay, deleteValueByPath, equalsIgnoreCaseAndAccents, escapeHtml, isSubsetOf, sanitizeSelector, setValueByPath, versionCompare } from './utils.js';
 import { isAdmin } from './user.js';
 import { addLocaleData, getCurrentLocale, t } from './i18n.js';
 import { debounce_timeout } from './constants.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { SimpleMutex } from './util/SimpleMutex.js';
+import { loadStylesheetAsync, prefetchAsset } from './dynamic-styles.js';
 
 export {
     getApiUrl,
@@ -106,6 +107,7 @@ const getApiUrl = () => extension_settings.apiUrl;
 const sortManifestsByOrder = (a, b) => parseInt(a.loading_order) - parseInt(b.loading_order) || String(a.display_name).localeCompare(String(b.display_name));
 const sortManifestsByName = (a, b) => String(a.display_name).localeCompare(String(b.display_name)) || parseInt(a.loading_order) - parseInt(b.loading_order);
 let connectedToApi = false;
+let extensionPrefetchToken = 0;
 
 /**
  * Holds manifest data for each extension.
@@ -117,6 +119,52 @@ let manifests = {};
  * Default URL for the Extras API.
  */
 const defaultUrl = 'http://localhost:5100';
+const extensionSecondaryPrefetchAssets = Object.freeze({
+    gallery: [
+        { path: 'nanogallery2.woff.min.css', as: 'style' },
+        { path: 'jquery.nanogallery2.min.js', as: 'script' },
+    ],
+    tts: [
+        { path: 'kokoro-worker.js', as: 'script' },
+        { path: 'lib/kokoro.web.js', as: 'script' },
+    ],
+});
+
+/**
+ * Checks if the extension is officially supported by its URL pattern.
+ * @param {string} url URL to check
+ * @returns {boolean} True if the URL matches the official pattern
+ */
+export const EMPTY_AUTHOR = Object.freeze({
+    name: '',
+    url: '',
+});
+
+export function getAuthorFromUrl(url) {
+    const result = structuredClone(EMPTY_AUTHOR);
+
+    try {
+        const parsedUrl = new URL(url);
+        const pathSegments = parsedUrl.pathname.split('/').filter(s => s.length > 0);
+
+        if (parsedUrl.host === 'github.com' && pathSegments.length >= 2) {
+            result.name = pathSegments[0];
+            result.url = `${parsedUrl.protocol}//${parsedUrl.hostname}/${result.name}`;
+        }
+    } catch (error) {
+        console.debug('Error parsing URL:', error);
+    }
+
+    return result;
+}
+
+export const isOfficialExtension = (url) => {
+    try {
+        return /^https:\/\/github\.com\/SillyTavern\/(.+)$/i.test(new URL(url).href);
+    } catch {
+        return false;
+    }
+};
 
 let requiresReload = false;
 let stateChanged = false;
@@ -128,6 +176,55 @@ function getExtensionAssetVersion() {
 
 function getExtensionAssetUrl(name, assetPath) {
     return `/scripts/extensions/${name}/${assetPath}?v=${getExtensionAssetVersion()}`;
+}
+
+function scheduleIdleTask(callback, timeout = 4000) {
+    if ('requestIdleCallback' in window) {
+        return window.requestIdleCallback(callback, { timeout });
+    }
+
+    return window.setTimeout(callback, Math.min(timeout, 1000));
+}
+
+function prefetchExtensionAsset(name, assetPath, as) {
+    if (!assetPath) {
+        return;
+    }
+
+    try {
+        prefetchAsset(getExtensionAssetUrl(name, assetPath), { as });
+    } catch (error) {
+        console.debug('Could not prefetch extension asset', name, assetPath, error);
+    }
+}
+
+function scheduleExtensionAssetPrefetch() {
+    const connection = navigator.connection;
+    if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) {
+        return;
+    }
+
+    const token = ++extensionPrefetchToken;
+
+    scheduleIdleTask(() => {
+        if (token !== extensionPrefetchToken) {
+            return;
+        }
+
+        for (const [name, manifest] of Object.entries(manifests)) {
+            if (extension_settings.disabledExtensions.includes(name)) {
+                continue;
+            }
+
+            prefetchExtensionAsset(name, manifest.js, 'script');
+            prefetchExtensionAsset(name, manifest.css, 'style');
+
+            const secondaryAssets = extensionSecondaryPrefetchAssets[name] ?? [];
+            for (const asset of secondaryAssets) {
+                prefetchExtensionAsset(name, asset.path, asset.as);
+            }
+        }
+    });
 }
 
 export function cancelDebouncedMetadataSave() {
@@ -450,6 +547,15 @@ function getExtensionHomePage(manifest) {
     }
 }
 
+function getFullExtensionName(extensionName) {
+    return String(extensionName || '').startsWith('third-party') ? extensionName : `third-party${extensionName}`;
+}
+
+function hasExtensionHook(extensionName, hookName) {
+    const manifest = manifests[getFullExtensionName(extensionName)];
+    return !!manifest?.hooks && Object.hasOwn(manifest.hooks, hookName);
+}
+
 /**
  * Gets the type of an extension based on its external ID.
  * @param {string} externalId External ID of the extension (excluding or including the leading 'third-party/')
@@ -581,7 +687,7 @@ function onToggleAllExtensions(extensionsToToggle, toggleContainer) {
  * Hooks are optional function names exported from the extension's JS entry point module.
  * The hook function can optionally return a Promise that will be awaited.
  * @param {string} name Extension name
- * @param {'install' | 'update' | 'delete' | 'enable' | 'disable' | 'activate'} hookName The hook to call
+ * @param {'install' | 'update' | 'delete' | 'enable' | 'disable' | 'activate' | 'clean'} hookName The hook to call
  * @returns {Promise<void>}
  */
 async function callExtensionHook(name, hookName) {
@@ -693,6 +799,20 @@ export function findExtension(name) {
     if (!internalExtensionName) return null;
     const isEnabled = !extension_settings.disabledExtensions.includes(internalExtensionName);
     return { name: internalExtensionName, enabled: isEnabled };
+}
+
+/**
+ * Returns a deep clone of an extension manifest by short or full name.
+ * @param {string} name Extension name, with or without the third-party prefix
+ * @returns {object|null} Cloned manifest, or null if not found
+ */
+export function getExtensionManifest(name) {
+    const internalExtensionName = extensionNames.find(extName => {
+        return equalsIgnoreCaseAndAccents(extName, name) || equalsIgnoreCaseAndAccents(extName, `third-party/${name}`);
+    });
+
+    const manifest = internalExtensionName ? manifests[internalExtensionName] : null;
+    return manifest ? structuredClone(manifest) : null;
 }
 
 function getNormalizedSettingsText(value) {
@@ -1125,25 +1245,10 @@ function addExtensionStyle(name, manifest) {
         return Promise.resolve();
     }
 
-    return new Promise((resolve, reject) => {
-        const url = getExtensionAssetUrl(name, manifest.css);
-        const id = sanitizeSelector(`${name}-css`);
+    const url = getExtensionAssetUrl(name, manifest.css);
+    const id = sanitizeSelector(`${name}-css`);
 
-        if ($(`link[id="${id}"]`).length === 0) {
-            const link = document.createElement('link');
-            link.id = id;
-            link.rel = 'stylesheet';
-            link.type = 'text/css';
-            link.href = url;
-            link.onload = function () {
-                resolve();
-            };
-            link.onerror = function (e) {
-                reject(e);
-            };
-            document.head.appendChild(link);
-        }
-    });
+    return loadStylesheetAsync(url, { id }).then(() => undefined);
 }
 
 /**
@@ -1262,6 +1367,7 @@ function generateExtensionHtml(name, manifest, isActive, isDisabled, isExternal,
         `<input type="checkbox" title="Cannot enable extension" data-name="${name}" class="extension_missing ${checkboxClass}" disabled>`;
 
     let deleteButton = isExternal ? `<button class="btn_delete menu_button" data-name="${externalId}" data-i18n="[title]Delete" title="Delete"><i class="fa-fw fa-solid fa-trash-can"></i></button>` : '';
+    let cleanButton = isExternal && hasExtensionHook(externalId, 'clean') ? `<button class="btn_clean menu_button" data-name="${externalId}" data-i18n="[title]Clean extension data" title="Clean extension data"><i class="fa-fw fa-solid fa-broom"></i></button>` : '';
     let reinstallButton = isExternal ? `<button class="btn_reinstall menu_button" data-name="${externalId}" data-i18n="[title]Reinstall" title="Reinstall"><i class="fa-fw fa-solid fa-rotate-right"></i></button>` : '';
     let updateButton = isExternal ? `<button class="btn_update menu_button displayNone" data-name="${externalId}" title="Update available"><i class="fa-solid fa-download fa-fw"></i></button>` : '';
     let moveButton = isExternal && isUserAdmin ? `<button class="btn_move menu_button" data-name="${externalId}" data-i18n="[title]Move" title="Move"><i class="fa-solid fa-folder-tree fa-fw"></i></button>` : '';
@@ -1308,6 +1414,7 @@ function generateExtensionHtml(name, manifest, isActive, isDisabled, isExternal,
                 ${updateButton}
                 ${branchButton}
                 ${moveButton}
+                ${cleanButton}
                 ${reinstallButton}
                 ${deleteButton}
             </div>
@@ -1651,6 +1758,7 @@ async function updateExtension(extensionName, quiet, timeout = null) {
  * This function makes a POST request to '/api/extensions/delete' with the extension's name.
  * If the extension is deleted, it displays a success message.
  * Creates a popup for the user to confirm before delete.
+ * If the extension has a clean hook, the user can optionally run it before delete.
  */
 async function onDeleteClick() {
     const extensionName = $(this).data('name');
@@ -1661,11 +1769,46 @@ async function onDeleteClick() {
         return;
     }
 
-    // use callPopup to create a popup for the user to confirm before delete
-    const confirmation = await callGenericPopup(t`Are you sure you want to delete ${extensionName}?`, POPUP_TYPE.CONFIRM, '', {});
+    const hasCleanHook = hasExtensionHook(extensionName, 'clean');
+    const customInputs = hasCleanHook ? [{
+        id: 'extension_delete_cleanup',
+        label: t`Also clean up extension data`,
+        type: 'checkbox',
+        defaultState: false,
+    }] : [];
+    const popup = new Popup(t`Are you sure you want to delete ${escapeHtml(extensionName)}?`, POPUP_TYPE.CONFIRM, '', { customInputs });
+    const confirmation = await popup.show();
     if (confirmation === POPUP_RESULT.AFFIRMATIVE) {
-        await deleteExtension(extensionName);
+        const shouldClean = hasCleanHook && Boolean(popup.inputResults?.get('extension_delete_cleanup'));
+        await deleteExtension(extensionName, shouldClean);
     }
+}
+
+/**
+ * Handles the click event for the clean button of an extension.
+ */
+async function onCleanClick() {
+    const extensionName = $(this).data('name');
+
+    const confirmation = await Popup.show.confirm(t`Clean extension data`, t`Are you sure you want to clean up data for ${escapeHtml(extensionName)}? This action cannot be undone.`);
+    if (!confirmation) {
+        return;
+    }
+
+    await cleanExtension(extensionName);
+}
+
+/**
+ * Runs an extension clean hook.
+ * @param {string} extensionName Extension name
+ * @returns {Promise<void>}
+ */
+async function cleanExtension(extensionName) {
+    const fullExtensionName = getFullExtensionName(extensionName);
+    await callExtensionHook(fullExtensionName, 'clean');
+    await saveSettings();
+    toastr.success(t`Extension ${extensionName} data cleaned`);
+    delay(1000).then(() => location.reload());
 }
 
 async function onReinstallClick() {
@@ -1835,9 +1978,15 @@ async function moveExtension(extensionName, source, destination) {
 /**
  * Deletes an extension via the API.
  * @param {string} extensionName Extension name to delete
+ * @param {boolean} [shouldClean=false] Whether to also run the clean hook before deleting
  */
-export async function deleteExtension(extensionName) {
-    await callExtensionHook(extensionName, 'delete');
+export async function deleteExtension(extensionName, shouldClean = false) {
+    const fullExtensionName = getFullExtensionName(extensionName);
+    if (shouldClean) {
+        await callExtensionHook(fullExtensionName, 'clean');
+    }
+
+    await callExtensionHook(fullExtensionName, 'delete');
 
     try {
         await fetch('/api/extensions/delete', {
@@ -1852,6 +2001,7 @@ export async function deleteExtension(extensionName) {
         console.error('Error:', error);
     }
 
+    await saveSettings();
     toastr.success(t`Extension ${extensionName} deleted`);
     delay(1000).then(() => location.reload());
 }
@@ -1961,6 +2111,48 @@ async function switchExtensionBranch(extensionName, isGlobal, branch) {
  * @returns {Promise<void>}
  */
 export async function installExtension(url, global, branch = '') {
+    try {
+        const parsedUrl = new URL(url);
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+            throw new Error('Invalid URL protocol');
+        }
+        url = parsedUrl.href;
+    } catch (error) {
+        console.error('Invalid URL:', error);
+        toastr.error(t`Only valid HTTP and HTTPS URLs are allowed.`, t`Invalid URL`);
+        return false;
+    }
+
+    if (!isOfficialExtension(url)) {
+        const extensionInstallationWarningKey = 'extensionInstallationWarningShown';
+        if (accountStorage.getItem(extensionInstallationWarningKey)) {
+            console.debug('Bypassed URL check for third-party extension (account preference).', url);
+        } else {
+            let dismissWarning = false;
+            const confirmation = await Popup.show.confirm(
+                t`Install a third-party extension?`,
+                await renderTemplateAsync('thirdPartyExtensionWarning'),
+                {
+                    customInputs: [{ id: 'dontAskAgain', type: 'checkbox', label: t`Don't show this warning again`, defaultState: false }],
+                    onClose: (popup) => {
+                        if (!popup.result) {
+                            return;
+                        }
+                        dismissWarning = Boolean(popup.inputResults?.get('dontAskAgain') ?? false);
+                    },
+                    okButton: t`Yes, install it`,
+                    cancelButton: t`No, cancel`,
+                },
+            );
+            if (!confirmation) {
+                return false;
+            }
+            if (dismissWarning) {
+                accountStorage.setItem(extensionInstallationWarningKey, '1');
+            }
+        }
+    }
+
     console.debug('Extension installation started', url);
 
     toastr.info(t`Please wait...`, t`Installing extension`);
@@ -1992,6 +2184,8 @@ export async function installExtension(url, global, branch = '') {
         const extensionName = `third-party/${response.folderName}`;
         await callExtensionHook(extensionName, 'install');
     }
+
+    return true;
 }
 
 /**
@@ -2033,6 +2227,8 @@ export async function loadExtensionSettings(settings, versionChanged, enableAuto
     } else if (removedCount > 0) {
         saveSettingsDebounced();
     }
+
+    scheduleExtensionAssetPrefetch();
 
     maybeShowMoonlitEchoesMovedNotice();
     void maybeShowGuidedGenerationsForkNotice();
@@ -2277,13 +2473,23 @@ export async function writeExtensionField(characterId, key, value) {
         console.warn('Character not found', characterId);
         return;
     }
-    const path = `data.extensions.${key}`;
-    setValueByPath(character, path, value);
+    const extensionPath = `data.extensions.${key}`;
+    const isUnset = value === UNSET_VALUE;
+
+    if (isUnset) {
+        deleteValueByPath(character, extensionPath);
+    } else {
+        setValueByPath(character, extensionPath, value);
+    }
 
     // Process JSON data
     if (character.json_data) {
         const jsonData = JSON.parse(character.json_data);
-        setValueByPath(jsonData, path, value);
+        if (isUnset) {
+            deleteValueByPath(jsonData, extensionPath);
+        } else {
+            setValueByPath(jsonData, extensionPath, value);
+        }
         character.json_data = JSON.stringify(jsonData);
 
         // Make sure the data doesn't get lost when saving the current character
@@ -2310,6 +2516,95 @@ export async function writeExtensionField(characterId, key, value) {
     if (!mergeResponse.ok) {
         console.error('Failed to save extension field', mergeResponse.statusText);
     }
+}
+
+/**
+ * Sentinel value that signals an extension field should be deleted.
+ * @type {string}
+ */
+export const UNSET_VALUE = '__@@UNSET@@__';
+
+/**
+ * @typedef {object} BulkExtensionFieldResult
+ * @property {string[]} updated Avatar filenames that were updated
+ * @property {string[]} skipped Avatar filenames skipped by filters
+ * @property {string[]} failed Avatar filenames that failed
+ */
+
+/**
+ * Writes or deletes an extension field for multiple characters.
+ * @param {string[]|null} avatars Avatar filenames. Empty/null targets all character cards.
+ * @param {string} key Extension field name
+ * @param {any} value Field value, or UNSET_VALUE to delete it
+ * @param {object} [options={}] Options
+ * @param {string} [options.filterPath] Dot-path filter that must exist
+ * @returns {Promise<BulkExtensionFieldResult>} Bulk operation summary
+ */
+export async function writeExtensionFieldBulk(avatars, key, value, { filterPath } = {}) {
+    const context = getContext();
+    const extensionPath = `data.extensions.${key}`;
+    const isUnset = value === UNSET_VALUE;
+    const requestBody = {
+        avatars: Array.isArray(avatars) && avatars.length > 0 ? avatars : [],
+        data: {
+            data: {
+                extensions: {
+                    [key]: value,
+                },
+            },
+        },
+    };
+
+    const resolvedFilterPath = filterPath ?? (isUnset ? extensionPath : undefined);
+    if (resolvedFilterPath) {
+        requestBody.filter = { path: resolvedFilterPath };
+    }
+
+    const mergeResponse = await fetch('/api/characters/merge-attributes', {
+        method: 'POST',
+        headers: getRequestHeaders(),
+        body: JSON.stringify(requestBody),
+    });
+
+    if (!mergeResponse.ok) {
+        console.error('Bulk extension field update failed', mergeResponse.statusText);
+        return { updated: [], skipped: [], failed: [] };
+    }
+
+    /** @type {BulkExtensionFieldResult} */
+    const result = await mergeResponse.json();
+    const updatedSet = new Set(result.updated);
+
+    for (const character of context.characters) {
+        if (!character || !updatedSet.has(character.avatar)) {
+            continue;
+        }
+
+        if (isUnset) {
+            deleteValueByPath(character, extensionPath);
+        } else {
+            setValueByPath(character, extensionPath, value);
+        }
+
+        if (character.json_data) {
+            const jsonData = JSON.parse(character.json_data);
+            if (isUnset) {
+                deleteValueByPath(jsonData, extensionPath);
+            } else {
+                setValueByPath(jsonData, extensionPath, value);
+            }
+            character.json_data = JSON.stringify(jsonData);
+        }
+    }
+
+    if (context.characterId !== undefined) {
+        const activeChar = context.characters[context.characterId];
+        if (activeChar && updatedSet.has(activeChar.avatar) && activeChar.json_data) {
+            $('#character_json_data').val(activeChar.json_data);
+        }
+    }
+
+    return result;
 }
 
 /**
@@ -2370,6 +2665,7 @@ export async function initExtensions() {
     $(document).on('click', '.extensions_info .extension_block .toggle_enable', onEnableExtensionClick);
     $(document).on('click', '.extensions_info .extension_block .btn_update', onUpdateClick);
     $(document).on('click', '.extensions_info .extension_block .btn_delete', onDeleteClick);
+    $(document).on('click', '.extensions_info .extension_block .btn_clean', onCleanClick);
     $(document).on('click', '.extensions_info .extension_block .btn_reinstall', onReinstallClick);
     $(document).on('click', '.extensions_info .extension_block .btn_move', onMoveClick);
     $(document).on('click', '.extensions_info .extension_block .btn_branch', onBranchClick);

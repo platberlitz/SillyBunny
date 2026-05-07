@@ -20,6 +20,7 @@ const SB_STORAGE_KEYS = Object.freeze({
     mobileButtonScale: 'sb-mobile-button-scale',
     settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
     compactMode: 'sb-compact-mode',
+    frontendIcon: 'sb-frontend-icon',
 });
 
 const SB_SHORTCUT_TARGETS = Object.freeze([
@@ -40,12 +41,46 @@ const SB_SHORTCUT_DEFAULTS = Object.freeze({
     left: 'left:agents',
     right: 'action:search',
 });
+const SB_PANEL_STYLESHEETS = Object.freeze({
+    'left:world-info': [
+        { href: 'css/world-info.css?v=20260425b', id: 'deferred-world-info-css' },
+    ],
+    'left:advanced-formatting': [
+        { href: 'css/macros.css', id: 'deferred-macros-css' },
+    ],
+    'right:extensions': [
+        { href: 'css/extensions-panel.css?v=20260425a', id: 'deferred-extensions-panel-css' },
+    ],
+});
+const SB_FRONTEND_ICON_DEFAULT = 'pixel';
+const SB_FRONTEND_ICONS = Object.freeze([
+    {
+        id: 'pixel',
+        label: 'Pixel',
+        description: 'Classic square icon.',
+        src: 'img/sillybunny-pixel-logo-og.png',
+    },
+    {
+        id: 'badge',
+        label: 'Badge',
+        description: 'Clean badge icon.',
+        src: 'img/sillybunny-badge.png',
+    },
+]);
 const SB_ACCOUNT_STORAGE_READY_MARKER = '__migrated';
 const SB_INLINE_DRAWER_CUSTOM_PERSISTENCE_SELECTOR = '.sb-openai-settings-drawer, .sb-openai-settings-subdrawer, [id$="prompt_manager_drawer"]';
+const SB_STORAGE_PREFIX = 'sb-';
+const SB_STORAGE_WRITE_DEBOUNCE_MS = 120;
+const SB_MOBILE_NAV_OPEN_GRACE_MS = 450;
+const SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX = 6;
 
 let sbInlineDrawerPersistenceObserver = null;
 let sbInlineDrawerPersistenceQueued = false;
 let sbChatScriptModulePromise = null;
+let sbStorageFlushTimer = 0;
+let sbStorageFlushEventsBound = false;
+const sbStorageCache = new Map();
+const sbStoragePendingWrites = new Map();
 
 function getShortcutTarget(side) {
     const stored = safeGetItem(side === 'left' ? SB_STORAGE_KEYS.shortcutLeft : SB_STORAGE_KEYS.shortcutRight);
@@ -87,21 +122,105 @@ function activateShortcutTarget(target) {
     }
 }
 
+function isSillyBunnyStorageKey(key) {
+    return typeof key === 'string' && key.startsWith(SB_STORAGE_PREFIX);
+}
+
+function scheduleSbStorageFlush() {
+    if (sbStorageFlushTimer) {
+        return;
+    }
+
+    sbStorageFlushTimer = window.setTimeout(flushSbStorageWrites, SB_STORAGE_WRITE_DEBOUNCE_MS);
+}
+
+function flushSbStorageWrites() {
+    if (sbStorageFlushTimer) {
+        window.clearTimeout(sbStorageFlushTimer);
+        sbStorageFlushTimer = 0;
+    }
+
+    if (!sbStoragePendingWrites.size) {
+        return;
+    }
+
+    const pendingWrites = Array.from(sbStoragePendingWrites.entries());
+    sbStoragePendingWrites.clear();
+
+    for (const [key, write] of pendingWrites) {
+        try {
+            if (write?.remove) {
+                localStorage.removeItem(key);
+            } else {
+                localStorage.setItem(key, write.value);
+            }
+        } catch {
+            // Keep the previous safe localStorage semantics: storage failures are non-fatal.
+        }
+    }
+}
+
+function bindSbStorageFlushEvents() {
+    if (sbStorageFlushEventsBound || typeof window === 'undefined') {
+        return;
+    }
+
+    window.addEventListener('pagehide', flushSbStorageWrites);
+    window.addEventListener('beforeunload', flushSbStorageWrites);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            flushSbStorageWrites();
+        }
+    });
+    sbStorageFlushEventsBound = true;
+}
+
 function safeGetItem(key) {
-    try { return localStorage.getItem(key); } catch { return null; }
+    if (!isSillyBunnyStorageKey(key)) {
+        try { return localStorage.getItem(key); } catch { return null; }
+    }
+
+    if (sbStorageCache.has(key)) {
+        return sbStorageCache.get(key);
+    }
+
+    try {
+        const value = localStorage.getItem(key);
+        sbStorageCache.set(key, value);
+        return value;
+    } catch {
+        return null;
+    }
 }
 
 function safeSetItem(key, value) {
-    try { localStorage.setItem(key, value); } catch {
-        // Ignore storage write failures.
+    if (!isSillyBunnyStorageKey(key)) {
+        try { localStorage.setItem(key, value); } catch {
+            // Ignore storage write failures.
+        }
+        return;
     }
+
+    const stringValue = String(value);
+    sbStorageCache.set(key, stringValue);
+    sbStoragePendingWrites.set(key, { value: stringValue, remove: false });
+    scheduleSbStorageFlush();
 }
 
 function safeRemoveItem(key) {
-    try { localStorage.removeItem(key); } catch {
-        // Ignore storage removal failures.
+    if (!isSillyBunnyStorageKey(key)) {
+        try { localStorage.removeItem(key); } catch {
+            // Ignore storage removal failures.
+        }
+        return;
     }
+
+    sbStorageCache.set(key, null);
+    sbStoragePendingWrites.set(key, { remove: true });
+    scheduleSbStorageFlush();
 }
+
+bindSbStorageFlushEvents();
 
 const SB_IDLE_BRAND_LABEL = 'SillyBunny';
 const SB_MOBILE_MEDIA_QUERY = '(max-width: 768px)';
@@ -200,15 +319,15 @@ const SB_SHELLS = Object.freeze({
         proxyIcon: 'fa-bars',
         proxyLabel: 'Workspace',
         title: 'Workspace',
-        subtitle: 'Back end modifications, model setup, presets, lorebooks, and formatting tools live here.',
-        searchPlaceholder: 'Quick find presets, samplers, lorebooks...',
+        subtitle: 'Set up models, prompts, lore, and helpers, then get back to the scene.',
+        searchPlaceholder: 'Find presets, samplers, lore, or tools...',
         storageKey: SB_STORAGE_KEYS.leftTab,
         defaultTabId: 'presets',
         baseTab: {
             id: 'presets',
             label: 'Presets',
             icon: 'fa-sliders',
-            description: 'Change presets, edit system prompts, and modify other output settings here.',
+            description: 'Choose presets and tune the prompts that shape each reply.',
         },
         embeddedTabs: [
             {
@@ -216,21 +335,21 @@ const SB_SHELLS = Object.freeze({
                 drawerId: 'sys-settings-button',
                 label: 'API',
                 icon: 'fa-plug',
-                description: 'Connect providers, select models, and manage backend-specific options here.',
+                description: 'Connect a provider, pick a model, and test the connection.',
             },
             {
                 id: 'advanced-formatting',
                 drawerId: 'advanced-formatting-button',
                 label: 'Formatting',
                 icon: 'fa-text-height',
-                description: 'Tune context and instruction formatting tools here.',
+                description: 'Adjust how context, instructions, and reasoning are formatted.',
             },
             {
                 id: 'world-info',
                 drawerId: 'WI-SP-button',
                 label: 'World Info',
                 icon: 'fa-book-atlas',
-                description: 'Edit and access lorebooks and world entries here.',
+                description: 'Manage lorebooks and world details for the current story.',
             },
         ],
         customTabs: [
@@ -238,7 +357,7 @@ const SB_SHELLS = Object.freeze({
                 id: 'sampling',
                 label: 'Sampling',
                 icon: 'fa-wave-square',
-                description: 'Control model sampling, seeds, and banned logits/tokens here.',
+                description: 'Tune generation style, randomness, seeds, and token controls.',
                 searchPlaceholder: 'Search temperature, top p, repetition penalty, or backend samplers',
                 searchExamples: ['temperature', 'top p', 'repetition penalty'],
             },
@@ -246,7 +365,7 @@ const SB_SHELLS = Object.freeze({
                 id: 'agents',
                 label: 'Agents',
                 icon: 'fa-robot',
-                description: 'Configure in-chat agent helpers.',
+                description: 'Manage helpers that can assist during the conversation.',
             },
         ],
     },
@@ -359,6 +478,7 @@ const sbState = {
     landingPageSyncFrame: 0,
     inlineDrawerAutoClose: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.settingsDrawerAutoClose), false),
     theme: normalizeTheme(safeGetItem(SB_STORAGE_KEYS.theme)),
+    frontendIcon: normalizeFrontendIcon(safeGetItem(SB_STORAGE_KEYS.frontendIcon)),
     surfaceTransparency: normalizeSurfaceTransparency(safeGetItem(SB_STORAGE_KEYS.surfaceTransparency)),
     compactMode: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), false),
     bottomBarScale: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.bottomBarScale)),
@@ -392,6 +512,7 @@ const sbState = {
         results: null,
         expanded: false,
         dismissBound: false,
+        activeIndex: -1,
     },
     shellSizing: {
         overrides: {
@@ -402,6 +523,12 @@ const sbState = {
     },
     characterDrawer: {
         rightLocked: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.characterDrawerRightLocked), false),
+    },
+    mobileModal: {
+        syncFrame: 0,
+    },
+    mobileNav: {
+        lastOpenedAt: 0,
     },
     chatbar: {
         desktop: null,
@@ -479,6 +606,21 @@ const sbState = {
 
 function normalizeTheme(themeId) {
     return SB_THEMES.some(theme => theme.id === themeId) ? themeId : 'clean-minimal';
+}
+
+function normalizeFrontendIcon(iconId) {
+    const normalizedIconId = normalizeText(iconId);
+    return SB_FRONTEND_ICONS.some(icon => icon.id === normalizedIconId) ? normalizedIconId : SB_FRONTEND_ICON_DEFAULT;
+}
+
+function getFrontendIconConfig(iconId = sbState.frontendIcon) {
+    const normalizedIconId = normalizeFrontendIcon(iconId);
+    return SB_FRONTEND_ICONS.find(icon => icon.id === normalizedIconId) || SB_FRONTEND_ICONS[0];
+}
+
+function getFrontendIconSrc(iconId = sbState.frontendIcon, { absolute = true } = {}) {
+    const src = getFrontendIconConfig(iconId).src;
+    return absolute ? `/${src}` : src;
 }
 
 function normalizeTopbarLabelPart(value, fallback = '') {
@@ -648,6 +790,7 @@ function restorePersistedTopbarState() {
     sbState.topbarScale.mobile = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.topbarScaleMobile));
     sbState.bottomBarScale = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.bottomBarScale));
     sbState.mobileButtonScale = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.mobileButtonScale));
+    sbState.frontendIcon = normalizeFrontendIcon(safeGetItem(SB_STORAGE_KEYS.frontendIcon));
     sbState.topbarLabel.desktopParts = safeGetItem(SB_STORAGE_KEYS.topbarLabelDesktopParts) === null
         ? ['char']
         : normalizeTopbarLabelParts(safeGetItem(SB_STORAGE_KEYS.topbarLabelDesktopParts), []);
@@ -788,6 +931,18 @@ function syncCharacterDrawerLockButton() {
 function syncCharacterDrawerLockPosition() {
     const panel = document.getElementById('right-nav-panel');
     if (!(panel instanceof HTMLElement)) {
+        return;
+    }
+
+    if (isMovingUIActive()) {
+        if (panel.dataset.sbCharacterLockInline === 'right') {
+            for (const property of ['left', 'right', 'margin-left', 'margin-right']) {
+                panel.style.removeProperty(property);
+            }
+
+            delete panel.dataset.sbCharacterLockInline;
+        }
+
         return;
     }
 
@@ -973,6 +1128,7 @@ function setUniversalSearchOpenState(isOpen, { focusInput = false } = {}) {
     root?.setAttribute('aria-expanded', String(nextOpenState));
     if (input instanceof HTMLInputElement) {
         input.tabIndex = nextOpenState ? 0 : -1;
+        input.setAttribute('aria-expanded', String(nextOpenState));
     }
 
     if (!nextOpenState) {
@@ -1003,6 +1159,8 @@ function clearUniversalSearch({ blur = false } = {}) {
         searchState.results.classList.remove('is-visible');
     }
 
+    searchState.activeIndex = -1;
+    searchState.input?.removeAttribute('aria-activedescendant');
     setUniversalSearchOpenState(false);
 }
 
@@ -1022,6 +1180,30 @@ function isMobileViewport() {
     return window.matchMedia(SB_MOBILE_MEDIA_QUERY).matches;
 }
 
+function prefersReducedMotion() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function scrollShellTabButtonIntoView(nav, button, { smooth = false } = {}) {
+    if (!(nav instanceof HTMLElement) || !(button instanceof HTMLElement)) {
+        return;
+    }
+
+    const navRect = nav.getBoundingClientRect();
+    const buttonRect = button.getBoundingClientRect();
+    const leftOverflow = buttonRect.left - navRect.left;
+    const rightOverflow = buttonRect.right - navRect.right;
+
+    if (leftOverflow >= 0 && rightOverflow <= 0) {
+        return;
+    }
+
+    nav.scrollBy({
+        left: leftOverflow < 0 ? leftOverflow : rightOverflow,
+        behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto',
+    });
+}
+
 function isTouchOnlyDesktopViewport() {
     const hasHover = window.matchMedia('(hover: hover), (any-hover: hover)').matches;
     const hasFinePointer = window.matchMedia('(pointer: fine), (any-pointer: fine)').matches;
@@ -1032,6 +1214,10 @@ function isTouchOnlyDesktopViewport() {
 
 function canResizeDesktopShells() {
     return !isMobileViewport() && !isTouchOnlyDesktopViewport();
+}
+
+function isMovingUIActive() {
+    return document.body?.classList.contains('movingUI') ?? false;
 }
 
 function isDesktopResizableShell(shellKey) {
@@ -1159,8 +1345,13 @@ function getDesktopShellDimensions(shellKey = '') {
         };
     }
 
+    // SillyBunny: cap shell width to the active chat width (--sheldWidth) so settings
+    // panels narrow when the user reduces the chat width, matching standard ST behaviour.
+    const sheldWidthStr = window.getComputedStyle(document.documentElement).getPropertyValue('--sheldWidth').trim();
+    const sheldWidthVw = parseFloat(sheldWidthStr);
+    const chatWidthPx = Number.isFinite(sheldWidthVw) ? Math.round((sheldWidthVw / 100) * viewportWidth) : viewportWidth;
     const desiredWidth = clampNumber(
-        viewportWidth * SB_DESKTOP_SHELL_LAYOUT.ratio,
+        Math.min(viewportWidth * SB_DESKTOP_SHELL_LAYOUT.ratio, chatWidthPx),
         SB_DESKTOP_SHELL_LAYOUT.minWidth,
         maxShellWidth,
     );
@@ -1258,6 +1449,15 @@ function applyDesktopShellSize(root, size) {
     root.style.setProperty('max-width', `${size.width}px`, 'important');
     root.style.setProperty('height', `${size.height}px`, 'important');
     root.style.setProperty('max-height', `${size.height}px`, 'important');
+    root.dataset.sbShellInlineSize = 'true';
+}
+
+function clearDesktopShellSize(root) {
+    root.style.removeProperty('width');
+    root.style.removeProperty('max-width');
+    root.style.removeProperty('height');
+    root.style.removeProperty('max-height');
+    delete root.dataset.sbShellInlineSize;
 }
 
 function syncDesktopShellSizing() {
@@ -1277,11 +1477,19 @@ function syncDesktopShellSizing() {
         const bounds = getDesktopShellResizeBounds(shellKey);
 
         if (isMobileViewport()) {
-            root.style.removeProperty('width');
-            root.style.removeProperty('max-width');
-            root.style.removeProperty('height');
-            root.style.removeProperty('max-height');
+            clearDesktopShellSize(root);
             root.classList.remove('sb-shell-can-resize');
+            syncShellResizeHandleValue(shellKey, null);
+            continue;
+        }
+
+        if (shellKey === 'characters' && isMovingUIActive()) {
+            if (root.dataset.sbShellInlineSize === 'true') {
+                clearDesktopShellSize(root);
+            }
+
+            root.classList.remove('sb-shell-can-resize');
+            syncShellResizeHandleValue(shellKey, null);
             continue;
         }
 
@@ -1307,6 +1515,7 @@ function syncDesktopShellSizing() {
 
         applyDesktopShellSize(root, sizeToApply);
         root.classList.toggle('sb-shell-can-resize', resizingEnabled);
+        syncShellResizeHandleValue(shellKey, sizeToApply);
     }
 
     syncCharacterDrawerLockPosition();
@@ -1330,6 +1539,7 @@ function isPrimaryShellResizeStart(event) {
 
 function bindShellResizeHandle(handle, shellKey) {
     stopProxyPointerPropagation(handle);
+    configureShellResizeHandle(handle, shellKey);
     handle.addEventListener('pointerdown', event => beginShellResize(shellKey, event));
     handle.addEventListener('mousedown', event => {
         if (event.defaultPrevented || sbState.shellSizing.activeResize) {
@@ -1338,10 +1548,102 @@ function bindShellResizeHandle(handle, shellKey) {
 
         beginShellResize(shellKey, event);
     });
+    handle.addEventListener('keydown', event => handleShellResizeKeydown(shellKey, event));
+}
+
+function configureShellResizeHandle(handle, shellKey) {
+    const bounds = getDesktopShellResizeBounds(shellKey);
+    const currentSize = getShellSizeOverride(shellKey) ?? {
+        width: bounds.defaultWidth,
+        height: bounds.defaultHeight,
+    };
+    const label = shellKey === 'characters' ? 'Characters' : getShellConfig(shellKey)?.title || 'panel';
+
+    handle.setAttribute('role', 'separator');
+    handle.setAttribute('aria-orientation', 'horizontal');
+    handle.setAttribute('aria-label', `Resize ${label} panel`);
+    handle.setAttribute('aria-valuemin', String(bounds.minWidth));
+    handle.setAttribute('aria-valuemax', String(bounds.maxWidth));
+    handle.setAttribute('aria-valuenow', String(Math.round(currentSize.width)));
+    handle.setAttribute('aria-valuetext', `${Math.round(currentSize.width)} pixels wide, ${Math.round(currentSize.height)} pixels tall`);
+    handle.tabIndex = canResizeDesktopShells() ? 0 : -1;
+}
+
+function syncShellResizeHandleValue(shellKey, size) {
+    const root = getResizableShellRoot(shellKey);
+    const shellState = getShellState(shellKey);
+    const handle = shellState?.resizeHandle ?? root?.querySelector(':scope > .sb-shell-resize-handle, .sb-shell-resize-handle');
+    if (!(handle instanceof HTMLElement)) {
+        return;
+    }
+
+    if (!size) {
+        configureShellResizeHandle(handle, shellKey);
+        return;
+    }
+
+    configureShellResizeHandle(handle, shellKey);
+    handle.setAttribute('aria-valuenow', String(Math.round(size.width)));
+    handle.setAttribute('aria-valuetext', `${Math.round(size.width)} pixels wide, ${Math.round(size.height)} pixels tall`);
+}
+
+function handleShellResizeKeydown(shellKey, event) {
+    if (!canResizeDesktopShells() || !isDesktopResizableShell(shellKey)) {
+        return;
+    }
+
+    const root = getResizableShellRoot(shellKey);
+    if (!(root instanceof HTMLElement) || !root.classList.contains('openDrawer')) {
+        return;
+    }
+
+    const bounds = getDesktopShellResizeBounds(shellKey);
+    const currentRect = root.getBoundingClientRect();
+    const currentSize = clampShellSize({
+        width: currentRect.width || bounds.defaultWidth,
+        height: currentRect.height || bounds.defaultHeight,
+    }, bounds);
+
+    if (!currentSize) {
+        return;
+    }
+
+    const step = event.shiftKey ? 72 : 24;
+    let nextSize = currentSize;
+
+    if (event.key === 'ArrowLeft') {
+        nextSize = { ...currentSize, width: currentSize.width - step };
+    } else if (event.key === 'ArrowRight') {
+        nextSize = { ...currentSize, width: currentSize.width + step };
+    } else if (event.key === 'ArrowUp') {
+        nextSize = { ...currentSize, height: currentSize.height - step };
+    } else if (event.key === 'ArrowDown') {
+        nextSize = { ...currentSize, height: currentSize.height + step };
+    } else if (event.key === 'Home') {
+        nextSize = { ...currentSize, width: bounds.minWidth };
+    } else if (event.key === 'End') {
+        nextSize = { ...currentSize, width: bounds.maxWidth };
+    } else {
+        return;
+    }
+
+    const clampedSize = clampShellSize(nextSize, bounds);
+    if (!clampedSize) {
+        return;
+    }
+
+    event.preventDefault();
+    setShellSizeOverride(shellKey, clampedSize);
+    applyDesktopShellSize(root, clampedSize);
+    syncShellResizeHandleValue(shellKey, clampedSize);
 }
 
 function beginShellResize(shellKey, event) {
     if (!canResizeDesktopShells() || !isDesktopResizableShell(shellKey) || !isPrimaryShellResizeStart(event)) {
+        return;
+    }
+
+    if (shellKey === 'characters' && isMovingUIActive()) {
         return;
     }
 
@@ -1417,6 +1719,7 @@ function beginShellResize(shellKey, event) {
 
         sbState.shellSizing.overrides[getShellSizingKey(shellKey)] = nextSize;
         applyDesktopShellSize(root, nextSize);
+        syncShellResizeHandleValue(shellKey, nextSize);
     };
 
     const onPointerUp = endEvent => {
@@ -1427,6 +1730,7 @@ function beginShellResize(shellKey, event) {
         const activeSize = getShellSizeOverride(shellKey) ?? startSize;
         cleanup();
         setShellSizeOverride(shellKey, activeSize);
+        syncShellResizeHandleValue(shellKey, activeSize);
         syncDesktopShellSizing();
     };
 
@@ -1691,6 +1995,42 @@ function setShellTheme(themeId, { persist = true } = {}) {
     updateThemeBadge();
 }
 
+function applyFrontendIcon(iconId = sbState.frontendIcon) {
+    const normalizedIconId = normalizeFrontendIcon(iconId);
+    const iconController = window.SillyBunnyFrontendIcon;
+
+    if (iconController?.apply) {
+        iconController.apply(normalizedIconId);
+        return;
+    }
+
+    const iconSrc = getFrontendIconSrc(normalizedIconId);
+
+    document.documentElement.dataset.sbFrontendIcon = normalizedIconId;
+
+    for (const image of document.querySelectorAll('img[data-sb-frontend-icon]')) {
+        image.setAttribute('src', iconSrc);
+    }
+
+    for (const link of document.querySelectorAll('link[rel~="icon"]')) {
+        link.setAttribute('href', iconSrc);
+        link.setAttribute('type', 'image/png');
+    }
+}
+
+function setFrontendIconPreference(iconId, { persist = true } = {}) {
+    const nextIconId = normalizeFrontendIcon(iconId);
+
+    sbState.frontendIcon = nextIconId;
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.frontendIcon, nextIconId);
+    }
+
+    applyFrontendIcon(nextIconId);
+    updateThemePickerUi();
+}
+
 function setSurfaceTransparency(value, { persist = true } = {}) {
     const nextTransparency = normalizeSurfaceTransparency(value);
     const surfaceOpacity = Math.max(0, 1 - (nextTransparency / 100));
@@ -1789,6 +2129,181 @@ function getChatScriptModule() {
     }
 
     return sbChatScriptModulePromise;
+}
+
+function getCookieClearDomains(hostname) {
+    if (!hostname || hostname === 'localhost' || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) {
+        return [''];
+    }
+
+    const parts = hostname.split('.').filter(Boolean);
+    const domains = [''];
+
+    for (let index = 0; index < parts.length - 1; index++) {
+        const domain = parts.slice(index).join('.');
+        domains.push(domain, `.${domain}`);
+    }
+
+    return [...new Set(domains)];
+}
+
+function getCookieClearPaths(pathname) {
+    const paths = new Set(['/']);
+    const segments = pathname.split('/').filter(Boolean);
+    let currentPath = '';
+
+    for (const segment of segments) {
+        currentPath += `/${segment}`;
+        paths.add(currentPath);
+        paths.add(`${currentPath}/`);
+    }
+
+    return [...paths];
+}
+
+function getCookieClearNames(cookieName) {
+    const names = new Set([cookieName]);
+
+    try {
+        names.add(encodeURIComponent(decodeURIComponent(cookieName)));
+    } catch {
+        names.add(encodeURIComponent(cookieName));
+    }
+
+    return [...names];
+}
+
+// SillyBunny: iOS WebKit keeps cookies outside cache/storage APIs, so expire them explicitly.
+function clearAllBrowserCookies() {
+    if (!document.cookie) {
+        return 0;
+    }
+
+    const cookieNames = document.cookie
+        .split(';')
+        .map(cookie => cookie.trim().split('=')[0])
+        .filter(Boolean);
+    const domains = getCookieClearDomains(window.location.hostname);
+    const paths = getCookieClearPaths(window.location.pathname);
+    const expires = 'expires=Thu, 01 Jan 1970 00:00:00 GMT';
+
+    for (const cookieName of cookieNames) {
+        for (const clearName of getCookieClearNames(cookieName)) {
+            for (const path of paths) {
+                document.cookie = `${clearName}=; ${expires}; max-age=0; path=${path}; SameSite=Lax`;
+
+                for (const domain of domains) {
+                    if (!domain) {
+                        continue;
+                    }
+
+                    document.cookie = `${clearName}=; ${expires}; max-age=0; path=${path}; domain=${domain}; SameSite=Lax`;
+                }
+            }
+        }
+    }
+
+    return cookieNames.length;
+}
+
+async function confirmClearCookiesAndCache() {
+    const context = getSillyTavernContext();
+    if (!context?.Popup?.show?.confirm) {
+        return window.confirm('Clear cookies & cache? This removes browser-accessible SillyBunny cookies and cached UI data, then reloads the page.');
+    }
+
+    const result = await context?.Popup?.show?.confirm?.(
+        'Clear cookies & cache?',
+        'This removes browser-accessible SillyBunny cookies, browser cache, temporary session data, and IndexedDB cache stores, then reloads the page. Saved settings and account data stay intact, but you may need to sign in again if your setup uses browser cookies.',
+        {
+            okButton: 'Clear cookies & cache',
+            cancelButton: 'Cancel',
+        },
+    );
+
+    if (context?.POPUP_RESULT) {
+        return result === context.POPUP_RESULT.AFFIRMATIVE;
+    }
+
+    return result === true || result === 1;
+}
+
+async function clearServerCookies() {
+    const response = await fetch('/api/cookies/clear', {
+        method: 'POST',
+        headers: getRequestHeadersFromContext(),
+        cache: 'no-store',
+    });
+
+    if (!response.ok) {
+        throw new Error(`Server cookie clear failed: ${response.status} ${response.statusText}`);
+    }
+
+    try {
+        return await response.json();
+    } catch {
+        return { success: true };
+    }
+}
+
+async function handleClearCookiesAndCacheClick(event) {
+    event?.preventDefault();
+
+    const button = document.getElementById('clear_cookies_cache_button');
+    if (!(button instanceof HTMLButtonElement) || button.disabled) {
+        return;
+    }
+
+    button.disabled = true;
+    button.classList.add('disabled');
+    button.setAttribute('aria-busy', 'true');
+
+    try {
+        const confirmed = await confirmClearCookiesAndCache();
+        if (!confirmed) {
+            button.disabled = false;
+            button.classList.remove('disabled');
+            button.removeAttribute('aria-busy');
+            return;
+        }
+
+        const clearFrontendCache = window.SillyBunnyClearFrontendCache;
+        if (typeof clearFrontendCache !== 'function') {
+            throw new Error('Cache clear helper is not available yet. Reload the page and try again.');
+        }
+
+        const didClear = await clearFrontendCache({ skipConfirmation: true });
+        if (!didClear) {
+            button.disabled = false;
+            button.classList.remove('disabled');
+            button.removeAttribute('aria-busy');
+            return;
+        }
+
+        const serverCookieResult = await clearServerCookies();
+        const clearedCookieCount = clearAllBrowserCookies();
+        globalThis.toastr?.success?.('Cookies and cache cleared. Reloading SillyBunny...', 'Cookies cleared');
+        console.info(`[Cache] Expired ${clearedCookieCount} browser cookies and queued ${serverCookieResult?.expirationAttempts ?? 0} server cookie expirations before reload`);
+        window.setTimeout(() => window.location.reload(), 450);
+    } catch (error) {
+        console.error('Failed to clear cookies and cache', error);
+        globalThis.toastr?.error?.(String(error?.message || error), 'Clear failed');
+        button.disabled = false;
+        button.classList.remove('disabled');
+        button.removeAttribute('aria-busy');
+    }
+}
+
+function bindClearCookiesAndCacheButton() {
+    const button = document.getElementById('clear_cookies_cache_button');
+    if (!(button instanceof HTMLButtonElement) || button.dataset.sbCookiesCacheBound === 'true') {
+        return;
+    }
+
+    button.dataset.sbCookiesCacheBound = 'true';
+    button.addEventListener('click', event => {
+        void handleClearCookiesAndCacheClick(event);
+    });
 }
 
 function hasActiveTopBarChat(context = getSillyTavernContext()) {
@@ -2701,6 +3216,66 @@ function getMassDeleteOlderThanDays(files, days, currentChatId) {
     return files.filter(chatFile => chatFile.fileName !== currentChatId && chatFile.sortTimestamp > 0 && chatFile.sortTimestamp < cutoff);
 }
 
+function bindChatDeleteVisualViewport(overlay) {
+    const visualViewport = window.visualViewport;
+    if (!(overlay instanceof HTMLElement) || !isMobileViewport() || !visualViewport) {
+        return () => {};
+    }
+
+    let animationFrame = 0;
+
+    function readViewportNumber(value, fallback = 0) {
+        const number = Number(value);
+        return Number.isFinite(number) && number > 0 ? number : fallback;
+    }
+
+    function update() {
+        animationFrame = 0;
+        const fallbackWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+        const fallbackHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        const viewportLeft = Math.max(0, readViewportNumber(visualViewport.offsetLeft));
+        const viewportTop = Math.max(0, readViewportNumber(visualViewport.offsetTop));
+        const viewportWidth = Math.max(1, readViewportNumber(visualViewport.width, fallbackWidth));
+        const viewportHeight = Math.max(1, readViewportNumber(visualViewport.height, fallbackHeight));
+
+        overlay.style.setProperty('--sb-chat-delete-vv-left', `${viewportLeft}px`);
+        overlay.style.setProperty('--sb-chat-delete-vv-top', `${viewportTop}px`);
+        overlay.style.setProperty('--sb-chat-delete-vv-width', `${viewportWidth}px`);
+        overlay.style.setProperty('--sb-chat-delete-vv-height', `${viewportHeight}px`);
+    }
+
+    function scheduleUpdate() {
+        if (animationFrame) {
+            return;
+        }
+
+        animationFrame = window.requestAnimationFrame(update);
+    }
+
+    overlay.classList.add('sb-chat-delete-overlay--visual-viewport');
+    update();
+    visualViewport.addEventListener('resize', scheduleUpdate);
+    visualViewport.addEventListener('scroll', scheduleUpdate);
+    window.addEventListener('resize', scheduleUpdate, { passive: true });
+    window.addEventListener('orientationchange', scheduleUpdate);
+
+    return () => {
+        if (animationFrame) {
+            window.cancelAnimationFrame(animationFrame);
+        }
+
+        visualViewport.removeEventListener('resize', scheduleUpdate);
+        visualViewport.removeEventListener('scroll', scheduleUpdate);
+        window.removeEventListener('resize', scheduleUpdate);
+        window.removeEventListener('orientationchange', scheduleUpdate);
+        overlay.classList.remove('sb-chat-delete-overlay--visual-viewport');
+        overlay.style.removeProperty('--sb-chat-delete-vv-left');
+        overlay.style.removeProperty('--sb-chat-delete-vv-top');
+        overlay.style.removeProperty('--sb-chat-delete-vv-width');
+        overlay.style.removeProperty('--sb-chat-delete-vv-height');
+    };
+}
+
 function showBottomChatMassDeleteDialog(files, currentChatId) {
     return new Promise(resolve => {
         const overlay = createElement('div', { className: 'sb-chat-delete-overlay' });
@@ -2732,9 +3307,17 @@ function showBottomChatMassDeleteDialog(files, currentChatId) {
         const deleteOlderButton = createElement('button', { className: 'menu_button', text: 'Delete older', attrs: { type: 'button' } });
         const cancelButton = createElement('button', { className: 'menu_button', text: 'Cancel', attrs: { type: 'button' } });
         const checkboxes = [];
+        let cleanupVisualViewport = () => {};
+        let isFinished = false;
 
         function finish(result) {
+            if (isFinished) {
+                return;
+            }
+
+            isFinished = true;
             document.removeEventListener('keydown', handleKeydown);
+            cleanupVisualViewport();
             overlay.remove();
             resolve(result);
         }
@@ -2804,9 +3387,12 @@ function showBottomChatMassDeleteDialog(files, currentChatId) {
         dialog.append(title, note, ageRow, status, list, actions);
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
+        cleanupVisualViewport = bindChatDeleteVisualViewport(overlay);
         document.addEventListener('keydown', handleKeydown);
         updateStatus();
-        ageInput.focus();
+        if (!isMobileViewport()) {
+            ageInput.focus();
+        }
     });
 }
 
@@ -3257,6 +3843,8 @@ function setMobileChatToolsOpenState(shouldOpen) {
     if ('inert' in refs.overlay) {
         refs.overlay.inert = !isOpen;
     }
+
+    queueMobileModalStateSync();
 
     if (isOpen) {
         scheduleChatbarRefresh(0);
@@ -3923,6 +4511,167 @@ function isDrawerActuallyOpen(drawerRootOrId) {
         && el.getClientRects().length > 0;
 }
 
+function isMobileOverlayActuallyOpen(overlayRootOrId, openClass) {
+    const el = getDrawerRoot(overlayRootOrId);
+
+    if (!(el instanceof HTMLElement) || !el.classList.contains(openClass)) {
+        return false;
+    }
+
+    const isExplicitlyHidden = el.hidden || el.getAttribute('aria-hidden') === 'true';
+    if (isExplicitlyHidden) {
+        return false;
+    }
+
+    const styles = getComputedStyle(el);
+    return styles.display !== 'none'
+        && styles.visibility !== 'hidden'
+        && styles.pointerEvents !== 'none'
+        && el.getClientRects().length > 0;
+}
+
+function getMobileModalRootCandidates() {
+    const chatTools = getChatbarState().mobileTools?.overlay ?? document.getElementById('sb-mobile-chat-tools');
+    return [
+        document.getElementById(getShellConfig('left').rootPanelId),
+        document.getElementById(getShellConfig('right').rootPanelId),
+        document.getElementById('right-nav-panel'),
+        document.getElementById('sb-mobile-nav'),
+        chatTools,
+    ].filter(element => element instanceof HTMLElement);
+}
+
+function isMobileModalRootOpen(root) {
+    if (!(root instanceof HTMLElement)) {
+        return false;
+    }
+
+    if (root.id === 'sb-mobile-nav') {
+        return isMobileOverlayActuallyOpen(root, 'sb-nav-open');
+    }
+
+    if (root.id === 'sb-mobile-chat-tools') {
+        return isMobileOverlayActuallyOpen(root, 'sb-chat-tools-open');
+    }
+
+    return isDrawerActuallyOpen(root);
+}
+
+function getActiveMobileModalRoots() {
+    if (!isMobileViewport()) {
+        return [];
+    }
+
+    return getMobileModalRootCandidates().filter(root => isMobileModalRootOpen(root));
+}
+
+function setElementInertForMobileModal(element, shouldInert) {
+    if (!(element instanceof HTMLElement)) {
+        return;
+    }
+
+    if (shouldInert) {
+        if (!element.hasAttribute('data-sb-mobile-modal-prev-aria-hidden')) {
+            element.setAttribute(
+                'data-sb-mobile-modal-prev-aria-hidden',
+                element.getAttribute('aria-hidden') ?? '',
+            );
+        }
+
+        element.setAttribute('aria-hidden', 'true');
+        if ('inert' in element) {
+            element.inert = true;
+        }
+        return;
+    }
+
+    const previousAriaHidden = element.getAttribute('data-sb-mobile-modal-prev-aria-hidden');
+    if (previousAriaHidden !== null) {
+        if (previousAriaHidden) {
+            element.setAttribute('aria-hidden', previousAriaHidden);
+        } else {
+            element.removeAttribute('aria-hidden');
+        }
+        element.removeAttribute('data-sb-mobile-modal-prev-aria-hidden');
+    }
+
+    if ('inert' in element) {
+        element.inert = false;
+    }
+}
+
+function setMobileModalRootA11y(root, isActiveRoot) {
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+
+    const hasManagedAriaState = root.id === 'sb-mobile-nav' || root.id === 'sb-mobile-chat-tools';
+
+    if (isActiveRoot) {
+        if (hasManagedAriaState) {
+            root.setAttribute('aria-hidden', 'false');
+            if ('inert' in root) {
+                root.inert = false;
+            }
+            return;
+        }
+
+        if (!root.hasAttribute('data-sb-mobile-modal-root-prev-aria-hidden')) {
+            root.setAttribute(
+                'data-sb-mobile-modal-root-prev-aria-hidden',
+                root.getAttribute('aria-hidden') ?? '',
+            );
+        }
+
+        root.setAttribute('aria-hidden', 'false');
+        if ('inert' in root) {
+            root.inert = false;
+        }
+        return;
+    }
+
+    if (hasManagedAriaState) {
+        return;
+    }
+
+    const previousAriaHidden = root.getAttribute('data-sb-mobile-modal-root-prev-aria-hidden');
+    if (previousAriaHidden !== null) {
+        if (previousAriaHidden) {
+            root.setAttribute('aria-hidden', previousAriaHidden);
+        } else {
+            root.removeAttribute('aria-hidden');
+        }
+        root.removeAttribute('data-sb-mobile-modal-root-prev-aria-hidden');
+    }
+}
+
+function syncMobileModalState() {
+    const activeRoots = getActiveMobileModalRoots();
+    const hasActiveMobileModal = activeRoots.length > 0;
+    const activeRootSet = new Set(activeRoots);
+    const shouldInertTopBar = activeRoots.some(root => root.id !== 'sb-mobile-nav');
+
+    document.body?.classList.toggle('sb-mobile-modal-open', hasActiveMobileModal);
+
+    for (const root of getMobileModalRootCandidates()) {
+        setMobileModalRootA11y(root, activeRootSet.has(root));
+    }
+
+    setElementInertForMobileModal(document.getElementById('sheld'), hasActiveMobileModal);
+    setElementInertForMobileModal(document.getElementById('top-bar'), shouldInertTopBar);
+}
+
+function queueMobileModalStateSync() {
+    if (sbState.mobileModal.syncFrame) {
+        return;
+    }
+
+    sbState.mobileModal.syncFrame = window.requestAnimationFrame(() => {
+        sbState.mobileModal.syncFrame = 0;
+        syncMobileModalState();
+    });
+}
+
 function forceDrawerState(drawerRootOrId, shouldOpen, drawerIconOrSelector = null) {
     const el = typeof drawerRootOrId === 'string'
         ? document.getElementById(drawerRootOrId)
@@ -3931,6 +4680,7 @@ function forceDrawerState(drawerRootOrId, shouldOpen, drawerIconOrSelector = nul
     el.classList.toggle('openDrawer', Boolean(shouldOpen));
     el.classList.toggle('closedDrawer', !shouldOpen);
     syncDrawerIconState(drawerIconOrSelector, shouldOpen);
+    queueMobileModalStateSync();
 }
 
 function isShellOpen(shellKey) {
@@ -3944,11 +4694,6 @@ function isShellTabOpen(shellKey, tabId) {
 
 function isCharacterPanelOpen() {
     return isDrawerActuallyOpen('right-nav-panel');
-}
-
-function getCharacterPanelMenuType() {
-    const panel = document.getElementById('right-nav-panel');
-    return panel instanceof HTMLElement ? panel.dataset.menuType ?? '' : '';
 }
 
 function hasActiveCharacterChat(context = getSillyTavernContext()) {
@@ -4041,6 +4786,7 @@ function closeCharacterPanel() {
     }
 
     syncChatbarVisibilityState();
+    queueMobileModalStateSync();
 }
 
 function ensureCharacterResizeHandle() {
@@ -4057,9 +4803,6 @@ function ensureCharacterResizeHandle() {
     handle = createElement('div', {
         className: 'sb-shell-resize-handle',
         attrs: {
-            role: 'separator',
-            'aria-orientation': 'both',
-            'aria-label': 'Resize Characters panel',
             title: 'Resize Characters panel',
         },
     });
@@ -4109,6 +4852,7 @@ function toggleCharacterPanel() {
 
         syncChatbarVisibilityState();
         syncDesktopShellSizing();
+        queueMobileModalStateSync();
     });
 }
 
@@ -4130,6 +4874,8 @@ function toggleShellPanel(shellKey, tabId = null) {
         return;
     }
 
+    preloadPanelStylesheets(shellKey, tabId);
+
     if (tabId ? isShellTabOpen(shellKey, tabId) : isShellOpen(shellKey)) {
         if (wasShellJustOpened(shellKey)) {
             return;
@@ -4141,6 +4887,21 @@ function toggleShellPanel(shellKey, tabId = null) {
 
     closeAllDropdowns({ except: shellKey });
     window.requestAnimationFrame(() => openShell(shellKey, tabId));
+}
+
+function preloadPanelStylesheets(shellKey, tabId = null) {
+    const key = `${shellKey}:${tabId || ''}`;
+    const stylesheets = SB_PANEL_STYLESHEETS[key];
+
+    if (!stylesheets || !window.SillyBunnyAssets?.loadStylesheetAsync) {
+        return;
+    }
+
+    for (const stylesheet of stylesheets) {
+        window.SillyBunnyAssets.loadStylesheetAsync(stylesheet.href, { id: stylesheet.id }).catch(error => {
+            console.warn('Failed to load panel stylesheet:', stylesheet.href, error);
+        });
+    }
 }
 
 function isLandingPageVisible() {
@@ -4285,10 +5046,14 @@ function buildUniversalSearchRow() {
             autocomplete: 'off',
             enterkeyhint: 'search',
             spellcheck: 'false',
+            role: 'combobox',
+            'aria-expanded': 'false',
+            'aria-controls': 'sb-universal-search-results',
         },
     });
     const panel = createElement('div', { className: 'sb-universal-search-panel' });
     const searchResults = createElement('div', {
+        id: 'sb-universal-search-results',
         className: 'sb-search-results',
         attrs: {
             role: 'listbox',
@@ -4326,8 +5091,22 @@ function buildUniversalSearchRow() {
     });
 
     searchInput.addEventListener('keydown', event => {
+        const resultButtons = Array.from(searchResults.querySelectorAll('.sb-search-result'));
+
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            if (!resultButtons.length) {
+                return;
+            }
+
+            const direction = event.key === 'ArrowDown' ? 1 : -1;
+            const nextIndex = (sbState.universalSearch.activeIndex + direction + resultButtons.length) % resultButtons.length;
+            setUniversalSearchActiveIndex(nextIndex);
+            return;
+        }
+
         if (event.key === 'Enter') {
-            const firstMatch = searchResults.querySelector('.sb-search-result');
+            const firstMatch = resultButtons[sbState.universalSearch.activeIndex] ?? resultButtons[0];
             if (firstMatch instanceof HTMLButtonElement) {
                 event.preventDefault();
                 firstMatch.click();
@@ -5357,6 +6136,7 @@ async function requestServerAdmin(endpoint, body = {}) {
             : data?.error || data?.message || text || `Request failed with status ${response.status}.`;
         const error = new Error(message);
         error.status = response.status;
+        error.data = data;
         throw error;
     }
 
@@ -5424,6 +6204,18 @@ function setServerAdminButtonLabel(button, isBusy, busyLabel) {
     }
 
     button.textContent = isBusy ? busyLabel : button.dataset.idleLabel;
+}
+
+function describeAutoStashState(result) {
+    if (!result?.stashed) {
+        return '';
+    }
+
+    if (result?.stashPopWarning) {
+        return result.stashPopWarning;
+    }
+
+    return 'Local tracked and untracked changes were auto-stashed and restored.';
 }
 
 function getThumbnailSettingsFromRefs(refs = getServerAdminRefs()) {
@@ -6041,15 +6833,22 @@ async function handleServerAdminUpdate() {
 
         if (!result?.updated) {
             renderServerAdminStatus(nextStatus);
-            setServerAdminMessage(refs.updateNote, result?.message || 'Already up to date.', 'good');
+            const stashMessage = describeAutoStashState(result);
+            setServerAdminMessage(refs.updateNote, [result?.message || 'Already up to date.', stashMessage].filter(Boolean).join('\n'), stashMessage ? 'warn' : 'good');
+            if (stashMessage) {
+                toastr.info(stashMessage, 'Auto-stash');
+            }
             toastr.success(result?.message || 'Already up to date.', 'Server update');
             return;
         }
 
         renderServerAdminStatus(nextStatus);
 
+        const stashMessage = describeAutoStashState(result);
         if (result?.stashPopWarning) {
-            toastr.warning(result.stashPopWarning, 'Auto-stash warning', { timeOut: 10000 });
+            toastr.warning(stashMessage, 'Auto-stash warning', { timeOut: 10000 });
+        } else if (stashMessage) {
+            toastr.info(stashMessage, 'Auto-stash');
         }
 
         if (result?.install?.stdout || result?.install?.stderr) {
@@ -6077,7 +6876,11 @@ async function handleServerAdminUpdate() {
     } catch (error) {
         console.error('Failed to update SillyBunny.', error);
         state.busy = false;
-        setServerAdminMessage(refs.updateNote, error.message || 'Failed to update SillyBunny.', 'danger');
+        const stashMessage = describeAutoStashState(error?.data);
+        if (stashMessage) {
+            toastr.warning(stashMessage, 'Auto-stash warning', { timeOut: 10000 });
+        }
+        setServerAdminMessage(refs.updateNote, [error.message || 'Failed to update SillyBunny.', stashMessage].filter(Boolean).join('\n'), 'danger');
         toastr.error(error.message || 'Failed to update SillyBunny.', 'Server update');
     } finally {
         setServerAdminButtonLabel(refs.updateButton, false, 'Updating…');
@@ -7212,6 +8015,50 @@ function createCompactModeSettingsGroup() {
     return group;
 }
 
+function createFrontendIconSettingsGroup() {
+    const group = createElement('section', {
+        className: 'sb-theme-slider-group sb-frontend-icon-group',
+    });
+    const header = createElement('div', { className: 'sb-frontend-icon-header' });
+    const title = createElement('strong', { text: 'Frontend Icon' });
+    const description = createElement('p', {
+        className: 'sb-theme-slider-caption',
+        text: 'Choose which SillyBunny icon appears in the app chrome, splash screen, and Home panel.',
+    });
+    const options = createElement('div', { className: 'sb-frontend-icon-options' });
+
+    header.append(title, description);
+
+    for (const icon of SB_FRONTEND_ICONS) {
+        const button = createElement('button', {
+            className: 'sb-theme-option sb-frontend-icon-option',
+            attrs: {
+                type: 'button',
+                'data-sb-frontend-icon-option': icon.id,
+            },
+        });
+        const preview = createElement('img', {
+            className: 'sb-frontend-icon-preview',
+            attrs: {
+                src: icon.src,
+                alt: '',
+                loading: 'lazy',
+            },
+        });
+        const copy = createElement('span', { className: 'sb-frontend-icon-copy' });
+        const label = createElement('span', { className: 'sb-theme-option-label', text: icon.label });
+        const meta = createElement('span', { className: 'sb-theme-option-meta', text: icon.description });
+
+        copy.append(label, meta);
+        button.append(preview, copy);
+        button.addEventListener('click', () => setFrontendIconPreference(icon.id));
+        options.appendChild(button);
+    }
+
+    group.append(header, options);
+    return group;
+}
+
 function updateShortcutButton(side) {
     const buttonId = side === 'left' ? 'sb-shortcut-left' : 'sb-shortcut-right';
     const button = document.getElementById(buttonId);
@@ -7368,6 +8215,7 @@ function injectThemePicker() {
     });
     const topbarLabelSettingsGroup = createTopbarLabelSettingsGroup();
     const compactModeSettingsGroup = createCompactModeSettingsGroup();
+    const frontendIconSettingsGroup = createFrontendIconSettingsGroup();
     const shortcutSettingsGroup = createShortcutSettingsGroup();
     header.append(title, description);
 
@@ -7392,7 +8240,7 @@ function injectThemePicker() {
     getMessageStyleSelect()?.addEventListener('change', updateThemePickerUi);
     document.addEventListener('sb:chat-style-updated', updateThemePickerUi);
 
-    card.append(header, optionRow, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
+    card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
     themeBlock.prepend(card);
     updateThemePickerUi();
 }
@@ -7412,6 +8260,13 @@ function updateThemePickerUi() {
     for (const button of document.querySelectorAll('[data-sb-theme-option]')) {
         const themeId = button.getAttribute('data-sb-theme-option');
         const isActive = themeId === sbState.theme;
+        button.classList.toggle('is-selected', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+    }
+
+    for (const button of document.querySelectorAll('[data-sb-frontend-icon-option]')) {
+        const iconId = button.getAttribute('data-sb-frontend-icon-option');
+        const isActive = iconId === sbState.frontendIcon;
         button.classList.toggle('is-selected', isActive);
         button.setAttribute('aria-pressed', String(isActive));
     }
@@ -7677,6 +8532,8 @@ function renderUniversalSearchResults(query) {
     }
 
     results.replaceChildren();
+    searchState.activeIndex = -1;
+    searchState.input?.removeAttribute('aria-activedescendant');
 
     if (!searchState.expanded) {
         results.classList.remove('is-visible');
@@ -7692,37 +8549,61 @@ function renderUniversalSearchResults(query) {
     }
 
     const matches = collectGlobalSearchMatches(trimmedQuery);
-
+    const groupedMatches = new Map();
     for (const match of matches) {
-        const button = createElement('button', {
-            className: 'sb-search-result',
+        const groupLabel = `${match.shellLabel} · ${match.tabLabel}`;
+        if (!groupedMatches.has(groupLabel)) {
+            groupedMatches.set(groupLabel, []);
+        }
+        groupedMatches.get(groupLabel).push(match);
+    }
+
+    for (const [groupLabel, groupMatches] of groupedMatches.entries()) {
+        const group = createElement('div', {
+            className: 'sb-search-result-group',
             attrs: {
-                type: 'button',
+                role: 'group',
+                'aria-label': groupLabel,
             },
         });
-        const detailText = normalizeText(match.displayText) === normalizeText(match.sectionLabel)
-            ? `Jump straight to this item in ${match.tabLabel}.`
-            : match.displayText;
-        const sectionDisplay = match.sectionLabel === match.tabLabel
-            ? match.displayText || match.tabLabel
-            : match.sectionLabel;
+        group.appendChild(createElement('div', { className: 'sb-search-result-group-label', text: groupLabel }));
 
-        button.appendChild(createElement('strong', { text: sectionDisplay }));
+        for (const match of groupMatches) {
+            const button = createElement('button', {
+                className: 'sb-search-result',
+                attrs: {
+                    type: 'button',
+                    role: 'option',
+                    id: `sb-search-result-${results.querySelectorAll('.sb-search-result').length}`,
+                    'aria-selected': 'false',
+                },
+            });
+            const detailText = normalizeText(match.displayText) === normalizeText(match.sectionLabel)
+                ? `Jump straight to this item in ${match.tabLabel}.`
+                : match.displayText;
+            const sectionDisplay = match.sectionLabel === match.tabLabel
+                ? match.displayText || match.tabLabel
+                : match.sectionLabel;
 
-        if (sectionDisplay !== match.displayText) {
-            button.appendChild(createElement('span', { text: detailText }));
+            button.appendChild(createElement('strong', { text: sectionDisplay }));
+
+            if (sectionDisplay !== match.displayText) {
+                button.appendChild(createElement('span', { text: detailText }));
+            }
+
+            button.appendChild(createElement('small', {
+                text: typeof match.action === 'function' ? 'Quick action' : 'Jump to setting',
+            }));
+
+            button.addEventListener('click', () => {
+                clearUniversalSearch({ blur: true });
+                revealSearchMatch(match.shellKey, match);
+            });
+
+            group.appendChild(button);
         }
 
-        button.appendChild(createElement('small', {
-            text: `${match.shellLabel} · ${match.tabLabel}`,
-        }));
-
-        button.addEventListener('click', () => {
-            clearUniversalSearch({ blur: true });
-            revealSearchMatch(match.shellKey, match);
-        });
-
-        results.appendChild(button);
+        results.appendChild(group);
     }
 
     if (!results.childElementCount) {
@@ -7734,6 +8615,35 @@ function renderUniversalSearchResults(query) {
     }
 
     results.classList.add('is-visible');
+    setUniversalSearchActiveIndex(results.querySelector('.sb-search-result') ? 0 : -1);
+}
+
+function setUniversalSearchActiveIndex(index) {
+    const searchState = getUniversalSearchState();
+    const results = searchState.results;
+    const input = searchState.input;
+
+    if (!(results instanceof HTMLElement)) {
+        return;
+    }
+
+    const buttons = Array.from(results.querySelectorAll('.sb-search-result'));
+    searchState.activeIndex = buttons.length ? Math.min(Math.max(index, 0), buttons.length - 1) : -1;
+
+    for (let i = 0; i < buttons.length; i++) {
+        const button = buttons[i];
+        const active = i === searchState.activeIndex;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-selected', String(active));
+        if (active) {
+            input?.setAttribute('aria-activedescendant', button.id);
+            button.scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    if (searchState.activeIndex === -1) {
+        input?.removeAttribute('aria-activedescendant');
+    }
 }
 
 function expandHiddenAccordions(target) {
@@ -7801,6 +8711,8 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
         return;
     }
 
+    preloadPanelStylesheets(shellKey, tabId);
+
     const previousTab = shellState.tabs.get(shellState.activeTabId);
     shellState.activeTabId = tabId;
     safeSetItem(shellConfig.storageKey, tabId);
@@ -7819,11 +8731,7 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
     const activeTab = shellState.tabs.get(tabId);
     shellState.headerTitle.textContent = activeTab.label;
     shellState.headerSubtitle.textContent = activeTab.description;
-    activeTab.button?.scrollIntoView({
-        block: 'nearest',
-        inline: 'nearest',
-        behavior: focusButton ? 'smooth' : 'auto',
-    });
+    scrollShellTabButtonIntoView(shellState.nav, activeTab.button, { smooth: focusButton });
     shellState.updateNavScrollIndicators?.();
 
     if (focusButton) {
@@ -7868,9 +8776,6 @@ function openShell(shellKey, tabId = null) {
     }
 
     if (!shellRoot.classList.contains('openDrawer')) {
-        triggerDrawerToggle(shellConfig.hostToggleSelector);
-        // Open managed shells immediately so cross-shell switches do not flash
-        // through a fully closed state before the legacy drawer handler settles.
         forceDrawerState(shellRoot, true, shellConfig.hostIconSelector);
         window.requestAnimationFrame(() => {
             if (!isDrawerActuallyOpen(shellRoot)) {
@@ -7955,8 +8860,81 @@ function buildShell(shellKey) {
     const scrollNavByPage = direction => {
         nav.scrollBy({
             left: direction * Math.max(nav.clientWidth * 0.72, 160),
-            behavior: 'smooth',
+            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
         });
+    };
+
+    let navTouchDrag = null;
+    let suppressNavClickUntil = 0;
+
+    const clearNavTouchDrag = () => {
+        navTouchDrag = null;
+    };
+
+    const finishNavTouchDrag = event => {
+        if (navTouchDrag?.dragging) {
+            suppressNavClickUntil = Date.now() + 350;
+            event.stopPropagation();
+        }
+
+        clearNavTouchDrag();
+    };
+
+    const beginNavTouchDrag = event => {
+        const touch = event.touches?.[0];
+
+        if (!isMobileViewport() || !touch) {
+            clearNavTouchDrag();
+            return;
+        }
+
+        navTouchDrag = {
+            x: touch.clientX,
+            y: touch.clientY,
+            scrollLeft: nav.scrollLeft,
+            dragging: false,
+        };
+    };
+
+    const updateNavTouchDrag = event => {
+        if (!navTouchDrag) {
+            return;
+        }
+
+        const touch = event.touches?.[0];
+
+        if (!touch) {
+            clearNavTouchDrag();
+            return;
+        }
+
+        const deltaX = touch.clientX - navTouchDrag.x;
+        const deltaY = touch.clientY - navTouchDrag.y;
+
+        navTouchDrag.dragging = navTouchDrag.dragging
+            || Math.abs(deltaX) > SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX
+            || Math.abs(deltaY) > SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX;
+
+        if (!navTouchDrag.dragging) {
+            return;
+        }
+
+        if (event.cancelable) {
+            event.preventDefault();
+        }
+
+        event.stopPropagation();
+        nav.scrollLeft = navTouchDrag.scrollLeft - deltaX;
+        updateNavScrollIndicators();
+    };
+
+    const suppressClickAfterNavDrag = event => {
+        if (Date.now() >= suppressNavClickUntil) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
     };
 
     const updateNavScrollIndicators = () => {
@@ -7969,6 +8947,11 @@ function buildShell(shellKey) {
     };
 
     nav.addEventListener('scroll', updateNavScrollIndicators, { passive: true });
+    nav.addEventListener('click', suppressClickAfterNavDrag, true);
+    nav.addEventListener('touchstart', beginNavTouchDrag, { passive: true });
+    nav.addEventListener('touchmove', updateNavTouchDrag, { passive: false });
+    nav.addEventListener('touchend', finishNavTouchDrag, { passive: true });
+    nav.addEventListener('touchcancel', clearNavTouchDrag, { passive: true });
     window.addEventListener('resize', updateNavScrollIndicators, { passive: true });
     navScrollLeft.addEventListener('click', () => scrollNavByPage(-1));
     navScrollRight.addEventListener('click', () => scrollNavByPage(1));
@@ -7993,7 +8976,6 @@ function buildShell(shellKey) {
     const resizeHandle = createElement('div', {
         className: 'sb-shell-resize-handle',
         attrs: {
-            'aria-hidden': 'true',
             title: `Resize ${shellConfig.title}`,
         },
     });
@@ -8038,10 +9020,12 @@ function buildShell(shellKey) {
             activeTab?.onActivate?.();
             dispatchShellTabActivated(shellKey, activeTab);
             updateNavScrollIndicators();
+            queueMobileModalStateSync();
             return;
         }
 
         shellState.tabs.get(shellState.activeTabId)?.onDeactivate?.();
+        queueMobileModalStateSync();
     }).observe(shellRoot, { attributes: true, attributeFilter: ['class'] });
 
     const basePanel = createShellPanel(shellConfig.baseTab);
@@ -8407,6 +9391,14 @@ function buildMobileNav() {
             return;
         }
 
+        if (!event.isTrusted) {
+            return;
+        }
+
+        if (performance.now() - sbState.mobileNav.lastOpenedAt < SB_MOBILE_NAV_OPEN_GRACE_MS) {
+            return;
+        }
+
         // Don't close if clicking the hamburger button itself
         if (target.closest('#sb-hamburger')) {
             return;
@@ -8436,6 +9428,10 @@ function setMobileNavOpenState(isOpen) {
         return;
     }
 
+    if (shouldOpen) {
+        sbState.mobileNav.lastOpenedAt = performance.now();
+    }
+
     overlay.hidden = !shouldOpen;
     overlay.classList.toggle('sb-nav-open', shouldOpen);
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
@@ -8449,6 +9445,8 @@ function setMobileNavOpenState(isOpen) {
     button.innerHTML = shouldOpen
         ? '<i class="fa-solid fa-xmark" aria-hidden="true"></i>'
         : '<i class="fa-solid fa-bars" aria-hidden="true"></i>';
+
+    queueMobileModalStateSync();
 }
 
 function toggleMobileNav() {
@@ -8477,6 +9475,8 @@ function closeMobileNav() {
 }
 
 function injectCharacterDrawerControls() {
+    document.getElementById('right-nav-panel')?.classList.add('sb-character-drawer-root');
+
     const target = document.getElementById('CharListButtonAndHotSwaps');
     if (!(target instanceof HTMLElement)) {
         return;
@@ -8503,6 +9503,26 @@ function injectCharacterDrawerControls() {
         target.appendChild(lockButton);
     }
 
+    let backButton = target.querySelector('#sb-character-back-to-list');
+    if (!(backButton instanceof HTMLButtonElement)) {
+        backButton = createElement('button', {
+            id: 'sb-character-back-to-list',
+            className: 'sb-character-back-to-list menu_button menu_button_icon',
+            attrs: {
+                type: 'button',
+                title: 'Back to characters list',
+                'aria-label': 'Back to characters list',
+            },
+        });
+
+        backButton.innerHTML = '<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>';
+        backButton.addEventListener('click', () => {
+            showCharacterListView();
+            syncChatbarVisibilityState();
+        });
+        target.appendChild(backButton);
+    }
+
     let closeButton = target.querySelector('#sb-character-mobile-close');
     if (!(closeButton instanceof HTMLButtonElement)) {
         closeButton = createElement('button', {
@@ -8517,12 +9537,6 @@ function injectCharacterDrawerControls() {
 
         closeButton.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
         closeButton.addEventListener('click', () => {
-            if (['character_edit', 'create'].includes(getCharacterPanelMenuType())) {
-                showCharacterListView();
-                syncChatbarVisibilityState();
-                return;
-            }
-
             closeCharacterPanel();
         });
         target.appendChild(closeButton);
@@ -8539,8 +9553,7 @@ function bindCharacterEditorExitButton() {
 
     button.dataset.sbBound = 'true';
     button.addEventListener('click', () => {
-        showCharacterListView();
-        syncChatbarVisibilityState();
+        closeCharacterPanel();
     });
 }
 
@@ -8794,6 +9807,7 @@ function syncMobileViewportState() {
     syncChatbarVisibilityState();
     updateTopBarBrand();
     scheduleTopbarContextRefresh(0);
+    syncMobileModalState();
 }
 
 function reinitSelect2AfterShell() {
@@ -9187,6 +10201,7 @@ function togglePersonaPicker() {
     const existing = document.getElementById('sb-persona-picker');
     if (existing) {
         existing.remove();
+        document.getElementById('sb-persona-bubble')?.focus({ preventScroll: true });
         return;
     }
 
@@ -9195,7 +10210,13 @@ function togglePersonaPicker() {
 
     const { personas, currentAvatarId } = getCurrentPersonaSelection(context);
     const personaDescriptions = context?.powerUserSettings?.persona_descriptions ?? {};
-    const picker = createElement('div', { id: 'sb-persona-picker' });
+    const picker = createElement('div', {
+        id: 'sb-persona-picker',
+        attrs: {
+            role: 'listbox',
+            'aria-label': 'Choose persona',
+        },
+    });
 
     const keys = Object.keys(personas).filter(avatarId => {
         const name = personas[avatarId];
@@ -9205,7 +10226,7 @@ function togglePersonaPicker() {
     });
 
     if (!keys.length) {
-        const empty = createElement('div', { className: 'sb-persona-option' });
+        const empty = createElement('div', { className: 'sb-persona-option-empty' });
         empty.textContent = 'No personas defined';
         picker.appendChild(empty);
     } else {
@@ -9221,6 +10242,9 @@ function togglePersonaPicker() {
     if (bubble instanceof HTMLElement) {
         document.body.appendChild(picker);
         positionPersonaPicker(picker, bubble);
+        const activeOption = picker.querySelector('.sb-persona-option.is-active');
+        const firstOption = picker.querySelector('.sb-persona-option');
+        (activeOption ?? firstOption)?.focus({ preventScroll: true });
     }
 }
 
@@ -9250,9 +10274,66 @@ function positionPersonaPicker(picker, bubble) {
     });
 }
 
+function closePersonaPicker({ restoreFocus = false } = {}) {
+    const picker = document.getElementById('sb-persona-picker');
+    if (picker) {
+        picker.remove();
+    }
+
+    if (restoreFocus) {
+        document.getElementById('sb-persona-bubble')?.focus({ preventScroll: true });
+    }
+}
+
+function focusPersonaOption(picker, offset) {
+    const options = Array.from(picker.querySelectorAll('.sb-persona-option'));
+    const currentIndex = options.indexOf(document.activeElement);
+    const nextIndex = currentIndex === -1
+        ? 0
+        : (currentIndex + offset + options.length) % options.length;
+    options[nextIndex]?.focus({ preventScroll: true });
+}
+
+async function selectPersonaOption(option, picker, avatarId, context) {
+    picker.querySelectorAll('.sb-persona-option').forEach(element => {
+        element.classList.toggle('is-active', element === option);
+        element.setAttribute('aria-selected', String(element === option));
+    });
+    closePersonaPicker();
+    const execSlash = context?.executeSlashCommandsWithOptions;
+    let switched = false;
+    if (typeof execSlash === 'function') {
+        try {
+            await execSlash(`/persona-set ${quoteSlashCommandArgument(avatarId)}`);
+            switched = true;
+        } catch (error) {
+            console.warn('[SillyBunny] Persona switch via slash command failed, falling back to DOM selection.', error);
+        }
+    }
+
+    if (!switched) {
+        // Fallback: try clicking the DOM avatar
+        const avatarBlock = document.getElementById('user_avatar_block');
+        const domAvatar = avatarBlock?.querySelector(`.avatar-container[title="${CSS.escape(avatarId)}"]`);
+        if (domAvatar instanceof HTMLElement) {
+            domAvatar.click();
+        } else {
+            openShell('right', 'persona');
+        }
+    }
+
+    updatePersonaBubble();
+    document.getElementById('sb-persona-bubble')?.focus({ preventScroll: true });
+}
+
 function addPersonaOption(picker, avatarId, name, title, isActive, context) {
-    const option = createElement('div', {
+    const option = createElement('button', {
         className: `sb-persona-option${isActive ? ' is-active' : ''}`,
+        attrs: {
+            type: 'button',
+            role: 'option',
+            'aria-selected': String(isActive),
+        },
     });
 
     const img = createElement('img', {
@@ -9278,30 +10359,24 @@ function addPersonaOption(picker, avatarId, name, title, isActive, context) {
         option.append(img, label);
     }
 
-    option.addEventListener('click', async () => {
-        picker.remove();
-        const execSlash = context?.executeSlashCommandsWithOptions;
-        let switched = false;
-        if (typeof execSlash === 'function') {
-            try {
-                await execSlash(`/persona-set ${quoteSlashCommandArgument(avatarId)}`);
-                switched = true;
-            } catch (error) {
-                console.warn('[SillyBunny] Persona switch via slash command failed, falling back to DOM selection.', error);
-            }
+    option.addEventListener('click', () => { void selectPersonaOption(option, picker, avatarId, context); });
+    option.addEventListener('keydown', event => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            focusPersonaOption(picker, 1);
+        } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+            event.preventDefault();
+            focusPersonaOption(picker, -1);
+        } else if (event.key === 'Home') {
+            event.preventDefault();
+            picker.querySelector('.sb-persona-option')?.focus({ preventScroll: true });
+        } else if (event.key === 'End') {
+            event.preventDefault();
+            Array.from(picker.querySelectorAll('.sb-persona-option')).at(-1)?.focus({ preventScroll: true });
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            closePersonaPicker({ restoreFocus: true });
         }
-
-        if (!switched) {
-            // Fallback: try clicking the DOM avatar
-            const avatarBlock = document.getElementById('user_avatar_block');
-            const domAvatar = avatarBlock?.querySelector(`.avatar-container[title="${CSS.escape(avatarId)}"]`);
-            if (domAvatar instanceof HTMLElement) {
-                domAvatar.click();
-            } else {
-                openShell('right', 'persona');
-            }
-        }
-        updatePersonaBubble();
     });
 
     picker.appendChild(option);
@@ -9359,6 +10434,7 @@ function initAll() {
     injectCharacterDrawerControls();
     bindCharacterEditorExitButton();
     setShellTheme(sbState.theme, { persist: false });
+    setFrontendIconPreference(sbState.frontendIcon, { persist: false });
     setSurfaceTransparency(sbState.surfaceTransparency, { persist: false });
     setCompactMode(sbState.compactMode, { persist: false });
     setCharacterDrawerRightLock(sbState.characterDrawer.rightLocked, { persist: false });
@@ -9377,6 +10453,7 @@ function initAll() {
     scheduleBottomChatBarRefresh(0);
     bindTopbarDragEvents();
     bindChatbarEvents();
+    bindClearCookiesAndCacheButton();
     scheduleChatbarRefresh(0);
     interceptDrawerOpeners();
     bindWorldInfoRoute();
@@ -9387,6 +10464,12 @@ function initAll() {
     window.addEventListener('resize', syncMobileViewportState, { passive: true });
     window.addEventListener('orientationchange', syncMobileViewportState);
 
+    // SillyBunny: re-sync shell width when the chat width slider changes so settings
+    // panels narrow alongside the chat container (matches standard ST behaviour).
+    $(document).on('input change mouseup touchend', '#chat_width_slider', () => {
+        syncDesktopShellSizing();
+    });
+
     // Reinitialize Select2 widgets after shell reparents DOM elements.
     // Select2 bindings break when elements are moved in the DOM.
     reinitSelect2AfterShell();
@@ -9394,7 +10477,7 @@ function initAll() {
     // Group Advanced Formatting sections into collapsible drawers
     groupAdvancedFormattingIntoDrawers();
 
-    window.SillyBunnyShell = {
+    window.SillyBunnyShell = Object.assign(window.SillyBunnyShell || {}, {
         openTab(shellKey, tabId) {
             if (SB_SHELLS[shellKey]) {
                 openShell(shellKey, tabId);
@@ -9409,6 +10492,9 @@ function initAll() {
         },
         applyTheme(themeId) {
             setShellTheme(themeId);
+        },
+        setFrontendIcon(iconId) {
+            setFrontendIconPreference(iconId);
         },
         setSurfaceTransparency(value) {
             setSurfaceTransparency(value);
@@ -9444,6 +10530,9 @@ function initAll() {
         getTheme() {
             return sbState.theme;
         },
+        getFrontendIcon() {
+            return sbState.frontendIcon;
+        },
         getSurfaceTransparency() {
             return sbState.surfaceTransparency;
         },
@@ -9458,7 +10547,7 @@ function initAll() {
         getCompactMode() {
             return sbState.compactMode;
         },
-    };
+    });
 }
 
 // Init shell UI as soon as DOM is ready.

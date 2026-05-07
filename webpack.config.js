@@ -9,6 +9,8 @@ import { serverDirectory } from './src/server-directory.js';
 import { getVersion, color } from './src/util.js';
 
 const BUN_LIB_BUNDLE_SIGNATURE = 'bun-no-minify-v1';
+const WEBPACK_CACHE_KEEP_COUNT = 3;
+const PUBLIC_LIB_FILENAME = 'lib.js';
 
 function hashFileIfPresent(hasher, filePath) {
     if (!fs.existsSync(filePath)) {
@@ -25,20 +27,20 @@ function getPublicLibInputsSignature() {
 
     hashFileIfPresent(hasher, path.join(serverDirectory, 'public', 'lib.js'));
     hashFileIfPresent(hasher, path.join(serverDirectory, 'package.json'));
+    hashFileIfPresent(hasher, path.join(serverDirectory, 'package-lock.json'));
     hashFileIfPresent(hasher, path.join(serverDirectory, 'bun.lock'));
 
     return hasher.digest('hex');
 }
 
 /**
- * Generate a cache version string based on the application version, Git revision, and Webpack version.
+ * Generate a cache version string based on the application version, Webpack version, runtime, and public lib inputs.
  * @returns {string} The cache version string.
  */
 function getWebpackCacheVersion() {
     return crypto.createHash('shake256', { outputLength: 8 })
         .update(JSON.stringify([
             appVersion.pkgVersion,
-            appVersion.gitRevision,
             webpack.version,
             isBunRuntime() ? BUN_LIB_BUNDLE_SIGNATURE : 'default',
             getPublicLibInputsSignature(),
@@ -50,8 +52,10 @@ function getWebpackCacheVersion() {
  * Prune old Webpack cache directories that do not match the current cache version.
  * @param {string} webpackRoot The root directory where Webpack caches are stored.
  * @param {string} currentCacheVersion The current cache version to keep.
+ * @param {object} options Options.
+ * @param {number} [options.keepCount=WEBPACK_CACHE_KEEP_COUNT] Number of recent cache directories to keep.
  */
-function pruneWebpackCache(webpackRoot, currentCacheVersion) {
+function pruneWebpackCache(webpackRoot, currentCacheVersion, { keepCount = WEBPACK_CACHE_KEEP_COUNT } = {}) {
     try {
         if (!fs.existsSync(webpackRoot)) {
             return;
@@ -59,16 +63,32 @@ function pruneWebpackCache(webpackRoot, currentCacheVersion) {
 
         const cacheDirectories = fs.readdirSync(webpackRoot, { withFileTypes: true })
             .filter(dirent => dirent.isDirectory())
-            .map(dirent => dirent.name);
+            .map((dirent) => {
+                const dirPath = path.join(webpackRoot, dirent.name);
+                return {
+                    name: dirent.name,
+                    path: dirPath,
+                    mtimeMs: fs.statSync(dirPath).mtimeMs,
+                };
+            })
+            .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+        const keepDirectories = new Set([currentCacheVersion]);
+        for (const dir of cacheDirectories) {
+            if (keepDirectories.size >= keepCount) {
+                break;
+            }
+
+            keepDirectories.add(dir.name);
+        }
 
         for (const dir of cacheDirectories) {
-            const dirPath = path.join(webpackRoot, dir);
-            if (dir !== currentCacheVersion) {
+            if (!keepDirectories.has(dir.name)) {
                 try {
-                    fs.rmSync(dirPath, { recursive: true, force: true });
-                    console.debug(`Removed outdated cache directory: ${color.yellow(dir)}`);
+                    fs.rmSync(dir.path, { recursive: true, force: true });
+                    console.debug(`Removed outdated cache directory: ${color.yellow(dir.name)}`);
                 } catch (error) {
-                    console.error(`Failed to remove Webpack cache directory: ${color.red(dir)}`, error);
+                    console.error(`Failed to remove Webpack cache directory: ${color.red(dir.name)}`, error);
                 }
             }
         }
@@ -79,6 +99,64 @@ function pruneWebpackCache(webpackRoot, currentCacheVersion) {
 
 const appVersion = await getVersion();
 
+function getWebpackRoot({ forceDist = false } = {}) {
+    if (forceDist || isDocker()) {
+        return path.resolve(process.cwd(), 'dist', '_webpack');
+    }
+
+    if (typeof globalThis.DATA_ROOT === 'string') {
+        return path.resolve(globalThis.DATA_ROOT, '_webpack');
+    }
+
+    throw new Error('DATA_ROOT variable is not set.');
+}
+
+function getCacheDirectory(webpackRoot, cacheVersion) {
+    return path.join(webpackRoot, cacheVersion, 'cache');
+}
+
+function getOutputDirectory(webpackRoot, cacheVersion) {
+    return path.join(webpackRoot, cacheVersion, 'output');
+}
+
+/**
+ * Get the resolved output paths for the public lib bundle.
+ * @param {object} options Configuration options.
+ * @param {boolean} [options.forceDist=false] Whether to force the use the /dist folder.
+ * @returns {{ webpackRoot: string, cacheVersion: string, cacheDirectory: string, outputDirectory: string, outputFile: string, outputFilePath: string }}
+ */
+export function getPublicLibCacheInfo({ forceDist = false } = {}) {
+    const webpackRoot = getWebpackRoot({ forceDist });
+    const cacheVersion = getWebpackCacheVersion();
+    const cacheDirectory = getCacheDirectory(webpackRoot, cacheVersion);
+    const outputDirectory = getOutputDirectory(webpackRoot, cacheVersion);
+    const outputFile = PUBLIC_LIB_FILENAME;
+    const outputFilePath = path.join(outputDirectory, outputFile);
+
+    return {
+        webpackRoot,
+        cacheVersion,
+        cacheDirectory,
+        outputDirectory,
+        outputFile,
+        outputFilePath,
+    };
+}
+
+/**
+ * Prune older public lib cache directories after a successful compile.
+ * @param {object} options Options.
+ * @param {boolean} [options.forceDist=false] Whether to force the use the /dist folder.
+ * @param {string} [options.currentCacheVersion] Cache version to preserve.
+ * @param {number} [options.keepCount=WEBPACK_CACHE_KEEP_COUNT] Number of recent cache directories to keep.
+ * @returns {void}
+ */
+export function prunePublicLibCache({ forceDist = false, currentCacheVersion = undefined, keepCount = WEBPACK_CACHE_KEEP_COUNT } = {}) {
+    const webpackRoot = getWebpackRoot({ forceDist });
+    const cacheVersion = currentCacheVersion ?? getWebpackCacheVersion();
+    pruneWebpackCache(webpackRoot, cacheVersion, { keepCount });
+}
+
 /**
  * Get the Webpack configuration for the public/lib.js file.
  * 1. Docker has got cache and the output file pre-baked.
@@ -86,34 +164,17 @@ const appVersion = await getVersion();
  * @param {object} options Configuration options.
  * @param {boolean} [options.forceDist=false] Whether to force the use the /dist folder.
  * @param {boolean} [options.pruneCache=false] Whether to prune old cache directories.
+ * @param {string} [options.outputPath] Override for the Webpack output directory.
  * @returns {import('webpack').Configuration}
  * @throws {Error} If the DATA_ROOT variable is not set.
  * */
-export default function getPublicLibConfig({ forceDist = false, pruneCache = false } = {}) {
-    function getWebpackRoot() {
-        if (forceDist || isDocker()) {
-            return path.resolve(process.cwd(), 'dist', '_webpack');
-        }
-
-        if (typeof globalThis.DATA_ROOT === 'string') {
-            return path.resolve(globalThis.DATA_ROOT, '_webpack');
-        }
-
-        throw new Error('DATA_ROOT variable is not set.');
-    }
-
-    function getCacheDirectory() {
-        return path.join(webpackRoot, cacheVersion, 'cache');
-    }
-
-    function getOutputDirectory() {
-        return path.join(webpackRoot, cacheVersion, 'output');
-    }
-
-    const webpackRoot = getWebpackRoot();
-    const cacheVersion = getWebpackCacheVersion();
-    const cacheDirectory = getCacheDirectory();
-    const outputDirectory = getOutputDirectory();
+export default function getPublicLibConfig({ forceDist = false, pruneCache = false, outputPath = undefined } = {}) {
+    const {
+        webpackRoot,
+        cacheVersion,
+        cacheDirectory,
+        outputDirectory,
+    } = getPublicLibCacheInfo({ forceDist });
 
     if (pruneCache) {
         pruneWebpackCache(webpackRoot, cacheVersion);
@@ -152,8 +213,8 @@ export default function getPublicLibConfig({ forceDist = false, pruneCache = fal
             minimize,
         },
         output: {
-            path: outputDirectory,
-            filename: 'lib.js',
+            path: outputPath ?? outputDirectory,
+            filename: PUBLIC_LIB_FILENAME,
             libraryTarget: 'module',
         },
     };

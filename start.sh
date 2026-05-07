@@ -29,6 +29,11 @@ prefer_node_runtime() {
         return 0
     fi
 
+    # Forced Bun override for users who accept the ARM/macOS CPU tradeoff
+    if is_truthy "${SILLYBUNNY_USE_BUN:-}"; then
+        return 1
+    fi
+
     # Termux always prefers Node unless overridden
     if is_termux; then
         case "${SILLYBUNNY_TERMUX_RUNTIME:-auto}" in
@@ -250,6 +255,8 @@ if ! "$RUNTIME_CMD" "$SCRIPT_DIR/scripts/dependency-state.js" check "$dependency
 else
     echo "Dependencies are up to date."
 fi
+
+"$PACKAGE_MANAGER_CMD" run init
 
 echo "Entering SillyBunny..."
 export NODE_NO_WARNINGS=1

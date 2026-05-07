@@ -5,7 +5,15 @@ import express from 'express';
 import sanitize from 'sanitize-filename';
 import { sync as writeFileAtomicSync } from 'write-file-atomic';
 
-import { getDefaultPresetFile, getDefaultPresets } from './content-manager.js';
+import {
+    clearDefaultPresetDeletion,
+    findDefaultPreset,
+    getDefaultPresetFile,
+    getDefaultPresets,
+    isDefaultPresetDeleted,
+    recordDefaultPresetDeletion,
+    restoreDefaultPresetFiles,
+} from './content-manager.js';
 
 /**
  * Gets the folder and extension for the preset settings based on the API source ID.
@@ -37,6 +45,27 @@ function getPresetSettingsByAPI(apiId, directories) {
     }
 }
 
+function getPresetContentTypeByAPI(apiId) {
+    switch (apiId) {
+        case 'kobold':
+        case 'koboldhorde':
+            return 'kobold_preset';
+        case 'novel':
+            return 'novel_preset';
+        case 'textgenerationwebui':
+            return 'textgen_preset';
+        case 'openai':
+            return 'openai_preset';
+        case 'instruct':
+        case 'context':
+        case 'sysprompt':
+        case 'reasoning':
+            return apiId;
+        default:
+            return null;
+    }
+}
+
 export const router = express.Router();
 
 router.post('/save', function (request, response) {
@@ -53,6 +82,21 @@ router.post('/save', function (request, response) {
     }
 
     const fullpath = path.join(settings.folder, filename);
+    const defaultPreset = findDefaultPreset(request.user.directories, { folder: settings.folder, name });
+    const explicitDefaultRestore = Boolean(request.body.restoreDefault);
+
+    if (defaultPreset && isDefaultPresetDeleted(request.user.directories, defaultPreset) && !explicitDefaultRestore) {
+        return response.status(409).send({
+            error: 'This bundled default preset was deleted by the user and will not be recreated unless defaults are explicitly restored.',
+            isDeletedDefault: true,
+            name,
+        });
+    }
+
+    if (defaultPreset && explicitDefaultRestore) {
+        clearDefaultPresetDeletion(request.user.directories, defaultPreset);
+    }
+
     writeFileAtomicSync(fullpath, JSON.stringify(request.body.preset, null, 4), 'utf-8');
     return response.send({ name });
 });
@@ -72,12 +116,23 @@ router.post('/delete', function (request, response) {
 
     const fullpath = path.join(settings.folder, filename);
 
+    const defaultPreset = findDefaultPreset(request.user.directories, { folder: settings.folder, name });
+
     if (fs.existsSync(fullpath)) {
+        if (defaultPreset) {
+            recordDefaultPresetDeletion(request.user.directories, defaultPreset);
+        }
+
         fs.unlinkSync(fullpath);
         return response.sendStatus(200);
-    } else {
-        return response.sendStatus(404);
     }
+
+    if (defaultPreset) {
+        recordDefaultPresetDeletion(request.user.directories, defaultPreset);
+        return response.sendStatus(200);
+    }
+
+    return response.sendStatus(404);
 });
 
 router.post('/restore', function (request, response) {
@@ -88,14 +143,38 @@ router.post('/restore', function (request, response) {
 
         const defaultPreset = defaultPresets.find(p => p.name === name && p.folder === settings.folder);
 
-        const result = { isDefault: false, preset: {} };
+        const result = { isDefault: false, preset: {}, tombstoneCleared: false };
 
         if (defaultPreset) {
             result.isDefault = true;
             result.preset = getDefaultPresetFile(defaultPreset.filename) || {};
+            if (request.body.clearTombstone === true) {
+                result.tombstoneCleared = clearDefaultPresetDeletion(request.user.directories, defaultPreset);
+            }
         }
 
         return response.send(result);
+    } catch (error) {
+        console.error(error);
+        return response.sendStatus(500);
+    }
+});
+
+router.post('/restore-defaults', function (request, response) {
+    try {
+        const apiId = request.body.apiId ? String(request.body.apiId) : '';
+        const contentType = apiId ? getPresetContentTypeByAPI(apiId) : null;
+
+        if (apiId && !contentType) {
+            return response.sendStatus(400);
+        }
+
+        const result = restoreDefaultPresetFiles(request.user.directories, contentType ? [contentType] : null);
+
+        return response.send({
+            ok: result.failed.length === 0,
+            ...result,
+        });
     } catch (error) {
         console.error(error);
         return response.sendStatus(500);

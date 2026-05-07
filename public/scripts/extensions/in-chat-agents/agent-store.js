@@ -411,9 +411,169 @@ export function resolveConnectionProfile(profileId = '') {
 
 export const LEGACY_AGENT_MAX_TOKENS = 2000;
 export const DEFAULT_AGENT_MAX_TOKENS = 8192;
+export const PATHFINDER_TEMPLATE_ID = 'tpl-pathfinder';
 
 export function areAgentsGloballyEnabled() {
     return globalSettings.enabled !== false;
+}
+
+function getAgentTemplateName(value) {
+    return String(value ?? '').trim().toLowerCase();
+}
+
+function isLikelyBundledAgentTemplateMatch(agent, template) {
+    const agentName = getAgentTemplateName(agent?.name);
+    const templateName = getAgentTemplateName(template?.name);
+    if (!agentName || agentName !== templateName) {
+        return false;
+    }
+
+    const agentAuthor = String(agent?.author ?? '').trim().toLowerCase();
+    const templateAuthor = String(template?.author ?? '').trim().toLowerCase();
+    if (!agentAuthor || !templateAuthor || agentAuthor !== templateAuthor) {
+        return false;
+    }
+
+    const agentCategory = normalizeAgentCategory(agent?.category, agent?.sourceTemplateId, agent?.name);
+    const templateCategory = normalizeAgentCategory(template?.category, template?.id, template?.name);
+    return agentCategory === templateCategory;
+}
+
+export function findTemplateForAgentSnapshot(agent, templates = []) {
+    const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+    if (sourceTemplateId) {
+        return templates.find(template => String(template?.id ?? '').trim() === sourceTemplateId) ?? null;
+    }
+
+    const agentName = getAgentTemplateName(agent?.name);
+    const agentPrompt = String(agent?.prompt ?? '').trim();
+    if (!agentName) {
+        return null;
+    }
+
+    const exactTemplate = templates.find(template =>
+        getAgentTemplateName(template?.name) === agentName &&
+        String(template?.prompt ?? '').trim() === agentPrompt,
+    );
+    if (exactTemplate) {
+        return exactTemplate;
+    }
+
+    const likelyTemplates = templates.filter(template => isLikelyBundledAgentTemplateMatch(agent, template));
+    return likelyTemplates.length === 1 ? likelyTemplates[0] : null;
+}
+
+function hasPathfinderToolMetadata(agent) {
+    return Array.isArray(agent?.tools) && agent.tools.some(tool => String(tool?.name ?? '').startsWith('Pathfinder_'));
+}
+
+export function isBundledPathfinderAgentSnapshot(agent, templates = []) {
+    const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+    if (sourceTemplateId === PATHFINDER_TEMPLATE_ID) {
+        return true;
+    }
+
+    const template = findTemplateForAgentSnapshot(agent, templates);
+    if (String(template?.id ?? '').trim() === PATHFINDER_TEMPLATE_ID) {
+        return true;
+    }
+
+    const agentName = String(agent?.name ?? '').trim().toLowerCase();
+    const agentPrompt = String(agent?.prompt ?? '').trim();
+    const agentAuthor = String(agent?.author ?? '').trim().toLowerCase();
+    const category = normalizeAgentCategory(agent?.category, agent?.sourceTemplateId, agent?.name);
+    return agentName === 'pathfinder' &&
+        category === 'tool' &&
+        agentPrompt === '' &&
+        (agentAuthor === 'sillybunny' || hasPathfinderToolMetadata(agent));
+}
+
+function getBundledAgentDuplicateKey(agent, templates = []) {
+    if (isBundledPathfinderAgentSnapshot(agent, templates)) {
+        return `template\u0000${PATHFINDER_TEMPLATE_ID}`;
+    }
+
+    const agentName = String(agent?.name ?? '').trim().toLowerCase();
+    const agentPrompt = String(agent?.prompt ?? '').trim();
+    if (!agentName || !agentPrompt) {
+        return '';
+    }
+
+    return `${agentName}\u0000${agentPrompt}`;
+}
+
+function getPathfinderKeepRank(agent) {
+    const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+    if (sourceTemplateId === PATHFINDER_TEMPLATE_ID && !agent?.phaseLocked) {
+        return 0;
+    }
+    if (sourceTemplateId === PATHFINDER_TEMPLATE_ID) {
+        return 1;
+    }
+    if (!agent?.phaseLocked) {
+        return 2;
+    }
+    return 3;
+}
+
+function choosePathfinderAgentToKeep(agents) {
+    return [...agents].sort((a, b) => getPathfinderKeepRank(a) - getPathfinderKeepRank(b))[0] ?? null;
+}
+
+export function getRedundantBundledAgentDuplicateIds(agentList = [], templateList = []) {
+    const groupedAgents = new Map();
+
+    for (const agent of agentList) {
+        const key = getBundledAgentDuplicateKey(agent, templateList);
+        if (!key) {
+            continue;
+        }
+
+        if (!groupedAgents.has(key)) {
+            groupedAgents.set(key, []);
+        }
+
+        groupedAgents.get(key).push(agent);
+    }
+
+    const redundantIds = new Set();
+
+    for (const grouped of groupedAgents.values()) {
+        if (grouped.length < 2) {
+            continue;
+        }
+
+        const pathfinderAgents = grouped.filter(agent => isBundledPathfinderAgentSnapshot(agent, templateList));
+        if (pathfinderAgents.length > 1) {
+            const keepAgent = choosePathfinderAgentToKeep(pathfinderAgents);
+            for (const agent of pathfinderAgents) {
+                if (agent?.id && agent.id !== keepAgent?.id && !agent.phaseLocked) {
+                    redundantIds.add(agent.id);
+                }
+            }
+            continue;
+        }
+
+        const templateBacked = grouped.filter(agent => String(agent?.sourceTemplateId ?? '').trim());
+        const unsourced = grouped.filter(agent => !String(agent?.sourceTemplateId ?? '').trim());
+
+        if (templateBacked.length !== 1 || unsourced.length === 0) {
+            continue;
+        }
+
+        const template = findTemplateForAgentSnapshot(templateBacked[0], templateList);
+        if (!template) {
+            continue;
+        }
+
+        for (const agent of unsourced) {
+            if (agent?.id && !agent.phaseLocked) {
+                redundantIds.add(agent.id);
+            }
+        }
+    }
+
+    return [...redundantIds];
 }
 
 export function getPromptTransformMode(agent) {

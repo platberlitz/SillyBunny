@@ -13,6 +13,7 @@ let mockActiveBooks;
 let mockContextualBooks;
 let mockEnabledAgents;
 let mockRuntimeAgent;
+let mockSyncToolAgentRegistrations;
 
 await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/tree-store.js', () => ({
     getSettings: jest.fn(() => mockSettings),
@@ -32,6 +33,7 @@ await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/agen
 
 await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/agent-runner.js', () => ({
     getPathfinderRuntimeAgent: jest.fn(() => mockRuntimeAgent),
+    syncToolAgentRegistrations: jest.fn(() => mockSyncToolAgentRegistrations()),
 }));
 
 const { runDiagnostics } = await import('../public/scripts/extensions/in-chat-agents/pathfinder/diagnostics.js');
@@ -53,6 +55,7 @@ describe('Pathfinder diagnostics', () => {
         mockRuntimeAgent = {
             tools: TOOL_NAMES.map(name => ({ name, enabled: true })),
         };
+        mockSyncToolAgentRegistrations = jest.fn();
         globalThis.window = {
             SillyTavern: {
                 getContext: () => ({
@@ -72,6 +75,7 @@ describe('Pathfinder diagnostics', () => {
     test('accepts active enabled Pathfinder tools when each enabled tool is registered', async () => {
         const results = await runDiagnostics();
 
+        expect(mockSyncToolAgentRegistrations).toHaveBeenCalledTimes(1);
         expect(results['Tool Registration']).toEqual({
             ok: true,
             message: 'All 3 enabled Pathfinder tool(s) registered and active',
@@ -86,6 +90,33 @@ describe('Pathfinder diagnostics', () => {
         expect(results['Tool Registration']).toEqual({
             ok: false,
             message: 'Tool mode is enabled, but the Pathfinder tool agent is not active right now. Enable Pathfinder as a tool agent, then reopen settings or reload agents.',
+        });
+    });
+
+    test('uses enabled tools from the active Pathfinder agent instead of registered disabled-state guesses', async () => {
+        mockRuntimeAgent = {
+            tools: [
+                { name: 'Pathfinder_Search', enabled: false },
+                { name: 'Pathfinder_Summarize', enabled: true },
+                { name: 'Pathfinder_Remember', enabled: false },
+            ],
+        };
+        globalThis.window.SillyTavern.getContext = () => ({
+            ToolManager: {
+                tools: new Map([
+                    ['Pathfinder_Search', { name: 'Pathfinder_Search' }],
+                    ['Pathfinder_Summarize', { name: 'Pathfinder_Summarize' }],
+                    ['Pathfinder_Remember', { name: 'Pathfinder_Remember' }],
+                ]),
+                isToolCallingSupported: jest.fn(() => true),
+            },
+        });
+
+        const results = await runDiagnostics();
+
+        expect(results['Tool Registration']).toEqual({
+            ok: true,
+            message: 'All 1 enabled Pathfinder tool(s) registered and active',
         });
     });
 });

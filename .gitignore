@@ -62,3 +62,13 @@ yarn.lock
 *.code-workspace
 test-results/
 .playwright-cli/
+
+# Local UI/performance screenshots
+screenshots/layout-clean-desktop-workspace-20260505.png
+screenshots/layout-clean-mobile-api-sheet-20260505.png
+screenshots/layout-desktop-workspace-20260505.png
+screenshots/layout-mobile-api-sheet-20260505.png
+screenshots/layout-mobile-workspace-20260505.png
+screenshots/sillybunny-ui-polish-desktop-ooc.png
+screenshots/sillybunny-ui-polish-desktop-workspace.png
+screenshots/sillybunny-ui-polish-mobile-workspace.png

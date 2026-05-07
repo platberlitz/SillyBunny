@@ -713,6 +713,7 @@ export function initBookmarks() {
         }
 
         const loaderHandle = loader.show({
+            slug: 'chat-load',
             title: t`Chat History`,
             message: t`Loading chat…`,
             toastMode: loader.ToastMode.STATIC,

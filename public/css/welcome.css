@@ -89,6 +89,7 @@
 
 .welcomePanel.recentHidden:not(.welcomePanel--listOnly) .welcomeRecentShell,
 .welcomePanel.recentHidden .hideRecentChats,
+.welcomePanel.recentHidden .recentChatsSettings,
 .welcomePanel:not(.recentHidden) .showRecentChats {
     display: none;
 }

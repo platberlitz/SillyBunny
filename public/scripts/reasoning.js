@@ -9,6 +9,7 @@ import { chat_completion_sources, getChatCompletionModel, oai_settings } from '.
 import { Popup } from './popup.js';
 import { performFuzzySearch, power_user } from './power-user.js';
 import { getPresetManager } from './preset-manager.js';
+import { shouldReduceStreamingDomWork, shouldRenderLiveReasoningContent } from './mobile-streaming.js';
 import { SlashCommand } from './slash-commands/SlashCommand.js';
 import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from './slash-commands/SlashCommandArgument.js';
 import { commonEnumProviders, enumIcons } from './slash-commands/SlashCommandCommonEnumsProvider.js';
@@ -223,6 +224,7 @@ export function extractReasoningFromData(data, {
                 case chat_completion_sources.NANOGPT:
                 case chat_completion_sources.SILICONFLOW:
                 case chat_completion_sources.ZAI:
+                case chat_completion_sources.WORKERS_AI:
                 case chat_completion_sources.CUSTOM: {
                     return data?.choices?.[0]?.message?.reasoning_content
                         ?? data?.choices?.[0]?.message?.reasoning
@@ -351,6 +353,8 @@ export class ReasoningHandler {
     #parsingReasoningMesStartIndex = null;
     /** @type {ReasoningTemplate?} The template currently being parsed from streamed message text */
     #activeStreamingTemplate = null;
+    /** @type {number} Last time the live reasoning body was rendered */
+    #lastReasoningDomRenderAt = 0;
 
     /**
      * @param {Date?} [timeStarted=null] - When the generation started
@@ -665,14 +669,29 @@ export class ReasoningHandler {
         setDatasetProperty(this.messageReasoningDetailsDom, 'state', this.state);
         setDatasetProperty(this.messageReasoningDetailsDom, 'type', this.type);
 
-        // Update the reasoning message
-        const reasoning = trimSpaces(this.reasoningDisplayText ?? this.reasoning);
-        const displayReasoning = messageFormatting(reasoning, '', false, false, messageId, {}, true);
+        const now = Date.now();
+        const shouldRenderReasoning = shouldRenderLiveReasoningContent({
+            isReducedDomWork: shouldReduceStreamingDomWork(),
+            state: this.state,
+            detailsOpen: Boolean(this.messageReasoningDetailsDom.open),
+            hasRenderedContent: Boolean(this.messageReasoningContentDom.childNodes.length),
+            lastRenderAt: this.#lastReasoningDomRenderAt,
+            now,
+        });
 
-        if (power_user.stream_fade_in) {
-            applyStreamFadeIn(this.messageReasoningContentDom, displayReasoning);
-        } else {
-            applyStreamDomPatch(this.messageReasoningContentDom, displayReasoning);
+        // SillyBunny: iOS WebKit can force-reload under reasoning-heavy streams if we
+        // format and morph a growing hidden reasoning block on every live tick.
+        if (shouldRenderReasoning) {
+            const reasoning = trimSpaces(this.reasoningDisplayText ?? this.reasoning);
+            const displayReasoning = messageFormatting(reasoning, '', false, false, messageId, {}, true);
+
+            if (power_user.stream_fade_in) {
+                applyStreamFadeIn(this.messageReasoningContentDom, displayReasoning);
+            } else {
+                applyStreamDomPatch(this.messageReasoningContentDom, displayReasoning);
+            }
+
+            this.#lastReasoningDomRenderAt = now;
         }
 
         // Update tooltip for hidden reasoning edit
@@ -1136,6 +1155,44 @@ function registerReasoningSlashCommands() {
         },
     }));
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'reasoning-format',
+        aliases: ['format-reasoning'],
+        returns: 'formatted string',
+        helpString: t`Formats reasoning and content into a single string using Reasoning Formatting settings. Useful for preparing text that can be parsed with /reasoning-parse.`,
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'reasoning',
+                description: 'The reasoning/thinking text to format',
+                typeList: [ARGUMENT_TYPE.STRING],
+                isRequired: true,
+            }),
+        ],
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'The main content text',
+                typeList: [ARGUMENT_TYPE.STRING],
+                isRequired: false,
+            }),
+        ],
+        callback: (args, value) => {
+            const reasoning = String(args?.reasoning ?? '');
+            const content = String(value ?? '');
+
+            if (!power_user.reasoning.prefix || !power_user.reasoning.suffix) {
+                toastr.warning(t`Both prefix and suffix must be set in the Reasoning Formatting settings.`, t`Reasoning Format`);
+                return '';
+            }
+
+            if (!reasoning) {
+                toastr.warning(t`Reasoning argument is required.`, t`Reasoning Format`);
+                return '';
+            }
+
+            const { formatted } = formatReasoning(reasoning, content);
+            return formatted;
+        },
+    }));
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'reasoning-template',
         aliases: ['reasoning-formatting', 'reasoning-preset'],
         callback: selectReasoningTemplateCallback,
@@ -1208,7 +1265,7 @@ function registerReasoningSlashCommands() {
         helpString: t`Collapse the reasoning block of a message or range of messages.`,
         unnamedArgumentList: reasoningVisibilityArgs,
         callback: (_args, value) => {
-            const details = getReasoningDetailsElements(value);
+            const details = getReasoningDetailsElements(value?.toString?.() ?? value);
             if (details) {
                 details.removeAttr('open');
                 details.each(function () {
@@ -1226,7 +1283,7 @@ function registerReasoningSlashCommands() {
         helpString: t`Expand the reasoning block of a message or range of messages.`,
         unnamedArgumentList: reasoningVisibilityArgs,
         callback: (_args, value) => {
-            const details = getReasoningDetailsElements(value);
+            const details = getReasoningDetailsElements(value?.toString?.() ?? value);
             if (details) {
                 details.attr('open', '');
                 details.each(function () {
@@ -1244,7 +1301,7 @@ function registerReasoningSlashCommands() {
         helpString: t`Toggle the reasoning block of a message or range of messages. Expanded blocks will be collapsed, and collapsed blocks will be expanded.`,
         unnamedArgumentList: reasoningVisibilityArgs,
         callback: (_args, value) => {
-            const details = getReasoningDetailsElements(value);
+            const details = getReasoningDetailsElements(value.toString());
             if (!details) return '';
             details.each(function () {
                 const $el = $(this);
@@ -1568,6 +1625,36 @@ function parseReasoningFromStringWithFallbacks(str, options = {}) {
     }
 
     return null;
+}
+
+/**
+ * Formats reasoning and content into a string using the reasoning template.
+ * This is the inverse of parseReasoningFromString.
+ * @typedef {Object} FormattedReasoning
+ * @property {string} formatted The formatted string with reasoning wrapped in prefix/suffix
+ * @property {string} contentOnly The content without reasoning
+ * @param {string} reasoning The reasoning/thinking text
+ * @param {string} content The main content/response text
+ * @param {ReasoningTemplate} [template=null] Optional template to use. Defaults to power_user.reasoning
+ * @returns {FormattedReasoning} Object containing both formatted (reasoning + content) and contentOnly
+ */
+export function formatReasoning(reasoning, content, template = null) {
+    template = template ?? power_user.reasoning;
+
+    // If no reasoning provided, return content only
+    if (!reasoning || !template.prefix || !template.suffix) {
+        return { formatted: content, contentOnly: content };
+    }
+
+    // Substitute macros in template parts
+    const prefix = substituteParams(template.prefix || '');
+    const suffix = substituteParams(template.suffix || '');
+    const separator = substituteParams(template.separator || '');
+
+    // Build the formatted string: prefix + reasoning + suffix + separator + content
+    const formatted = `${prefix}${reasoning}${suffix}${separator}${content}`;
+
+    return { formatted, contentOnly: content };
 }
 
 /**

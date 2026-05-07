@@ -7,7 +7,7 @@ import { setSummaryMemoryCreated } from '../summary-memory-store.js';
 
 const COMPACT_DESCRIPTION = 'Create a scene or event summary with significance level and optional narrative arc.';
 
-async function summarizeAction(args) {
+export async function createSummaryMemoryEntry(args = {}) {
     const title = String(args.title || '').trim();
     const content = String(args.content || '').trim();
     const arc = String(args.arc || '').trim();
@@ -18,14 +18,14 @@ async function summarizeAction(args) {
 
     if (!title || !content) {
         logToolCallError(TOOL_NAMES.SUMMARIZE, 'Missing title or content');
-        return 'Error: "title" and "content" are required.';
+        throw new Error('"title" and "content" are required.');
     }
 
     const writableBooks = getActiveTunnelVisionBooks();
     const targetBook = resolveTargetBook(bookName, writableBooks);
     if (!targetBook) {
         logToolCallError(TOOL_NAMES.SUMMARIZE, 'No writable lorebooks');
-        return 'No Pathfinder-enabled lorebooks available for writing.';
+        throw new Error('No Pathfinder-enabled lorebooks available for writing.');
     }
 
     const summaryTitle = `[Summary] ${title}${arc ? ` — ${arc}` : ''}`;
@@ -66,9 +66,25 @@ async function summarizeAction(args) {
         }
 
         logToolCallCompleted(TOOL_NAMES.SUMMARIZE, `Summarized: ${title}`);
-        return `📝 Summary "${title}" saved in "${targetBook}" (UID: ${result.uid}). Significance: ${significance}. ${arc ? `Filed under arc "${arc}".` : ''}`;
+        return {
+            title,
+            summaryTitle,
+            targetBook,
+            uid: result.uid,
+            significance,
+            arc,
+        };
     } catch (err) {
         logToolCallError(TOOL_NAMES.SUMMARIZE, err.message);
+        throw err;
+    }
+}
+
+async function summarizeAction(args) {
+    try {
+        const result = await createSummaryMemoryEntry(args);
+        return `📝 Summary "${result.title}" saved in "${result.targetBook}" (UID: ${result.uid}). Significance: ${result.significance}. ${result.arc ? `Filed under arc "${result.arc}".` : ''}`;
+    } catch (err) {
         return `❌ Failed to summarize: ${err.message}`;
     }
 }

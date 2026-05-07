@@ -298,6 +298,7 @@ function getRestartPayload() {
         cwd: serverDirectory,
         command: [process.argv[0], ...process.argv.slice(1)],
         envPatch: isNativeTermuxEnvironment() ? { SILLYBUNNY_SKIP_BROWSER_AUTO_LAUNCH: '1' } : {},
+        visibleRelaunch: process.platform === 'win32',
     };
 
     return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64');
@@ -322,10 +323,14 @@ function scheduleRestart(response) {
     const helper = spawn(process.argv[0], [helperScriptPath, getRestartPayload()], {
         cwd: serverDirectory,
         detached: true,
-        stdio: 'ignore',
+        stdio: process.platform === 'win32' ? ['ignore', 'inherit', 'inherit'] : 'ignore',
         env: process.env,
+        windowsHide: false,
     });
 
+    helper.once('error', (error) => {
+        console.error('Failed to start restart helper.', error);
+    });
     helper.unref();
 
     response.once('finish', () => {
@@ -337,6 +342,18 @@ function scheduleRestart(response) {
             }
         }, RESTART_RESPONSE_DELAY_MS);
     });
+}
+
+async function restoreAutoStash(git, { reason = 'after update failure' } = {}) {
+    try {
+        await git.stash(['pop']);
+        console.info(`Auto-stashed changes restored ${reason}.`);
+        return null;
+    } catch (error) {
+        const warning = `Auto-stashed changes could not be restored ${reason}: ${error.message}. Your changes remain in git stash.`;
+        console.warn(warning);
+        return warning;
+    }
 }
 
 async function runCommand(command, args, options = {}) {
@@ -714,6 +731,8 @@ router.post('/restart', requireAdminMiddleware, async (_request, response) => {
 });
 
 router.post('/update', requireAdminMiddleware, async (_request, response) => {
+    let git = null;
+    let stashed = false;
     try {
         const repository = await getRepositoryStatus();
 
@@ -730,8 +749,7 @@ router.post('/update', requireAdminMiddleware, async (_request, response) => {
         }
 
         const autoStash = getConfigValue('autoStashBeforePull', false, 'boolean');
-        const git = simpleGit({ baseDir: serverDirectory, ...GIT_OPTIONS });
-        let stashed = false;
+        git = simpleGit({ baseDir: serverDirectory, ...GIT_OPTIONS });
         let stashPopWarning = null;
 
         if (repository.hasLocalChanges) {
@@ -739,9 +757,9 @@ router.post('/update', requireAdminMiddleware, async (_request, response) => {
                 return response.status(409).json({ error: repository.message || 'Local changes are present, so auto-update is blocked.', repository });
             }
             try {
-                await git.stash(['push', '-m', 'SillyBunny auto-stash before update']);
+                await git.stash(['push', '-u', '-m', 'SillyBunny auto-stash before update']);
                 stashed = true;
-                console.info('Local changes stashed before update.');
+                console.info('Local changes, including untracked files, stashed before update.');
             } catch (stashError) {
                 console.error('Failed to stash local changes.', stashError);
                 return response.status(500).json({ error: 'Failed to stash local changes: ' + stashError.message });
@@ -749,16 +767,21 @@ router.post('/update', requireAdminMiddleware, async (_request, response) => {
         }
 
         if (repository.ahead > 0 && repository.behind > 0) {
-            return response.status(409).json({ error: repository.message || 'This branch has diverged from upstream.', repository });
+            if (stashed) {
+                stashPopWarning = await restoreAutoStash(git, { reason: 'after diverged-branch update stop' });
+            }
+            return response.status(409).json({ error: repository.message || 'This branch has diverged from upstream.', repository, stashed, stashPopWarning });
         }
 
         if (repository.behind === 0) {
             if (stashed) {
-                try { await git.stash(['pop']); } catch (_) { /* nothing to worry about */ }
+                stashPopWarning = await restoreAutoStash(git, { reason: 'after no-op update' });
             }
             return response.json({
                 updated: false,
                 restarting: false,
+                stashed,
+                stashPopWarning,
                 message: `Already up to date on ${repository.branch || 'current branch'} tracking ${repository.trackingBranch}.`,
                 repository,
             });
@@ -768,13 +791,7 @@ router.post('/update', requireAdminMiddleware, async (_request, response) => {
         await git.raw(['merge', '--ff-only', repository.trackingBranch]);
 
         if (stashed) {
-            try {
-                await git.stash(['pop']);
-                console.info('Stashed changes restored after update.');
-            } catch (popError) {
-                stashPopWarning = 'Update succeeded, but local changes could not be restored: ' + popError.message + '. Your changes remain in git stash.';
-                console.warn(stashPopWarning);
-            }
+            stashPopWarning = await restoreAutoStash(git, { reason: 'after update' });
         }
 
         const installCommand = getInstallCommand();
@@ -814,8 +831,14 @@ router.post('/update', requireAdminMiddleware, async (_request, response) => {
         });
     } catch (error) {
         console.error('Failed to update SillyBunny.', error);
+        let stashPopWarning = null;
+        if (stashed && git) {
+            stashPopWarning = await restoreAutoStash(git, { reason: 'after update failure' });
+        }
         response.status(500).json({
             error: error.message || 'Failed to update SillyBunny.',
+            stashed,
+            stashPopWarning,
         });
     }
 });

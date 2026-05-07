@@ -167,7 +167,7 @@ const handleCharChange = () => {
     settings.charConfig = charConfig;
 };
 
-const init = async () => {
+export async function init() {
     await loadSets();
     await loadSettings();
     log('settings: ', settings);
@@ -222,7 +222,8 @@ const init = async () => {
     eventSource.on(event_types.APP_READY, async () => await finalizeInit());
 
     globalThis.quickReplyApi = quickReplyApi;
-};
+}
+
 const finalizeInit = async () => {
     debug('executing startup');
     await autoExec.handleStartup();
@@ -237,6 +238,7 @@ const finalizeInit = async () => {
     isReady = true;
     debug('READY');
 };
+
 // Fire-and-forget init — using top-level await here creates a circular
 // top-level-await deadlock on slow boots: init() awaits a dynamic import of
 // ./src/QuickReply.js, but that module statically imports from this file via

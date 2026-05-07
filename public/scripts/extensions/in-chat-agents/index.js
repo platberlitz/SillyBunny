@@ -2,7 +2,7 @@ import { DiffMatchPatch } from '../../../lib.js';
 import { extension_settings, renderExtensionTemplateAsync, getContext } from '../../extensions.js';
 import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../popup.js';
 import { download, escapeHtml, escapeRegex, getSortableDelay, uuidv4 } from '../../utils.js';
-import { CLIENT_VERSION, chat, getRequestHeaders, generateQuietPrompt, normalizeContentText, saveSettingsDebounced } from '../../../script.js';
+import { CLIENT_VERSION, chat, getRequestHeaders, generateQuietPrompt, normalizeContentText, saveSettingsDebounced, substituteParams } from '../../../script.js';
 import { eventSource, event_types } from '../../events.js';
 import {
     areAgentsGloballyEnabled,
@@ -25,6 +25,8 @@ import {
     normalizeAgentCategory,
     getAgentChatScopeLabel,
     getPromptTransformMode,
+    findTemplateForAgentSnapshot,
+    getRedundantBundledAgentDuplicateIds,
     reconcileScopedEnabledAgentIdsFromLegacyFlags,
     resolveConnectionProfile,
     setAgentEnabledForCurrentScope,
@@ -39,6 +41,7 @@ import {
 } from './agent-store.js';
 import {
     cancelAgentGeneration,
+    buildPromptDynamicMacros,
     initAgentRunner,
     isAgentGenerationActive,
     onAgentGenerationStateChanged,
@@ -194,21 +197,7 @@ function findTemplateById(templateId) {
 }
 
 function findTemplateForAgent(agent) {
-    const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
-    if (sourceTemplateId) {
-        return findTemplateById(sourceTemplateId) ?? null;
-    }
-
-    const agentName = String(agent?.name ?? '').trim().toLowerCase();
-    const agentPrompt = String(agent?.prompt ?? '').trim();
-    if (!agentName) {
-        return null;
-    }
-
-    return templates.find(template =>
-        String(template?.name ?? '').trim().toLowerCase() === agentName &&
-        String(template?.prompt ?? '').trim() === agentPrompt,
-    ) ?? null;
+    return findTemplateForAgentSnapshot(agent, templates);
 }
 
 function getBundledRegexScriptsForTemplate(templateId) {
@@ -360,8 +349,41 @@ function hasPromptTransform(agent) {
     );
 }
 
+function canPreviewPreGenerationPrompt(agent) {
+    return Boolean(
+        !isPathfinderAgent(agent) &&
+        ['pre', 'both'].includes(String(agent?.phase ?? '')) &&
+        String(agent?.prompt ?? '').trim(),
+    );
+}
+
 function getPromptTransformLabel(agent) {
     return getPromptTransformMode(agent) === 'append' ? 'prompt append' : 'prompt rewrite';
+}
+
+async function previewPreGenerationPrompt(agent, promptOverride = null) {
+    const prompt = String(promptOverride ?? agent?.prompt ?? '');
+    if (!prompt.trim()) {
+        toastr.warning('Enter a prompt before previewing it.');
+        return;
+    }
+
+    const previewText = substituteParams(prompt, {
+        dynamicMacros: buildPromptDynamicMacros('', null, agent, 'normal'),
+    });
+    const previewHtml = $(
+        `<div class="ica--prompt-preview">
+            <div class="ica--regex-note">Preview uses the current chat context with no generated assistant message yet. Random macros are evaluated now and may differ when the agent runs.</div>
+            <pre>${escapeHtml(previewText || '(empty after macro substitution)')}</pre>
+        </div>`,
+    );
+
+    await new Popup(previewHtml, POPUP_TYPE.TEXT, '', {
+        wide: true,
+        large: true,
+        allowVerticalScrolling: true,
+        leftAlign: true,
+    }).show();
 }
 
 function buildAgentFromTemplate(template) {
@@ -381,6 +403,38 @@ function buildAgentFromSnapshot(snapshot) {
         id: uuidv4(),
         enabled: false,
     };
+}
+
+function shouldMigratePathfinderAgentTools(agent, template) {
+    if (!template || shouldSkipBundledTemplateMigrations(agent)) {
+        return false;
+    }
+
+    if (String(template?.id ?? '').trim() !== 'tpl-pathfinder') {
+        return false;
+    }
+
+    const templateTools = Array.isArray(template?.tools) ? template.tools : [];
+    const agentTools = Array.isArray(agent?.tools) ? agent.tools : [];
+    return templateTools.length > 0 && agentTools.length === 0;
+}
+
+async function migratePathfinderAgentToolsFromTemplate() {
+    let migratedCount = 0;
+
+    for (const agent of getAgents()) {
+        const template = findTemplateForAgent(agent);
+        if (!shouldMigratePathfinderAgentTools(agent, template)) {
+            continue;
+        }
+
+        agent.tools = structuredClone(template.tools);
+        agent.sourceTemplateId = agent.sourceTemplateId || template.id;
+        await saveAgent(agent);
+        migratedCount++;
+    }
+
+    return migratedCount;
 }
 
 function shouldSkipBundledTemplateMigrations(agent) {
@@ -686,61 +740,14 @@ async function migrateLegacyPromptTransformMaxTokens() {
     return migratedCount;
 }
 
-function getAgentDuplicateKey(agent) {
-    const agentName = String(agent?.name ?? '').trim().toLowerCase();
-    const agentPrompt = String(agent?.prompt ?? '').trim();
-    if (!agentName || !agentPrompt) {
-        return '';
-    }
-
-    return `${agentName}\u0000${agentPrompt}`;
-}
-
 async function removeRedundantBundledAgentDuplicates() {
-    const groupedAgents = new Map();
-
-    for (const agent of getAgents()) {
-        const key = getAgentDuplicateKey(agent);
-        if (!key) {
-            continue;
-        }
-
-        if (!groupedAgents.has(key)) {
-            groupedAgents.set(key, []);
-        }
-
-        groupedAgents.get(key).push(agent);
-    }
-
-    const redundantIds = new Set();
-
-    for (const grouped of groupedAgents.values()) {
-        if (grouped.length < 2) {
-            continue;
-        }
-
-        const templateBacked = grouped.filter(agent => String(agent?.sourceTemplateId ?? '').trim());
-        const unsourced = grouped.filter(agent => !String(agent?.sourceTemplateId ?? '').trim());
-
-        if (templateBacked.length !== 1 || unsourced.length === 0) {
-            continue;
-        }
-
-        const template = findTemplateForAgent(templateBacked[0]);
-        if (!template) {
-            continue;
-        }
-
-        for (const agent of unsourced) {
-            redundantIds.add(agent.id);
-        }
-    }
+    const redundantIds = getRedundantBundledAgentDuplicateIds(getAgents(), templates);
 
     for (const agentId of redundantIds) {
         await deleteAgent(agentId);
     }
 
-    return redundantIds.size;
+    return redundantIds.length;
 }
 
 async function purgeRemovedBundledAgents() {
@@ -1281,6 +1288,9 @@ function renderAgentList() {
             const regexCount = getAgentRegexScripts(agent).length;
             const promptTransformEnabled = hasPromptTransform(agent);
             const promptTransformLabel = getPromptTransformLabel(agent);
+            const previewPromptButton = canPreviewPreGenerationPrompt(agent)
+                ? '<button type="button" class="ica--card-btn ica--btn-preview-prompt" title="Preview this pre-generation prompt after macro substitution"><i class="fa-solid fa-eye"></i> Preview Prompt</button>'
+                : '';
             const connectionProfileLabel = agent.connectionProfile
                 ? profileNames.get(agent.connectionProfile) || `Missing profile (${agent.connectionProfile})`
                 : '';
@@ -1313,6 +1323,7 @@ function renderAgentList() {
                         ${modelOverrideLabel ? `<span class="ica--card-pill"><i class="fa-solid fa-microchip fa-xs"></i> ${escapeHtml(modelOverrideLabel)}</span>` : ''}
                     </div>
                     <div class="ica--card-actions">
+                        ${previewPromptButton}
                         ${isPathfinderAgent(agent) ? '' : '<button type="button" class="ica--card-btn ica--btn-run" title="Manually apply this agent to the last assistant reply"><i class="fa-solid fa-robot"></i> Apply to Last Reply</button>'}
                         <button type="button" class="ica--card-btn ica--btn-edit"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
                         ${isPathfinderAgent(agent) ? '' : '<button type="button" class="ica--card-btn ica--btn-export"><i class="fa-solid fa-download"></i> Export</button>'}
@@ -1375,6 +1386,11 @@ function renderAgentList() {
                     return;
                 }
                 await runAgentOnMessage(agent.id, lastCharMessageIndex);
+            });
+
+            card.find('.ica--btn-preview-prompt').on('click', async event => {
+                stopEvent(event);
+                await previewPreGenerationPrompt(agent);
             });
 
             card.find('.ica--btn-export').on('click', event => {
@@ -1799,6 +1815,15 @@ async function openEditor(agentId = null) {
         if (refined) {
             editorEl.find('#ica--editor-prompt').val(refined);
         }
+    });
+
+    editorEl.find('#ica--editor-preview-prompt').on('click', async () => {
+        const previewAgent = {
+            ...agent,
+            name: editorEl.find('#ica--editor-name').val()?.toString().trim() || agent.name,
+            phase: editorEl.find('#ica--editor-phase').val()?.toString() || agent.phase,
+        };
+        await previewPreGenerationPrompt(previewAgent, editorEl.find('#ica--editor-prompt').val()?.toString() || '');
     });
 
     // Show popup
@@ -2931,6 +2956,11 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     const migratedRegexPostDefaultsCount = await migrateBundledRegexPostDefaultsToSavedAgents();
     if (migratedRegexPostDefaultsCount > 0) {
         toastr.success(`Updated ${migratedRegexPostDefaultsCount} bundled regex agent(s) to post-generation defaults.`);
+    }
+
+    const migratedPathfinderToolCount = await migratePathfinderAgentToolsFromTemplate();
+    if (migratedPathfinderToolCount > 0) {
+        toastr.success(`Updated ${migratedPathfinderToolCount} Pathfinder agent(s) with default tool toggles.`);
     }
 
     const migratedPromptTransformImpersonateCount = await migrateBundledPromptTransformImpersonateToSavedAgents();

@@ -54,6 +54,7 @@ These screenshots show the graphical shell UI across Workspace, Customize, Agent
 * [Project Goals](#project-goals-aka-why-we-made-this-fork)
 * [Changes Compared to SillyTavern](#changes-vs-sillytavern)
 * [Latest Update](#latest-update)
+    * [v1.5.3 (2026-05-03)](#v153-2026-05-03)
     * [v1.5.2 (2026-04-30)](#v152-2026-04-30)
     * [v1.5.1 (2026-04-29)](#v151-2026-04-29)
 * [Upstream Information](#upstream-information)
@@ -120,8 +121,8 @@ cd SillyBunny
 bash start.sh
 ```
 
-- The launcher defaults to Node.js + npm on native Termux (more reliable than Bun under grun)
-- To force Bun anyway: `SILLYBUNNY_TERMUX_RUNTIME=bun bash start.sh`
+- The launcher defaults to Node.js + npm on native Termux and ARM devices when Node.js is available
+- To force Bun anyway: `SILLYBUNNY_USE_BUN=1 bash start.sh`
 - For shared storage access: `termux-setup-storage` once before starting
   
 ### How to Update
@@ -216,6 +217,120 @@ SillyBunny includes some extras by default to help you get started right away:
 ---
 
 ## Latest Update
+
+### v1.5.3 (2026-05-03)
+
+This update adds the Black Orange theme and desktop character drawer tiles, improves managed shell coexistence, restores Moving UI control over the character drawer size, and quiets expected Pathfinder sidecar aborts.
+
+**Mobile UI Polish**
+* Lengthened the slim mobile Persona bottom chat bar to match the Image #2 near-full-width footprint while preserving its compact height.
+* Slimmed the mobile Persona bottom chat bar so the Bottom Bar Size slider can make it visually thinner while keeping the controls centered in one row.
+* Narrowed the mobile Persona bottom chat bar so it no longer spans edge-to-edge on phone and landscape mobile layouts.
+* Made the mobile Persona bottom chat bar even narrower, mobile-only, horizontal, and tied the compact width to the existing Bottom Bar Size slider.
+* Recentered the Prompt Manager close, undo, and save icon buttons in the prompt editor footer.
+* Let the Presets "Independent mode" helper copy wrap inside the mobile panel without being clipped, while keeping its checkbox and label aligned.
+* Bumped the affected stylesheet cache keys so the mobile and prompt editor CSS updates are loaded by existing browsers.
+
+**Provider Model Picking**
+* Added searchable Model ID inputs for Claude, AI21, Cohere, Perplexity, Vertex AI, Custom, and Z.AI providers by filtering each provider's Available Models list as the user types.
+* Added favorite buttons for editable provider model IDs, reusing the existing per-provider model favorites store and pinning favorites at the top of the matching provider list.
+* Kept typed custom model IDs available even when they are not returned by an API model list.
+
+**Pathfinder**
+* Pathfinder automatic retrieval now waits for pipeline or sidecar lookup to finish before the main writing prompt is injected, while real cancellation still aborts retrieval.
+* Contextual Pathfinder lorebooks now include chat, persona, character card/primary, extra character, and group member lorebooks without requiring manual Pathfinder selection or vectorization.
+* Memory Summaries now keep the summary tool toggle off when disabled, accept intervals down to 2 messages, and offer a Create Summary action that writes through the Pathfinder summary lorebook path.
+* Diagnostics now refresh tool registrations before checking state, read enabled tools from the active Pathfinder agent, and avoid false all-tools-disabled reports.
+* Tightened Pathfinder mobile Pipeline Settings spacing and kept Diagnostics content/action alignment left in the settings panel.
+* Duplicate bundled Pathfinder agents are cleaned up while preserving the automatic `tpl-pathfinder` agent.
+* Pathfinder summary prompts are injected after retrieval prompt keys so the summary tool request no longer precedes retrieved context.
+
+**In-Chat Agents**
+* Synced the Achievements Tracker and Scene Tracker template catalog entries with their updated source wording, and made bundled template reset recognize saved bundled agents after prompt wording changes.
+
+**PR #13 SillyTavern 1.18.0 Sync**
+Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. GitHub and the local merge both reported the PR as conflict-free.
+
+* Kept SillyBunny's Bun-first defaults and port `4444` while updating Node-compatible dependency and lockfile state for the SillyTavern 1.18.0 surface.
+* Updated launcher and Electron package files for the new runtime layout.
+* Preserved fork defaults and avoided tracked `data/default-user/**` state.
+* Added account-version session handling, password/recovery hardening, trusted proxy validation, private request filtering, basic-auth rate limiting, forwarded-header helpers, cache busting, and immutable data-root override support.
+* Preserved SillyBunny session auth and HTTPS behavior while adopting compatible upstream hardening.
+* Updated OpenRouter, OpenAI, NanoGPT, MiniMax, Workers AI, Kobold/KoboldCpp, NovelAI, Stable Diffusion, tokenizer, speech, vector, and text/chat completion paths.
+* Added Workers AI vector UI controls and fixed OpenRouter PKCE browser encoding.
+* Adopted required upstream 1.18.0 UI and JavaScript compatibility changes without replacing SillyBunny's shell/navigation structure.
+* Added extension lifecycle compatibility, third-party extension warning flow, streaming display utilities, persona slash commands and events, provider settings updates, popup validation, swipe picker updates, and welcome panel templates.
+* Kept mobile and desktop parity in scope for newly merged UI controls, especially settings rows, vector controls, and extension flows.
+* Brought in or updated unit coverage for private request filtering, prompt converters, Tavern card validation, and utility behavior.
+* PR verification before merge reported passing lint, unit tests, diff whitespace checks, and Node/Bun startup smokes.
+
+**Themes And Character Drawer**
+* Added the Black Orange theme.
+* Added desktop character drawer tile styling for the SillyBunny tabs layout.
+
+**Shell And Moving UI**
+* Opening Customize no longer closes an already-open Workspace or Agents shell, and opening Workspace or Agents no longer closes Customize.
+* Moving UI now keeps control of the character drawer position and size instead of being overridden by SillyBunny desktop drawer sizing.
+* Disabled the SillyBunny character drawer resize handle while Moving UI is active so the upstream drag/resize controls remain the single source of truth.
+* Preserved Launchpad highlighting when the SillyBunny shell reinitializes so Moonlit Echoes and Guided Generations toast actions open the correct Launchpad cards.
+* Center-aligned checkbox controls and label text across desktop, mobile, OpenAI/API cards, settings cards, theme toggles, chat delete rows, and Pathfinder prompt settings.
+* Aligned Character Author's Note placement controls and Custom API key controls on mobile WebKit.
+* Kept the persona chat mass-delete dialog inside iOS safe areas and tightened its narrow-screen controls so the age input and presets remain reachable on mobile Safari.
+* Bound the mobile chat mass-delete dialog to iOS WebKit's visual viewport, kept the overlay above app chrome during browser toolbar shifts, constrained scrolling to the dialog list, avoided mobile autofocus jumps, aligned checkbox rows, and rotated the SillyBunny shell cache keys so corrected styles load immediately.
+* Made active character and chat lorebook toolbar icons glow with the active accent color so linked lorebooks are easier to spot in the character editor.
+* Made Clear cookies & cache expire server-side HttpOnly session cookies as well as browser-visible cookies before reloading.
+* Paused streaming autoscroll while iOS WebKit users touch or momentum-scroll the chat so mid-generation updates no longer snap the view away from the scroll position.
+* Reduced live reasoning render churn on iOS WebKit so reasoning-heavy DeepSeek and GLM streams no longer overwhelm the browser during generation.
+* Kept previous chat loads pinned to the bottom on iOS WebKit even when the chat list tap leaves temporary manual-scroll suppression active.
+* Extended chat manual-scroll suppression to all mobile and narrow chat surfaces so Android/Termux and iOS do not fight user scrolling during streaming or history edits.
+* Opened previous-message editors with scroll-preserving focus and removed mobile off-screen message containment so chat history stays anchored while editing.
+
+**Settings Panels And Preset Prompts**
+* Settings panels (Customize, Presets, Workspace, etc.) now narrow alongside the chat when the chat width is reduced, matching standard SillyTavern behaviour.
+* Toggling a prompt on or off inside a preset no longer jumps the scroll position back to the top; the panel stays at the user's current scroll position.
+
+**UI Icons And Provider Models**
+* Replaced the Badge frontend icon with the pixel-art bunny badge shown in the latest reference image.
+* Restored the Badge frontend icon to the original bunny artwork inside the peach pixel badge frame so the Shell Style preview no longer shows the distorted hand-drawn version.
+* Added a Shell Style option to switch the frontend between the SillyBunny pixel icon and badge icon, including the splash screen, Home panel logo, favicon, and future system avatar messages.
+* Aligned the Reverse Proxy preset row, Prompt Manager undo action, and OpenAI model favorite button with their neighboring dropdowns on desktop and mobile layouts.
+* Added current OpenAI `gpt-5.5` and `gpt-5.5-pro`, Claude `claude-opus-4-7`, and Z.AI `glm-5.1` / `glm-5v-turbo` model choices to the backend dropdowns.
+* Updated related OpenAI, Claude, and Z.AI capability handling so context, reasoning, media inlining, and Claude sampling rules stay in step with the added models.
+
+**Settings And Browser Storage**
+* Added a dedicated Clear cookies & cache utility action, wired through the cache-busted SillyBunny shell script so stale browser cache does not leave the button inert.
+
+**Pathfinder And Release Metadata**
+* Suppressed expected `AbortError` stack traces when Pathfinder sidecar generation is cancelled by its retrieval timeout or a closed client connection.
+* Kept Pathfinder prompt action buttons from collapsing into icon-only controls by wrapping visible button labels in spans.
+* Restored default Pathfinder tool toggles for existing template agents with empty tool definitions and made diagnostics report the last pipeline retrieval result.
+* Added `SILLYBUNNY_USE_BUN=1 bash start.sh` as the launcher override for users who want to force Bun on ARM devices.
+* Kept iOS WebKit chats pinned to the bottom while regenerated replies and post-generation agent refreshes update the latest message.
+* Softened the idle send button glyph so the paper-plane icon no longer reads overly bright across themes.
+* Prevented DeepSeek and other web tokenizers from failing when a Bun/ARM runtime exposes an empty server-side `location.href`.
+* Updated app, Horde client, bundled extension, and package metadata to 1.5.3.
+
+**Runtime And Upstream Sync**
+* Aligned the startup init flow with SillyTavern 1.18 by moving the old post-install bootstrap into `src/server-init.js` and wiring launchers plus Docker startup through `bun run init`.
+* Kept first-run default public-file synchronization additive so missing bundled files are copied without overwriting existing user files.
+* Updated default configuration with upstream keep-alive, forwarded header, trusted proxy, private address whitelist, authentication rate-limit, and cache buster options.
+* Added upstream runtime dependencies and npm install guards for safer package installation defaults.
+* Pointed OpenAI Responses tests at `default/config.yaml` so they do not depend on mutable local configuration.
+
+**Character Drawer**
+* Reset character drawer tag grid placement and containment so inline tags stay inside their own character rows without overlapping adjacent entries.
+* Made the character drawer X close the panel completely, added a dedicated back-to-list control for edit mode, restored inline tags in mobile grid view, and reduced the mobile header height.
+* Restored mobile list-view character tags, hid the edit-only header after returning to the character list, hid the mobile hotswap strip while editing, compacted the mobile editor header, and kept the FAV/ADV controls readable on narrow screens.
+
+**In-Chat Agents**
+* Updated bundled Achievements Tracker reset defaults to use `[ACH|Title|Rarity|Description of the achievement]`.
+* Updated bundled Scene Tracker reset defaults to use `detail: one-line sensory detail to set the current scene`.
+* Prevented swipe navigation from re-running already-applied post-generation agents while preserving real new-swipe generation processing.
+* Made Cancel Agent requests persist through in-flight manual runs, added a Cancel Agent action directly to running prompt-pass toasts, and prevented cancelled manual outputs from applying after they return.
+* Added pre-generation prompt preview actions in the agent editor and eligible agent cards so macro-expanded prompts can be checked before sending.
+* Let manual agent runs start independently in Parallel mode instead of queuing them behind other manual runs.
+* Restored agent transform badges and undo/redo access after chat refreshes when the active swipe still has saved transform history.
+* Deferred post-processing for new assistant messages while an agent is already working so users can keep sending or swiping without the older agent touching the newer message.
 
 ### v1.5.2 (2026-04-30)
 

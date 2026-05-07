@@ -6,6 +6,8 @@ import path from 'node:path';
 import util from 'node:util';
 import dns from 'node:dns';
 import process from 'node:process';
+import http from 'node:http';
+import https from 'node:https';
 
 import cors from 'cors';
 import { csrfSync } from 'csrf-sync';
@@ -39,6 +41,7 @@ import {
     getSessionCookieExpires,
     verifySecuritySettings,
     loginPageMiddleware,
+    migratePublicOverrides,
 } from './users.js';
 
 import getWebpackServeMiddleware from './middleware/webpack-serve.js';
@@ -51,8 +54,11 @@ import getWhitelistMiddleware from './middleware/whitelist.js';
 import accessLoggerMiddleware, { getAccessLogPath, migrateAccessLog } from './middleware/accessLogWriter.js';
 import multerMonkeyPatch from './middleware/multerMonkeyPatch.js';
 import initRequestProxy from './request-proxy.js';
+import initPrivateRequestFilter from './private-request-filter.js';
+import cacheBuster from './middleware/cacheBuster.js';
 import corsProxyMiddleware from './middleware/corsProxy.js';
 import hostWhitelistMiddleware from './middleware/hostWhitelist.js';
+import userCssMiddleware from './middleware/userCss.js';
 import {
     getVersion,
     color,
@@ -90,6 +96,10 @@ if (!cliArgs.enableIPv6 && !cliArgs.enableIPv4) {
     console.error('error: You can\'t disable all internet protocols: at least IPv6 or IPv4 must be enabled.');
     process.exit(1);
 }
+
+// Set keep-alive preference for all HTTP/HTTPS requests.
+http.globalAgent = new http.Agent({ keepAlive: cliArgs.enableKeepAlive });
+https.globalAgent = new https.Agent({ keepAlive: cliArgs.enableKeepAlive });
 
 const app = express();
 app.use(helmet({
@@ -194,6 +204,111 @@ if (cliArgs.listen) {
 
 app.use(setUserDataMiddleware);
 
+function parseCookieHeaderNames(cookieHeader) {
+    return String(cookieHeader || '')
+        .split(';')
+        .map(cookie => cookie.trim().split('=')[0]?.trim())
+        .filter(Boolean);
+}
+
+function getServerCookieClearDomains(hostname) {
+    const cleanHostname = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
+
+    if (!cleanHostname || cleanHostname === 'localhost' || cleanHostname.includes(':') || /^[\d.]+$/.test(cleanHostname)) {
+        return [''];
+    }
+
+    const parts = cleanHostname.split('.').filter(Boolean);
+    if (parts.length < 2) {
+        return [''];
+    }
+
+    const domains = new Set(['']);
+    for (let index = 0; index < parts.length - 1; index++) {
+        const domain = parts.slice(index).join('.');
+        domains.add(domain);
+        domains.add(`.${domain}`);
+    }
+
+    return [...domains];
+}
+
+function getServerCookieClearPaths(pathname) {
+    const paths = new Set(['/']);
+    const segments = String(pathname || '/').split('/').filter(Boolean);
+    let currentPath = '';
+
+    for (const segment of segments) {
+        currentPath += `/${segment}`;
+        paths.add(currentPath);
+        paths.add(`${currentPath}/`);
+    }
+
+    return [...paths];
+}
+
+function isSecureCookieRequest(request) {
+    const forwardedProto = request.get('x-forwarded-proto')?.split(',')[0]?.trim();
+    return Boolean(request.secure || request.protocol === 'https' || forwardedProto === 'https');
+}
+
+// SillyBunny: Clear cookies & cache must also expire HttpOnly cookie-session data.
+app.post('/api/cookies/clear', express.json(), (request, response) => {
+    const sessionName = getCookieSessionName();
+    const cookieNames = new Set([
+        ...parseCookieHeaderNames(request.headers.cookie),
+        sessionName,
+        `${sessionName}.sig`,
+        'session',
+        'session.sig',
+    ]);
+    const domains = getServerCookieClearDomains(request.hostname);
+    const paths = getServerCookieClearPaths(request.path);
+    const secure = isSecureCookieRequest(request);
+    let expirationAttempts = 0;
+
+    if (request.session) {
+        request.sessionOptions.overwrite = false;
+        request.session.handle = null;
+        request.session.csrfToken = null;
+        request.session = null;
+    }
+
+    for (const name of cookieNames) {
+        for (const path of paths) {
+            for (const domain of domains) {
+                const options = {
+                    path,
+                    sameSite: 'lax',
+                    httpOnly: true,
+                    expires: new Date(0),
+                };
+
+                if (secure) {
+                    options.secure = true;
+                }
+
+                if (domain) {
+                    options.domain = domain;
+                }
+
+                try {
+                    response.cookie(name, '', options);
+                    expirationAttempts++;
+                } catch (error) {
+                    console.warn(`Failed to queue cookie expiration for ${name}`, error);
+                }
+            }
+        }
+    }
+
+    return response.json({
+        success: true,
+        clearedCookieNames: cookieNames.size,
+        expirationAttempts,
+    });
+});
+
 // CSRF Protection //
 function applyCsrfTokenHeaders(res) {
     res.set({
@@ -253,7 +368,7 @@ if (!cliArgs.disableCsrf) {
 
 // Static files
 // Host index page
-app.get('/', (request, response) => {
+app.get('/', cacheBuster.middleware, (request, response) => {
     if (shouldRedirectToLogin(request)) {
         const query = request.url.split('?')[1];
         const redirectUrl = query ? `/login?${query}` : '/login';
@@ -290,6 +405,7 @@ const webpackMiddleware = getWebpackServeMiddleware();
 const frontendAssetMiddleware = getFrontendAssetMiddleware();
 app.use(FRONTEND_ASSET_PREFIX, frontendAssetMiddleware.immutableAssets);
 app.use(webpackMiddleware);
+app.use(userCssMiddleware);
 app.use((request, response, next) => {
     if (!shouldServeFrontendAssets()) {
         return next();
@@ -358,6 +474,7 @@ async function preSetupTasks() {
 
     startupDirectories = await getUserDirectoriesList();
     await migrateGroupChatsMetadataFormat(startupDirectories);
+    await migratePublicOverrides();
     await checkForNewContent(startupDirectories, PRESET_CONTENT_TYPES);
     migrateFlatSecrets(startupDirectories);
     cleanUploads();
@@ -391,11 +508,29 @@ async function preSetupTasks() {
         exitProcess();
     });
 
+    // Add private request filter.
+    const requestFilterOptions = {
+        listen: cliArgs.listen,
+        enabled: !!getConfigValue('privateAddressWhitelist.enabled', false, 'boolean'),
+        privateAddressWhitelist: getConfigValue('privateAddressWhitelist.allowedRanges', ['127.0.0.0/8', '::1/128']),
+        logBlocked: !!getConfigValue('privateAddressWhitelist.log.blockedRequests', true, 'boolean'),
+        logAllowed: !!getConfigValue('privateAddressWhitelist.log.allowedRequests', false, 'boolean'),
+        allowUnresolvedHosts: !!getConfigValue('privateAddressWhitelist.allowUnresolvedHosts', false, 'boolean'),
+        enableKeepAlive: cliArgs.enableKeepAlive,
+    };
+    initPrivateRequestFilter(requestFilterOptions);
+
     // Add request proxy.
-    initRequestProxy({ enabled: cliArgs.requestProxyEnabled, url: cliArgs.requestProxyUrl, bypass: cliArgs.requestProxyBypass });
+    initRequestProxy({
+        enabled: cliArgs.requestProxyEnabled,
+        url: cliArgs.requestProxyUrl,
+        bypass: cliArgs.requestProxyBypass,
+        enableKeepAlive: cliArgs.enableKeepAlive,
+        privateRequestFilterEnabled: requestFilterOptions.enabled,
+    });
 
     // Wait for frontend libs to compile
-    await webpackMiddleware.runWebpackCompiler({ pruneCache: true });
+    await webpackMiddleware.runWebpackCompiler();
 }
 
 async function runDeferredStartupTasks() {

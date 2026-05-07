@@ -69,6 +69,7 @@ import { IMAGE_OVERSWIPE, MEDIA_DISPLAY } from './constants.js';
 import { t } from './i18n.js';
 import { getBackgroundPath, isCustomBackgroundUrl } from './backgrounds.js';
 import { setSlashCommandParserSettingsGetter } from './slash-commands/SlashCommandParserConfig.js';
+import { persona_description_positions as _persona_description_positions } from './personas.js';
 
 export const toastPositionClasses = [
     'toast-top-left',
@@ -206,17 +207,7 @@ export const send_on_enter_options = {
     ENABLED: 1,
 };
 
-export const persona_description_positions = {
-    IN_PROMPT: 0,
-    /**
-     * @deprecated Use persona_description_positions.IN_PROMPT instead.
-     */
-    AFTER_CHAR: 1,
-    TOP_AN: 2,
-    BOTTOM_AN: 3,
-    AT_DEPTH: 4,
-    NONE: 9,
-};
+export const persona_description_positions = _persona_description_positions;
 
 export const power_user = {
     charListGrid: false,
@@ -1947,6 +1938,39 @@ function loadCharListState() {
     document.body.classList.toggle('charListGrid', power_user.charListGrid);
 }
 
+const movingUIPixelStyles = new Set(['width', 'height', 'top', 'right', 'bottom', 'left']);
+
+function normalizeMovingUIStateStyle(property, value) {
+    if (value === null || value === undefined || value === '') {
+        return '';
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value) && movingUIPixelStyles.has(property)) {
+        return `${value}px`;
+    }
+
+    if (typeof value === 'string' && movingUIPixelStyles.has(property) && /^-?\d+(?:\.\d+)?$/.test(value.trim())) {
+        return `${value.trim()}px`;
+    }
+
+    return String(value);
+}
+
+function applyMovingUIStateStyle(element, property, value) {
+    const normalizedValue = normalizeMovingUIStateStyle(property, value);
+    if (!normalizedValue) {
+        return;
+    }
+
+    element.style.setProperty(property, normalizedValue, 'important');
+}
+
+function applyMovingUIStateStyles(element, state) {
+    for (const [property, value] of Object.entries(state)) {
+        applyMovingUIStateStyle(element, property, value);
+    }
+}
+
 export function loadMovingUIState() {
     if (!isMobile()
         && power_user.movingUIState
@@ -1961,7 +1985,7 @@ export function loadMovingUIState() {
                     var elmnt = $('#' + $.escapeSelector(targetName));
                     if (elmnt.length) {
                         console.debug(`loading state for ${targetName} from ${elmntName}`);
-                        elmnt.css(elmntState);
+                        applyMovingUIStateStyles(elmnt[0], elmntState);
                         applied = true;
                     }
                 }
@@ -3271,9 +3295,10 @@ jQuery(async () => {
                         }
 
                         console.log(`scaling ${targetName} by ${scaleX}x${scaleY} to ${newWidth}x${newHeight}`);
-                        elmnt.css('height', newHeight);
-                        elmnt.css('width', newWidth);
-                        elmnt.css('inset', `${newTop}px ${newRight}px ${newBottom}px ${newLeft}px`);
+                        const element = elmnt[0];
+                        applyMovingUIStateStyle(element, 'height', newHeight);
+                        applyMovingUIStateStyle(element, 'width', newWidth);
+                        applyMovingUIStateStyle(element, 'inset', `${newTop}px ${newRight}px ${newBottom}px ${newLeft}px`);
                         applied = true;
                     }
 

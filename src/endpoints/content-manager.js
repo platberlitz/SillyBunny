@@ -18,6 +18,7 @@ const contentDirectory = path.join(serverDirectory, 'default/content');
 const scaffoldDirectory = path.join(serverDirectory, 'default/scaffold');
 const contentIndexPath = path.join(contentDirectory, 'index.json');
 const scaffoldIndexPath = path.join(scaffoldDirectory, 'index.json');
+const DEFAULT_PRESET_DELETIONS_FILE = 'default-preset-deletions.json';
 
 const WHITELIST_GENERIC_URL_DOWNLOAD_SOURCES = getConfigValue('whitelistImportDomains', []);
 const USER_AGENT = 'SillyTavern';
@@ -53,6 +54,8 @@ export const CONTENT_TYPES = {
     QUICK_REPLIES: 'quick_replies',
     SYSPROMPT: 'sysprompt',
     REASONING: 'reasoning',
+    ERROR_PAGE: 'error_page',
+    STYLESHEET: 'stylesheet',
 };
 
 export const PRESET_CONTENT_TYPES = Object.freeze([
@@ -81,21 +84,169 @@ function isPresetContentType(type) {
     return PRESET_CONTENT_TYPES.includes(type);
 }
 
+function getDefaultPresetDeletionPath(directories) {
+    return path.join(directories.root, DEFAULT_PRESET_DELETIONS_FILE);
+}
+
+function getDefaultPresetDeletionKey(contentItem) {
+    return `${contentItem.type}::${contentItem.filename}`;
+}
+
+function normalizePresetDeletionData(data) {
+    const normalized = { version: 1, deleted: {} };
+
+    if (!data || typeof data !== 'object') {
+        return normalized;
+    }
+
+    const source = data.deleted && typeof data.deleted === 'object' ? data.deleted : data;
+
+    if (Array.isArray(source)) {
+        for (const item of source) {
+            if (!item || typeof item !== 'object' || !item.type || !item.filename) {
+                continue;
+            }
+
+            normalized.deleted[getDefaultPresetDeletionKey(item)] = {
+                type: String(item.type),
+                filename: String(item.filename),
+                deletedAt: Number(item.deletedAt) || Date.now(),
+            };
+        }
+
+        return normalized;
+    }
+
+    for (const [key, value] of Object.entries(source)) {
+        if (value === true) {
+            const [type, filename] = key.split('::');
+            if (type && filename) {
+                normalized.deleted[key] = { type, filename, deletedAt: Date.now() };
+            }
+            continue;
+        }
+
+        if (!value || typeof value !== 'object' || !value.type || !value.filename) {
+            continue;
+        }
+
+        normalized.deleted[getDefaultPresetDeletionKey(value)] = {
+            type: String(value.type),
+            filename: String(value.filename),
+            deletedAt: Number(value.deletedAt) || Date.now(),
+        };
+    }
+
+    return normalized;
+}
+
+export function getDefaultPresetDeletions(directories) {
+    try {
+        const deletionPath = getDefaultPresetDeletionPath(directories);
+        if (!fs.existsSync(deletionPath)) {
+            return { version: 1, deleted: {} };
+        }
+
+        return normalizePresetDeletionData(JSON.parse(fs.readFileSync(deletionPath, 'utf8')));
+    } catch (error) {
+        console.warn('Failed to read default preset deletions', error);
+        return { version: 1, deleted: {} };
+    }
+}
+
+function writeDefaultPresetDeletions(directories, deletions) {
+    const normalized = normalizePresetDeletionData(deletions);
+    const deletionPath = getDefaultPresetDeletionPath(directories);
+
+    fs.mkdirSync(path.dirname(deletionPath), { recursive: true });
+    writeFileAtomicSync(deletionPath, `${JSON.stringify(normalized, null, 4)}\n`, 'utf8');
+}
+
+export function isDefaultPresetDeleted(directories, contentItem) {
+    if (!contentItem || !isPresetContentType(contentItem.type)) {
+        return false;
+    }
+
+    const deletions = getDefaultPresetDeletions(directories);
+    return Object.hasOwn(deletions.deleted, getDefaultPresetDeletionKey(contentItem));
+}
+
+export function recordDefaultPresetDeletion(directories, contentItem) {
+    if (!contentItem || !isPresetContentType(contentItem.type)) {
+        return false;
+    }
+
+    const deletions = getDefaultPresetDeletions(directories);
+    const key = getDefaultPresetDeletionKey(contentItem);
+    deletions.deleted[key] = {
+        type: contentItem.type,
+        filename: contentItem.filename,
+        deletedAt: Date.now(),
+    };
+    writeDefaultPresetDeletions(directories, deletions);
+    return true;
+}
+
+export function clearDefaultPresetDeletion(directories, contentItem) {
+    if (!contentItem || !isPresetContentType(contentItem.type)) {
+        return false;
+    }
+
+    const deletions = getDefaultPresetDeletions(directories);
+    const key = getDefaultPresetDeletionKey(contentItem);
+
+    if (!Object.hasOwn(deletions.deleted, key)) {
+        return false;
+    }
+
+    delete deletions.deleted[key];
+    writeDefaultPresetDeletions(directories, deletions);
+    return true;
+}
+
+/**
+ * @enum {string}
+ */
+export const CONTENT_SCOPE = {
+    USER: 'user',
+    GLOBAL: 'global',
+};
+
+/**
+ * Gets the scope of a content type.
+ * @param {CONTENT_TYPES} type Content type
+ * @returns {CONTENT_SCOPE} Resolved content scope
+ */
+function getScopeByType(type) {
+    const globalTypes = [
+        CONTENT_TYPES.ERROR_PAGE,
+        CONTENT_TYPES.STYLESHEET,
+    ];
+    return globalTypes.includes(type) ? CONTENT_SCOPE.GLOBAL : CONTENT_SCOPE.USER;
+}
+
 /**
  * Gets the default presets from the content directory.
  * @param {import('../users.js').UserDirectoryList} directories User directories
  * @returns {object[]} Array of default presets
  */
-export function getDefaultPresets(directories) {
+export function getDefaultPresets(directories, { includeDeleted = true } = {}) {
     try {
-        const contentIndex = getContentIndex();
+        const contentIndex = getContentIndex(CONTENT_SCOPE.USER);
         const presets = [];
 
         for (const contentItem of contentIndex) {
             if (isPresetContentType(contentItem.type)) {
-                contentItem.name = path.parse(contentItem.filename).name;
-                contentItem.folder = getTargetByType(contentItem.type, directories);
-                presets.push(contentItem);
+                if (!includeDeleted && isDefaultPresetDeleted(directories, contentItem)) {
+                    continue;
+                }
+
+                presets.push({
+                    ...contentItem,
+                    name: path.parse(contentItem.filename).name,
+                    folder: getUserTargetByType(contentItem.type, directories),
+                    sourceFolder: contentItem.folder,
+                });
             }
         }
 
@@ -104,6 +255,63 @@ export function getDefaultPresets(directories) {
         console.warn('Failed to get default presets', err);
         return [];
     }
+}
+
+/**
+ * Finds a bundled default preset by target folder and display name.
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ * @param {object} options Lookup options
+ * @param {string} options.folder Target folder
+ * @param {string} options.name Preset name without extension
+ * @returns {ContentItem|null} Default preset item
+ */
+export function findDefaultPreset(directories, { folder, name }) {
+    if (!folder || !name) {
+        return null;
+    }
+
+    const defaultPresets = getDefaultPresets(directories, { includeDeleted: true });
+    return defaultPresets.find(preset => preset.folder === folder && preset.name === name) || null;
+}
+
+/**
+ * Restores bundled default preset files for a user.
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ * @param {string[]|null} types Content types to restore, or null for all preset types
+ * @returns {{restored: string[], failed: {filename: string, error: string}[]}}
+ */
+export function restoreDefaultPresetFiles(directories, types = null) {
+    const allowedTypes = Array.isArray(types) && types.length ? new Set(types) : null;
+    const defaultPresets = getDefaultPresets(directories, { includeDeleted: true })
+        .filter(preset => !allowedTypes || allowedTypes.has(preset.type));
+    const restored = [];
+    const failed = [];
+
+    for (const preset of defaultPresets) {
+        try {
+            const sourceFolder = preset.sourceFolder || contentDirectory;
+            const sourcePath = path.join(sourceFolder, preset.filename);
+            const targetFolder = preset.folder;
+            const targetPath = path.join(targetFolder, path.parse(preset.filename).base);
+
+            if (!targetFolder || !fs.existsSync(sourcePath)) {
+                throw new Error('Default preset source is missing.');
+            }
+
+            fs.mkdirSync(targetFolder, { recursive: true });
+            fs.cpSync(sourcePath, targetPath, { recursive: true, force: true });
+            setPermissionsSync(targetPath);
+            clearDefaultPresetDeletion(directories, preset);
+            restored.push(preset.filename);
+        } catch (error) {
+            failed.push({
+                filename: preset.filename,
+                error: error.message || String(error),
+            });
+        }
+    }
+
+    return { restored, failed };
 }
 
 /**
@@ -128,23 +336,16 @@ export function getDefaultPresetFile(filename) {
 }
 
 /**
- * Seeds content for a user.
+ * Seeds content from a content index into a target location.
  * @param {ContentItem[]} contentIndex Content index
- * @param {import('../users.js').UserDirectoryList} directories User directories
- * @param {string[]} forceCategories List of categories to force check (even if content check is skipped)
- * @returns {Promise<boolean>} Whether any content was added
+ * @param {string} contentLogPath Path to the content log file
+ * @param {(type: string) => string | null} resolveTarget Function to resolve the target directory for a content type
+ * @param {string[]} [forceCategories] List of categories to force check (even if content check is skipped)
+ * @returns {boolean} Whether any content was added
  */
-async function seedContentForUser(contentIndex, directories, forceCategories) {
+function seedContent(contentIndex, contentLogPath, resolveTarget, forceCategories) {
     let anyContentAdded = false;
-
-    if (!fs.existsSync(directories.root)) {
-        fs.mkdirSync(directories.root, { recursive: true });
-    }
-
-    const contentLogPath = path.join(directories.root, 'content.log');
     const contentLog = getContentLog(contentLogPath);
-
-    removeObsoleteContent(contentLog, directories);
 
     for (const contentItem of contentIndex) {
         const hasLoggedContent = contentLog.includes(contentItem.filename);
@@ -166,7 +367,7 @@ async function seedContentForUser(contentIndex, directories, forceCategories) {
             continue;
         }
 
-        const contentTarget = getTargetByType(contentItem.type, directories);
+        const contentTarget = resolveTarget(contentItem.type);
 
         if (!contentTarget) {
             console.warn(`Content file ${contentItem.filename} has unknown type ${contentItem.type}`);
@@ -187,6 +388,7 @@ async function seedContentForUser(contentIndex, directories, forceCategories) {
             continue;
         }
 
+        fs.mkdirSync(contentTarget, { recursive: true });
         fs.cpSync(contentPath, targetPath, { recursive: true, force: false });
         setPermissionsSync(targetPath);
         console.info(`Content file ${contentItem.filename} copied to ${contentTarget}`);
@@ -210,7 +412,7 @@ function removeObsoleteContent(contentLog, directories) {
             continue;
         }
 
-        const contentTarget = getTargetByType(contentItem.type, directories);
+        const contentTarget = getUserTargetByType(contentItem.type, directories);
 
         if (!contentTarget) {
             continue;
@@ -229,6 +431,43 @@ function removeObsoleteContent(contentLog, directories) {
 }
 
 /**
+ * Seeds content for a user.
+ * @param {ContentItem[]} contentIndex Content index
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ * @param {string[]} forceCategories List of categories to force check (even if content check is skipped)
+ * @returns {Promise<boolean>} Whether any content was added
+ */
+async function seedContentForUser(contentIndex, directories, forceCategories) {
+    if (!fs.existsSync(directories.root)) {
+        fs.mkdirSync(directories.root, { recursive: true });
+    }
+
+    const contentLogPath = path.join(directories.root, 'content.log');
+    const contentLog = getContentLog(contentLogPath);
+    removeObsoleteContent(contentLog, directories);
+    writeFileAtomicSync(contentLogPath, contentLog.join('\n'));
+    const filteredContentIndex = contentIndex.filter(contentItem => {
+        if (!isPresetContentType(contentItem.type)) {
+            return true;
+        }
+
+        return !isDefaultPresetDeleted(directories, contentItem);
+    });
+
+    return seedContent(filteredContentIndex, contentLogPath, (type) => getUserTargetByType(type, directories), forceCategories);
+}
+
+/**
+ * Seeds global content that is not user-specific, such as error pages.
+ * @param {ContentItem[]} contentIndex Content index
+ * @returns {Promise<boolean>} Whether any content was added
+ */
+async function seedGlobalContent(contentIndex) {
+    const contentLogPath = path.join(globalThis.DATA_ROOT, 'content.log');
+    return seedContent(contentIndex, contentLogPath, getGlobalTargetByType);
+}
+
+/**
  * Checks for new content and seeds it for all users.
  * @param {import('../users.js').UserDirectoryList[]} directoriesList List of user directories
  * @param {string[]} forceCategories List of categories to force check (even if content check is skipped)
@@ -241,16 +480,19 @@ export async function checkForNewContent(directoriesList, forceCategories = []) 
             return;
         }
 
-        const forceCategorySet = new Set(forceCategories ?? []);
-        const contentIndex = getContentIndex().filter(item => (
-            !contentCheckSkip || forceCategorySet.size === 0 || forceCategorySet.has(item.type)
-        ));
+        const userContentIndex = getContentIndex(CONTENT_SCOPE.USER);
+        const globalContentIndex = getContentIndex(CONTENT_SCOPE.GLOBAL);
         let anyContentAdded = false;
 
-        for (const directories of directoriesList) {
-            const seedResult = await seedContentForUser(contentIndex, directories, forceCategories);
+        const globalSeedResult = await seedGlobalContent(globalContentIndex);
+        if (globalSeedResult) {
+            anyContentAdded = true;
+        }
 
-            if (seedResult) {
+        for (const directories of directoriesList) {
+            const userSeedResult = await seedContentForUser(userContentIndex, directories, forceCategories);
+
+            if (userSeedResult) {
                 anyContentAdded = true;
             }
         }
@@ -267,9 +509,10 @@ export async function checkForNewContent(directoriesList, forceCategories = []) 
 
 /**
  * Gets combined content index from the content and scaffold directories.
+ * @param {CONTENT_SCOPE} scope Scope of content to get
  * @returns {ContentItem[]} Array of content index
  */
-function getContentIndex() {
+function getContentIndex(scope = CONTENT_SCOPE.USER) {
     const result = [];
 
     if (fs.existsSync(scaffoldIndexPath)) {
@@ -278,6 +521,7 @@ function getContentIndex() {
         if (Array.isArray(scaffoldIndex)) {
             scaffoldIndex.forEach((item) => {
                 item.folder = scaffoldDirectory;
+                item.scope = getScopeByType(item.type);
             });
             result.push(...scaffoldIndex);
         }
@@ -289,22 +533,24 @@ function getContentIndex() {
         if (Array.isArray(contentIndex)) {
             contentIndex.forEach((item) => {
                 item.folder = contentDirectory;
+                item.scope = getScopeByType(item.type);
             });
             result.push(...contentIndex);
         }
     }
 
-    return result;
+    return result.filter((item) => item.scope === scope);
 }
 
 /**
  * Gets content by type and format.
  * @param {string} type Type of content
  * @param {'json'|'string'|'raw'} format Format of content
+ * @param {CONTENT_SCOPE} scope Scope of content to get
  * @returns {string[]|Buffer[]} Array of content
  */
-export function getContentOfType(type, format) {
-    const contentIndex = getContentIndex();
+export function getContentOfType(type, format, scope = CONTENT_SCOPE.USER) {
+    const contentIndex = getContentIndex(scope);
     const indexItems = contentIndex.filter((item) => item.type === type && item.folder);
     const files = [];
     for (const item of indexItems) {
@@ -338,7 +584,7 @@ export function getContentOfType(type, format) {
  * @param {import('../users.js').UserDirectoryList} directories User directories
  * @returns {string | null} Target directory
  */
-function getTargetByType(type, directories) {
+export function getUserTargetByType(type, directories) {
     switch (type) {
         case CONTENT_TYPES.SETTINGS:
             return directories.root;
@@ -376,6 +622,22 @@ function getTargetByType(type, directories) {
             return directories.sysprompt;
         case CONTENT_TYPES.REASONING:
             return directories.reasoning;
+        default:
+            return null;
+    }
+}
+
+/**
+ * Gets the target directory for global content types.
+ * @param {CONTENT_TYPES} type Content type
+ * @returns {string | null} Target directory
+ */
+export function getGlobalTargetByType(type) {
+    switch (type) {
+        case CONTENT_TYPES.ERROR_PAGE:
+            return path.join(globalThis.DATA_ROOT, '_errors');
+        case CONTENT_TYPES.STYLESHEET:
+            return path.join(globalThis.DATA_ROOT, '_css');
         default:
             return null;
     }

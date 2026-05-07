@@ -43,34 +43,71 @@ export function getActiveTunnelVisionBooks() {
     return Array.from(new Set(books.filter(Boolean)));
 }
 
-export function getContextualLorebooks() {
+function addBookSource(sources, name, type) {
+    const bookName = String(name ?? '').trim();
+    if (!bookName) {
+        return;
+    }
+
+    const existing = sources.find(source => source.name === bookName);
+    if (existing) {
+        existing.types.add(type);
+        return;
+    }
+
+    sources.push({
+        name: bookName,
+        types: new Set([type]),
+    });
+}
+
+function getChatMetadata(ctx) {
+    return ctx?.chatMetadata ?? ctx?.chat_metadata ?? {};
+}
+
+function getPowerUserSettings(ctx) {
+    return ctx?.powerUserSettings ?? ctx?.power_user ?? {};
+}
+
+function getWorldInfoSettings(ctx) {
+    return ctx?.worldInfoSettings ?? ctx?.world_info ?? {};
+}
+
+function hasActiveGroup(ctx) {
+    return ctx?.groupId !== null && ctx?.groupId !== undefined && String(ctx.groupId).trim() !== '';
+}
+
+export function getContextualLorebookDetails() {
     const ctx = window?.SillyTavern?.getContext?.();
-    const books = [];
-    const chatLorebook = ctx?.chatMetadata?.[CHAT_LOREBOOK_METADATA_KEY];
-    const personaLorebook = ctx?.powerUserSettings?.persona_description_lorebook;
+    const sources = [];
+    const chatLorebook = getChatMetadata(ctx)?.[CHAT_LOREBOOK_METADATA_KEY];
+    const personaLorebook = getPowerUserSettings(ctx)?.persona_description_lorebook;
 
-    if (chatLorebook) {
-        books.push(chatLorebook);
-    }
-
-    if (personaLorebook) {
-        books.push(personaLorebook);
-    }
+    addBookSource(sources, chatLorebook, 'chat');
+    addBookSource(sources, personaLorebook, 'persona');
 
     for (const character of getContextCharacters(ctx)) {
         const primaryBook = character?.data?.extensions?.world || character?.data?.character_book?.name;
-        if (primaryBook) {
-            books.push(primaryBook);
-        }
+        addBookSource(sources, primaryBook, hasActiveGroup(ctx) ? 'group' : 'character');
 
         const fileName = getCharacterFileName(character);
-        const extraCharLore = ctx?.worldInfoSettings?.charLore?.find?.(entry => entry?.name === fileName);
+        const extraCharLore = getWorldInfoSettings(ctx)?.charLore?.find?.(entry => String(entry?.name ?? '') === fileName);
         if (Array.isArray(extraCharLore?.extraBooks)) {
-            books.push(...extraCharLore.extraBooks);
+            for (const book of extraCharLore.extraBooks) {
+                addBookSource(sources, book, hasActiveGroup(ctx) ? 'group' : 'character');
+            }
         }
     }
 
-    return Array.from(new Set(books.filter(Boolean)));
+    return sources.map(source => ({
+        name: source.name,
+        types: [...source.types],
+        type: [...source.types][0] ?? 'attached',
+    }));
+}
+
+export function getContextualLorebooks() {
+    return getContextualLorebookDetails().map(source => source.name);
 }
 
 function getContextCharacters(ctx) {
@@ -78,8 +115,8 @@ function getContextCharacters(ctx) {
         return [];
     }
 
-    if (ctx.groupId) {
-        const group = ctx.groups?.find?.(item => item?.id === ctx.groupId);
+    if (hasActiveGroup(ctx)) {
+        const group = ctx.groups?.find?.(item => String(item?.id ?? '') === String(ctx.groupId ?? ''));
         const memberAvatars = Array.isArray(group?.members) ? group.members : [];
         return memberAvatars
             .map(avatar => ctx.characters.find(character => character?.avatar === avatar))

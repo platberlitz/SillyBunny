@@ -137,4 +137,108 @@ describe('in-chat agent scoped enabled state', () => {
             group: [],
         });
     });
+
+    test('preserves disabled Pathfinder summary tool toggles while normalizing agents', async () => {
+        const store = await importStore();
+        store.loadAgents([
+            {
+                id: 'pathfinder-agent',
+                name: 'Pathfinder',
+                category: 'tool',
+                sourceTemplateId: 'tpl-pathfinder',
+                tools: [
+                    { name: 'Pathfinder_Summarize', enabled: false },
+                    { name: 'Pathfinder_Search', enabled: true },
+                ],
+            },
+        ]);
+
+        expect(store.getAgentById('pathfinder-agent').tools).toEqual(expect.arrayContaining([
+            expect.objectContaining({ name: 'Pathfinder_Summarize', enabled: false }),
+            expect.objectContaining({ name: 'Pathfinder_Search', enabled: true }),
+        ]));
+    });
+
+    test('removes duplicate Pathfinder template agents while keeping the bundled automatic entry', async () => {
+        const store = await importStore();
+        const templates = [{
+            id: 'tpl-pathfinder',
+            name: 'Pathfinder',
+            prompt: '',
+            category: 'tool',
+        }];
+        const agents = [
+            {
+                id: 'keep-pathfinder',
+                name: 'Pathfinder',
+                prompt: '',
+                category: 'tool',
+                sourceTemplateId: 'tpl-pathfinder',
+                author: 'SillyBunny',
+                tools: [{ name: 'Pathfinder_Search' }],
+            },
+            {
+                id: 'duplicate-pathfinder',
+                name: 'Pathfinder',
+                prompt: '',
+                category: 'tool',
+                author: 'SillyBunny',
+                tools: [{ name: 'Pathfinder_Search' }],
+            },
+            {
+                id: 'custom-locked-pathfinder',
+                name: 'Pathfinder',
+                prompt: '',
+                category: 'tool',
+                sourceTemplateId: 'tpl-pathfinder',
+                author: 'SillyBunny',
+                phaseLocked: true,
+                tools: [{ name: 'Pathfinder_Search' }],
+            },
+        ];
+
+        expect(store.getRedundantBundledAgentDuplicateIds(agents, templates)).toEqual(['duplicate-pathfinder']);
+    });
+
+    test('matches bundled template snapshots after template prompt wording changes', async () => {
+        const store = await importStore();
+        const templates = [{
+            id: 'tpl-achievements-tracker',
+            name: 'Achievements Tracker',
+            prompt: 'new bundled wording',
+            author: 'Purachina',
+            category: 'tracker',
+        }];
+
+        const agent = {
+            id: 'saved-achievements',
+            name: 'Achievements Tracker',
+            prompt: 'old bundled wording',
+            author: 'Purachina',
+            category: 'tracker',
+        };
+
+        expect(store.findTemplateForAgentSnapshot(agent, templates)?.id).toBe('tpl-achievements-tracker');
+    });
+
+    test('keeps prompt-changed custom snapshots from matching bundled templates', async () => {
+        const store = await importStore();
+        const templates = [{
+            id: 'tpl-scene-tracker',
+            name: 'Scene Tracker',
+            prompt: 'new scene wording',
+            author: 'Purachina',
+            category: 'tracker',
+        }];
+
+        const agent = {
+            id: 'custom-scene',
+            name: 'Scene Tracker',
+            prompt: 'custom scene wording',
+            author: 'Someone Else',
+            category: 'tracker',
+        };
+
+        expect(store.findTemplateForAgentSnapshot(agent, templates)).toBeNull();
+    });
 });

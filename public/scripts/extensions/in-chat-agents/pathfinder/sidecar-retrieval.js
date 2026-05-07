@@ -13,37 +13,38 @@ export const PATHFINDER_RETRIEVAL_PROMPT_KEYS = Object.freeze([
     PIPELINE_RETRIEVAL_KEY,
 ]);
 
-function getRetrievalTimeoutMs() {
+function getRetrievalStatusTimeoutMs() {
     const seconds = Number(getSettings().retrievalTimeoutSeconds ?? 8);
     return Math.max(1, Math.min(60, Number.isFinite(seconds) ? seconds : 8)) * 1000;
 }
 
-async function withRetrievalTimeout(task, mode = 'retrieval') {
-    const controller = new AbortController();
-    const timeoutMs = getRetrievalTimeoutMs();
+function throwIfAborted(signal) {
+    if (!signal?.aborted) {
+        return;
+    }
+
+    throw signal.reason ?? new Error('Pathfinder retrieval cancelled.');
+}
+
+function isAbortLikeError(error, signal = null) {
+    return Boolean(
+        signal?.aborted ||
+        error?.name === 'AbortError' ||
+        /abort|cancel/i.test(String(error?.message ?? error ?? '')),
+    );
+}
+
+async function withRetrievalStatusGuard(task, mode = 'retrieval', signal = null) {
+    const timeoutMs = getRetrievalStatusTimeoutMs();
     let timeoutId = null;
 
-    const timeoutPromise = new Promise((resolve) => {
-        timeoutId = setTimeout(() => {
-            controller.abort(new Error(`Pathfinder ${mode} timed out after ${timeoutMs / 1000}s`));
-            console.warn(`[Pathfinder] ${mode} timed out after ${timeoutMs / 1000}s; continuing without retrieval.`);
-            logPathfinderRetrievalDetail({
-                mode,
-                books: getReadableBooks(),
-                selectedEntries: [],
-                stageResults: [],
-                injectedPrompt: '',
-                metadata: { timedOut: true, timeoutSeconds: timeoutMs / 1000 },
-            });
-            resolve(false);
-        }, timeoutMs);
-    });
+    timeoutId = setTimeout(() => {
+        console.warn(`[Pathfinder] ${mode} is still running after ${timeoutMs / 1000}s; waiting for retrieval before generation.`);
+    }, timeoutMs);
 
     try {
-        return await Promise.race([
-            task(controller.signal).then(() => true),
-            timeoutPromise,
-        ]);
+        throwIfAborted(signal);
+        return await task(signal);
     } finally {
         clearTimeout(timeoutId);
     }
@@ -66,7 +67,9 @@ function formatCollapsedGuide(tree, bookName) {
     return lines.join('\n');
 }
 
-async function ensureLorebookTree(bookName) {
+async function ensureLorebookTree(bookName, signal = null) {
+    throwIfAborted(signal);
+
     if (getTree(bookName)) {
         return true;
     }
@@ -79,6 +82,7 @@ async function ensureLorebookTree(bookName) {
 
     try {
         const bookData = await ctx.loadWorldInfo(bookName);
+        throwIfAborted(signal);
         if (!bookData?.entries) {
             console.warn(`[Pathfinder] Could not build a tree for "${bookName}" because no lorebook entries were found.`);
             return false;
@@ -92,11 +96,11 @@ async function ensureLorebookTree(bookName) {
     }
 }
 
-async function ensureReadableBookTrees(bookNames) {
+async function ensureReadableBookTrees(bookNames, signal = null) {
     const readableBooks = Array.from(new Set((bookNames ?? []).filter(Boolean)));
 
     for (const bookName of readableBooks) {
-        await ensureLorebookTree(bookName);
+        await ensureLorebookTree(bookName, signal);
     }
 
     return readableBooks.filter(bookName => getTree(bookName));
@@ -112,7 +116,7 @@ async function ensureReadableBookTrees(bookNames) {
 async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal = null) {
     const s = getSettings();
     const pipelineId = s.pipelineId || 'default';
-    const books = await ensureReadableBookTrees(getReadableBooks());
+    const books = await ensureReadableBookTrees(getReadableBooks(), signal);
 
     // Get chat messages from context
     const ctx = window?.SillyTavern?.getContext?.();
@@ -261,7 +265,7 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
  * @returns {Promise<void>}
  */
 async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal = null) {
-    const books = await ensureReadableBookTrees(getReadableBooks());
+    const books = await ensureReadableBookTrees(getReadableBooks(), signal);
     if (books.length === 0) return;
 
     let contextText = '';
@@ -324,11 +328,13 @@ async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptType
             setExtensionPrompt(RETRIEVAL_PROMPT_KEY, content, extensionPromptTypes?.IN_PROMPT ?? 0, 4, false, extensionPromptRoles?.SYSTEM ?? 0);
         }
     } catch (err) {
-        console.warn('[Pathfinder] Sidecar retrieval failed:', err);
+        if (!isAbortLikeError(err, signal)) {
+            console.warn('[Pathfinder] Sidecar retrieval failed:', err);
+        }
     }
 }
 
-export async function runSidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles) {
+export async function runSidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal = null) {
     const s = getSettings();
     if (!(s.sidecarEnabled || s.pipelineEnabled)) return;
 
@@ -338,15 +344,17 @@ export async function runSidecarRetrieval(setExtensionPrompt, extensionPromptTyp
     setSidecarActive(true);
 
     try {
-        await withRetrievalTimeout(async (signal) => {
+        await withRetrievalStatusGuard(async (retrievalSignal) => {
             if (s.pipelineEnabled) {
-                await runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal);
+                await runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, retrievalSignal);
             } else {
-                await runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal);
+                await runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, retrievalSignal);
             }
-        }, s.pipelineEnabled ? 'pipeline' : 'tool-retrieval');
+        }, s.pipelineEnabled ? 'pipeline' : 'tool-retrieval', signal);
     } catch (err) {
-        console.warn('[Pathfinder] Retrieval failed:', err);
+        if (!isAbortLikeError(err, signal)) {
+            console.warn('[Pathfinder] Retrieval failed:', err);
+        }
     } finally {
         setSidecarActive(false);
     }

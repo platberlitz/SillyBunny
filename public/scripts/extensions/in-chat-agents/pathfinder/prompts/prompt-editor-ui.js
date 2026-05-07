@@ -74,7 +74,7 @@ const EDITOR_HTML = `
 
         <div class="prompt-editor-actions">
             <button id="pf-prompt-save" class="menu_button">
-                <i class="fa-solid fa-save"></i> Save
+                <i class="fa-solid fa-save"></i> <span>Save</span>
             </button>
             <span id="pf-prompt-status" class="prompt-status"></span>
         </div>
@@ -222,14 +222,14 @@ const EDITOR_CSS = `
     color: var(--SmartThemeColorError, #f44336);
 }
 
-.checkbox_label {
+.pathfinder-prompt-editor .checkbox_label {
     display: flex;
     align-items: center;
     gap: 8px;
     cursor: pointer;
 }
 
-.checkbox_label input[type="checkbox"] {
+.pathfinder-prompt-editor .checkbox_label input[type="checkbox"] {
     margin: 0;
 }
 </style>

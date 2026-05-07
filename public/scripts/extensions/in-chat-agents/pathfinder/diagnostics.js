@@ -1,11 +1,18 @@
 import { getSettings, getTree, getAllEntryUids } from './tree-store.js';
 import { ALL_TOOL_NAMES, getActiveTunnelVisionBooks, getContextualLorebooks } from './pathfinder-tool-bridge.js';
+import { getFeedItems } from './activity-feed.js';
 import { getEnabledToolAgents } from '../agent-store.js';
-import { getPathfinderRuntimeAgent } from '../agent-runner.js';
+import { getPathfinderRuntimeAgent, syncToolAgentRegistrations } from '../agent-runner.js';
 
 function getRegisteredPathfinderTools(ToolManager) {
+    const tools = ToolManager?.tools instanceof Map
+        ? [...ToolManager.tools.values()]
+        : Array.isArray(ToolManager?.tools)
+            ? ToolManager.tools
+            : [];
+
     return ALL_TOOL_NAMES.filter(name =>
-        ToolManager?.tools?.find(t => t.name === name),
+        tools.find(t => t?.name === name),
     );
 }
 
@@ -25,12 +32,70 @@ function getEnabledPathfinderTools(pathfinderAgent, registeredTools = []) {
         return Array.from(new Set(enabledAgentToolNames));
     }
 
-    return registeredTools.filter(name => ALL_TOOL_NAMES.includes(name));
+    return registeredTools.length > 0
+        ? registeredTools.filter(name => ALL_TOOL_NAMES.includes(name))
+        : [...ALL_TOOL_NAMES];
+}
+
+function getLastPipelineRunMessage(settings) {
+    if (!settings.pipelineEnabled) {
+        return 'Disabled - entries won\'t be auto-injected';
+    }
+
+    const pipelineId = settings.pipelineId || 'default';
+    const lastRun = getFeedItems().find(item => item?.type === 'pathfinder_retrieval_detail' && item.mode === 'pipeline');
+    if (!lastRun) {
+        return `Enabled (${pipelineId} pipeline). No run recorded this session yet - send a message to trigger retrieval.`;
+    }
+
+    const metadata = lastRun.metadata || {};
+    const selectedCount = Number(metadata.selectedEntryCount ?? lastRun.selectedEntries?.length ?? 0) || 0;
+    const candidateCount = Number(metadata.candidateCount ?? 0) || 0;
+    const stageFailure = (lastRun.stageResults || []).find(stage => stage && stage.success === false);
+    if (stageFailure) {
+        return `Enabled (${pipelineId} pipeline). Last run failed at ${stageFailure.promptId || `stage ${Number(stageFailure.stageIndex ?? 0) + 1}`}: ${stageFailure.error || 'unknown error'}.`;
+    }
+
+    if (metadata.reason === 'no-readable-lorebooks') {
+        return `Enabled (${pipelineId} pipeline). Last run found no readable lorebooks with built trees.`;
+    }
+
+    if (metadata.reason === 'no-chat-messages') {
+        return `Enabled (${pipelineId} pipeline). Last run skipped because there were no chat messages yet.`;
+    }
+
+    if (metadata.timedOut) {
+        return `Enabled (${pipelineId} pipeline). Last run timed out after ${metadata.timeoutSeconds || '?'}s before entries could be injected.`;
+    }
+
+    if (metadata.error) {
+        return `Enabled (${pipelineId} pipeline). Last run failed: ${metadata.error}.`;
+    }
+
+    if (selectedCount === 0) {
+        return `Enabled (${pipelineId} pipeline). Last run returned 0 entries${candidateCount > 0 ? ` from ${candidateCount} candidate(s)` : ''}.${getPipelineStageSummary(lastRun.stageResults)}`;
+    }
+
+    return `Enabled (${pipelineId} pipeline). Last run injected ${selectedCount} entr${selectedCount === 1 ? 'y' : 'ies'}${candidateCount > 0 ? ` from ${candidateCount} candidate(s)` : ''}.`;
+}
+
+function getPipelineStageSummary(stageResults = []) {
+    const stageCounts = stageResults
+        .filter(stage => stage && Number.isFinite(Number(stage.entriesFound)))
+        .map(stage => `${stage.promptId || `stage ${Number(stage.stageIndex ?? 0) + 1}`}: ${Number(stage.entriesFound)} entr${Number(stage.entriesFound) === 1 ? 'y' : 'ies'}`);
+
+    return stageCounts.length > 0 ? ` Stages: ${stageCounts.join('; ')}.` : '';
 }
 
 export async function runDiagnostics() {
     const results = {};
     const s = getSettings();
+
+    try {
+        syncToolAgentRegistrations();
+    } catch (error) {
+        console.warn('[Pathfinder] Diagnostics could not refresh tool registrations before checks.', error);
+    }
 
     // Check enabled lorebooks
     const manualBooks = (s.enabledLorebooks || []);
@@ -46,9 +111,7 @@ export async function runDiagnostics() {
     // Check pipeline mode
     results['Pipeline Mode'] = {
         ok: true,
-        message: s.pipelineEnabled
-            ? `Enabled (${s.pipelineId || 'default'} pipeline)`
-            : 'Disabled - entries won\'t be auto-injected',
+        message: getLastPipelineRunMessage(s),
     };
 
     // Check sidecar/tool mode

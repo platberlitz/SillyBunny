@@ -33,7 +33,9 @@ describe('in-chat agent post-processing runner', () => {
     let saveChatDebounced;
     let saveChat;
     let generateQuietPrompt;
+    let runSidecarRetrieval;
     let streamingProcessor;
+    let globalSettings;
     let documentListeners;
     let windowListeners;
 
@@ -66,12 +68,18 @@ describe('in-chat agent post-processing runner', () => {
         saveChatDebounced = jest.fn();
         saveChat = jest.fn();
         generateQuietPrompt = jest.fn(async () => 'quiet result');
+        runSidecarRetrieval = jest.fn();
         streamingProcessor = {
             messageId: -1,
             type: 'normal',
             isFinished: true,
             isStopped: false,
             abortController: { signal: { aborted: false } },
+        };
+        globalSettings = {
+            enabled: true,
+            promptTransformShowNotifications: false,
+            appendAgentsExecutionMode: 'parallel',
         };
         documentListeners = new Map();
         windowListeners = new Map();
@@ -184,10 +192,7 @@ describe('in-chat agent post-processing runner', () => {
             getAgentRegexScripts: jest.fn(agent => Array.isArray(agent?.regexScripts) ? agent.regexScripts : []),
             getEnabledAgents: jest.fn(() => [...enabledAgents]),
             getEnabledToolAgents: jest.fn(() => []),
-            getGlobalSettings: jest.fn(() => ({
-                enabled: true,
-                promptTransformShowNotifications: false,
-            })),
+            getGlobalSettings: jest.fn(() => globalSettings),
             getPromptTransformMode: jest.fn(agent => agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite'),
             isToolAgent: jest.fn(() => false),
             normalizePromptTransformMaxTokens: jest.fn(value => Number.isFinite(Number(value)) ? Math.max(16, Math.min(16000, Number(value))) : 8192),
@@ -208,7 +213,7 @@ describe('in-chat agent post-processing runner', () => {
 
         await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/sidecar-retrieval.js', () => ({
             PATHFINDER_RETRIEVAL_PROMPT_KEYS: [],
-            runSidecarRetrieval: jest.fn(),
+            runSidecarRetrieval,
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/auto-summary.js', () => ({
@@ -456,8 +461,53 @@ describe('in-chat agent post-processing runner', () => {
         expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toEqual({ value: 'Use the current scene style.' });
     });
 
-    test('queues manual agent runs while another manual agent is active', async () => {
+    test('waits for Pathfinder retrieval before injecting pre-generation prompts', async () => {
+        usePrePromptAgent();
+        enabledAgents.unshift({
+            id: 'agent-pathfinder',
+            name: 'Pathfinder',
+            category: 'tool',
+            sourceTemplateId: 'tpl-pathfinder',
+            phase: 'both',
+            prompt: '',
+            injection: { order: 0 },
+            settings: { pipelineEnabled: true, sidecarEnabled: false },
+            tools: [],
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        });
+
+        let resolveRetrieval;
+        const retrievalDone = new Promise(resolve => {
+            resolveRetrieval = resolve;
+        });
+        runSidecarRetrieval.mockImplementation(async () => {
+            await retrievalDone;
+            extensionPrompts.pathfinder_pipeline_retrieval = { value: 'retrieved lore' };
+        });
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        const generationPromise = eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        await Promise.resolve();
+
+        expect(runSidecarRetrieval).toHaveBeenCalledTimes(1);
+        expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toBeUndefined();
+
+        resolveRetrieval();
+        await generationPromise;
+
+        expect(extensionPrompts.pathfinder_pipeline_retrieval).toEqual({ value: 'retrieved lore' });
+        expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toEqual({ value: 'Use the current scene style.' });
+    });
+
+    test('queues manual agent runs while another manual agent is active in sequential mode', async () => {
         useManualTransformAgents();
+        globalSettings.appendAgentsExecutionMode = 'sequential';
         const quietResolvers = [];
         generateQuietPrompt.mockImplementation(async () => await new Promise(resolve => quietResolvers.push(resolve)));
         chat.push({
@@ -498,6 +548,42 @@ describe('in-chat agent post-processing runner', () => {
         expect(secondResult.status).toBe('changed');
         expect(chat[0].mes).toBe('Second rewrite');
         expect(globalThis.toastr.warning).not.toHaveBeenCalledWith('Cannot run an agent while another is in progress.');
+        expect(isAgentGenerationActive()).toBe(false);
+    });
+
+    test('starts manual agent runs immediately in parallel mode', async () => {
+        useManualTransformAgents();
+        globalSettings.appendAgentsExecutionMode = 'parallel';
+        const quietResolvers = [];
+        generateQuietPrompt.mockImplementation(async () => await new Promise(resolve => quietResolvers.push(resolve)));
+        chat.push({
+            name: 'Assistant',
+            mes: 'Original reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        const { isAgentGenerationActive, runAgentOnMessage } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+
+        const firstRun = runAgentOnMessage('agent-manual-a', 0);
+        await waitFor(() => generateQuietPrompt.mock.calls.length === 1);
+        const secondRun = runAgentOnMessage('agent-manual-b', 0);
+        await waitFor(() => generateQuietPrompt.mock.calls.length === 2);
+
+        expect(quietResolvers).toHaveLength(2);
+        expect(globalThis.toastr.info).toHaveBeenCalledWith('Running agent in parallel.');
+        expect(globalThis.toastr.info).not.toHaveBeenCalledWith('Queued agent run.');
+        expect(isAgentGenerationActive()).toBe(true);
+
+        quietResolvers.shift()('First rewrite');
+        const firstResult = await firstRun;
+        quietResolvers.shift()('Second rewrite');
+        const secondResult = await secondRun;
+
+        expect(firstResult.status).toBe('changed');
+        expect(secondResult.status).toBe('changed');
+        expect(chat[0].mes).toBe('Second rewrite');
         expect(isAgentGenerationActive()).toBe(false);
     });
 

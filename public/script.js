@@ -115,6 +115,12 @@ import {
     initOpenAI,
     reconnectOpenAi,
 } from './scripts/openai.js';
+import {
+    extractOocBlocksForDisplay,
+    hasTextOrArrayPayload,
+    restoreOocBlocksForDisplay,
+    stripOocBlocksFromContext,
+} from './scripts/ooc-blocks.js';
 
 import {
     generateNovelWithStreaming,
@@ -218,7 +224,7 @@ import {
     tag_import_setting,
     applyCharacterTagsToMessageDivs,
 } from './scripts/tags.js';
-import { initSecrets, readSecretState } from './scripts/secrets.js';
+import { checkOpenRouterAuth, initSecrets, readSecretState } from './scripts/secrets.js';
 import { markdownExclusionExt } from './scripts/showdown-exclusion.js';
 import { markdownUnderscoreExt } from './scripts/showdown-underscore.js';
 import { NOTE_MODULE_NAME, initAuthorsNote, metadata_keys, setFloatingPrompt, shouldWIAddPrompt } from './scripts/authors-note.js';
@@ -263,7 +269,7 @@ import { initScrapers } from './scripts/scrapers.js';
 import { initCustomSelectedSamplers, validateDisabledSamplers } from './scripts/samplerSelect.js';
 import { DragAndDropHandler } from './scripts/dragdrop.js';
 import { INTERACTABLE_CONTROL_CLASS, initKeyboard } from './scripts/keyboard.js';
-import { initDynamicStyles } from './scripts/dynamic-styles.js';
+import { loadStylesheetAsync, initDynamicStyles } from './scripts/dynamic-styles.js';
 import { initInputMarkdown } from './scripts/input-md-formatting.js';
 import { AbortReason } from './scripts/util/AbortReason.js';
 import { initSystemPrompts } from './scripts/sysprompt.js';
@@ -296,6 +302,15 @@ import { onboardingExperimentalMacroEngine } from './scripts/macros/engine/Macro
 import { compressRequest, setRequestCompressionConfig } from './scripts/request-compression.js';
 import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker } from './scripts/swipe-picker.js';
 import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
+import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
+
+const DEFERRED_STARTUP_STYLESHEETS = Object.freeze([
+    { href: 'css/bright.min.css', id: 'deferred-highlight-theme-css' },
+    { href: 'css/cropper.min.css', id: 'deferred-cropper-css' },
+    { href: 'css/rm-groups.css', id: 'deferred-rm-groups-css' },
+    { href: 'css/group-avatars.css', id: 'deferred-group-avatars-css' },
+    { href: 'css/macros.css', id: 'deferred-macros-css' },
+]);
 
 // API OBJECT FOR EXTERNAL WIRING
 globalThis.SillyTavern = {
@@ -439,7 +454,7 @@ export let isChatSaving = false;
 export let firstRun = false;
 export let settingsReady = false;
 let currentVersion = '0.0.0';
-const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.5.2';
+const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.5.3';
 
 export let displayVersion = SILLYBUNNY_UI_VERSION;
 
@@ -453,10 +468,72 @@ export let characters = [];
 export let this_chid;
 let saveCharactersPage = 0;
 export const default_avatar = 'img/ai4.png';
-export const system_avatar = 'img/sillybunny-pixel-logo.png';
+const SILLYBUNNY_FRONTEND_ICON_STORAGE_KEY = 'sb-frontend-icon';
+const SILLYBUNNY_FRONTEND_ICON_DEFAULT = 'pixel';
+const SILLYBUNNY_FRONTEND_ICONS = Object.freeze({
+    pixel: 'img/sillybunny-pixel-logo-og.png',
+    badge: 'img/sillybunny-badge.png',
+});
+let appliedSillyBunnyFrontendIconId = '';
+
+function normalizeSillyBunnyFrontendIcon(iconId) {
+    return Object.hasOwn(SILLYBUNNY_FRONTEND_ICONS, String(iconId)) ? String(iconId) : SILLYBUNNY_FRONTEND_ICON_DEFAULT;
+}
+
+function getStoredSillyBunnyFrontendIcon() {
+    try {
+        return normalizeSillyBunnyFrontendIcon(localStorage.getItem(SILLYBUNNY_FRONTEND_ICON_STORAGE_KEY));
+    } catch {
+        return SILLYBUNNY_FRONTEND_ICON_DEFAULT;
+    }
+}
+
+export function getSillyBunnyFrontendIconSrc({ absolute = false } = {}) {
+    const src = SILLYBUNNY_FRONTEND_ICONS[getStoredSillyBunnyFrontendIcon()];
+    return absolute ? `/${src}` : src;
+}
+
+export let system_avatar = getSillyBunnyFrontendIconSrc();
 export const comment_avatar = 'img/quill.png';
 export const default_user_avatar = 'img/user-default.png';
-export let CLIENT_VERSION = 'SillyBunny:v1.5.2:platberlitz'; // For Horde header
+export let CLIENT_VERSION = 'SillyBunny:v1.5.3:platberlitz'; // For Horde header
+
+function applySillyBunnyFrontendIcon(iconId = getStoredSillyBunnyFrontendIcon()) {
+    const normalizedIconId = normalizeSillyBunnyFrontendIcon(iconId);
+    const src = SILLYBUNNY_FRONTEND_ICONS[normalizedIconId];
+    const absoluteSrc = `/${src}`;
+    const iconAlreadyApplied = appliedSillyBunnyFrontendIconId === normalizedIconId;
+    system_avatar = src;
+
+    document.documentElement.dataset.sbFrontendIcon = normalizedIconId;
+
+    for (const image of document.querySelectorAll('img[data-sb-frontend-icon]')) {
+        if (image.getAttribute('src') !== absoluteSrc) {
+            image.setAttribute('src', absoluteSrc);
+        }
+    }
+
+    if (!iconAlreadyApplied) {
+        for (const link of document.querySelectorAll('link[rel~="icon"]')) {
+            link.setAttribute('href', absoluteSrc);
+            link.setAttribute('type', 'image/png');
+        }
+    }
+
+    appliedSillyBunnyFrontendIconId = normalizedIconId;
+}
+
+window.SillyBunnyFrontendIcon = Object.assign(window.SillyBunnyFrontendIcon || {}, {
+    getId: getStoredSillyBunnyFrontendIcon,
+    getSrc: ({ absolute = true } = {}) => getSillyBunnyFrontendIconSrc({ absolute }),
+    apply: applySillyBunnyFrontendIcon,
+});
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => applySillyBunnyFrontendIcon(), { once: true });
+} else {
+    applySillyBunnyFrontendIcon();
+}
 let optionsPopper = Popper.createPopper(document.getElementById('options_button'), document.getElementById('options'), {
     placement: 'top-start',
 });
@@ -474,9 +551,17 @@ const MOBILE_MESSAGE_UPDATE_DELAY_MS = 24;
 const MOBILE_MEDIA_SCROLL_MAX_DELAY_MS = 300;
 const MOBILE_SEND_SCROLL_IMMUNITY_MS = 1500;
 const MOBILE_SEND_SCROLL_SETTLE_MS = 200;
+const MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS = 400;
+const MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS = 1400;
+const MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
+const MOBILE_CHAT_BOTTOM_PIN_MS = 1500;
+const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 8;
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
+const SHOW_MORE_TOUCH_MOVE_CANCEL_PX = 12;
 let isLoadingMoreMessages = false;
 let lastShowMoreTouchEventAt = 0;
+let showMoreTouchStart = null;
+let showMoreTouchMoved = false;
 let pendingMobileMessageUpdateFrame = 0;
 let pendingMobileMessageUpdateTimer = 0;
 /** @type {Map<number, { message: object, rerenderMessage: boolean }>} */
@@ -493,6 +578,9 @@ let is_delete_mode = false;
 let fav_ch_checked = false;
 let scrollLock = false;
 let scrollLockImmunityUntil = 0;
+let mobileChatTouchScrolling = false;
+let mobileChatManualScrollSuppressedUntil = 0;
+let mobileChatBottomPinUntil = 0;
 export let abortStatusCheck = new AbortController();
 export let charDragDropHandler = null;
 export let chatDragDropHandler = null;
@@ -746,6 +834,23 @@ function registerSillyBunnyServiceWorker() {
     window.addEventListener('load', register, { once: true });
 }
 
+function scheduleDeferredStartupStylesheets() {
+    const loadStylesheets = () => {
+        for (const stylesheet of DEFERRED_STARTUP_STYLESHEETS) {
+            loadStylesheetAsync(stylesheet.href, { id: stylesheet.id }).catch(error => {
+                console.warn('Failed to load deferred stylesheet:', stylesheet.href, error);
+            });
+        }
+    };
+
+    if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(loadStylesheets, { timeout: 2500 });
+        return;
+    }
+
+    window.setTimeout(loadStylesheets, 800);
+}
+
 //MARK: firstLoadInit
 async function firstLoadInit() {
     const scheduleStartupLoaderCleanup = (reason) => {
@@ -758,10 +863,11 @@ async function firstLoadInit() {
     initLoaderOverlay.classList.add('splash-screen');
 
     const splashLogo = document.createElement('img');
-    splashLogo.src = '/img/sillybunny-pixel-logo.png';
+    splashLogo.src = getSillyBunnyFrontendIconSrc({ absolute: true });
     splashLogo.alt = 'SillyBunny';
     splashLogo.className = 'splash-logo';
     splashLogo.ariaLabel = t`SillyBunny Badge`;
+    splashLogo.dataset.sbFrontendIcon = 'true';
 
     const splashMessage = document.createElement('h2');
     splashMessage.className = 'splash-message';
@@ -772,10 +878,12 @@ async function firstLoadInit() {
     initLoaderOverlay.appendChild(splashMessage);
 
     const initLoaderHandle = loader.show({
+        slug: 'app-init',
         toastMode: loader.ToastMode.NONE,
         overlayContent: initLoaderOverlay,
     });
     let startupLoaderReleased = false;
+
 
     const releaseStartupLoader = async (reason) => {
         if (startupLoaderReleased) return;
@@ -820,16 +928,18 @@ async function firstLoadInit() {
         initKoboldSettings();
         initNovelAISettings();
         initSystemPrompts();
-        initExtensions();
+        await initExtensions();
         initExtensionSlashCommands();
         ToolManager.initToolSlashCommands();
         await initPresetManager();
         await initSystemMessages();
         await getSettings(initLoaderHandle);
+        await checkOpenRouterAuth();
         initKeyboard();
         initDynamicStyles();
         initTags();
         initBookmarks();
+        scheduleDeferredStartupStylesheets();
         await releaseStartupLoader('startup loader release');
         await getUserAvatars(true, user_avatar);
         await getCharacters();
@@ -1028,7 +1138,12 @@ function getCharacterBlock(item, id) {
     // Populate the template
     const template = $('#character_template .character_select').clone();
     template.attr({ 'data-chid': id, 'id': `CharID${id}` });
-    template.find('img').attr('src', this_avatar).attr('alt', item.name);
+    template.find('img').attr({
+        src: this_avatar,
+        alt: item.name,
+        loading: 'lazy',
+        decoding: 'async',
+    });
     template.find('.avatar').attr('title', `[Character] ${item.name}\nFile: ${item.avatar}`);
     template.find('.ch_name').text(item.name).attr('title', `[Character] ${item.name}`);
     if (power_user.show_card_avatar_urls) {
@@ -1388,13 +1503,7 @@ export async function getCharacters() {
         for (let i = 0; i < getData.length; i++) {
             characters[i] = getData[i];
             characters[i].name = DOMPurify.sanitize(characters[i].name);
-
-            // For dropped-in cards
-            if (!characters[i].chat) {
-                characters[i].chat = `${characters[i].name} - ${humanizedDateTime()}`;
-            }
-
-            characters[i].chat = String(characters[i].chat);
+            characters[i].chat = characters[i].chat ? String(characters[i].chat) : '';
         }
 
         if (previousAvatar) {
@@ -1417,6 +1526,65 @@ export async function getCharacters() {
             await Popup.show.text(t`Character data length limit reached`, t`To resolve this, set "performance.lazyLoadCharacters" to "true" in config.yaml and restart the server.`);
         }
     }
+}
+
+async function getExistingCharacterChats(characterId) {
+    const character = characters[characterId];
+    if (!character?.avatar) {
+        return [];
+    }
+
+    const response = await fetch('/api/characters/chats', {
+        method: 'POST',
+        headers: getRequestHeaders(),
+        body: JSON.stringify({ avatar_url: character.avatar }),
+    });
+
+    if (!response.ok) {
+        return [];
+    }
+
+    const data = await response.json();
+    if (typeof data === 'object' && data?.error === true) {
+        return [];
+    }
+
+    const chats = Object.values(data);
+    chats.sort((a, b) => sortMoments(timestampToMoment(a.last_mes), timestampToMoment(b.last_mes)));
+    return chats.filter(chatInfo => typeof chatInfo?.file_name === 'string');
+}
+
+async function resolveCharacterChatForLoad(characterId, { allowCreate = false, allowMissingPersisted = false } = {}) {
+    const character = characters[characterId];
+    if (!character) {
+        return { chatName: '', created: false };
+    }
+
+    const persistedChat = String(character.chat || '').trim();
+    if (persistedChat && allowMissingPersisted) {
+        character.chat = persistedChat;
+        return { chatName: persistedChat, created: true };
+    }
+
+    if (persistedChat) {
+        character.chat = persistedChat;
+        return { chatName: persistedChat, created: false };
+    }
+
+    const existingChats = await getExistingCharacterChats(characterId);
+    const latestChat = existingChats[0]?.file_name?.replace('.jsonl', '') || '';
+    const nextChatName = latestChat || (allowCreate ? `${character.name} - ${humanizedDateTime()}` : '');
+
+    if (nextChatName && nextChatName !== persistedChat) {
+        await updateRemoteChatName(characterId, nextChatName);
+    } else {
+        character.chat = nextChatName;
+    }
+
+    return {
+        chatName: nextChatName,
+        created: Boolean(!latestChat && allowCreate && nextChatName),
+    };
 }
 
 async function delChat(chatfile) {
@@ -1521,6 +1689,114 @@ function shouldBatchMobileChatRendering() {
     return Boolean(isNarrowViewport || isMobile());
 }
 
+function shouldGuardMobileChatScroll() {
+    return shouldBatchMobileChatRendering();
+}
+
+function isChatScrolledNearBottom(threshold = CHAT_SCROLL_BOTTOM_THRESHOLD_PX) {
+    const element = chatElement[0];
+
+    if (!element) {
+        return true;
+    }
+
+    return Math.abs(element.scrollHeight - element.clientHeight - element.scrollTop) <= threshold;
+}
+
+function markMobileChatManualScroll({ touchActive = false, suppressMs = MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS } = {}) {
+    if (!shouldGuardMobileChatScroll()) {
+        return;
+    }
+
+    mobileChatBottomPinUntil = 0;
+
+    if (touchActive) {
+        mobileChatTouchScrolling = true;
+    }
+
+    mobileChatManualScrollSuppressedUntil = Math.max(mobileChatManualScrollSuppressedUntil, Date.now() + suppressMs);
+    scrollLockImmunityUntil = 0;
+}
+
+function releaseMobileChatTouchScroll() {
+    if (!shouldGuardMobileChatScroll()) {
+        mobileChatTouchScrolling = false;
+        return;
+    }
+
+    mobileChatTouchScrolling = false;
+    markMobileChatManualScroll();
+}
+
+function shouldSuppressMobileChatAutoScroll() {
+    if (!shouldGuardMobileChatScroll()) {
+        return false;
+    }
+
+    if (Date.now() < mobileChatBottomPinUntil) {
+        return false;
+    }
+
+    if (mobileChatTouchScrolling) {
+        return true;
+    }
+
+    return Date.now() < mobileChatManualScrollSuppressedUntil && !isChatScrolledNearBottom();
+}
+
+function requestMobileChatBottomPin({ requireNearBottom = true, durationMs = MOBILE_CHAT_BOTTOM_PIN_MS } = {}) {
+    if (!shouldGuardMobileChatScroll() || mobileChatTouchScrolling) {
+        return false;
+    }
+
+    if (requireNearBottom && !isChatScrolledNearBottom()) {
+        return false;
+    }
+
+    mobileChatBottomPinUntil = Math.max(mobileChatBottomPinUntil, Date.now() + durationMs);
+    return true;
+}
+
+function shouldPinMobileChatToBottom() {
+    if (!shouldGuardMobileChatScroll() || mobileChatTouchScrolling) {
+        return false;
+    }
+
+    return Date.now() < mobileChatBottomPinUntil || isChatScrolledNearBottom();
+}
+
+function pinMobileChatToBottom({ waitForFrame = true, settle = false } = {}) {
+    if (!shouldGuardMobileChatScroll()) {
+        return;
+    }
+
+    mobileChatManualScrollSuppressedUntil = 0;
+    requestMobileChatBottomPin({ requireNearBottom: false });
+    scrollLock = false;
+    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
+
+    const pin = () => {
+        const element = chatElement[0];
+        if (element) {
+            element.scrollTop = element.scrollHeight;
+        }
+    };
+
+    pin();
+
+    if (waitForFrame) {
+        requestAnimationFrame(pin);
+    }
+
+    if (settle) {
+        setTimeout(() => {
+            if (Date.now() < mobileChatBottomPinUntil) {
+                pin();
+            }
+        }, MOBILE_SEND_SCROLL_SETTLE_MS);
+    }
+}
+
 function shouldDeferMobileMessageUpdates() {
     return Boolean(shouldBatchMobileChatRendering() && !is_send_press);
 }
@@ -1535,6 +1811,55 @@ function getMobileChatRenderBatchSize(messageCount) {
 
 function waitForNextFrame() {
     return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+function captureVisibleChatMessageAnchor() {
+    const chatNode = chatElement[0];
+
+    if (!(chatNode instanceof HTMLElement)) {
+        return null;
+    }
+
+    const chatRect = chatNode.getBoundingClientRect();
+    const messages = Array.from(chatNode.querySelectorAll('.mes[mesid]'));
+    const anchorElement = messages.find(message => {
+        const messageRect = message.getBoundingClientRect();
+        return messageRect.bottom > chatRect.top && messageRect.top < chatRect.bottom;
+    });
+
+    if (!(anchorElement instanceof HTMLElement)) {
+        return null;
+    }
+
+    return {
+        messageId: anchorElement.getAttribute('mesid'),
+        offsetTop: anchorElement.getBoundingClientRect().top - chatRect.top,
+    };
+}
+
+function restoreVisibleChatMessageAnchor(anchor) {
+    const chatNode = chatElement[0];
+
+    if (!(chatNode instanceof HTMLElement) || !anchor?.messageId) {
+        return;
+    }
+
+    const anchorElement = chatNode.querySelector(`.mes[mesid="${anchor.messageId}"]`);
+
+    if (!(anchorElement instanceof HTMLElement)) {
+        return;
+    }
+
+    const chatRect = chatNode.getBoundingClientRect();
+    const nextOffsetTop = anchorElement.getBoundingClientRect().top - chatRect.top;
+    chatNode.scrollTop += nextOffsetTop - anchor.offsetTop;
+}
+
+async function settleVisibleChatMessageAnchor(anchor, frames = 8) {
+    for (let i = 0; i < frames; i++) {
+        await waitForNextFrame();
+        restoreVisibleChatMessageAnchor(anchor);
+    }
 }
 
 function flushPendingMobileMessageUpdates() {
@@ -1599,14 +1924,14 @@ export async function showMoreMessages(messagesToLoad = null) {
         const insertionReference = showMoreButtonElement instanceof HTMLElement
             ? showMoreButtonElement.nextSibling
             : chatElement[0]?.firstChild ?? null;
-        const shouldPreserveScroll = isElementInViewport(showMoreButtonElement);
+        const anchor = captureVisibleChatMessageAnchor();
+        const shouldPreserveScroll = Boolean(anchor);
 
         if (showMoreButtonElement instanceof HTMLElement) {
             showMoreButtonElement.setAttribute('aria-busy', 'true');
         }
 
         for (let offset = 0; offset < messages.length; offset += batchSize) {
-            const prevHeight = chatElement.prop('scrollHeight');
             const fragment = document.createDocumentFragment();
             const batch = messages.slice(offset, offset + batchSize);
 
@@ -1621,12 +1946,14 @@ export async function showMoreMessages(messagesToLoad = null) {
             insertShowMoreFragment(insertionReference, fragment);
 
             if (shouldPreserveScroll) {
-                const newHeight = chatElement.prop('scrollHeight');
-                chatElement.scrollTop(chatElement.scrollTop() + newHeight - prevHeight);
+                restoreVisibleChatMessageAnchor(anchor);
             }
 
             if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
                 await waitForNextFrame();
+                if (shouldPreserveScroll) {
+                    restoreVisibleChatMessageAnchor(anchor);
+                }
             }
         }
 
@@ -1639,6 +1966,11 @@ export async function showMoreMessages(messagesToLoad = null) {
         }
 
         applyStylePins();
+
+        if (shouldPreserveScroll) {
+            await settleVisibleChatMessageAnchor(anchor);
+        }
+
         await eventSource.emit(event_types.MORE_MESSAGES_LOADED);
     } finally {
         if (showMoreButtonElement instanceof HTMLElement) {
@@ -1661,8 +1993,20 @@ export async function printMessages() {
 
     // Wait for next frame to ensure batch rendering completes
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    scrollChatToBottom({ waitForFrame: true });
-    delay(debounce_timeout.short).then(() => scrollOnMediaLoad());
+    scrollLoadedChatToBottom();
+    delay(debounce_timeout.short).then(() => scrollOnMediaLoad({ force: true }));
+}
+
+function scrollLoadedChatToBottom() {
+    // SillyBunny: previous-chat taps can leave the mobile manual-scroll guard active.
+    scrollChatToBottom({ force: true });
+    scrollChatToBottom({ waitForFrame: true, force: true });
+
+    if (shouldGuardMobileChatScroll()) {
+        setTimeout(() => {
+            scrollChatToBottom({ waitForFrame: true, force: true });
+        }, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS);
+    }
 }
 
 /**
@@ -1689,7 +2033,9 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
         const shouldYieldBetweenBatches = batchSize < messages.length;
 
         for (let offset = 0; offset < messages.length; offset += batchSize) {
-            const newMessageElements = messages.slice(offset, offset + batchSize).map((message, batchOffset) => {
+            const batchMessages = messages.slice(offset, offset + batchSize);
+            const fragment = document.createDocumentFragment();
+            const newMessageElements = batchMessages.map((message, batchOffset) => {
                 const i = startIndex + offset + batchOffset;
                 const messageElement = updateMessageElement(message, { messageId: i });
 
@@ -1702,7 +2048,10 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
             }
 
             //Append each batch in one DOM update.
-            chatElement.append(newMessageElements);
+            for (const messageElement of newMessageElements) {
+                fragment.appendChild(messageElement);
+            }
+            chatElement[0].appendChild(fragment);
 
             if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
                 await waitForNextFrame();
@@ -1719,7 +2068,7 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
     console.info(`Rendered ${targetChat.length - startIndex} messages in ${((performance.now() - t1) / 1000).toFixed(3)} seconds.`);
 }
 
-export function scrollOnMediaLoad() {
+export function scrollOnMediaLoad({ force = false } = {}) {
     const started = Date.now();
     const media = chatElement.find('.last_mes .mes_block img, .last_mes .mes_block video, .last_mes .mes_block audio').toArray()
         .filter(element => element instanceof HTMLElement && (isElementInViewport(element) || isElementInViewport(element.closest('.last_mes'))));
@@ -1754,7 +2103,7 @@ export function scrollOnMediaLoad() {
         }
         mediaLoaded++;
         if (mediaLoaded === media.length) {
-            scrollChatToBottom({ waitForFrame: true });
+            scrollChatToBottom({ waitForFrame: true, force });
         }
     }
 }
@@ -1949,6 +2298,8 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
         return '';
     }
 
+    const oocBlocks = [];
+
     const resolvedMessageId = messageId !== null && messageId !== undefined && messageId !== ''
         ? Number(messageId)
         : NaN;
@@ -2027,6 +2378,10 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
 
     if (power_user.auto_fix_generated_markdown) {
         mes = fixMarkdown(mes, true);
+    }
+
+    if (!isSystem && !isReasoning) {
+        mes = extractOocBlocksForDisplay(mes, oocBlocks);
     }
 
     if (!isSystem && power_user.encode_tags) {
@@ -2116,11 +2471,42 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
         ADD_TAGS: ['custom-style'],
         ...sanitizerOverrides,
     };
+    mes = restoreOocBlocksForDisplay(mes, oocBlocks);
     mes = encodeStyleTags(mes);
     mes = DOMPurify.sanitize(mes, config);
     mes = decodeStyleTags(mes, { prefix: '.mes_text ' });
 
     return mes;
+}
+
+/**
+ * Checks whether a prompt message still carries non-text payload after OOC text is removed.
+ * @param {object} chatItem Message history item.
+ * @returns {boolean} True if the prompt item should remain in context.
+ */
+function hasPromptPayload(chatItem) {
+    return hasTextOrArrayPayload(chatItem?.mes, [
+        chatItem?.extra?.media,
+        chatItem?.extra?.files,
+        chatItem?.extra?.tool_invocations,
+    ]);
+}
+
+/**
+ * Creates an Image element for the given API/model icon.
+ * The image references the matching SVG file from `/img/` and includes a tooltip with API and model info.
+ * The caller is responsible for appending the image to the DOM and optionally calling `SVGInject` on it.
+ *
+ * @param {string} apiName - API identifier matching an SVG file in /img/ (e.g. 'openai', 'openrouter', 'claude')
+ * @param {string} [modelName=''] - Model name shown in the tooltip
+ * @returns {HTMLImageElement} The image element (not yet in the DOM)
+ */
+export function createModelIcon(apiName, modelName = '') {
+    const image = new Image();
+    image.classList.add('icon-svg');
+    image.src = `/img/${apiName}.svg`;
+    image.title = modelName ? `${apiName} - ${modelName}` : apiName;
+    return image;
 }
 
 /**
@@ -2132,7 +2518,6 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
 function insertSVGIcon(mes, extra) {
     const modelName = getMessageIconName(extra);
 
-    // If there's no API information, we can't determine which SVG to use
     if (!modelName) {
         return;
     }
@@ -2150,16 +2535,14 @@ function insertSVGIcon(mes, extra) {
         };
     };
 
-    const createModelImage = (className, targetSelector, insertBefore) => {
-        const image = new Image();
-        image.classList.add('icon-svg', className);
-        image.src = `/img/${modelName}.svg`;
-        image.title = `${extra?.api ? extra.api + ' - ' : ''}${extra?.model ?? ''}`;
+    const insertIcon = (className, targetSelector, insertBefore) => {
+        const image = createModelIcon(modelName, extra?.model);
+        image.classList.add(className);
         insertOrReplaceSVG(image, className, targetSelector, insertBefore);
     };
 
-    createModelImage('timestamp-icon', '.timestamp');
-    createModelImage('thinking-icon', '.mes_reasoning_header_title', true);
+    insertIcon('timestamp-icon', '.timestamp');
+    insertIcon('thinking-icon', '.mes_reasoning_header_title', true);
 }
 
 const CUSTOM_MODEL_ICON_PATTERNS = Object.freeze([
@@ -2238,6 +2621,8 @@ function applyMessageBlockUpdate(messageId, message, { rerenderMessage = true } 
         return;
     }
 
+    const shouldPinMobileBottom = shouldPinMobileChatToBottom();
+
     if (rerenderMessage) {
         const text = message?.extra?.display_text ?? message.mes;
         messageElement.find('.mes_text').html(messageFormatting(text, message.name, message.is_system, message.is_user, messageId, {}, false));
@@ -2248,6 +2633,10 @@ function applyMessageBlockUpdate(messageId, message, { rerenderMessage = true } 
 
     addCopyToCodeBlocks(messageElement);
     appendMediaToMessage(message, messageElement);
+
+    if (shouldPinMobileBottom) {
+        pinMobileChatToBottom({ waitForFrame: true, settle: true });
+    }
 }
 
 /**
@@ -2484,8 +2873,12 @@ export function appendMediaToMessage(mes, messageElement, scrollBehavior = SCROL
         template.attr('data-index', index);
 
         const image = template.find('.mes_img');
-        image.attr('src', attachment.url);
-        image.attr('title', attachment.title || mes.extra.title || '');
+        image.attr({
+            src: attachment.url,
+            title: attachment.title || mes.extra.title || '',
+            loading: 'lazy',
+            decoding: 'async',
+        });
         mediaPromises.push(new Promise((resolve) => {
             function onLoad() {
                 image.removeAttr('alt');
@@ -2520,8 +2913,11 @@ export function appendMediaToMessage(mes, messageElement, scrollBehavior = SCROL
         template.attr('data-index', index);
 
         const video = template.find('.mes_video');
-        video.attr('src', attachment.url);
-        video.attr('title', attachment.title || mes.extra.title || '');
+        video.attr({
+            src: attachment.url,
+            title: attachment.title || mes.extra.title || '',
+            preload: 'metadata',
+        });
         mediaPromises.push(new Promise((resolve) => {
             function onLoad() {
                 resolve();
@@ -2789,8 +3185,10 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
         }
         return chat.length - 1;
     })();
+    const shouldPinMobileBottom = !insertAfter && !insertBefore && scroll && shouldPinMobileChatToBottom();
 
     let messageElement;
+    let insertedElement = null;
 
     if (type === 'swipe') {
         // Forbidden black magic
@@ -2800,8 +3198,10 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
         //This keeps listeners intact.
         messageElement = chatElement.find(`[mesid="${messageId}"]`);
         updateMessageElement(mes, { messageId, messageElement, adjustMediaScroll: scroll ? SCROLL_BEHAVIOR.ADJUST : SCROLL_BEHAVIOR.NONE });
+        insertedElement = messageElement[0] ?? null;
     } else {
         messageElement = updateMessageElement(mes, { messageId, adjustMediaScroll: scroll ? SCROLL_BEHAVIOR.ADJUST : SCROLL_BEHAVIOR.NONE });
+        insertedElement = messageElement[0] ?? null;
         if (typeof insertAfter === 'number' && insertAfter >= 0) {
             const target = chatElement.find(`.mes[mesid="${insertAfter}"]`);
             $(messageElement).insertAfter(target);
@@ -2815,13 +3215,22 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
 
 
     //last_mes should always be updated.
-    chatElement.find('.mes').removeClass('last_mes');
-    chatElement.find('.mes').last().addClass('last_mes');
+    const chatNode = chatElement[0];
+    chatNode?.querySelector('.mes.last_mes')?.classList.remove('last_mes');
+    const canUseInsertedAsLast = type !== 'swipe' && !insertAfter && !insertBefore && insertedElement instanceof HTMLElement;
+    const lastMessageElement = canUseInsertedAsLast
+        ? insertedElement
+        : Array.from(chatNode?.querySelectorAll('.mes') ?? []).at(-1);
+    lastMessageElement?.classList.add('last_mes');
 
     if (showSwipes) refreshSwipeButtons();
     // Don't scroll if not inserting last
     if (!insertAfter && !insertBefore && scroll) {
-        scrollChatToBottom({ waitForFrame: true });
+        if (shouldPinMobileBottom) {
+            pinMobileChatToBottom({ waitForFrame: true, settle: true });
+        } else {
+            scrollChatToBottom({ waitForFrame: true });
+        }
     }
 
     applyCharacterTagsToMessageDivs({ mesIds: messageId });
@@ -2894,7 +3303,12 @@ export function updateMessageElement(mes, { messageId = chat.length - 1, message
         messageElement[0].style.setProperty('--mes-avatar-original-url', originalAvatarCssUrl);
     }
 
-    messageElement.find('.avatar img').attr('src', originalAvatarImg).attr('data-thumbnail-src', avatarImg);
+    messageElement.find('.avatar img').attr({
+        src: originalAvatarImg,
+        'data-thumbnail-src': avatarImg,
+        decoding: 'async',
+        loading: messageId > 8 ? 'lazy' : 'eager',
+    });
     messageElement.find('.ch_name .name_text').text(mes.name);
     messageElement.find('.timestamp').text(timestamp).attr('title', `${mes.extra?.api ? mes.extra.api + ' - ' : ''}${mes.extra?.model ?? ''}`);
     messageElement.find('.mesIDDisplay').text(`#${messageId}`);
@@ -3116,13 +3530,20 @@ let requestId = null;
  * Scrolls the chat to the bottom if configured to do so.
  * @param {object} [options] Options
  * @param {boolean} [options.waitForFrame] If true, waits for the animation frame before scrolling
+ * @param {boolean} [options.force=false] If true, bypasses temporary mobile manual-scroll suppression
  */
-export function scrollChatToBottom({ waitForFrame } = {}) {
+export function scrollChatToBottom({ waitForFrame, force = false } = {}) {
     if (!power_user.auto_scroll_chat_to_bottom) {
         return;
     }
 
     const doScroll = () => {
+        // SillyBunny: mobile browsers can fight streaming autoscroll during touch and momentum scrolling.
+        if (!force && shouldSuppressMobileChatAutoScroll()) {
+            requestId = null;
+            return;
+        }
+
         let position = chatElement[0].scrollHeight;
 
         if (power_user.waifuMode) {
@@ -3350,6 +3771,11 @@ export function substituteParamsLegacy(content, _name1, _name2, _original, _grou
  */
 export function substituteParams(content, options = {}) {
     if (!content) return '';
+
+    if (typeof content !== 'string') {
+        console.warn('substituteParams: content will be coerced to string', content);
+        content = String(content);
+    }
 
     // Handle legacy signature calls to substituteParams
     // We'll simply re-route them to a temporary legacy function. In the future, we'll remove this and cleanly build the options object ourselves.
@@ -3953,6 +4379,14 @@ class StreamingProcessor {
         this.reasoningSignature = null;
         /** @type {number} */
         this.reasoningTokens = 0;
+        /** @type {string?} Latest reasoning received from the stream, applied on UI ticks */
+        this.pendingReasoning = null;
+    }
+
+    #applyPendingReasoning() {
+        if (typeof this.pendingReasoning === 'string') {
+            this.reasoningHandler.updateReasoning(this.messageId, this.pendingReasoning);
+        }
     }
 
     /**
@@ -4017,6 +4451,7 @@ class StreamingProcessor {
     async onProgressStreaming(messageId, text, isFinal) {
         const isImpersonate = this.type == 'impersonate';
         const isContinue = this.type == 'continue';
+        const shouldPinMobileBottom = !isImpersonate && shouldPinMobileChatToBottom();
 
         if (!isImpersonate && !isContinue && Array.isArray(this.swipes) && this.swipes.length > 0) {
             for (let i = 0; i < this.swipes.length; i++) {
@@ -4066,6 +4501,7 @@ class StreamingProcessor {
             chat[messageId].extra.time_to_first_token = this.timeToFirstToken;
 
             // Update reasoning
+            this.#applyPendingReasoning();
             await this.reasoningHandler.process(messageId, mesChanged, this.promptReasoning);
             processedText = chat[messageId].mes;
 
@@ -4121,7 +4557,9 @@ class StreamingProcessor {
             this.setFirstSwipe(messageId);
         }
 
-        if (!scrollLock) {
+        if (shouldPinMobileBottom) {
+            pinMobileChatToBottom({ waitForFrame: true, settle: isFinal });
+        } else if (!scrollLock) {
             scrollChatToBottom({ waitForFrame: true });
         }
     }
@@ -4264,7 +4702,7 @@ class StreamingProcessor {
         this.stoppingStrings = getStoppingStrings(isImpersonate, isContinue, main_api);
 
         try {
-            const sw = new Stopwatch(1000 / power_user.streaming_fps);
+            const sw = new Stopwatch(getStreamingUpdateInterval(1000 / power_user.streaming_fps));
             const timestamps = [];
             for await (const { text, swipes, logprobs, toolCalls, state } of this.generator()) {
                 const now = Date.now();
@@ -4285,8 +4723,9 @@ class StreamingProcessor {
                 if (logprobs) {
                     this.messageLogprobs.push(...(Array.isArray(logprobs) ? logprobs : [logprobs]));
                 }
-                // Get the updated reasoning string into the handler
-                this.reasoningHandler.updateReasoning(this.messageId, state?.reasoning);
+                // SillyBunny: keep full reasoning regex/DOM work on UI ticks. Reasoning-heavy
+                // streams like DeepSeek and GLM can otherwise overwhelm iOS WebKit.
+                this.pendingReasoning = typeof state?.reasoning === 'string' ? state.reasoning : null;
                 this.images = state?.images ?? [];
                 this.reasoningSignature = state?.signature ?? null;
                 this.reasoningTokens = state?.reasoning_tokens ?? 0;
@@ -4331,9 +4770,7 @@ export function createRawPrompt(prompt, api, instructOverride, quietToLoud, syst
 
     // If the prompt was given as a string, convert to a message-style object assuming user role
     if (typeof prompt === 'string') {
-        const message = api === 'openai'
-            ? { role: 'user', content: prompt.trim() }
-            : { role: 'system', content: prompt };
+        const message = { role: 'user', content: prompt.trim() };
         prompt = [message];
     } else {  // checks for message-style object
         if (prompt.length === 0 && !systemPrompt) throw Error('No messages provided');
@@ -4361,7 +4798,12 @@ export function createRawPrompt(prompt, api, instructOverride, quietToLoud, syst
     // prepend system prompt, if provided
     if (systemPrompt) {
         systemPrompt = substituteParams(systemPrompt);
-        systemPrompt = isInstruct ? (formatInstructModeStoryString(systemPrompt) + '\n') : systemPrompt.trim();
+        systemPrompt = isInstruct ? formatInstructModeStoryString(systemPrompt) : systemPrompt.trim();
+        if (isInstruct && systemPrompt.length > 0 && !systemPrompt.endsWith('\n')) {
+            if (power_user.instruct.wrap && !power_user.instruct.story_string_suffix) {
+                systemPrompt += '\n';
+            }
+        }
         prompt.unshift({ role: 'system', content: systemPrompt });
     }
 
@@ -4391,7 +4833,7 @@ export function createRawPrompt(prompt, api, instructOverride, quietToLoud, syst
  * @prop {number} [responseLength] Maximum response length. If unset, the global default value is used.
  * @prop {boolean} [trimNames] Whether to allow trimming "{{user}}:" and "{{char}}:" from the response.
  * @prop {string} [prefill] An optional prefill for the prompt.
- * @prop {object} [jsonSchema] JSON schema to use for the structured generation. Usually requires a special instruction.
+ * @prop {JsonSchema} [jsonSchema] JSON schema to use for the structured generation. Usually requires a special instruction.
  * @prop {AbortSignal} [signal] Optional signal to abort the request.
  */
 
@@ -4513,7 +4955,7 @@ export async function generateRawData({ prompt = '', api = null, instructOverrid
         }
 
         if (jsonSchema) {
-            return extractJsonFromData(data, { mainApi: api });
+            return extractJsonFromData(data, { mainApi: api, returnInvalidJson: jsonSchema.returnInvalid });
         }
 
         return data;
@@ -4679,6 +5121,7 @@ function removeLastMessage() {
  * @property {object} value JSON schema value.
  * @property {string} [description] Description of the schema.
  * @property {boolean} [strict] If true, the schema will be used in strict mode, meaning that only the fields defined in the schema will be allowed.
+ * @property {boolean} [returnInvalid] If true, a string that can't be parsed as a JSON will be returned as is, instead of an empty object.
  *
  * @typedef {object} GenerateOptions
  * @property {boolean} [automatic_trigger] If the generation was triggered automatically (e.g. group auto mode).
@@ -4792,7 +5235,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     if (selected_group && !is_group_generating) {
         if (!dryRun) {
             // Returns the promise that generateGroupWrapper returns; resolves when generation is done
-            return generateGroupWrapper(false, type, { quiet_prompt, force_chid, signal: abortController.signal, quietImage });
+            return generateGroupWrapper(false, type, { quiet_prompt, force_chid, signal: abortController.signal, quietImage, jsonSchema });
         }
 
         const characterIndexMap = new Map(characters.map((char, index) => [char.avatar, index]));
@@ -4847,6 +5290,9 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         if (chat.length && lastMessage.is_user) {
             //do nothing? why does this check exist?
         } else if (type !== 'quiet' && type !== 'swipe' && !isImpersonate && !dryRun && !depth && chat.length) {
+            if (type === 'regenerate') {
+                requestMobileChatBottomPin();
+            }
             deleteItemizedPromptForMessage(chat.length - 1);
             chat.length = chat.length - 1;
             await removeLastMessage();
@@ -4986,27 +5432,34 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
 
         return {
             ...chatItem,
-            mes: regexedMessage,
+            mes: stripOocBlocksFromContext(regexedMessage),
             index,
         };
     }));
+    coreChat = coreChat.filter(hasPromptPayload);
 
     const promptReasoning = new PromptReasoning();
     for (let i = coreChat.length - 1; i >= 0; i--) {
         const depth = coreChat.length - i - (isContinue ? 2 : 1);
         const isPrefix = isContinue && i === coreChat.length - 1;
+
+        // In group chats, only include reasoning from the currently generating character
+        const isOtherGroupMember = selected_group && coreChat[i].name !== name2;
+
         coreChat[i] = {
             ...coreChat[i],
-            mes: promptReasoning.addToMessage(
-                coreChat[i].mes,
-                getRegexedString(
-                    String(coreChat[i].extra?.reasoning ?? ''),
-                    regex_placement.REASONING,
-                    { isPrompt: true, depth: depth },
+            mes: isOtherGroupMember
+                ? coreChat[i].mes
+                : promptReasoning.addToMessage(
+                    coreChat[i].mes,
+                    getRegexedString(
+                        String(coreChat[i].extra?.reasoning ?? ''),
+                        regex_placement.REASONING,
+                        { isPrompt: true, depth: depth },
+                    ),
+                    isPrefix,
+                    coreChat[i].extra?.reasoning_duration,
                 ),
-                isPrefix,
-                coreChat[i].extra?.reasoning_duration,
-            ),
         };
         if (promptReasoning.isLimitReached()) {
             break;
@@ -5245,7 +5698,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             chat2[i] = formatMessageHistoryItem(coreChat[j], isInstruct, force_output_sequence.FIRST);
         }
 
-        if (lastUserMessageIndex >= 0 && j === lastUserMessageIndex && isInstruct) {
+        if (lastUserMessageIndex >= 0 && j === lastUserMessageIndex && isInstruct && !isImpersonate) {
             // Reformat with the last input sequence (if any)
             chat2[i] = formatMessageHistoryItem(coreChat[j], isInstruct, force_output_sequence.LAST);
         }
@@ -5849,7 +6302,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 activeStreamingProcessor.firstMessageText = '';
             }
 
-            activeStreamingProcessor.generator = await sendStreamingRequest(type, generate_data);
+            activeStreamingProcessor.generator = await sendStreamingRequest(type, generate_data, { jsonSchema });
 
             hideSwipeButtons();
             let getMessage = await activeStreamingProcessor.generate();
@@ -5944,7 +6397,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
 
         if (jsonSchema) {
             unblockGeneration(type);
-            return extractJsonFromData(data);
+            return extractJsonFromData(data, { returnInvalidJson: jsonSchema.returnInvalid ?? false });
         }
 
         //const getData = await response.json();
@@ -6386,12 +6839,12 @@ export async function sendMessageAsUser(messageText, messageBias, insertAt = nul
         await eventSource.emit(event_types.USER_MESSAGE_RENDERED, insertAt);
     } else {
         chat.push(message);
+        await saveChatConditional();
         const chat_id = (chat.length - 1);
         addOneMessage(message, { scroll: false });
         keepMobileSendScrollAnchored({ settle: true });
         await eventSource.emit(event_types.MESSAGE_SENT, chat_id);
         await eventSource.emit(event_types.USER_MESSAGE_RENDERED, chat_id);
-        await saveChatConditional();
     }
 
     return message;
@@ -6567,7 +7020,7 @@ function setInContextMessages(msgInContextCount, type) {
 
     if (lastMessageBlock.length === 0) {
         const firstMessageId = getFirstDisplayedMessageId();
-        chatElement.find(`.mes[mesid="${firstMessageId}"`).addClass('lastInContext');
+        chatElement.find(`.mes[mesid="${firstMessageId}"]`).addClass('lastInContext');
     }
 
     // Update last id to chat. No metadata save on purpose, gets hopefully saved via another call
@@ -6882,9 +7335,13 @@ export function extractMessageFromData(data, activeApi = null) {
 /**
  * Extracts JSON from the response data.
  * @param {object} data Response data
+ * @param {object} [options] Extraction options
+ * @param {string} [options.mainApi] Main API to use
+ * @param {string} [options.chatCompletionSource] Chat completion source
+ * @param {boolean} [options.returnInvalidJson=false] Whether to return the raw JSON string even if it fails to parse
  * @returns {string} Extracted JSON string from the response data
  */
-export function extractJsonFromData(data, { mainApi = null, chatCompletionSource = null } = {}) {
+export function extractJsonFromData(data, { mainApi = null, chatCompletionSource = null, returnInvalidJson = false } = {}) {
     mainApi = mainApi ?? main_api;
     chatCompletionSource = chatCompletionSource ?? oai_settings.chat_completion_source;
 
@@ -6907,6 +7364,9 @@ export function extractJsonFromData(data, { mainApi = null, chatCompletionSource
                     break;
                 case chat_completion_sources.PERPLEXITY:
                     result = tryParse(removeReasoningFromString(text));
+                    if (!result && returnInvalidJson) {
+                        return text;
+                    }
                     break;
                 case chat_completion_sources.VERTEXAI:
                 case chat_completion_sources.MAKERSUITE:
@@ -6927,6 +7387,9 @@ export function extractJsonFromData(data, { mainApi = null, chatCompletionSource
                 case chat_completion_sources.ZAI:
                 default:
                     result = tryParse(text);
+                    if (!result && returnInvalidJson) {
+                        return text;
+                    }
                     break;
             }
         } break;
@@ -8190,7 +8653,12 @@ export function buildAvatarList(block, entities, { templateId = 'inline_avatar_t
 
         avatarTemplate.attr('data-type', entity.type);
         avatarTemplate.attr('data-chid', id);
-        avatarTemplate.find('img').attr('src', this_avatar).attr('alt', entity.item.name);
+        avatarTemplate.find('img').attr({
+            src: this_avatar,
+            alt: entity.item.name,
+            loading: 'lazy',
+            decoding: 'async',
+        });
         avatarTemplate.attr('title', `[Character] ${entity.item.name}\nFile: ${entity.item.avatar}`);
         if (highlightFavs) {
             avatarTemplate.toggleClass('is_fav', entity.item.fav || entity.item.fav == 'true');
@@ -8208,7 +8676,11 @@ export function buildAvatarList(block, entities, { templateId = 'inline_avatar_t
             avatarTemplate.attr('title', `[Group] ${entity.item.name}`);
         } else if (entity.type === 'persona') {
             avatarTemplate.attr({ 'data-pid': id, 'data-chid': null });
-            avatarTemplate.find('img').attr('src', getThumbnailUrl('persona', entity.item.avatar));
+            avatarTemplate.find('img').attr({
+                src: getThumbnailUrl('persona', entity.item.avatar),
+                loading: 'lazy',
+                decoding: 'async',
+            });
             avatarTemplate.attr('title', `[Persona] ${entity.item.name}\nFile: ${entity.item.avatar}`);
         }
 
@@ -8254,9 +8726,10 @@ export async function unshallowCharacter(characterId) {
     await getOneCharacter(avatar);
 }
 
-export async function getChat() {
+export async function getChat({ allowMissingPersisted = false } = {}) {
     try {
         await unshallowCharacter(this_chid);
+        const resolvedChat = await resolveCharacterChatForLoad(this_chid, { allowCreate: true, allowMissingPersisted });
 
         const response = await fetch('/api/chats/get', {
             method: 'POST',
@@ -8264,7 +8737,7 @@ export async function getChat() {
             cache: 'no-cache',
             body: JSON.stringify({
                 ch_name: characters[this_chid].name,
-                file_name: characters[this_chid].chat,
+                file_name: resolvedChat.chatName,
                 avatar_url: characters[this_chid].avatar,
             }),
         });
@@ -8288,7 +8761,7 @@ export async function getChat() {
         if (!chat_metadata.integrity) {
             chat_metadata.integrity = uuidv4();
         }
-        await getChatResult();
+        await getChatResult({ emitCreated: resolvedChat.created });
         eventSource.emit(event_types.CHAT_LOADED, { detail: { id: this_chid, character: characters[this_chid] } });
 
         // Focus on the textarea if not already focused on a visible text input
@@ -8304,7 +8777,7 @@ export async function getChat() {
     }
 }
 
-async function getChatResult() {
+async function getChatResult({ emitCreated = false } = {}) {
     name2 = characters[this_chid].name;
     let freshChat = false;
     if (chat.length === 0) {
@@ -8321,7 +8794,7 @@ async function getChatResult() {
     select_selected_character(this_chid);
 
     await eventSource.emit(event_types.CHAT_CHANGED, (getCurrentChatId()));
-    if (freshChat) await eventSource.emit(event_types.CHAT_CREATED);
+    if (freshChat && emitCreated) await eventSource.emit(event_types.CHAT_CREATED);
 
     if (chat.length === 1) {
         const chat_id = (chat.length - 1);
@@ -8654,6 +9127,15 @@ export async function getSettings(initLoaderHandle = null) {
             await loadExtensionSettings(settings, isVersionChanged, enableAutoUpdate);
             await eventSource.emit(event_types.EXTENSION_SETTINGS_LOADED);
             applyPowerUserSettings();
+        } else {
+            Object.assign(extension_settings, (settings.extension_settings ?? {}));
+            $('#third_party_extension_button').addClass('disabled');
+            $('#extensions_details').addClass('disabled');
+            $('#extensions_connect').addClass('disabled');
+            $('#extensions_notify_updates').attr('disabled', 'disabled');
+            $('#extensions_autoconnect').attr('disabled', 'disabled');
+            $('#extensions_url').attr('disabled', 'disabled');
+            $('#extensions_api_key').attr('disabled', 'disabled');
         }
 
         firstRun = !!settings.firstRun;
@@ -9430,13 +9912,30 @@ export async function messageEdit(editMessageId) {
         $editTextArea.height(editTextArea.scrollHeight);
     }
 
-    $editTextArea.trigger('focus');
+    if (shouldGuardMobileChatScroll()) {
+        markMobileChatManualScroll();
+    }
+
+    const shouldRestoreChatScroll = shouldGuardMobileChatScroll() || Number(this_edit_mes_id) === chat.length - 1;
+    const restoreChatScroll = () => {
+        if (shouldRestoreChatScroll) {
+            chatElement.scrollTop(chatScrollPosition);
+        }
+    };
+
+    try {
+        editTextArea.focus({ preventScroll: true });
+    } catch {
+        editTextArea.focus();
+    }
 
     // Sets the cursor at the end of the text
     editTextArea.setSelectionRange(text.length, text.length);
+    restoreChatScroll();
 
-    if (Number(this_edit_mes_id) === chat.length - 1) {
-        chatElement.scrollTop(chatScrollPosition);
+    if (shouldRestoreChatScroll) {
+        requestAnimationFrame(restoreChatScroll);
+        setTimeout(restoreChatScroll, MOBILE_SEND_SCROLL_SETTLE_MS);
     }
 
     updateEditArrowClasses();
@@ -11686,7 +12185,10 @@ function openAlternateGreetings() {
         }
 
         field.focus({ preventScroll: true });
-        field.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        field.scrollIntoView({
+            block: 'nearest',
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        });
     });
 }
 
@@ -12588,7 +13090,7 @@ export async function doNewChat({ deleteCurrentChat = false } = {}) {
         const newChatName = `${name2} - ${humanizedDateTime()}`;
         characters[this_chid].chat = newChatName;
         $('#selected_chat_pole').val(newChatName);
-        await getChat();
+        await getChat({ allowMissingPersisted: true });
         await updateRemoteChatName(this_chid, newChatName);
         if (deleteCurrentChat) await delChat(chat_file_for_del + '.jsonl');
     }
@@ -12623,6 +13125,7 @@ export async function renameGroupOrCharacterChat({ characterId, groupId, oldFile
     }
 
     const loaderHandle = showLoader ? loader.show({
+        slug: 'chat-rename',
         title: t`Rename Chat`,
         message: t`Renaming chat…`,
         toastMode: loader.ToastMode.STATIC,
@@ -12660,6 +13163,9 @@ export async function renameGroupOrCharacterChat({ characterId, groupId, oldFile
         if (shouldReloadCurrent && currentChatId) {
             await reloadCurrentChat();
         }
+
+        const eventData = { avatarId: body.avatar_url, groupId, oldFileName: body.original_file, newFileName: body.renamed_file };
+        await eventSource.emit(event_types.CHAT_RENAMED, eventData);
     } catch {
         await delay(500);
         await callGenericPopup('An error has occurred. Chat was not renamed.', POPUP_TYPE.TEXT);
@@ -13194,17 +13700,38 @@ jQuery(async function () {
     }
 
     const chatElementScroll = document.getElementById('chat');
+    const markMobileChatTouchScrollStart = () => markMobileChatManualScroll({ touchActive: true });
+    const markMobileChatTouchScrollMove = () => markMobileChatManualScroll();
+    const markMobileChatWheelScroll = () => markMobileChatManualScroll();
+    const markMobileViewportScroll = () => {
+        if (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil) {
+            markMobileChatManualScroll({ suppressMs: MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS });
+        }
+    };
+
+    chatElementScroll.addEventListener('touchstart', markMobileChatTouchScrollStart, { passive: true });
+    chatElementScroll.addEventListener('touchmove', markMobileChatTouchScrollMove, { passive: true });
+    chatElementScroll.addEventListener('touchend', releaseMobileChatTouchScroll, { passive: true });
+    chatElementScroll.addEventListener('touchcancel', releaseMobileChatTouchScroll, { passive: true });
+    chatElementScroll.addEventListener('wheel', markMobileChatWheelScroll, { passive: true });
+    window.visualViewport?.addEventListener('scroll', markMobileViewportScroll, { passive: true });
+    window.visualViewport?.addEventListener('resize', markMobileViewportScroll, { passive: true });
+
     const chatScrollHandler = function () {
         if (power_user.waifuMode) {
             scrollLock = true;
             return;
         }
 
+        if (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil) {
+            markMobileChatManualScroll();
+        }
+
         if (Date.now() < scrollLockImmunityUntil) {
             return;
         }
 
-        const scrollIsAtBottom = Math.abs(chatElementScroll.scrollHeight - chatElementScroll.clientHeight - chatElementScroll.scrollTop) < 5;
+        const scrollIsAtBottom = isChatScrolledNearBottom(5);
 
         // Resume autoscroll if the user scrolls to the bottom
         if (scrollLock && scrollIsAtBottom) {
@@ -13253,6 +13780,7 @@ jQuery(async function () {
         $('#select_chat_cross').trigger('click');
 
         const loaderHandle = loader.show({
+            slug: 'chat-delete',
             title: t`Delete Chat`,
             message: t`Deleting chat…`,
             toastMode: loader.ToastMode.STATIC,
@@ -14609,13 +15137,44 @@ jQuery(async function () {
         $('#avatar-and-name-block').slideToggle();
     });
 
+    $(document).on('touchstart', '#show_more_messages', function (event) {
+        const touch = event.originalEvent?.changedTouches?.[0];
+        showMoreTouchMoved = false;
+        showMoreTouchStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
+    });
+
+    $(document).on('touchmove', '#show_more_messages', function (event) {
+        if (!showMoreTouchStart) {
+            return;
+        }
+
+        const touch = event.originalEvent?.changedTouches?.[0];
+
+        if (!touch) {
+            return;
+        }
+
+        const deltaX = Math.abs(touch.clientX - showMoreTouchStart.x);
+        const deltaY = Math.abs(touch.clientY - showMoreTouchStart.y);
+        showMoreTouchMoved = showMoreTouchMoved || deltaX > SHOW_MORE_TOUCH_MOVE_CANCEL_PX || deltaY > SHOW_MORE_TOUCH_MOVE_CANCEL_PX;
+    });
+
     $(document).on('mouseup touchend', '#show_more_messages', async function (event) {
         if (event.type === 'touchend') {
             lastShowMoreTouchEventAt = Date.now();
+            showMoreTouchStart = null;
+
+            if (showMoreTouchMoved) {
+                showMoreTouchMoved = false;
+                return;
+            }
         } else if (event.type === 'mouseup' && Date.now() - lastShowMoreTouchEventAt < SHOW_MORE_DUPLICATE_EVENT_GUARD_MS) {
             return;
         }
 
+        showMoreTouchMoved = false;
+        event.stopPropagation();
+        event.preventDefault();
         await showMoreMessages();
     });
 

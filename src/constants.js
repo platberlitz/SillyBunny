@@ -212,6 +212,8 @@ export const CHAT_COMPLETION_SOURCES = {
     OPENAI_RESPONSES: 'openai_responses',
     ZAI: 'zai',
     SILICONFLOW: 'siliconflow',
+    MINIMAX: 'minimax',
+    WORKERS_AI: 'workers_ai',
 };
 
 /**
@@ -481,6 +483,14 @@ export const OPENAI_REASONING_EFFORT_MODELS = [
     'gpt-5.2-chat-latest',
     'gpt-5.3-chat-latest',
     'gpt-5.4',
+    'gpt-5.4-2026-03-05',
+    'gpt-5.4-mini',
+    'gpt-5.4-mini-2026-03-17',
+    'gpt-5.4-nano',
+    'gpt-5.4-nano-2026-03-17',
+    'gpt-5.5',
+    'gpt-5.5-2026-04-23',
+    'gpt-5.5-pro',
 ];
 
 export const OPENAI_REASONING_EFFORT_MAP = {
@@ -556,6 +566,11 @@ export const ZAI_ENDPOINT = {
 };
 
 export const SILICONFLOW_ENDPOINT = {
+    GLOBAL: 'global',
+    CN: 'cn',
+};
+
+export const MINIMAX_ENDPOINT = {
     GLOBAL: 'global',
     CN: 'cn',
 };

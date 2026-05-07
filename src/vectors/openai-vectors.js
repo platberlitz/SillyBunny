@@ -62,6 +62,13 @@ const SOURCES = {
         headers: {},
         processBody: () => {},
     },
+    'workers_ai': {
+        secretKey: SECRET_KEYS.WORKERS_AI,
+        url: '',
+        model: '@cf/baai/bge-m3',
+        headers: {},
+        processBody: () => {},
+    },
 };
 
 /**
