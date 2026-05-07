@@ -948,9 +948,11 @@ export function initRossMods() {
                 const threshold = 1;
                 const newHeight = chatBlock.offsetHeight;
                 const deltaHeight = newHeight - lastHeight;
-                const isScrollAtBottom = Math.abs(chatBlock.scrollHeight - chatBlock.scrollTop - newHeight) <= threshold;
+                const wasScrollAtBottom = Math.abs(chatBlock.scrollHeight - chatBlock.scrollTop - lastHeight) <= threshold;
 
-                if (!isScrollAtBottom && Math.abs(deltaHeight) > threshold) {
+                if (wasScrollAtBottom) {
+                    chatBlock.scrollTop = chatBlock.scrollHeight;
+                } else if (!isMobile() && Math.abs(deltaHeight) > threshold) {
                     chatBlock.scrollTop -= deltaHeight;
                 }
                 lastHeight = newHeight;

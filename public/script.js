@@ -557,8 +557,11 @@ const MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
 const MOBILE_CHAT_BOTTOM_PIN_MS = 1500;
 const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 8;
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
+const SHOW_MORE_TOUCH_MOVE_CANCEL_PX = 12;
 let isLoadingMoreMessages = false;
 let lastShowMoreTouchEventAt = 0;
+let showMoreTouchStart = null;
+let showMoreTouchMoved = false;
 let pendingMobileMessageUpdateFrame = 0;
 let pendingMobileMessageUpdateTimer = 0;
 /** @type {Map<number, { message: object, rerenderMessage: boolean }>} */
@@ -1810,6 +1813,55 @@ function waitForNextFrame() {
     return new Promise(resolve => requestAnimationFrame(() => resolve()));
 }
 
+function captureVisibleChatMessageAnchor() {
+    const chatNode = chatElement[0];
+
+    if (!(chatNode instanceof HTMLElement)) {
+        return null;
+    }
+
+    const chatRect = chatNode.getBoundingClientRect();
+    const messages = Array.from(chatNode.querySelectorAll('.mes[mesid]'));
+    const anchorElement = messages.find(message => {
+        const messageRect = message.getBoundingClientRect();
+        return messageRect.bottom > chatRect.top && messageRect.top < chatRect.bottom;
+    });
+
+    if (!(anchorElement instanceof HTMLElement)) {
+        return null;
+    }
+
+    return {
+        messageId: anchorElement.getAttribute('mesid'),
+        offsetTop: anchorElement.getBoundingClientRect().top - chatRect.top,
+    };
+}
+
+function restoreVisibleChatMessageAnchor(anchor) {
+    const chatNode = chatElement[0];
+
+    if (!(chatNode instanceof HTMLElement) || !anchor?.messageId) {
+        return;
+    }
+
+    const anchorElement = chatNode.querySelector(`.mes[mesid="${anchor.messageId}"]`);
+
+    if (!(anchorElement instanceof HTMLElement)) {
+        return;
+    }
+
+    const chatRect = chatNode.getBoundingClientRect();
+    const nextOffsetTop = anchorElement.getBoundingClientRect().top - chatRect.top;
+    chatNode.scrollTop += nextOffsetTop - anchor.offsetTop;
+}
+
+async function settleVisibleChatMessageAnchor(anchor, frames = 8) {
+    for (let i = 0; i < frames; i++) {
+        await waitForNextFrame();
+        restoreVisibleChatMessageAnchor(anchor);
+    }
+}
+
 function flushPendingMobileMessageUpdates() {
     pendingMobileMessageUpdateFrame = 0;
     pendingMobileMessageUpdateTimer = 0;
@@ -1872,14 +1924,14 @@ export async function showMoreMessages(messagesToLoad = null) {
         const insertionReference = showMoreButtonElement instanceof HTMLElement
             ? showMoreButtonElement.nextSibling
             : chatElement[0]?.firstChild ?? null;
-        const shouldPreserveScroll = isElementInViewport(showMoreButtonElement);
+        const anchor = captureVisibleChatMessageAnchor();
+        const shouldPreserveScroll = Boolean(anchor);
 
         if (showMoreButtonElement instanceof HTMLElement) {
             showMoreButtonElement.setAttribute('aria-busy', 'true');
         }
 
         for (let offset = 0; offset < messages.length; offset += batchSize) {
-            const prevHeight = chatElement.prop('scrollHeight');
             const fragment = document.createDocumentFragment();
             const batch = messages.slice(offset, offset + batchSize);
 
@@ -1894,12 +1946,14 @@ export async function showMoreMessages(messagesToLoad = null) {
             insertShowMoreFragment(insertionReference, fragment);
 
             if (shouldPreserveScroll) {
-                const newHeight = chatElement.prop('scrollHeight');
-                chatElement.scrollTop(chatElement.scrollTop() + newHeight - prevHeight);
+                restoreVisibleChatMessageAnchor(anchor);
             }
 
             if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
                 await waitForNextFrame();
+                if (shouldPreserveScroll) {
+                    restoreVisibleChatMessageAnchor(anchor);
+                }
             }
         }
 
@@ -1912,6 +1966,11 @@ export async function showMoreMessages(messagesToLoad = null) {
         }
 
         applyStylePins();
+
+        if (shouldPreserveScroll) {
+            await settleVisibleChatMessageAnchor(anchor);
+        }
+
         await eventSource.emit(event_types.MORE_MESSAGES_LOADED);
     } finally {
         if (showMoreButtonElement instanceof HTMLElement) {
@@ -15078,13 +15137,42 @@ jQuery(async function () {
         $('#avatar-and-name-block').slideToggle();
     });
 
+    $(document).on('touchstart', '#show_more_messages', function (event) {
+        const touch = event.originalEvent?.changedTouches?.[0];
+        showMoreTouchMoved = false;
+        showMoreTouchStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
+    });
+
+    $(document).on('touchmove', '#show_more_messages', function (event) {
+        if (!showMoreTouchStart) {
+            return;
+        }
+
+        const touch = event.originalEvent?.changedTouches?.[0];
+
+        if (!touch) {
+            return;
+        }
+
+        const deltaX = Math.abs(touch.clientX - showMoreTouchStart.x);
+        const deltaY = Math.abs(touch.clientY - showMoreTouchStart.y);
+        showMoreTouchMoved = showMoreTouchMoved || deltaX > SHOW_MORE_TOUCH_MOVE_CANCEL_PX || deltaY > SHOW_MORE_TOUCH_MOVE_CANCEL_PX;
+    });
+
     $(document).on('mouseup touchend', '#show_more_messages', async function (event) {
         if (event.type === 'touchend') {
             lastShowMoreTouchEventAt = Date.now();
+            showMoreTouchStart = null;
+
+            if (showMoreTouchMoved) {
+                showMoreTouchMoved = false;
+                return;
+            }
         } else if (event.type === 'mouseup' && Date.now() - lastShowMoreTouchEventAt < SHOW_MORE_DUPLICATE_EVENT_GUARD_MS) {
             return;
         }
 
+        showMoreTouchMoved = false;
         event.stopPropagation();
         event.preventDefault();
         await showMoreMessages();
