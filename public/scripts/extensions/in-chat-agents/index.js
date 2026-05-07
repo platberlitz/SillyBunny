@@ -25,6 +25,7 @@ import {
     normalizeAgentCategory,
     getAgentChatScopeLabel,
     getPromptTransformMode,
+    findTemplateForAgentSnapshot,
     getRedundantBundledAgentDuplicateIds,
     reconcileScopedEnabledAgentIdsFromLegacyFlags,
     resolveConnectionProfile,
@@ -196,21 +197,7 @@ function findTemplateById(templateId) {
 }
 
 function findTemplateForAgent(agent) {
-    const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
-    if (sourceTemplateId) {
-        return findTemplateById(sourceTemplateId) ?? null;
-    }
-
-    const agentName = String(agent?.name ?? '').trim().toLowerCase();
-    const agentPrompt = String(agent?.prompt ?? '').trim();
-    if (!agentName) {
-        return null;
-    }
-
-    return templates.find(template =>
-        String(template?.name ?? '').trim().toLowerCase() === agentName &&
-        String(template?.prompt ?? '').trim() === agentPrompt,
-    ) ?? null;
+    return findTemplateForAgentSnapshot(agent, templates);
 }
 
 function getBundledRegexScriptsForTemplate(templateId) {

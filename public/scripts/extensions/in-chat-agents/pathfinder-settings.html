@@ -514,9 +514,11 @@
 .pf--section-header {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 10px;
     margin-bottom: 10px;
     font-size: 14px;
+    text-align: left;
 }
 
 .pf--collapsible-header {
@@ -828,6 +830,7 @@
 .pf--setting-row .pf--setting-group {
     flex: 1 1 180px;
     min-width: 0;
+    margin-bottom: 0;
 }
 
 
@@ -936,12 +939,14 @@
     text-align: left !important;
     width: 100%;
     box-sizing: border-box;
+    margin-right: auto;
 }
 
 .pf--diagnostics-panel {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    text-align: left !important;
 }
 
 #pf--run-diagnostics {
@@ -952,6 +957,8 @@
     max-inline-size: 100%;
     min-inline-size: var(--sb-control-min-height, 30px);
     white-space: normal;
+    margin-left: 0;
+    margin-right: auto;
 }
 
 #pf--run-diagnostics span {
@@ -980,6 +987,12 @@
 
     .pf--setting-row {
         flex-direction: column;
+        gap: 10px;
+    }
+
+    .pf--setting-row .pf--setting-group {
+        flex: 0 1 auto;
+        width: 100%;
     }
 
     .pf--summary-actions {

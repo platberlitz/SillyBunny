@@ -25,8 +25,12 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 - Contextual Pathfinder lorebooks now include chat, persona, character card/primary, extra character, and group member lorebooks without requiring manual Pathfinder selection or vectorization.
 - Memory Summaries now keep the summary tool toggle off when disabled, accept intervals down to 2 messages, and offer a Create Summary action that writes through the Pathfinder summary lorebook path.
 - Diagnostics now refresh tool registrations before checking state, read enabled tools from the active Pathfinder agent, and avoid false all-tools-disabled reports.
+- Tightened Pathfinder mobile Pipeline Settings spacing and kept Diagnostics content/action alignment left in the settings panel.
 - Duplicate bundled Pathfinder agents are cleaned up while preserving the automatic `tpl-pathfinder` agent.
 - Pathfinder summary prompts are injected after retrieval prompt keys so the summary tool request no longer precedes retrieved context.
+
+### In-Chat Agents
+- Synced the Achievements Tracker and Scene Tracker template catalog entries with their updated source wording, and made bundled template reset recognize saved bundled agents after prompt wording changes.
 
 ### PR #13 SillyTavern 1.18.0 Sync
 Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. GitHub and the local merge both reported the PR as conflict-free.

@@ -199,4 +199,46 @@ describe('in-chat agent scoped enabled state', () => {
 
         expect(store.getRedundantBundledAgentDuplicateIds(agents, templates)).toEqual(['duplicate-pathfinder']);
     });
+
+    test('matches bundled template snapshots after template prompt wording changes', async () => {
+        const store = await importStore();
+        const templates = [{
+            id: 'tpl-achievements-tracker',
+            name: 'Achievements Tracker',
+            prompt: 'new bundled wording',
+            author: 'Purachina',
+            category: 'tracker',
+        }];
+
+        const agent = {
+            id: 'saved-achievements',
+            name: 'Achievements Tracker',
+            prompt: 'old bundled wording',
+            author: 'Purachina',
+            category: 'tracker',
+        };
+
+        expect(store.findTemplateForAgentSnapshot(agent, templates)?.id).toBe('tpl-achievements-tracker');
+    });
+
+    test('keeps prompt-changed custom snapshots from matching bundled templates', async () => {
+        const store = await importStore();
+        const templates = [{
+            id: 'tpl-scene-tracker',
+            name: 'Scene Tracker',
+            prompt: 'new scene wording',
+            author: 'Purachina',
+            category: 'tracker',
+        }];
+
+        const agent = {
+            id: 'custom-scene',
+            name: 'Scene Tracker',
+            prompt: 'custom scene wording',
+            author: 'Someone Else',
+            category: 'tracker',
+        };
+
+        expect(store.findTemplateForAgentSnapshot(agent, templates)).toBeNull();
+    });
 });

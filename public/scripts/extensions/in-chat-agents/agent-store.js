@@ -417,22 +417,50 @@ export function areAgentsGloballyEnabled() {
     return globalSettings.enabled !== false;
 }
 
-function findTemplateForAgentSnapshot(agent, templates = []) {
+function getAgentTemplateName(value) {
+    return String(value ?? '').trim().toLowerCase();
+}
+
+function isLikelyBundledAgentTemplateMatch(agent, template) {
+    const agentName = getAgentTemplateName(agent?.name);
+    const templateName = getAgentTemplateName(template?.name);
+    if (!agentName || agentName !== templateName) {
+        return false;
+    }
+
+    const agentAuthor = String(agent?.author ?? '').trim().toLowerCase();
+    const templateAuthor = String(template?.author ?? '').trim().toLowerCase();
+    if (!agentAuthor || !templateAuthor || agentAuthor !== templateAuthor) {
+        return false;
+    }
+
+    const agentCategory = normalizeAgentCategory(agent?.category, agent?.sourceTemplateId, agent?.name);
+    const templateCategory = normalizeAgentCategory(template?.category, template?.id, template?.name);
+    return agentCategory === templateCategory;
+}
+
+export function findTemplateForAgentSnapshot(agent, templates = []) {
     const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
     if (sourceTemplateId) {
         return templates.find(template => String(template?.id ?? '').trim() === sourceTemplateId) ?? null;
     }
 
-    const agentName = String(agent?.name ?? '').trim().toLowerCase();
+    const agentName = getAgentTemplateName(agent?.name);
     const agentPrompt = String(agent?.prompt ?? '').trim();
     if (!agentName) {
         return null;
     }
 
-    return templates.find(template =>
-        String(template?.name ?? '').trim().toLowerCase() === agentName &&
+    const exactTemplate = templates.find(template =>
+        getAgentTemplateName(template?.name) === agentName &&
         String(template?.prompt ?? '').trim() === agentPrompt,
-    ) ?? null;
+    );
+    if (exactTemplate) {
+        return exactTemplate;
+    }
+
+    const likelyTemplates = templates.filter(template => isLikelyBundledAgentTemplateMatch(agent, template));
+    return likelyTemplates.length === 1 ? likelyTemplates[0] : null;
 }
 
 function hasPathfinderToolMetadata(agent) {
