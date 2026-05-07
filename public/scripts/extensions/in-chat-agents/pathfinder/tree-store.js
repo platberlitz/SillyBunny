@@ -44,6 +44,10 @@ export const SETTING_DEFAULTS = {
 
 let settings = { ...SETTING_DEFAULTS };
 
+export function normalizeAutoSummaryInterval(value) {
+    return Math.max(2, Math.min(200, parseInt(value, 10) || SETTING_DEFAULTS.autoSummaryInterval));
+}
+
 export function getSettings() {
     if (!settings) {
         settings = { ...SETTING_DEFAULTS };

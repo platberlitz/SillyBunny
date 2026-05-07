@@ -14,6 +14,14 @@ export async function sidecarGenerate(prompt, systemPrompt = '', signal = null) 
     return sidecarGenerateWithProfile(prompt, systemPrompt, profileId, 2048, signal);
 }
 
+function isAbortLikeError(error, signal = null) {
+    return Boolean(
+        signal?.aborted ||
+        error?.name === 'AbortError' ||
+        /abort|cancel/i.test(String(error?.message ?? error ?? '')),
+    );
+}
+
 /**
  * Generate using a specific connection profile
  * @param {string} prompt - User prompt
@@ -42,6 +50,9 @@ export async function sidecarGenerateWithProfile(prompt, systemPrompt = '', prof
             });
             return typeof result === 'string' ? result : extractProfileResponseText(result);
         } catch (err) {
+            if (isAbortLikeError(err, signal)) {
+                throw err;
+            }
             console.warn(`[Pathfinder] Sidecar via profile "${profileId}" failed:`, err);
         }
     }
@@ -54,6 +65,9 @@ export async function sidecarGenerateWithProfile(prompt, systemPrompt = '', prof
             signal,
         });
     } catch (err) {
+        if (isAbortLikeError(err, signal)) {
+            throw err;
+        }
         console.warn('[Pathfinder] Sidecar via main model failed:', err);
     }
 

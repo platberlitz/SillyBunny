@@ -15,6 +15,22 @@ function logPathfinderPipeline(message, ...details) {
     console.log(`${PATHFINDER_LOG_PREFIX} ${message}`, ...details);
 }
 
+function throwIfAborted(signal) {
+    if (!signal?.aborted) {
+        return;
+    }
+
+    throw signal.reason ?? new Error('Pathfinder pipeline cancelled.');
+}
+
+function isAbortLikeError(error, signal = null) {
+    return Boolean(
+        signal?.aborted ||
+        error?.name === 'AbortError' ||
+        /abort|cancel/i.test(String(error?.message ?? error ?? '')),
+    );
+}
+
 /**
  * @typedef {Object} PipelineContext
  * @property {string} chat_history - Formatted recent chat
@@ -39,6 +55,7 @@ function logPathfinderPipeline(message, ...details) {
  * @returns {Promise<PipelineResult>}
  */
 export async function runPipeline(pipelineId, chatMessages, maxMessages = 10, signal = null) {
+    throwIfAborted(signal);
     logPathfinderPipeline(`Starting predictive pipeline "${pipelineId}".`, {
         chatMessageCount: Array.isArray(chatMessages) ? chatMessages.length : 0,
         maxMessages,
@@ -71,6 +88,7 @@ export async function runPipeline(pipelineId, chatMessages, maxMessages = 10, si
     let currentEntries = [];
 
     for (let i = 0; i < pipeline.stages.length; i++) {
+        throwIfAborted(signal);
         const stage = pipeline.stages[i];
 
         // Check skip condition
@@ -134,6 +152,7 @@ export async function runPipeline(pipelineId, chatMessages, maxMessages = 10, si
                 maxTokens,
                 signal,
             );
+            throwIfAborted(signal);
 
             // Parse the output
             const parsed = parseOutput(response, prompt.outputFormat, context.entriesByName);
@@ -159,6 +178,10 @@ export async function runPipeline(pipelineId, chatMessages, maxMessages = 10, si
                 reasoning: parsed.reasoning,
             });
         } catch (error) {
+            if (isAbortLikeError(error, signal)) {
+                throw error;
+            }
+
             const errorMsg = error instanceof Error ? error.message : String(error);
             logPipelineError(pipeline.name, stage.promptId, errorMsg);
             console.warn(`${PATHFINDER_LOG_PREFIX} Pipeline stage ${i + 1}/${pipeline.stages.length} failed.`, {

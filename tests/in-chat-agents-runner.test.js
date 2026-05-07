@@ -33,6 +33,7 @@ describe('in-chat agent post-processing runner', () => {
     let saveChatDebounced;
     let saveChat;
     let generateQuietPrompt;
+    let runSidecarRetrieval;
     let streamingProcessor;
     let globalSettings;
     let documentListeners;
@@ -67,6 +68,7 @@ describe('in-chat agent post-processing runner', () => {
         saveChatDebounced = jest.fn();
         saveChat = jest.fn();
         generateQuietPrompt = jest.fn(async () => 'quiet result');
+        runSidecarRetrieval = jest.fn();
         streamingProcessor = {
             messageId: -1,
             type: 'normal',
@@ -211,7 +213,7 @@ describe('in-chat agent post-processing runner', () => {
 
         await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/sidecar-retrieval.js', () => ({
             PATHFINDER_RETRIEVAL_PROMPT_KEYS: [],
-            runSidecarRetrieval: jest.fn(),
+            runSidecarRetrieval,
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/auto-summary.js', () => ({
@@ -456,6 +458,50 @@ describe('in-chat agent post-processing runner', () => {
         await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, true);
 
         expect(extensionPrompts.inchat_agent_stale).toBeUndefined();
+        expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toEqual({ value: 'Use the current scene style.' });
+    });
+
+    test('waits for Pathfinder retrieval before injecting pre-generation prompts', async () => {
+        usePrePromptAgent();
+        enabledAgents.unshift({
+            id: 'agent-pathfinder',
+            name: 'Pathfinder',
+            category: 'tool',
+            sourceTemplateId: 'tpl-pathfinder',
+            phase: 'both',
+            prompt: '',
+            injection: { order: 0 },
+            settings: { pipelineEnabled: true, sidecarEnabled: false },
+            tools: [],
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        });
+
+        let resolveRetrieval;
+        const retrievalDone = new Promise(resolve => {
+            resolveRetrieval = resolve;
+        });
+        runSidecarRetrieval.mockImplementation(async () => {
+            await retrievalDone;
+            extensionPrompts.pathfinder_pipeline_retrieval = { value: 'retrieved lore' };
+        });
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        const generationPromise = eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        await Promise.resolve();
+
+        expect(runSidecarRetrieval).toHaveBeenCalledTimes(1);
+        expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toBeUndefined();
+
+        resolveRetrieval();
+        await generationPromise;
+
+        expect(extensionPrompts.pathfinder_pipeline_retrieval).toEqual({ value: 'retrieved lore' });
         expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toEqual({ value: 'Use the current scene style.' });
     });
 

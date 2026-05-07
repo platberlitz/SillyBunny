@@ -1,17 +1,14 @@
 # Changelog
 
-## Unreleased
+## v1.5.3
 
-### Mobile UI Polish
-- Made the mobile Persona bottom chat bar even narrower, mobile-only, horizontal, and tied the compact width to the existing Bottom Bar Size slider.
+Date: 2026-05-03
 
-### Local Commits
-- `fix(ui): tighten mobile persona bottom bar`
-
-## 2026-05-07
+This update adds the Black Orange theme and desktop character drawer tiles, improves managed shell coexistence, restores Moving UI control over the character drawer size, and quiets expected Pathfinder sidecar aborts.
 
 ### Mobile UI Polish
 - Narrowed the mobile Persona bottom chat bar so it no longer spans edge-to-edge on phone and landscape mobile layouts.
+- Made the mobile Persona bottom chat bar even narrower, mobile-only, horizontal, and tied the compact width to the existing Bottom Bar Size slider.
 - Recentered the Prompt Manager close, undo, and save icon buttons in the prompt editor footer.
 - Let the Presets "Independent mode" helper copy wrap inside the mobile panel without being clipped, while keeping its checkbox and label aligned.
 - Bumped the affected stylesheet cache keys so the mobile and prompt editor CSS updates are loaded by existing browsers.
@@ -21,14 +18,13 @@
 - Added favorite buttons for editable provider model IDs, reusing the existing per-provider model favorites store and pinning favorites at the top of the matching provider list.
 - Kept typed custom model IDs available even when they are not returned by an API model list.
 
-### Local Commits
-- `feat(ui): improve mobile preset and model controls`
-
-## v1.5.3
-
-Date: 2026-05-03
-
-This update adds the Black Orange theme and desktop character drawer tiles, improves managed shell coexistence, restores Moving UI control over the character drawer size, and quiets expected Pathfinder sidecar aborts.
+### Pathfinder
+- Pathfinder automatic retrieval now waits for pipeline or sidecar lookup to finish before the main writing prompt is injected, while real cancellation still aborts retrieval.
+- Contextual Pathfinder lorebooks now include chat, persona, character card/primary, extra character, and group member lorebooks without requiring manual Pathfinder selection or vectorization.
+- Memory Summaries now keep the summary tool toggle off when disabled, accept intervals down to 2 messages, and offer a Create Summary action that writes through the Pathfinder summary lorebook path.
+- Diagnostics now refresh tool registrations before checking state, read enabled tools from the active Pathfinder agent, and avoid false all-tools-disabled reports.
+- Duplicate bundled Pathfinder agents are cleaned up while preserving the automatic `tpl-pathfinder` agent.
+- Pathfinder summary prompts are injected after retrieval prompt keys so the summary tool request no longer precedes retrieved context.
 
 ### PR #13 SillyTavern 1.18.0 Sync
 Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. GitHub and the local merge both reported the PR as conflict-free.
@@ -113,6 +109,9 @@ Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. 
 - Deferred post-processing for new assistant messages while an agent is already working so users can keep sending or swiping without the older agent touching the newer message.
 
 ### Local Commits
+- `fix(pathfinder): wait for retrieval before generation`
+- `fix(ui): tighten mobile persona bottom bar`
+- `feat(ui): improve mobile preset and model controls`
 - `fix(mobile): align settings controls and bun override`
 - `fix(mobile): preserve ios chat position during regeneration`
 - `fix(tokenizers): stabilize web tokenizer runtime loading`

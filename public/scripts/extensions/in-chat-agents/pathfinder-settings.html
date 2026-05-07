@@ -162,7 +162,7 @@
                 <div class="pf--setting-group">
                     <label class="pf--setting-label">Retrieval Timeout</label>
                     <input type="number" id="pf--retrieval-timeout" class="text_pole" min="1" max="60" value="8" />
-                    <div class="pf--setting-help">Seconds before Pathfinder skips retrieval and sends anyway</div>
+                    <div class="pf--setting-help">Seconds before Pathfinder shows a slow-retrieval warning. Generation still waits unless cancelled.</div>
                 </div>
             </div>
 
@@ -260,6 +260,10 @@
                 <textarea id="pf--summary-content" class="text_pole" rows="7" placeholder="When Pathfinder creates a memory summary, it will appear here for review and editing."></textarea>
                 <div class="pf--summary-meta" id="pf--summary-meta">No Pathfinder summary has been created yet.</div>
                 <div class="pf--summary-actions">
+                    <button type="button" id="pf--summary-create" class="menu_button menu_button_icon">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>Create Summary</span>
+                    </button>
                     <button type="button" id="pf--summary-save" class="menu_button menu_button_icon">
                         <i class="fa-solid fa-save"></i>
                         <span>Save Summary</span>
@@ -430,6 +434,24 @@
     align-items: center;
     gap: 10px;
     margin: 0;
+}
+
+.pf--settings .checkbox_label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-height: var(--sb-control-min-height, 30px);
+    line-height: 1.35;
+}
+
+.pf--settings .checkbox_label input[type="checkbox"] {
+    flex: 0 0 auto;
+    margin-top: 2px;
+}
+
+.pf--settings .checkbox_label span {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .pf--master-toggle input[type="checkbox"] {
@@ -799,11 +821,13 @@
 
 .pf--setting-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 12px;
 }
 
 .pf--setting-row .pf--setting-group {
-    flex: 1;
+    flex: 1 1 180px;
+    min-width: 0;
 }
 
 
@@ -848,8 +872,18 @@
 .pf--summary-actions {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
     margin-top: 8px;
+}
+
+.pf--summary-actions .menu_button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    max-width: 100%;
+    white-space: normal;
 }
 
 /* Tool List */
@@ -876,6 +910,8 @@
 .pf--prompt-status {
     font-size: 12px;
     margin-left: auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .pf--prompt-status.success {
@@ -898,6 +934,8 @@
     overflow-y: auto;
     margin-bottom: 10px;
     text-align: left !important;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .pf--diagnostics-panel {
@@ -942,6 +980,19 @@
 
     .pf--setting-row {
         flex-direction: column;
+    }
+
+    .pf--summary-actions {
+        align-items: stretch;
+    }
+
+    .pf--summary-actions .menu_button {
+        flex: 1 1 160px;
+    }
+
+    .pf--prompt-status {
+        flex: 1 1 100%;
+        margin-left: 0;
     }
 }
 </style>

@@ -25,6 +25,7 @@ import {
     normalizeAgentCategory,
     getAgentChatScopeLabel,
     getPromptTransformMode,
+    getRedundantBundledAgentDuplicateIds,
     reconcileScopedEnabledAgentIdsFromLegacyFlags,
     resolveConnectionProfile,
     setAgentEnabledForCurrentScope,
@@ -752,61 +753,14 @@ async function migrateLegacyPromptTransformMaxTokens() {
     return migratedCount;
 }
 
-function getAgentDuplicateKey(agent) {
-    const agentName = String(agent?.name ?? '').trim().toLowerCase();
-    const agentPrompt = String(agent?.prompt ?? '').trim();
-    if (!agentName || !agentPrompt) {
-        return '';
-    }
-
-    return `${agentName}\u0000${agentPrompt}`;
-}
-
 async function removeRedundantBundledAgentDuplicates() {
-    const groupedAgents = new Map();
-
-    for (const agent of getAgents()) {
-        const key = getAgentDuplicateKey(agent);
-        if (!key) {
-            continue;
-        }
-
-        if (!groupedAgents.has(key)) {
-            groupedAgents.set(key, []);
-        }
-
-        groupedAgents.get(key).push(agent);
-    }
-
-    const redundantIds = new Set();
-
-    for (const grouped of groupedAgents.values()) {
-        if (grouped.length < 2) {
-            continue;
-        }
-
-        const templateBacked = grouped.filter(agent => String(agent?.sourceTemplateId ?? '').trim());
-        const unsourced = grouped.filter(agent => !String(agent?.sourceTemplateId ?? '').trim());
-
-        if (templateBacked.length !== 1 || unsourced.length === 0) {
-            continue;
-        }
-
-        const template = findTemplateForAgent(templateBacked[0]);
-        if (!template) {
-            continue;
-        }
-
-        for (const agent of unsourced) {
-            redundantIds.add(agent.id);
-        }
-    }
+    const redundantIds = getRedundantBundledAgentDuplicateIds(getAgents(), templates);
 
     for (const agentId of redundantIds) {
         await deleteAgent(agentId);
     }
 
-    return redundantIds.size;
+    return redundantIds.length;
 }
 
 async function purgeRemovedBundledAgents() {

@@ -2,11 +2,17 @@ import { getSettings, getTree, getAllEntryUids } from './tree-store.js';
 import { ALL_TOOL_NAMES, getActiveTunnelVisionBooks, getContextualLorebooks } from './pathfinder-tool-bridge.js';
 import { getFeedItems } from './activity-feed.js';
 import { getEnabledToolAgents } from '../agent-store.js';
-import { getPathfinderRuntimeAgent } from '../agent-runner.js';
+import { getPathfinderRuntimeAgent, syncToolAgentRegistrations } from '../agent-runner.js';
 
 function getRegisteredPathfinderTools(ToolManager) {
+    const tools = ToolManager?.tools instanceof Map
+        ? [...ToolManager.tools.values()]
+        : Array.isArray(ToolManager?.tools)
+            ? ToolManager.tools
+            : [];
+
     return ALL_TOOL_NAMES.filter(name =>
-        ToolManager?.tools?.find(t => t.name === name),
+        tools.find(t => t?.name === name),
     );
 }
 
@@ -84,6 +90,12 @@ function getPipelineStageSummary(stageResults = []) {
 export async function runDiagnostics() {
     const results = {};
     const s = getSettings();
+
+    try {
+        syncToolAgentRegistrations();
+    } catch (error) {
+        console.warn('[Pathfinder] Diagnostics could not refresh tool registrations before checks.', error);
+    }
 
     // Check enabled lorebooks
     const manualBooks = (s.enabledLorebooks || []);

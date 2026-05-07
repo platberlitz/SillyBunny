@@ -45,6 +45,7 @@ import { PATHFINDER_RETRIEVAL_PROMPT_KEYS, runSidecarRetrieval } from './pathfin
 import { markAutoSummaryComplete, shouldAutoSummarize } from './pathfinder/auto-summary.js';
 
 const PROMPT_KEY_PREFIX = 'inchat_agent_';
+const PATHFINDER_AUTO_SUMMARY_PROMPT_KEY = 'pathfinder_zz_auto_summary';
 const MESSAGE_EXTRA_KEY = 'inChatAgents';
 const POST_PROCESSING_RUNS_EXTRA_KEY = 'inChatAgentPostRuns';
 export const PROMPT_RUNS_EXTRA_KEY = 'inChatAgentPromptRuns';
@@ -96,6 +97,7 @@ let lastMainGenerationEndedAt = 0;
 let currentMainGenerationType = 'normal';
 let postProcessingGenerationRunId = 0;
 let swipeNavigationPending = false;
+const activePathfinderRetrievalAbortControllers = new Set();
 
 /** Track which tool names were registered by the agent system so we can cleanly unregister only our own. */
 const agentRegisteredToolNames = new Set();
@@ -191,6 +193,7 @@ export function cancelAgentGeneration() {
     clearDeferredPostProcessing();
     clearMissedGenerationEndRecoveryCheck();
     clearAllPromptTransformRunningToasts();
+    abortActivePathfinderRetrieval('Pathfinder retrieval cancelled by user.');
 
     const stopped = internalPromptTransformDepth > 0 || activeManualAgentRun ? stopGeneration() : false;
     notifyAgentGenerationStateChanged();
@@ -202,6 +205,16 @@ export function cancelAgentGeneration() {
 
     toastr.info('No agent generation is currently running.');
     return false;
+}
+
+function abortActivePathfinderRetrieval(reason = 'Pathfinder retrieval cancelled.') {
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+
+    for (const controller of activePathfinderRetrievalAbortControllers) {
+        controller.abort(error);
+    }
+
+    activePathfinderRetrievalAbortControllers.clear();
 }
 
 async function processManualAgentRunQueue() {
@@ -331,6 +344,14 @@ function getRegisterableAgentTools(agent) {
     }
 
     return enabledTools.filter(tool => tool.name === 'Pathfinder_Summarize');
+}
+
+function isPathfinderSummarizeToolEnabled(agent) {
+    const summarizeTool = Array.isArray(agent?.tools)
+        ? agent.tools.find(tool => tool?.name === 'Pathfinder_Summarize')
+        : null;
+
+    return summarizeTool?.enabled !== false;
 }
 
 /**
@@ -2185,7 +2206,7 @@ function scheduleMessageRefresh(messageIndex, expectedMessage) {
 
 function clearInChatAgentExtensionPrompts() {
     for (const key of Object.keys(extension_prompts)) {
-        if (key.startsWith(PROMPT_KEY_PREFIX) || PATHFINDER_RETRIEVAL_PROMPT_KEYS.includes(key)) {
+        if (key.startsWith(PROMPT_KEY_PREFIX) || PATHFINDER_RETRIEVAL_PROMPT_KEYS.includes(key) || key === PATHFINDER_AUTO_SUMMARY_PROMPT_KEY) {
             delete extension_prompts[key];
         }
     }
@@ -2290,6 +2311,7 @@ function onGenerationStopped() {
     clearMissedGenerationEndRecoveryCheck();
     clearDeferredPostProcessing();
     clearAllPromptTransformRunningToasts();
+    abortActivePathfinderRetrieval('Pathfinder retrieval cancelled because generation stopped.');
 }
 
 /**
@@ -2331,13 +2353,24 @@ async function onGenerationAfterCommands(generationType, _options, dryRun) {
     const pathfinderAgent = getPathfinderRuntimeAgent(activeAgents);
 
     if (!dryRun && pathfinderAgent) {
+        const retrievalCancelRevision = agentGenerationCancelRevision;
+        const retrievalAbortController = new AbortController();
         syncPathfinderRuntimeSettings(pathfinderAgent);
-        await runSidecarRetrieval(setExtensionPrompt, extension_prompt_types, extension_prompt_roles);
+        activePathfinderRetrievalAbortControllers.add(retrievalAbortController);
 
-        if (shouldAutoSummarize()) {
-            const key = PROMPT_KEY_PREFIX + 'pathfinder_auto_summary';
+        try {
+            await runSidecarRetrieval(setExtensionPrompt, extension_prompt_types, extension_prompt_roles, retrievalAbortController.signal);
+        } finally {
+            activePathfinderRetrievalAbortControllers.delete(retrievalAbortController);
+        }
+
+        if (generationStopRequested || agentGenerationCancelRevision !== retrievalCancelRevision || retrievalAbortController.signal.aborted) {
+            return;
+        }
+
+        if (shouldAutoSummarize() && isPathfinderSummarizeToolEnabled(pathfinderAgent)) {
             setExtensionPrompt(
-                key,
+                PATHFINDER_AUTO_SUMMARY_PROMPT_KEY,
                 'Pathfinder memory summary is due. If the recent conversation contains a meaningful scene, event, state change, or resolved arc, call Pathfinder_Summarize with a concise title, useful content, significance, and arc when applicable. If nothing important happened, do not call it.',
                 extension_prompt_types.IN_PROMPT,
                 4,

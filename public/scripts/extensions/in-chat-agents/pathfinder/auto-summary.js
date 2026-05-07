@@ -1,4 +1,4 @@
-import { getSettings } from './tree-store.js';
+import { getSettings, normalizeAutoSummaryInterval } from './tree-store.js';
 import { getActiveTunnelVisionBooks } from './pathfinder-tool-bridge.js';
 
 let autoSummaryCount = 0;
@@ -35,6 +35,6 @@ export function shouldAutoSummarize() {
     const s = getSettings();
     if (!s.autoSummary) return false;
     if (getActiveTunnelVisionBooks().length === 0) return false;
-    const interval = s.autoSummaryInterval || 20;
+    const interval = normalizeAutoSummaryInterval(s.autoSummaryInterval);
     return autoSummaryCount >= interval;
 }
