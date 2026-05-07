@@ -70,6 +70,7 @@ Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. 
 - Toggling a prompt on or off inside a preset no longer jumps the scroll position back to the top; the panel stays at the user's current scroll position.
 
 ### UI Icons And Provider Models
+- Replaced the Badge frontend icon with the pixel-art bunny badge shown in the latest reference image.
 - Added a Shell Style option to switch the frontend between the SillyBunny pixel icon and badge icon, including the splash screen, Home panel logo, favicon, and future system avatar messages.
 - Aligned the Reverse Proxy preset row, Prompt Manager undo action, and OpenAI model favorite button with their neighboring dropdowns on desktop and mobile layouts.
 - Added current OpenAI `gpt-5.5` and `gpt-5.5-pro`, Claude `claude-opus-4-7`, and Z.AI `glm-5.1` / `glm-5v-turbo` model choices to the backend dropdowns.
@@ -122,6 +123,7 @@ Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. 
 - `fix(mobile): keep previous chats bottom-pinned`
 - `fix(mobile): slim persona bottom chat bar`
 - `fix(mobile): match persona bar screenshot width`
+- `fix(ui): update badge frontend icon`
 - `fix(mobile): stabilize chat scrolling while editing history`
 - `sync: merge PR 11 runtime init alignment`
 - `sync: align runtime init with SillyTavern 1.18`
