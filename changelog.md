@@ -75,6 +75,7 @@ Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. 
 
 ### UI Icons And Provider Models
 - Replaced the Badge frontend icon with the pixel-art bunny badge shown in the latest reference image.
+- Restored the Badge frontend icon to the original bunny artwork inside the peach pixel badge frame so the Shell Style preview no longer shows the distorted hand-drawn version.
 - Added a Shell Style option to switch the frontend between the SillyBunny pixel icon and badge icon, including the splash screen, Home panel logo, favicon, and future system avatar messages.
 - Aligned the Reverse Proxy preset row, Prompt Manager undo action, and OpenAI model favorite button with their neighboring dropdowns on desktop and mobile layouts.
 - Added current OpenAI `gpt-5.5` and `gpt-5.5-pro`, Claude `claude-opus-4-7`, and Z.AI `glm-5.1` / `glm-5v-turbo` model choices to the backend dropdowns.

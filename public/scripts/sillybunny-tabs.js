@@ -64,7 +64,7 @@ const SB_FRONTEND_ICONS = Object.freeze([
         id: 'badge',
         label: 'Badge',
         description: 'Clean badge icon.',
-        src: 'img/sillybunny-badge.svg',
+        src: 'img/sillybunny-badge.png',
     },
 ]);
 const SB_ACCOUNT_STORAGE_READY_MARKER = '__migrated';
@@ -2014,7 +2014,7 @@ function applyFrontendIcon(iconId = sbState.frontendIcon) {
 
     for (const link of document.querySelectorAll('link[rel~="icon"]')) {
         link.setAttribute('href', iconSrc);
-        link.setAttribute('type', normalizedIconId === 'badge' ? 'image/svg+xml' : 'image/png');
+        link.setAttribute('type', 'image/png');
     }
 }
 

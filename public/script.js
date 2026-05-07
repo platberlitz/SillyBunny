@@ -472,7 +472,7 @@ const SILLYBUNNY_FRONTEND_ICON_STORAGE_KEY = 'sb-frontend-icon';
 const SILLYBUNNY_FRONTEND_ICON_DEFAULT = 'pixel';
 const SILLYBUNNY_FRONTEND_ICONS = Object.freeze({
     pixel: 'img/sillybunny-pixel-logo-og.png',
-    badge: 'img/sillybunny-badge.svg',
+    badge: 'img/sillybunny-badge.png',
 });
 let appliedSillyBunnyFrontendIconId = '';
 
@@ -516,7 +516,7 @@ function applySillyBunnyFrontendIcon(iconId = getStoredSillyBunnyFrontendIcon())
     if (!iconAlreadyApplied) {
         for (const link of document.querySelectorAll('link[rel~="icon"]')) {
             link.setAttribute('href', absoluteSrc);
-            link.setAttribute('type', normalizedIconId === 'badge' ? 'image/svg+xml' : 'image/png');
+            link.setAttribute('type', 'image/png');
         }
     }
 
