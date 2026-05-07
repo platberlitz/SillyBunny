@@ -1531,6 +1531,7 @@ body.sb-shell-resizing * {
     overflow-x: auto;
     overflow-y: hidden;
     flex-shrink: 0;
+    overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -4177,7 +4178,7 @@ body.sb-shell-resizing * {
     .sb-shell-nav {
         justify-content: flex-start;
         scroll-padding-inline: 24px;
-        touch-action: pan-x;
+        touch-action: none;
     }
 
     .sb-shell-panel-scroller,
@@ -4432,7 +4433,7 @@ body.sb-shell-resizing * {
         align-items: stretch;
         overflow-x: auto;
         overflow-y: hidden;
-        overscroll-behavior-x: contain;
+        overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
         scroll-snap-type: x proximity;

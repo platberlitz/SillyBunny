@@ -72,6 +72,7 @@ const SB_INLINE_DRAWER_CUSTOM_PERSISTENCE_SELECTOR = '.sb-openai-settings-drawer
 const SB_STORAGE_PREFIX = 'sb-';
 const SB_STORAGE_WRITE_DEBOUNCE_MS = 120;
 const SB_MOBILE_NAV_OPEN_GRACE_MS = 450;
+const SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX = 6;
 
 let sbInlineDrawerPersistenceObserver = null;
 let sbInlineDrawerPersistenceQueued = false;
@@ -1181,6 +1182,26 @@ function isMobileViewport() {
 
 function prefersReducedMotion() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function scrollShellTabButtonIntoView(nav, button, { smooth = false } = {}) {
+    if (!(nav instanceof HTMLElement) || !(button instanceof HTMLElement)) {
+        return;
+    }
+
+    const navRect = nav.getBoundingClientRect();
+    const buttonRect = button.getBoundingClientRect();
+    const leftOverflow = buttonRect.left - navRect.left;
+    const rightOverflow = buttonRect.right - navRect.right;
+
+    if (leftOverflow >= 0 && rightOverflow <= 0) {
+        return;
+    }
+
+    nav.scrollBy({
+        left: leftOverflow < 0 ? leftOverflow : rightOverflow,
+        behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto',
+    });
 }
 
 function isTouchOnlyDesktopViewport() {
@@ -8710,11 +8731,7 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
     const activeTab = shellState.tabs.get(tabId);
     shellState.headerTitle.textContent = activeTab.label;
     shellState.headerSubtitle.textContent = activeTab.description;
-    activeTab.button?.scrollIntoView({
-        block: 'nearest',
-        inline: 'nearest',
-        behavior: focusButton && !prefersReducedMotion() ? 'smooth' : 'auto',
-    });
+    scrollShellTabButtonIntoView(shellState.nav, activeTab.button, { smooth: focusButton });
     shellState.updateNavScrollIndicators?.();
 
     if (focusButton) {
@@ -8847,6 +8864,79 @@ function buildShell(shellKey) {
         });
     };
 
+    let navTouchDrag = null;
+    let suppressNavClickUntil = 0;
+
+    const clearNavTouchDrag = () => {
+        navTouchDrag = null;
+    };
+
+    const finishNavTouchDrag = event => {
+        if (navTouchDrag?.dragging) {
+            suppressNavClickUntil = Date.now() + 350;
+            event.stopPropagation();
+        }
+
+        clearNavTouchDrag();
+    };
+
+    const beginNavTouchDrag = event => {
+        const touch = event.touches?.[0];
+
+        if (!isMobileViewport() || !touch) {
+            clearNavTouchDrag();
+            return;
+        }
+
+        navTouchDrag = {
+            x: touch.clientX,
+            y: touch.clientY,
+            scrollLeft: nav.scrollLeft,
+            dragging: false,
+        };
+    };
+
+    const updateNavTouchDrag = event => {
+        if (!navTouchDrag) {
+            return;
+        }
+
+        const touch = event.touches?.[0];
+
+        if (!touch) {
+            clearNavTouchDrag();
+            return;
+        }
+
+        const deltaX = touch.clientX - navTouchDrag.x;
+        const deltaY = touch.clientY - navTouchDrag.y;
+
+        navTouchDrag.dragging = navTouchDrag.dragging
+            || Math.abs(deltaX) > SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX
+            || Math.abs(deltaY) > SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX;
+
+        if (!navTouchDrag.dragging) {
+            return;
+        }
+
+        if (event.cancelable) {
+            event.preventDefault();
+        }
+
+        event.stopPropagation();
+        nav.scrollLeft = navTouchDrag.scrollLeft - deltaX;
+        updateNavScrollIndicators();
+    };
+
+    const suppressClickAfterNavDrag = event => {
+        if (Date.now() >= suppressNavClickUntil) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+    };
+
     const updateNavScrollIndicators = () => {
         const canScrollLeft = nav.scrollLeft > 0;
         const canScrollRight = Math.ceil(nav.scrollLeft + nav.clientWidth) < nav.scrollWidth;
@@ -8857,6 +8947,11 @@ function buildShell(shellKey) {
     };
 
     nav.addEventListener('scroll', updateNavScrollIndicators, { passive: true });
+    nav.addEventListener('click', suppressClickAfterNavDrag, true);
+    nav.addEventListener('touchstart', beginNavTouchDrag, { passive: true });
+    nav.addEventListener('touchmove', updateNavTouchDrag, { passive: false });
+    nav.addEventListener('touchend', finishNavTouchDrag, { passive: true });
+    nav.addEventListener('touchcancel', clearNavTouchDrag, { passive: true });
     window.addEventListener('resize', updateNavScrollIndicators, { passive: true });
     navScrollLeft.addEventListener('click', () => scrollNavByPage(-1));
     navScrollRight.addEventListener('click', () => scrollNavByPage(1));
