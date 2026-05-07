@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Mobile UI Polish
+- Narrowed the mobile Persona bottom chat bar so it no longer spans edge-to-edge on phone and landscape mobile layouts.
+- Recentered the Prompt Manager close, undo, and save icon buttons in the prompt editor footer.
+- Let the Presets "Independent mode" helper copy wrap inside the mobile panel without being clipped, while keeping its checkbox and label aligned.
+- Bumped the affected stylesheet cache keys so the mobile and prompt editor CSS updates are loaded by existing browsers.
+
+### Provider Model Picking
+- Added searchable Model ID inputs for Claude, AI21, Cohere, Perplexity, Vertex AI, Custom, and Z.AI providers by filtering each provider's Available Models list as the user types.
+- Added favorite buttons for editable provider model IDs, reusing the existing per-provider model favorites store and pinning favorites at the top of the matching provider list.
+- Kept typed custom model IDs available even when they are not returned by an API model list.
+
+### Local Commits
+- `feat(ui): improve mobile preset and model controls`
+
 ## v1.5.3
 
 Date: 2026-05-03

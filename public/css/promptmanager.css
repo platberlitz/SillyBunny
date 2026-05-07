@@ -232,9 +232,19 @@
 #completion_prompt_manager_popup .completion_prompt_manager_popup_entry_form_footer #completion_prompt_manager_popup_entry_form_save {
     font-size: 1.25em;
     padding: 0.5em;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+#completion_prompt_manager_popup .completion_prompt_manager_popup_entry_form_footer .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands)::before {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 1em;
+    height: 1em;
+    margin: 0;
     line-height: 1;
 }
 

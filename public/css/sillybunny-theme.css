@@ -1580,7 +1580,7 @@ body.bubblechat .mes[is_user='true'] .mes_block {
         max-inline-size: var(--sb-icon-control-size);
         max-height: var(--sb-icon-control-size);
         max-block-size: var(--sb-icon-control-size);
-        display: inline-flex;
+        display: inline-flex !important;
         align-items: center;
         justify-content: center;
         flex: 0 0 var(--sb-icon-control-size);
@@ -2292,6 +2292,46 @@ input[type='range']::-moz-range-thumb {
     text-align: left;
 }
 
+#openai_api-presets .sb-setting-inline-copy-center {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+}
+
+#openai_api-presets .sb-setting-inline-copy-center label.checkbox_label {
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    margin-bottom: 6px;
+    white-space: normal;
+}
+
+#openai_api-presets .sb-setting-inline-copy-center label.checkbox_label > input[type="checkbox"] {
+    flex: 0 0 auto;
+    align-self: center;
+    margin: 0;
+}
+
+#openai_api-presets .sb-setting-inline-copy-center label.checkbox_label > span,
+#openai_api-presets .sb-setting-inline-copy-center .toggle-description,
+#openai_api-presets .sb-setting-inline-copy-center strong.toggle-description {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+#openai_api-presets .sb-setting-inline-copy-center label.checkbox_label > span {
+    flex: 1 1 auto;
+    width: auto;
+    line-height: 1.35;
+}
+
 .sb-setting-inline-center select {
     flex: 0 0 auto;
     width: min(100%, 220px);
@@ -2399,6 +2439,43 @@ input[type='range']::-moz-range-thumb {
 }
 
 #model_openai_favorite_toggle.is-favorite {
+    color: var(--sb-state-favorite);
+    border-color: var(--sb-state-favorite-border);
+    background: var(--sb-state-favorite-bg);
+}
+
+.sb-model-id-search-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+}
+
+.sb-model-id-search-row > input.text_pole {
+    flex: 1 1 auto;
+    width: auto !important;
+    min-width: 0;
+}
+
+.sb-model-id-search-row > datalist {
+    display: none;
+}
+
+.sb-model-id-favorite-toggle {
+    flex: 0 0 46px;
+    width: 46px;
+    min-width: 46px;
+    min-height: 46px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    line-height: 1;
+}
+
+.sb-model-id-favorite-toggle.is-favorite {
     color: var(--sb-state-favorite);
     border-color: var(--sb-state-favorite-border);
     background: var(--sb-state-favorite-bg);
@@ -4609,6 +4686,17 @@ input[type='range']::-moz-range-thumb {
     }
 
     #model_openai_favorite_toggle {
+        flex-basis: 44px;
+        width: 44px;
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .sb-model-id-search-row {
+        gap: 8px;
+    }
+
+    .sb-model-id-favorite-toggle {
         flex-basis: 44px;
         width: 44px;
         min-width: 44px;

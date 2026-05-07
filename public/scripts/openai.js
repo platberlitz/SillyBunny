@@ -235,6 +235,18 @@ export const chat_completion_sources = {
     WORKERS_AI: 'workers_ai',
 };
 
+const MODEL_ID_SEARCH_CONTROLS = [
+    { source: chat_completion_sources.CLAUDE, setting: 'claude_model', input: '#claude_model_id', select: '#model_claude_select', dynamicGroupId: 'claude_other_models' },
+    { source: chat_completion_sources.AI21, setting: 'ai21_model', input: '#ai21_model_id', select: '#model_ai21_select', dynamicGroupId: 'ai21_other_models' },
+    { source: chat_completion_sources.COHERE, setting: 'cohere_model', input: '#cohere_model_id', select: '#model_cohere_select', dynamicGroupId: 'cohere_other_models' },
+    { source: chat_completion_sources.PERPLEXITY, setting: 'perplexity_model', input: '#perplexity_model_id', select: '#model_perplexity_select', dynamicGroupId: 'perplexity_other_models' },
+    { source: chat_completion_sources.VERTEXAI, setting: 'vertexai_model', input: '#vertexai_model_id', select: '#model_vertexai_select', dynamicGroupId: 'vertexai_other_models' },
+    { source: chat_completion_sources.CUSTOM, setting: 'custom_model', input: '#custom_model_id', select: '#model_custom_select', datalist: '#model_custom_select_fill', dynamicOnly: true },
+    { source: chat_completion_sources.ZAI, setting: 'zai_model', input: '#zai_model_id', select: '#model_zai_select', dynamicGroupId: 'zai_other_models' },
+];
+
+const modelIdSearchControlState = new Map();
+
 const character_names_behavior = {
     NONE: -1,
     DEFAULT: 0,
@@ -2228,6 +2240,444 @@ function toggleOpenAIModelFavorite() {
     saveSettingsDebounced();
 }
 
+function normalizeModelIdSearchValue(value) {
+    return String(value ?? '').trim();
+}
+
+function getModelIdSearchState(source) {
+    if (!modelIdSearchControlState.has(source)) {
+        modelIdSearchControlState.set(source, {
+            staticEntries: null,
+            query: '',
+        });
+    }
+
+    return modelIdSearchControlState.get(source);
+}
+
+function readModelIdSearchOption(option) {
+    const attrs = {};
+
+    for (const attribute of Array.from(option.attributes)) {
+        if (['selected', 'data-sb-model-id-generated', 'data-favorite'].includes(attribute.name)) {
+            continue;
+        }
+
+        attrs[attribute.name] = attribute.value;
+    }
+
+    return {
+        value: normalizeModelIdSearchValue(option.value),
+        text: option.textContent.trim() || option.value,
+        attrs,
+    };
+}
+
+function readModelIdSearchStaticEntries(control) {
+    if (control.dynamicOnly) {
+        return [];
+    }
+
+    const select = document.querySelector(control.select);
+    if (!(select instanceof HTMLSelectElement)) {
+        return [];
+    }
+
+    return Array.from(select.children).map(child => {
+        if (child.getAttribute('data-sb-model-id-generated') === 'true') {
+            return null;
+        }
+
+        if (child instanceof HTMLOptGroupElement) {
+            const attrs = {};
+            for (const attribute of Array.from(child.attributes)) {
+                if (['label', 'data-sb-model-id-generated'].includes(attribute.name)) {
+                    continue;
+                }
+
+                attrs[attribute.name] = attribute.value;
+            }
+
+            const isDynamicGroup = control.dynamicGroupId && child.id === control.dynamicGroupId;
+            return {
+                type: 'group',
+                label: child.label,
+                attrs,
+                dynamic: Boolean(isDynamicGroup),
+                options: isDynamicGroup
+                    ? []
+                    : Array.from(child.children)
+                        .filter(option => option instanceof HTMLOptionElement)
+                        .map(readModelIdSearchOption),
+            };
+        }
+
+        if (child instanceof HTMLOptionElement) {
+            return {
+                type: 'option',
+                option: readModelIdSearchOption(child),
+            };
+        }
+
+        return null;
+    }).filter(Boolean);
+}
+
+function getModelIdSearchStaticEntries(control) {
+    const state = getModelIdSearchState(control.source);
+
+    if (!Array.isArray(state.staticEntries)) {
+        state.staticEntries = readModelIdSearchStaticEntries(control);
+    }
+
+    return state.staticEntries;
+}
+
+function addModelIdSearchOption(optionMap, option) {
+    const value = normalizeModelIdSearchValue(option?.value);
+    if (!value || optionMap.has(value)) {
+        return;
+    }
+
+    optionMap.set(value, {
+        value,
+        text: String(option?.text || value),
+        attrs: option?.attrs || {},
+    });
+}
+
+function getModelIdSearchDynamicOptions(control) {
+    if (oai_settings.chat_completion_source !== control.source || !Array.isArray(model_list)) {
+        return [];
+    }
+
+    return model_list
+        .map(model => {
+            const id = normalizeModelIdSearchValue(model?.id);
+            if (!id) {
+                return null;
+            }
+
+            return {
+                value: id,
+                text: String(model?.name || model?.display_name || id),
+            };
+        })
+        .filter(Boolean);
+}
+
+function createModelIdSearchOptionElement(option, { favorite = false } = {}) {
+    const optionElement = new Option(option.text || option.value, option.value);
+
+    for (const [name, value] of Object.entries(option.attrs || {})) {
+        if (!['selected', 'data-sb-model-id-generated', 'data-favorite'].includes(name)) {
+            optionElement.setAttribute(name, value);
+        }
+    }
+
+    optionElement.setAttribute('data-sb-model-id-generated', 'true');
+    optionElement.setAttribute('data-favorite', favorite ? 'true' : 'false');
+    return optionElement;
+}
+
+function modelIdSearchOptionMatches(option, query) {
+    if (!query) {
+        return true;
+    }
+
+    const haystack = `${option.value} ${option.text}`.toLowerCase();
+    return haystack.includes(query);
+}
+
+function appendModelIdSearchOption(parent, option, renderedValues, { favorite = false } = {}) {
+    if (renderedValues.has(option.value)) {
+        return false;
+    }
+
+    parent.appendChild(createModelIdSearchOptionElement(option, { favorite }));
+    renderedValues.add(option.value);
+    return true;
+}
+
+function rebuildModelIdSearchDatalist(control, optionMap, favoriteOptions, query) {
+    if (!control.datalist) {
+        return;
+    }
+
+    const datalist = document.querySelector(control.datalist);
+    if (!(datalist instanceof HTMLDataListElement)) {
+        return;
+    }
+
+    const seen = new Set();
+    const options = [...favoriteOptions, ...optionMap.values()];
+    datalist.replaceChildren();
+
+    for (const option of options) {
+        if (seen.has(option.value) || !modelIdSearchOptionMatches(option, query)) {
+            continue;
+        }
+
+        const optionElement = document.createElement('option');
+        optionElement.value = option.value;
+        optionElement.label = option.text;
+        datalist.appendChild(optionElement);
+        seen.add(option.value);
+    }
+}
+
+function rebuildModelIdSearchControl(control, { preserveQuery = false } = {}) {
+    const input = document.querySelector(control.input);
+    const select = document.querySelector(control.select);
+
+    if (!(input instanceof HTMLInputElement) || !(select instanceof HTMLSelectElement)) {
+        return;
+    }
+
+    const state = getModelIdSearchState(control.source);
+    const staticEntries = getModelIdSearchStaticEntries(control);
+    const query = preserveQuery ? normalizeModelIdSearchValue(state.query).toLowerCase() : '';
+    const selectedValue = normalizeModelIdSearchValue(oai_settings[control.setting] ?? input.value ?? select.value);
+    const favorites = getModelFavoritesForSource(control.source);
+    const favoriteValues = new Set(favorites);
+    const dynamicOptions = getModelIdSearchDynamicOptions(control);
+    const optionMap = new Map();
+
+    for (const entry of staticEntries) {
+        if (entry.type === 'group') {
+            entry.options.forEach(option => addModelIdSearchOption(optionMap, option));
+        } else {
+            addModelIdSearchOption(optionMap, entry.option);
+        }
+    }
+
+    dynamicOptions.forEach(option => addModelIdSearchOption(optionMap, option));
+    favorites.forEach(modelId => addModelIdSearchOption(optionMap, { value: modelId, text: modelId }));
+    addModelIdSearchOption(optionMap, { value: selectedValue, text: selectedValue });
+
+    const favoriteOptions = favorites
+        .map(modelId => optionMap.get(modelId))
+        .filter(Boolean)
+        .filter(option => modelIdSearchOptionMatches(option, query));
+    const renderedValues = new Set();
+
+    select.replaceChildren();
+
+    if (favoriteOptions.length > 0) {
+        const favoritesGroup = document.createElement('optgroup');
+        favoritesGroup.label = t`Favorites`;
+        favoritesGroup.setAttribute('data-sb-model-id-generated', 'true');
+        favoriteOptions.forEach(option => appendModelIdSearchOption(favoritesGroup, option, renderedValues, { favorite: true }));
+        select.appendChild(favoritesGroup);
+    }
+
+    for (const entry of staticEntries) {
+        if (entry.type === 'option') {
+            const option = entry.option;
+            if (!favoriteValues.has(option.value) && modelIdSearchOptionMatches(option, query)) {
+                appendModelIdSearchOption(select, option, renderedValues);
+            }
+            continue;
+        }
+
+        const group = document.createElement('optgroup');
+        group.label = entry.label;
+        for (const [name, value] of Object.entries(entry.attrs || {})) {
+            group.setAttribute(name, value);
+        }
+        group.setAttribute('data-sb-model-id-generated', 'true');
+
+        const groupOptions = entry.dynamic ? dynamicOptions : entry.options;
+        groupOptions
+            .filter(option => !favoriteValues.has(option.value))
+            .filter(option => modelIdSearchOptionMatches(option, query))
+            .forEach(option => appendModelIdSearchOption(group, option, renderedValues));
+
+        if (group.children.length > 0 || entry.dynamic) {
+            select.appendChild(group);
+        }
+    }
+
+    if (!staticEntries.some(entry => entry.type === 'group' && entry.dynamic) && dynamicOptions.length > 0) {
+        const dynamicGroup = document.createElement('optgroup');
+        dynamicGroup.label = t`From API`;
+        dynamicGroup.setAttribute('data-sb-model-id-generated', 'true');
+        dynamicOptions
+            .filter(option => !favoriteValues.has(option.value))
+            .filter(option => modelIdSearchOptionMatches(option, query))
+            .forEach(option => appendModelIdSearchOption(dynamicGroup, option, renderedValues));
+
+        if (dynamicGroup.children.length > 0) {
+            select.appendChild(dynamicGroup);
+        }
+    }
+
+    if (selectedValue && !renderedValues.has(selectedValue)) {
+        const currentGroup = document.createElement('optgroup');
+        currentGroup.label = t`Current`;
+        currentGroup.setAttribute('data-sb-model-id-generated', 'true');
+        appendModelIdSearchOption(currentGroup, optionMap.get(selectedValue) || { value: selectedValue, text: selectedValue }, renderedValues);
+        select.appendChild(currentGroup);
+    }
+
+    if (select.options.length === 0) {
+        const emptyOption = new Option(t`No matching models`, '');
+        emptyOption.disabled = true;
+        emptyOption.setAttribute('data-sb-model-id-generated', 'true');
+        select.appendChild(emptyOption);
+    }
+
+    if (selectedValue && select.querySelector(`option[value="${CSS.escape(selectedValue)}"]`)) {
+        select.value = selectedValue;
+    }
+
+    rebuildModelIdSearchDatalist(control, optionMap, favoriteOptions, query);
+    updateModelIdSearchFavoriteButton(control);
+}
+
+function getModelIdSearchControlBySource(source) {
+    return MODEL_ID_SEARCH_CONTROLS.find(control => control.source === source);
+}
+
+function refreshModelIdSearchControlsForSource(source = oai_settings.chat_completion_source) {
+    const control = getModelIdSearchControlBySource(source);
+    if (control) {
+        rebuildModelIdSearchControl(control);
+    }
+}
+
+function updateModelIdSearchFavoriteButton(control) {
+    const input = document.querySelector(control.input);
+    const select = document.querySelector(control.select);
+    const button = document.querySelector(`[data-sb-model-id-favorite-source="${CSS.escape(control.source)}"]`);
+
+    if (!(input instanceof HTMLInputElement) || !(select instanceof HTMLSelectElement) || !(button instanceof HTMLButtonElement)) {
+        return;
+    }
+
+    const modelId = normalizeModelIdSearchValue(input.value || oai_settings[control.setting] || '');
+    const isFavorite = modelId.length > 0 && getModelFavoritesForSource(control.source).includes(modelId);
+    const title = modelId.length === 0
+        ? t`Enter a model first`
+        : isFavorite
+            ? t`Remove current model from favorites`
+            : t`Add current model to favorites`;
+
+    button.disabled = modelId.length === 0;
+    button.title = title;
+    button.setAttribute('aria-label', title);
+    button.setAttribute('aria-pressed', String(isFavorite));
+    button.classList.toggle('is-favorite', isFavorite);
+}
+
+function updateModelIdSearchFavoriteButtons() {
+    MODEL_ID_SEARCH_CONTROLS.forEach(updateModelIdSearchFavoriteButton);
+}
+
+function toggleModelIdSearchFavorite(control) {
+    const input = document.querySelector(control.input);
+    const select = document.querySelector(control.select);
+
+    if (!(input instanceof HTMLInputElement) || !(select instanceof HTMLSelectElement)) {
+        return;
+    }
+
+    const modelId = normalizeModelIdSearchValue(input.value || oai_settings[control.setting] || '');
+    if (!modelId) {
+        return;
+    }
+
+    const favorites = [...getModelFavoritesForSource(control.source)];
+    const favoriteIndex = favorites.indexOf(modelId);
+
+    if (favoriteIndex >= 0) {
+        favorites.splice(favoriteIndex, 1);
+    } else {
+        favorites.unshift(modelId);
+    }
+
+    oai_settings[control.setting] = modelId;
+    input.value = modelId;
+    setModelFavoritesForSource(control.source, favorites);
+    getModelIdSearchState(control.source).query = '';
+    rebuildModelIdSearchControl(control);
+    saveSettingsDebounced();
+}
+
+function ensureModelIdSearchFavoriteButton(control) {
+    const input = document.querySelector(control.input);
+    if (!(input instanceof HTMLInputElement) || !(input.parentElement instanceof HTMLElement)) {
+        return;
+    }
+
+    const row = input.parentElement;
+    row.classList.add('sb-model-id-search-row');
+    input.classList.add('sb-model-id-search-input');
+
+    let button = row.querySelector(`[data-sb-model-id-favorite-source="${CSS.escape(control.source)}"]`);
+    if (button instanceof HTMLButtonElement) {
+        return;
+    }
+
+    button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'menu_button menu_button_icon sb-model-id-favorite-toggle';
+    button.dataset.sbModelIdFavoriteSource = control.source;
+    button.innerHTML = '<i class="fa-solid fa-star" aria-hidden="true"></i>';
+    button.addEventListener('click', () => toggleModelIdSearchFavorite(control));
+    input.insertAdjacentElement('afterend', button);
+}
+
+function initModelIdSearchControl(control) {
+    const input = document.querySelector(control.input);
+    const select = document.querySelector(control.select);
+
+    if (!(input instanceof HTMLInputElement) || !(select instanceof HTMLSelectElement)) {
+        return;
+    }
+
+    getModelIdSearchStaticEntries(control);
+    ensureModelIdSearchFavoriteButton(control);
+
+    if (input.dataset.sbModelIdSearchBound !== 'true') {
+        input.addEventListener('input', () => {
+            const state = getModelIdSearchState(control.source);
+            state.query = input.value;
+            rebuildModelIdSearchControl(control, { preserveQuery: true });
+        });
+        input.addEventListener('focus', () => {
+            const state = getModelIdSearchState(control.source);
+            state.query = input.value;
+            rebuildModelIdSearchControl(control, { preserveQuery: true });
+        });
+        input.addEventListener('blur', () => {
+            window.setTimeout(() => {
+                if (document.activeElement !== input && document.activeElement !== select) {
+                    getModelIdSearchState(control.source).query = '';
+                    rebuildModelIdSearchControl(control);
+                }
+            }, 160);
+        });
+        input.dataset.sbModelIdSearchBound = 'true';
+    }
+
+    if (select.dataset.sbModelIdSearchBound !== 'true') {
+        select.addEventListener('change', () => {
+            window.setTimeout(() => {
+                getModelIdSearchState(control.source).query = '';
+                rebuildModelIdSearchControl(control);
+            }, 0);
+        });
+        select.dataset.sbModelIdSearchBound = 'true';
+    }
+
+    rebuildModelIdSearchControl(control);
+}
+
+function initModelIdSearchControls() {
+    MODEL_ID_SEARCH_CONTROLS.forEach(initModelIdSearchControl);
+}
+
 function getOpenAISettingsDrawerStateKey(drawerId) {
     return `${OPENAI_SETTINGS_DRAWER_STATE_KEY_PREFIX}${drawerId}`;
 }
@@ -3597,6 +4047,8 @@ function saveModelList(data) {
             $('#vertexai_model_id').val(selectedModel);
         }
     }
+
+    refreshModelIdSearchControlsForSource(oai_settings.chat_completion_source);
 }
 
 function appendOpenRouterOptions(model_list, groupModels = false, sort = false) {
@@ -7206,6 +7658,8 @@ async function onModelChange() {
     updateFeatureSupportFlags();
     updateAdvancedFormattingVisibility();
     updateOpenAIModelFavoriteButton();
+    refreshModelIdSearchControlsForSource(oai_settings.chat_completion_source);
+    updateModelIdSearchFavoriteButtons();
     eventSource.emit(event_types.CHATCOMPLETION_MODEL_CHANGED, value);
 }
 
@@ -8647,6 +9101,7 @@ export function initOpenAI() {
     injectServerChatCompletionConfigCard();
     cacheOpenAIStaticModelGroups();
     rebuildOpenAIModelSelect();
+    initModelIdSearchControls();
     updateAdvancedFormattingVisibility();
     updateOpenAISettingsGroupVisibility();
     scheduleOpenAIUiRefresh();

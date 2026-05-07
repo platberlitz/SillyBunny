@@ -3265,8 +3265,10 @@ body.sb-shell-resizing * {
 
 @media screen and (max-width: 768px) {
     #sb-bottom-chat-bar {
+        --sb-bottom-chat-mobile-gutter: max(24px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+        width: min(560px, calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2)));
         gap: calc(4px * var(--sb-bottom-bar-scale));
-        margin: 0 max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left));
+        margin: 0 auto 6px;
         padding: calc(4px * var(--sb-bottom-bar-scale)) calc(6px * var(--sb-bottom-bar-scale));
         min-height: max(52px, calc(42px * var(--sb-bottom-bar-scale)));
         border-radius: calc(14px * var(--sb-bottom-bar-scale));
@@ -3292,6 +3294,7 @@ body.sb-shell-resizing * {
 
 @media screen and (max-width: 420px) {
     #sb-bottom-chat-bar {
+        --sb-bottom-chat-mobile-gutter: max(16px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
         gap: calc(3px * var(--sb-bottom-bar-scale));
         padding: calc(3px * var(--sb-bottom-bar-scale)) calc(5px * var(--sb-bottom-bar-scale));
         min-height: max(52px, calc(38px * var(--sb-bottom-bar-scale)));
