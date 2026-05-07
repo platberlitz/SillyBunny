@@ -3266,7 +3266,13 @@ body.sb-shell-resizing * {
 @media screen and (max-width: 768px) {
     #sb-bottom-chat-bar {
         --sb-bottom-chat-mobile-gutter: max(24px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
-        width: min(560px, calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2)));
+        --sb-bottom-chat-mobile-width: clamp(300px, calc(62vw + (52px * var(--sb-bottom-bar-scale))), calc(440px * var(--sb-bottom-bar-scale)));
+        --sb-bottom-chat-mobile-button-size: clamp(34px, calc(38px * var(--sb-bottom-bar-scale)), 42px);
+        --sb-bottom-chat-mobile-persona-size: clamp(40px, calc(42px * var(--sb-bottom-bar-scale)), 44px);
+        width: min(var(--sb-bottom-chat-mobile-width), calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2)));
+        max-width: calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2));
+        flex-direction: row;
+        flex-wrap: nowrap;
         gap: calc(4px * var(--sb-bottom-bar-scale));
         margin: 0 auto 6px;
         padding: calc(4px * var(--sb-bottom-bar-scale)) calc(6px * var(--sb-bottom-bar-scale));
@@ -3275,7 +3281,7 @@ body.sb-shell-resizing * {
     }
 
     #sb-bottom-chat-select {
-        flex: 1 1 72px;
+        flex: 1 1 64px;
         height: max(44px, calc(34px * var(--sb-bottom-bar-scale)));
         min-height: max(44px, calc(34px * var(--sb-bottom-bar-scale)));
         padding: 0 calc(8px * var(--sb-bottom-bar-scale));
@@ -3284,7 +3290,10 @@ body.sb-shell-resizing * {
     }
 
     .sb-bottom-chat-btn {
-        min-width: max(44px, calc(34px * var(--sb-bottom-bar-scale)));
+        flex: 0 0 var(--sb-bottom-chat-mobile-button-size);
+        width: var(--sb-bottom-chat-mobile-button-size);
+        min-width: var(--sb-bottom-chat-mobile-button-size);
+        max-width: var(--sb-bottom-chat-mobile-button-size);
         min-height: max(44px, calc(34px * var(--sb-bottom-bar-scale)));
         padding: 0 calc(6px * var(--sb-bottom-bar-scale));
         border-radius: calc(9px * var(--sb-bottom-bar-scale));
@@ -3294,25 +3303,30 @@ body.sb-shell-resizing * {
 
 @media screen and (max-width: 420px) {
     #sb-bottom-chat-bar {
-        --sb-bottom-chat-mobile-gutter: max(16px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
-        gap: calc(3px * var(--sb-bottom-bar-scale));
-        padding: calc(3px * var(--sb-bottom-bar-scale)) calc(5px * var(--sb-bottom-bar-scale));
+        --sb-bottom-chat-mobile-gutter: max(24px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+        --sb-bottom-chat-mobile-width: clamp(286px, calc(62vw + (56px * var(--sb-bottom-bar-scale))), calc(420px * var(--sb-bottom-bar-scale)));
+        --sb-bottom-chat-mobile-button-size: clamp(34px, calc(36px * var(--sb-bottom-bar-scale)), 40px);
+        --sb-bottom-chat-mobile-persona-size: clamp(38px, calc(40px * var(--sb-bottom-bar-scale)), 42px);
+        gap: calc(2px * var(--sb-bottom-bar-scale));
+        padding: calc(3px * var(--sb-bottom-bar-scale)) calc(4px * var(--sb-bottom-bar-scale));
         min-height: max(52px, calc(38px * var(--sb-bottom-bar-scale)));
         border-radius: calc(13px * var(--sb-bottom-bar-scale));
     }
 
-    #sb-bottom-chat-select {
-        flex-basis: 58px;
-        height: max(44px, calc(30px * var(--sb-bottom-bar-scale)));
+    #sb-bottom-chat-select,
+    .sb-bottom-chat-btn {
         min-height: max(44px, calc(30px * var(--sb-bottom-bar-scale)));
+    }
+
+    #sb-bottom-chat-select {
+        flex-basis: 50px;
+        height: max(44px, calc(30px * var(--sb-bottom-bar-scale)));
         padding: 0 calc(6px * var(--sb-bottom-bar-scale));
         font-size: calc(var(--mainFontSize) * 0.72 * var(--sb-bottom-bar-scale));
         border-radius: calc(10px * var(--sb-bottom-bar-scale));
     }
 
     .sb-bottom-chat-btn {
-        min-width: max(44px, calc(30px * var(--sb-bottom-bar-scale)));
-        min-height: max(44px, calc(30px * var(--sb-bottom-bar-scale)));
         padding: 0 calc(5px * var(--sb-bottom-bar-scale));
         font-size: calc(var(--mainFontSize) * 0.72 * var(--sb-bottom-bar-scale));
     }
@@ -3524,20 +3538,20 @@ body.sb-shell-resizing * {
 
 @media screen and (max-width: 768px) {
     #sb-persona-bubble {
-        width: 44px;
-        height: 44px;
-        min-width: 44px;
-        min-height: 44px;
+        width: var(--sb-bottom-chat-mobile-persona-size, 44px);
+        height: var(--sb-bottom-chat-mobile-persona-size, 44px);
+        min-width: var(--sb-bottom-chat-mobile-persona-size, 44px);
+        min-height: var(--sb-bottom-chat-mobile-persona-size, 44px);
         border-width: 1px;
     }
 }
 
 @media screen and (max-width: 420px) {
     #sb-persona-bubble {
-        width: 44px;
-        height: 44px;
-        min-width: 44px;
-        min-height: 44px;
+        width: var(--sb-bottom-chat-mobile-persona-size, 44px);
+        height: var(--sb-bottom-chat-mobile-persona-size, 44px);
+        min-width: var(--sb-bottom-chat-mobile-persona-size, 44px);
+        min-height: var(--sb-bottom-chat-mobile-persona-size, 44px);
     }
 }
 

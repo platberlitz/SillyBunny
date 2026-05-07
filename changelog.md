@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### Mobile UI Polish
+- Made the mobile Persona bottom chat bar even narrower, mobile-only, horizontal, and tied the compact width to the existing Bottom Bar Size slider.
+
+### Local Commits
+- `fix(ui): tighten mobile persona bottom bar`
+
+## 2026-05-07
+
+### Mobile UI Polish
 - Narrowed the mobile Persona bottom chat bar so it no longer spans edge-to-edge on phone and landscape mobile layouts.
 - Recentered the Prompt Manager close, undo, and save icon buttons in the prompt editor footer.
 - Let the Presets "Independent mode" helper copy wrap inside the mobile panel without being clipped, while keeping its checkbox and label aligned.
