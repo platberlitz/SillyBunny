@@ -7,6 +7,7 @@ Date: 2026-05-03
 This update adds the Black Orange theme and desktop character drawer tiles, improves managed shell coexistence, restores Moving UI control over the character drawer size, and quiets expected Pathfinder sidecar aborts.
 
 ### Mobile UI Polish
+- Lengthened the slim mobile Persona bottom chat bar to match the Image #2 near-full-width footprint while preserving its compact height.
 - Slimmed the mobile Persona bottom chat bar so the Bottom Bar Size slider can make it visually thinner while keeping the controls centered in one row.
 - Narrowed the mobile Persona bottom chat bar so it no longer spans edge-to-edge on phone and landscape mobile layouts.
 - Made the mobile Persona bottom chat bar even narrower, mobile-only, horizontal, and tied the compact width to the existing Bottom Bar Size slider.
@@ -120,6 +121,7 @@ Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. 
 - `fix(mobile): reduce ios reasoning stream churn`
 - `fix(mobile): keep previous chats bottom-pinned`
 - `fix(mobile): slim persona bottom chat bar`
+- `fix(mobile): match persona bar screenshot width`
 - `fix(mobile): stabilize chat scrolling while editing history`
 - `sync: merge PR 11 runtime init alignment`
 - `sync: align runtime init with SillyTavern 1.18`

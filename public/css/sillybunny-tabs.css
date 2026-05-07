@@ -3265,8 +3265,8 @@ body.sb-shell-resizing * {
 
 @media screen and (max-width: 768px) {
     #sb-bottom-chat-bar {
-        --sb-bottom-chat-mobile-gutter: max(28px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
-        --sb-bottom-chat-mobile-width: clamp(max(268px, calc(292px * var(--sb-bottom-bar-scale))), calc(54vw + (28px * var(--sb-bottom-bar-scale))), max(292px, calc(408px * var(--sb-bottom-bar-scale))));
+        --sb-bottom-chat-mobile-gutter: max(14px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+        --sb-bottom-chat-mobile-width: calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2));
         --sb-bottom-chat-mobile-gap: clamp(2px, calc(4px * var(--sb-bottom-bar-scale)), 6px);
         --sb-bottom-chat-mobile-padding-block: clamp(3px, calc(4px * var(--sb-bottom-bar-scale)), 6px);
         --sb-bottom-chat-mobile-padding-inline: clamp(5px, calc(6px * var(--sb-bottom-bar-scale)), 9px);
@@ -3315,8 +3315,8 @@ body.sb-shell-resizing * {
 
 @media screen and (max-width: 420px) {
     #sb-bottom-chat-bar {
-        --sb-bottom-chat-mobile-gutter: max(26px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
-        --sb-bottom-chat-mobile-width: clamp(max(260px, calc(276px * var(--sb-bottom-bar-scale))), calc(54vw + (36px * var(--sb-bottom-bar-scale))), max(276px, calc(356px * var(--sb-bottom-bar-scale))));
+        --sb-bottom-chat-mobile-gutter: max(4px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+        --sb-bottom-chat-mobile-width: calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2));
         --sb-bottom-chat-mobile-gap: clamp(2px, calc(2px * var(--sb-bottom-bar-scale)), 4px);
         --sb-bottom-chat-mobile-padding-block: clamp(3px, calc(3px * var(--sb-bottom-bar-scale)), 5px);
         --sb-bottom-chat-mobile-padding-inline: clamp(4px, calc(5px * var(--sb-bottom-bar-scale)), 7px);
