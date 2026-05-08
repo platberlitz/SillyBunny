@@ -22,6 +22,8 @@ This update stabilizes preset and connection profile switching, adds bottom chat
 ### Mobile Bottom Chat Bar
 - Added a mobile-only collapse button that hides or restores the second-row chat actions while preserving 44px touch targets.
 - Moved bottom chat search behind a second-row search icon so the full search field only expands when requested, reducing persistent bar height on phones.
+- Kept the mobile chat dropdown on the left with up/down controls beside it, while the single collapse control hides the additional actions row.
+- Placed the mobile chat search icon directly before the trash action in the expanded additional-actions row.
 - Kept the desktop bottom chat bar layout unchanged while aligning mobile persona, chat select, action, and search controls symmetrically.
 
 ### Runtime And Updates
@@ -41,6 +43,7 @@ This update stabilizes preset and connection profile switching, adds bottom chat
 ### Local Commits
 - `fix(settings): stabilize presets and chat loading`
 - `fix(ui): tighten mobile chat bar and update flow`
+- `fix(mobile): align bottom chat controls`
 
 ## v1.5.3
 

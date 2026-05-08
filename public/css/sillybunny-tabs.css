@@ -3365,9 +3365,10 @@ body.sb-shell-resizing * {
         --sb-bottom-chat-mobile-radius: clamp(12px, calc(14px * var(--sb-bottom-bar-scale)), 18px);
         width: min(var(--sb-bottom-chat-mobile-width), calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2)));
         max-width: calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2));
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
+        display: grid;
+        grid-template-columns: var(--sb-bottom-chat-mobile-persona-size) minmax(0, 1fr) repeat(3, var(--sb-bottom-chat-mobile-button-size));
+        align-items: center;
+        justify-content: stretch;
         gap: var(--sb-bottom-chat-mobile-gap);
         margin: 0 auto 6px;
         padding: var(--sb-bottom-chat-mobile-padding-block) var(--sb-bottom-chat-mobile-padding-inline);
@@ -3376,8 +3377,10 @@ body.sb-shell-resizing * {
     }
 
     #sb-bottom-chat-select {
-        flex: 1 1 92px;
-        order: 1;
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
+        min-width: 0;
         height: var(--sb-bottom-chat-mobile-select-height);
         min-height: var(--sb-bottom-chat-mobile-select-height);
         max-height: var(--sb-bottom-chat-mobile-select-height);
@@ -3388,12 +3391,15 @@ body.sb-shell-resizing * {
     }
 
     .sb-bottom-chat-collapse-toggle {
-        order: 2;
+        grid-column: 5;
+        grid-row: 1;
         display: inline-flex;
     }
 
     .sb-bottom-chat-nav-actions {
-        order: 2;
+        grid-column: 3 / span 2;
+        grid-row: 1;
+        justify-self: center;
     }
 
     .sb-bottom-chat-search-toggle {
@@ -3401,12 +3407,13 @@ body.sb-shell-resizing * {
     }
 
     .sb-bottom-chat-secondary-row {
-        order: 5;
+        grid-column: 1 / -1;
+        grid-row: 2;
         display: flex;
         align-items: center;
-        justify-content: center;
-        flex: 1 1 100%;
-        min-width: 100%;
+        justify-content: flex-end;
+        width: 100%;
+        min-width: 0;
         gap: var(--sb-bottom-chat-mobile-gap);
         overflow-x: auto;
         overflow-y: hidden;
@@ -3424,8 +3431,8 @@ body.sb-shell-resizing * {
     }
 
     .sb-bottom-chat-search-field {
-        order: 10;
-        flex: 1 1 100%;
+        grid-column: 1 / -1;
+        grid-row: 3;
         min-width: 100%;
         height: var(--sb-bottom-chat-mobile-select-height);
         min-height: var(--sb-bottom-chat-mobile-select-height);
@@ -3459,6 +3466,11 @@ body.sb-shell-resizing * {
     .sb-bottom-chat-nav-actions {
         padding-inline-end: 0;
         border-inline-end: 0;
+    }
+
+    #sb-persona-bubble {
+        grid-column: 1;
+        grid-row: 1;
     }
 
     .sb-bottom-chat-btn {

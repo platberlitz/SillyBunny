@@ -10351,8 +10351,8 @@ function buildBottomChatBar() {
     const deleteBtn = createBottomChatButton({ icon: 'fa-trash', title: 'Delete chat' }, () => { void handleDeleteChat(); });
 
     navCluster.append(topBtn, bottomBtn);
-    managementCluster.append(newBtn, massDeleteBtn, autoNameBtn, renameBtn, deleteBtn);
-    secondaryRow.append(searchToggleBtn, managementCluster);
+    managementCluster.append(newBtn, massDeleteBtn, autoNameBtn, renameBtn, searchToggleBtn, deleteBtn);
+    secondaryRow.append(managementCluster);
     container.append(personaBubble, chatSelect, search.field, navCluster, collapseToggleBtn, secondaryRow);
 
     // Store references for refresh and late context binding retries.
