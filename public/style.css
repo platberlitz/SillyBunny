@@ -112,8 +112,8 @@
     /*base variable calculated in rems*/
     --fontScale: 1;
     --mainFontSize: calc(var(--fontScale) * 15px);
-    --mainFontFamily: 'Figtree', 'Noto Sans', sans-serif;
-    --monoFontFamily: 'Red Hat Mono', 'Noto Sans Mono', 'Courier New', Consolas, monospace;
+    --mainFontFamily: 'Figtree', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', sans-serif;
+    --monoFontFamily: 'Noto Sans Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
     --sb-type-caption: calc(var(--mainFontSize) * 0.72);
     --sb-type-meta: calc(var(--mainFontSize) * 0.78);
     --sb-type-control: calc(var(--mainFontSize) * 0.86);

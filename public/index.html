@@ -19,11 +19,12 @@
     </style>
     <link rel="preload" as="style" href="style.css">
     <link rel="modulepreload" href="script.js">
-    <link rel="preload" as="script" href="scripts/sillybunny-tabs.js?v=20260507a">
+    <link rel="modulepreload" href="scripts/sillybunny-tabs.js?v=20260507a">
+    <link rel="preload" as="font" type="font/woff2" href="webfonts/Figtree/Figtree-Regular.woff2?v=20260422b" crossorigin>
     <link rel="manifest" crossorigin="use-credentials" href="manifest.json">
     <link href="webfonts/Figtree/stylesheet.css?v=20260422b" rel="stylesheet">
-    <link href="webfonts/NotoSans/stylesheet.css" rel="stylesheet">
-    <link href="webfonts/NotoSansMono/stylesheet.css" rel="stylesheet">
+    <link href="webfonts/NotoSans/stylesheet.css" rel="preload" as="style" data-sb-deferred-style data-sb-media="all">
+    <link href="webfonts/NotoSansMono/stylesheet.css" rel="preload" as="style" data-sb-deferred-style data-sb-media="all">
     <link href="css/fontawesome.min.css" rel="stylesheet">
     <link href="css/solid.min.css" rel="stylesheet">
     <link href="css/brands.min.css" rel="stylesheet">
@@ -8700,8 +8701,9 @@
     <script type="module" src="lib/swiped-events.js"></script>
     <script type="module" src="lib/eventemitter.js"></script>
     <script type="module" src="scripts/i18n.js"></script>
+    <script type="module" src="scripts/performance-loader.js"></script>
     <script type="module" src="script.js"></script>
-    <script src="scripts/sillybunny-tabs.js?v=20260507a" defer></script>
+    <script type="module" src="scripts/sillybunny-tabs.js?v=20260507a"></script>
     <script>
         window.addEventListener('load', (event) => {
             const documentHeight = () => {

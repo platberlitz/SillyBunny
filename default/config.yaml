@@ -268,6 +268,12 @@ performance:
     maxPayloadSize: '8mb'
     # Timeout for request compression in milliseconds.
     timeout: 4000
+  frontendBuild:
+    # Serve hashed frontend assets from dist/frontend when a production asset manifest is present.
+    # Dev mode continues to serve plain files from public for upstream compatibility.
+    enabled: false
+    # Static cache max age for hashed frontend assets in seconds.
+    immutableMaxAge: 31536000
 
 # CACHE BUSTER CONFIGURATION
 # IMPORTANT: Requires localhost or a domain with HTTPS, otherwise will not work!

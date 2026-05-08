@@ -45,6 +45,8 @@ import {
 } from './users.js';
 
 import getWebpackServeMiddleware from './middleware/webpack-serve.js';
+import { FRONTEND_ASSET_PREFIX, rewriteFrontendHtml } from './frontend-assets.js';
+import { getFrontendAssetMiddleware, shouldServeFrontendAssets } from './middleware/frontend-assets.js';
 import basicAuthMiddleware from './middleware/basicAuth.js';
 import requireHttpsMiddleware from './middleware/requireHttps.js';
 import { createSession, destroySession, validateCredentials, isSessionAuthEnabled } from './middleware/sessionAuth.js';
@@ -373,6 +375,14 @@ app.get('/', cacheBuster.middleware, (request, response) => {
         return response.redirect(redirectUrl);
     }
 
+    if (shouldServeFrontendAssets()) {
+        const indexPath = path.join(serverDirectory, 'public', 'index.html');
+        const indexHtml = safeReadFileSync(indexPath);
+        response.type('html');
+        response.set('Cache-Control', 'no-cache');
+        return response.send(rewriteFrontendHtml(indexHtml));
+    }
+
     return response.sendFile('index.html', { root: path.join(serverDirectory, 'public') });
 });
 
@@ -392,8 +402,17 @@ app.get('/login', loginPageMiddleware);
 
 // Host frontend assets
 const webpackMiddleware = getWebpackServeMiddleware();
+const frontendAssetMiddleware = getFrontendAssetMiddleware();
+app.use(FRONTEND_ASSET_PREFIX, frontendAssetMiddleware.immutableAssets);
 app.use(webpackMiddleware);
 app.use(userCssMiddleware);
+app.use((request, response, next) => {
+    if (!shouldServeFrontendAssets()) {
+        return next();
+    }
+
+    return frontendAssetMiddleware.publicAssets(request, response, next);
+});
 app.use(express.static(path.join(serverDirectory, 'public'), {}));
 
 // Public API
