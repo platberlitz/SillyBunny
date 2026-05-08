@@ -537,6 +537,7 @@ const sbState = {
         visible: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.chatbarVisible), true),
         searchQuery: '',
         searchTimer: 0,
+        searchApplyToken: 0,
         refreshTimer: 0,
         refreshToken: 0,
         pendingSearchScroll: false,
@@ -567,6 +568,10 @@ const sbState = {
     bottomChatBar: {
         chatSelect: null,
         personaBubble: null,
+        searchInput: null,
+        searchStatus: null,
+        scrollTopButton: null,
+        scrollBottomButton: null,
         massDeleteButton: null,
         autoNameButton: null,
         bindingRetryTimer: 0,
@@ -3519,15 +3524,65 @@ function setButtonPressed(button, pressed) {
 function setSearchStatusText(statusText) {
     const normalizedText = String(statusText ?? '').trim();
 
-    for (const refs of [getChatDesktopRefs(), getChatMobileRefs()]) {
+    for (const refs of [getChatDesktopRefs(), getChatMobileRefs(), getBottomChatBarState()]) {
         const status = refs?.searchStatus;
         if (!(status instanceof HTMLElement)) {
             continue;
         }
 
         status.textContent = normalizedText;
+        status.title = normalizedText;
         status.hidden = !normalizedText;
     }
+}
+
+function getChatScrollElement() {
+    const chatRoot = document.getElementById('chat');
+    return chatRoot instanceof HTMLElement ? chatRoot : null;
+}
+
+function getReducedMotionScrollBehavior() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+}
+
+function scrollCurrentChatToTop() {
+    const chatRoot = getChatScrollElement();
+    if (!(chatRoot instanceof HTMLElement)) {
+        return;
+    }
+
+    chatRoot.scrollTo({
+        top: 0,
+        behavior: getReducedMotionScrollBehavior(),
+    });
+}
+
+function scrollCurrentChatToBottom() {
+    const context = getSillyTavernContext();
+
+    if (typeof context?.scrollChatToBottom === 'function') {
+        context.scrollChatToBottom({ force: true });
+        context.scrollChatToBottom({ waitForFrame: true, force: true });
+        return;
+    }
+
+    const chatRoot = getChatScrollElement();
+    if (chatRoot instanceof HTMLElement) {
+        chatRoot.scrollTo({
+            top: chatRoot.scrollHeight,
+            behavior: getReducedMotionScrollBehavior(),
+        });
+    }
+}
+
+function countRegexMatches(value, regex) {
+    const text = String(value ?? '');
+    if (!text || !(regex instanceof RegExp)) {
+        return 0;
+    }
+
+    regex.lastIndex = 0;
+    return Array.from(text.matchAll(regex)).length;
 }
 
 function populateChatSelector(select, chatNames, chatContext, placeholder) {
@@ -3725,7 +3780,7 @@ function buildMobileChatTools() {
     const searchField = createChatField({
         id: 'sb-mobile-chat-search-field',
         icon: 'fa-magnifying-glass',
-        title: 'Search current chat',
+        title: 'Search all messages in this chat, including hidden messages',
         className: 'is-mobile',
     });
     const searchInput = createElement('input', {
@@ -3734,7 +3789,7 @@ function buildMobileChatTools() {
         attrs: {
             type: 'search',
             placeholder: 'Search this chat...',
-            'aria-label': 'Search this chat',
+            'aria-label': 'Search all messages in this chat',
         },
     });
     const searchStatus = createElement('small', { className: 'sb-chatbar-search-status' });
@@ -3944,6 +3999,143 @@ function getSearchTerms(query = getChatbarState().searchQuery) {
         .filter(Boolean);
 }
 
+function createChatSearchRegex(terms = getSearchTerms()) {
+    if (!terms.length) {
+        return null;
+    }
+
+    return new RegExp(`(${terms.map(escapeRegExp).join('|')})`, 'gi');
+}
+
+function addChatSearchTextSegment(segments, value) {
+    const normalizedValue = String(value ?? '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (normalizedValue && !segments.includes(normalizedValue)) {
+        segments.push(normalizedValue);
+    }
+}
+
+function getChatSearchMessageText(message) {
+    if (!message || typeof message !== 'object') {
+        return '';
+    }
+
+    const segments = [];
+
+    addChatSearchTextSegment(segments, message.extra?.display_text);
+    addChatSearchTextSegment(segments, message.mes);
+    addChatSearchTextSegment(segments, message.extra?.reasoning_display_text);
+    addChatSearchTextSegment(segments, message.extra?.reasoning);
+
+    return segments.join('\n');
+}
+
+function getChatSearchMatches(regex) {
+    const context = getSillyTavernContext();
+    const chat = Array.isArray(context?.chat) ? context.chat : [];
+    const matches = [];
+    let totalMatches = 0;
+
+    if (!(regex instanceof RegExp)) {
+        return { matches, totalMatches };
+    }
+
+    chat.forEach((message, messageId) => {
+        const count = countRegexMatches(getChatSearchMessageText(message), regex);
+        if (!count) {
+            return;
+        }
+
+        matches.push({ messageId, count, message });
+        totalMatches += count;
+    });
+
+    return { matches, totalMatches };
+}
+
+function getChatMessageElement(messageId) {
+    const chatRoot = getChatScrollElement();
+    if (!(chatRoot instanceof HTMLElement) || !Number.isInteger(messageId)) {
+        return null;
+    }
+
+    return chatRoot.querySelector(`.mes[mesid="${messageId}"]`);
+}
+
+async function waitForNextAnimationFrame() {
+    await new Promise(resolve => window.requestAnimationFrame(resolve));
+}
+
+async function ensureChatMessageRendered(messageId) {
+    if (!Number.isInteger(messageId) || messageId < 0) {
+        return null;
+    }
+
+    let messageElement = getChatMessageElement(messageId);
+    if (messageElement instanceof HTMLElement) {
+        return messageElement;
+    }
+
+    const context = getSillyTavernContext();
+    const chatLength = Array.isArray(context?.chat) ? context.chat.length : 0;
+    const firstRenderedId = Number(document.querySelector('#chat .mes[mesid]')?.getAttribute('mesid') ?? NaN);
+    const chatModule = await getChatScriptModule().catch(() => null);
+    const showMoreMessages = typeof context?.showMoreMessages === 'function'
+        ? context.showMoreMessages
+        : chatModule?.showMoreMessages;
+    const redisplayChat = typeof context?.redisplayChat === 'function'
+        ? context.redisplayChat
+        : chatModule?.redisplayChat;
+
+    if (typeof showMoreMessages === 'function' && Number.isInteger(firstRenderedId) && messageId < firstRenderedId) {
+        await showMoreMessages(firstRenderedId - messageId);
+        await waitForNextAnimationFrame();
+        messageElement = getChatMessageElement(messageId);
+        if (messageElement instanceof HTMLElement) {
+            return messageElement;
+        }
+    }
+
+    if (typeof redisplayChat === 'function' && chatLength > 0) {
+        if (!getChatMessageElement(0)) {
+            getChatScrollElement()?.querySelectorAll('.mes, #show_more_messages').forEach(element => element.remove());
+        }
+
+        await redisplayChat({ startIndex: 0, fade: false });
+        await waitForNextAnimationFrame();
+        return getChatMessageElement(messageId);
+    }
+
+    return null;
+}
+
+function releaseChatSearchApply(chatbarState, applyToken) {
+    window.setTimeout(() => {
+        if (applyToken === chatbarState.searchApplyToken) {
+            chatbarState.isApplyingSearch = false;
+        }
+    }, 0);
+}
+
+function getChatSearchStatusText(totalMatches, renderedMatches) {
+    if (!totalMatches) {
+        return 'No matches';
+    }
+
+    if (renderedMatches > 0 && renderedMatches < totalMatches) {
+        return `${renderedMatches}/${totalMatches} visible`;
+    }
+
+    if (!renderedMatches) {
+        return `${totalMatches} hidden match${totalMatches === 1 ? '' : 'es'}`;
+    }
+
+    return `${totalMatches} match${totalMatches === 1 ? '' : 'es'}`;
+}
+
 function clearChatSearchHighlights() {
     for (const mark of document.querySelectorAll(SB_CHAT_SEARCH_MARK_SELECTOR)) {
         if (!(mark instanceof HTMLElement) || !mark.parentNode) {
@@ -3953,6 +4145,9 @@ function clearChatSearchHighlights() {
         mark.replaceWith(document.createTextNode(mark.textContent ?? ''));
     }
 
+    document.querySelectorAll('#chat .sb-search-hit').forEach(element => {
+        element.classList.remove('sb-search-hit');
+    });
     document.getElementById('chat')?.normalize();
     setSearchStatusText('');
 }
@@ -3969,7 +4164,9 @@ function highlightMessageText(root, regex) {
             }
 
             const parent = node.parentElement;
-            if (!parent || parent.closest(SB_CHAT_SEARCH_MARK_SELECTOR)) {
+            if (!parent
+                || parent.closest(SB_CHAT_SEARCH_MARK_SELECTOR)
+                || parent.closest('.mes_buttons, .extraMesButtons, .mes_edit_buttons, .mes_reasoning_actions, .mes_bias, .mes_avatar, .avatar, .timestamp, .tokenCounterDisplay, .mesIDDisplay, .swipes-counter')) {
                 return NodeFilter.FILTER_REJECT;
             }
 
@@ -4031,9 +4228,10 @@ function highlightMessageText(root, regex) {
     return { count, firstMatch };
 }
 
-function applyChatSearchHighlights({ scrollToFirst = false } = {}) {
+async function applyChatSearchHighlights({ scrollToFirst = false } = {}) {
     const chatbarState = getChatbarState();
     const terms = getSearchTerms();
+    const applyToken = ++chatbarState.searchApplyToken;
 
     chatbarState.pendingSearchScroll = false;
     clearTimeout(chatbarState.searchTimer);
@@ -4045,27 +4243,61 @@ function applyChatSearchHighlights({ scrollToFirst = false } = {}) {
         return;
     }
 
-    const regex = new RegExp(`(${terms.map(escapeRegExp).join('|')})`, 'gi');
-    let totalMatches = 0;
+    const regex = createChatSearchRegex(terms);
+    if (!(regex instanceof RegExp)) {
+        chatbarState.isApplyingSearch = false;
+        return;
+    }
+
+    const searchMatches = getChatSearchMatches(regex);
+    const firstMatchId = searchMatches.matches[0]?.messageId;
+
+    if (scrollToFirst && Number.isInteger(firstMatchId)) {
+        setSearchStatusText('Loading match...');
+
+        try {
+            await ensureChatMessageRendered(firstMatchId);
+        } catch (error) {
+            console.warn('[SillyBunny] Failed to reveal chat search match.', error);
+        }
+
+        if (applyToken !== chatbarState.searchApplyToken) {
+            chatbarState.isApplyingSearch = false;
+            return;
+        }
+    }
+
+    let renderedMatches = 0;
     let firstMatch = null;
 
     try {
         for (const node of document.querySelectorAll('#chat .mes_text')) {
             const result = highlightMessageText(node, regex);
-            totalMatches += result.count;
+            renderedMatches += result.count;
             firstMatch ??= result.firstMatch;
         }
     } finally {
-        chatbarState.isApplyingSearch = false;
+        releaseChatSearchApply(chatbarState, applyToken);
     }
 
-    setSearchStatusText(totalMatches ? `${totalMatches} match${totalMatches === 1 ? '' : 'es'}` : 'No matches');
+    const totalMatches = Math.max(searchMatches.totalMatches, renderedMatches);
+    setSearchStatusText(getChatSearchStatusText(totalMatches, renderedMatches));
 
     if (scrollToFirst && firstMatch instanceof HTMLElement) {
         firstMatch.scrollIntoView({
             block: 'center',
-            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+            behavior: getReducedMotionScrollBehavior(),
         });
+    } else if (scrollToFirst && Number.isInteger(firstMatchId)) {
+        const messageElement = getChatMessageElement(firstMatchId);
+        if (messageElement instanceof HTMLElement) {
+            messageElement.classList.add('sb-search-hit');
+            window.setTimeout(() => messageElement.classList.remove('sb-search-hit'), 2400);
+            messageElement.scrollIntoView({
+                block: 'center',
+                behavior: getReducedMotionScrollBehavior(),
+            });
+        }
     }
 }
 
@@ -4077,15 +4309,18 @@ function scheduleChatSearchHighlight({ scrollToFirst = false } = {}) {
     chatbarState.searchTimer = window.setTimeout(() => {
         const shouldScroll = chatbarState.pendingSearchScroll;
         chatbarState.pendingSearchScroll = false;
-        applyChatSearchHighlights({ scrollToFirst: shouldScroll });
+        void applyChatSearchHighlights({ scrollToFirst: shouldScroll });
     }, SB_CHATBAR_SEARCH_DEBOUNCE);
 }
 
 function setChatSearchQuery(value, { source = null } = {}) {
     const nextValue = String(value ?? '');
-    getChatbarState().searchQuery = nextValue;
+    const chatbarState = getChatbarState();
 
-    for (const input of [getChatDesktopRefs()?.searchInput, getChatMobileRefs()?.searchInput]) {
+    chatbarState.searchQuery = nextValue;
+    chatbarState.searchApplyToken += 1;
+
+    for (const input of [getChatDesktopRefs()?.searchInput, getChatMobileRefs()?.searchInput, getBottomChatBarState()?.searchInput]) {
         if (!(input instanceof HTMLInputElement) || input === source) {
             continue;
         }
@@ -4094,11 +4329,65 @@ function setChatSearchQuery(value, { source = null } = {}) {
     }
 
     if (!nextValue.trim()) {
+        clearTimeout(chatbarState.searchTimer);
+        chatbarState.pendingSearchScroll = false;
+        chatbarState.isApplyingSearch = false;
         clearChatSearchHighlights();
         return;
     }
 
     scheduleChatSearchHighlight({ scrollToFirst: true });
+}
+
+function createBottomChatButton({ icon, title, className = '' }, onClick) {
+    const button = createElement('button', {
+        className: `sb-bottom-chat-btn ${className}`.trim(),
+        attrs: {
+            type: 'button',
+            title,
+            'aria-label': title,
+        },
+    });
+
+    button.innerHTML = `<i class="fa-solid ${icon}" aria-hidden="true"></i>`;
+    button.addEventListener('click', onClick);
+
+    return button;
+}
+
+function createBottomChatSearchField() {
+    const field = createElement('label', {
+        id: 'sb-bottom-chat-search-field',
+        className: 'sb-bottom-chat-search-field',
+        attrs: {
+            title: 'Search all messages in this chat, including hidden messages',
+        },
+    });
+    const icon = createElement('i', {
+        className: 'fa-solid fa-magnifying-glass',
+        attrs: {
+            'aria-hidden': 'true',
+        },
+    });
+    const input = createElement('input', {
+        id: 'sb-bottom-chat-search',
+        className: 'text_pole',
+        attrs: {
+            type: 'search',
+            placeholder: 'Search chat...',
+            'aria-label': 'Search all messages in this chat',
+            autocomplete: 'off',
+            spellcheck: 'false',
+        },
+    });
+    const status = createElement('small', { className: 'sb-chatbar-search-status sb-bottom-chat-search-status' });
+
+    input.value = getChatbarState().searchQuery;
+    status.hidden = true;
+    field.append(icon, input, status);
+    input.addEventListener('input', () => setChatSearchQuery(input.value, { source: input }));
+
+    return { field, input, status };
 }
 
 function initChatSearchObserver() {
@@ -9921,45 +10210,33 @@ function buildBottomChatBar() {
         void openChatById(chatSelect.value);
     });
 
-    const newBtn = createElement('button', {
-        className: 'sb-bottom-chat-btn',
-        attrs: { type: 'button', title: 'New chat' },
-    });
-    newBtn.innerHTML = '<i class="fa-solid fa-plus" aria-hidden="true"></i>';
-    newBtn.addEventListener('click', () => handleNewChat());
+    const search = createBottomChatSearchField();
+    const navCluster = createElement('div', { className: 'sb-bottom-chat-nav-actions' });
+    const managementCluster = createElement('div', { className: 'sb-bottom-chat-management-actions' });
 
-    const massDeleteBtn = createElement('button', {
-        className: 'sb-bottom-chat-btn',
-        attrs: { type: 'button', title: 'Mass delete chats' },
-    });
-    massDeleteBtn.innerHTML = '<i class="fa-solid fa-list-check" aria-hidden="true"></i>';
-    massDeleteBtn.addEventListener('click', () => { void handleMassDeleteChats(); });
+    const topBtn = createBottomChatButton({ icon: 'fa-arrow-up', title: 'Go to top of chat' }, scrollCurrentChatToTop);
+    const bottomBtn = createBottomChatButton({ icon: 'fa-arrow-down', title: 'Go to bottom of chat' }, scrollCurrentChatToBottom);
+    const newBtn = createBottomChatButton({ icon: 'fa-plus', title: 'New chat' }, handleNewChat);
+    const massDeleteBtn = createBottomChatButton({ icon: 'fa-list-check', title: 'Mass delete chats' }, () => { void handleMassDeleteChats(); });
+    const autoNameBtn = createBottomChatButton({ icon: 'fa-wand-magic-sparkles', title: 'Ask the LLM to name this chat' }, () => { void handleAutoNameChat(); });
+    const renameBtn = createBottomChatButton({ icon: 'fa-pencil', title: 'Rename chat' }, () => { void handleRenameChat(); });
+    const deleteBtn = createBottomChatButton({ icon: 'fa-trash', title: 'Delete chat' }, () => { void handleDeleteChat(); });
 
-    const autoNameBtn = createElement('button', {
-        className: 'sb-bottom-chat-btn',
-        attrs: { type: 'button', title: 'Ask the LLM to name this chat' },
-    });
-    autoNameBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>';
-    autoNameBtn.addEventListener('click', () => { void handleAutoNameChat(); });
-
-    const renameBtn = createElement('button', {
-        className: 'sb-bottom-chat-btn',
-        attrs: { type: 'button', title: 'Rename chat' },
-    });
-    renameBtn.innerHTML = '<i class="fa-solid fa-pencil" aria-hidden="true"></i>';
-    renameBtn.addEventListener('click', () => handleRenameChat());
-
-    const deleteBtn = createElement('button', {
-        className: 'sb-bottom-chat-btn',
-        attrs: { type: 'button', title: 'Delete chat' },
-    });
-    deleteBtn.innerHTML = '<i class="fa-solid fa-trash" aria-hidden="true"></i>';
-    deleteBtn.addEventListener('click', () => handleDeleteChat());
-
-    container.append(personaBubble, chatSelect, newBtn, massDeleteBtn, autoNameBtn, renameBtn, deleteBtn);
+    navCluster.append(topBtn, bottomBtn);
+    managementCluster.append(newBtn, massDeleteBtn, autoNameBtn, renameBtn, deleteBtn);
+    container.append(personaBubble, chatSelect, search.field, navCluster, managementCluster);
 
     // Store references for refresh and late context binding retries.
-    Object.assign(getBottomChatBarState(), { chatSelect, personaBubble, massDeleteButton: massDeleteBtn, autoNameButton: autoNameBtn });
+    Object.assign(getBottomChatBarState(), {
+        chatSelect,
+        personaBubble,
+        searchInput: search.input,
+        searchStatus: search.status,
+        scrollTopButton: topBtn,
+        scrollBottomButton: bottomBtn,
+        massDeleteButton: massDeleteBtn,
+        autoNameButton: autoNameBtn,
+    });
 
     // Defer initial persona bubble update in case user_avatar isn't ready yet
     setTimeout(() => updatePersonaBubble(personaBubble), 100);
@@ -9995,12 +10272,16 @@ async function refreshBottomChatSelect() {
     }
 
     const chatContext = getChatUiContext();
+
+    setButtonDisabled(sbState.bottomChatBar?.searchInput, !chatContext.hasChat);
+    setButtonDisabled(sbState.bottomChatBar?.scrollTopButton, !chatContext.hasChat);
+    setButtonDisabled(sbState.bottomChatBar?.scrollBottomButton, !chatContext.hasChat);
+    setButtonDisabled(sbState.bottomChatBar?.massDeleteButton, !chatContext.canBrowseChats);
+    setButtonDisabled(sbState.bottomChatBar?.autoNameButton, !chatContext.hasChat);
+
     if (!chatContext.context) {
         return;
     }
-
-    setButtonDisabled(sbState.bottomChatBar?.massDeleteButton, !chatContext.canBrowseChats);
-    setButtonDisabled(sbState.bottomChatBar?.autoNameButton, !chatContext.hasChat);
 
     const currentChatName = chatContext.chatId;
     chatSelect.replaceChildren();
