@@ -30,6 +30,7 @@ let backgroundLayerElement = null;
 let backgroundMutationObserver = null;
 let backgroundCardObserversAttached = false;
 let backgroundSyncTimer = null;
+let backgroundLifecycleHandlersAttached = false;
 let legacySettingsMigrationChecked = false;
 
 function migrateLegacySettings() {
@@ -666,6 +667,8 @@ function attachBackgroundEnhancer() {
         });
     }
 
+    attachBackgroundLifecycleHandlers();
+
     const backgroundDrawer = document.getElementById('Backgrounds');
     if (backgroundDrawer) {
         injectAnimatedBackgroundPanel(backgroundDrawer);
@@ -929,6 +932,10 @@ function buildYouTubeEmbedUrl(videoId) {
     return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
 }
 
+function isIOSWebKit() {
+    return /iPad|iPhone|iPod/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 function clearAnimatedBackgroundLayer() {
     if (!backgroundLayerElement) {
         return;
@@ -938,6 +945,62 @@ function clearAnimatedBackgroundLayer() {
     backgroundLayerElement.removeAttribute('data-active-key');
     document.body.classList.remove('bpt-animated-bg-active');
     renderAnimatedSourceList();
+}
+
+function suspendAnimatedBackgroundMedia() {
+    if (!isIOSWebKit() || !backgroundLayerElement) {
+        return;
+    }
+
+    const video = backgroundLayerElement.querySelector('video');
+    if (video) {
+        video.pause();
+    }
+
+    const iframe = backgroundLayerElement.querySelector('iframe');
+    if (iframe instanceof HTMLIFrameElement && !iframe.dataset.bptSuspendedSrc) {
+        iframe.dataset.bptSuspendedSrc = iframe.getAttribute('src') || '';
+        iframe.removeAttribute('src');
+    }
+}
+
+function resumeAnimatedBackgroundMedia() {
+    if (!isIOSWebKit() || !backgroundLayerElement) {
+        return;
+    }
+
+    const iframe = backgroundLayerElement.querySelector('iframe[data-bpt-suspended-src]');
+    if (iframe instanceof HTMLIFrameElement) {
+        iframe.src = iframe.dataset.bptSuspendedSrc || '';
+        delete iframe.dataset.bptSuspendedSrc;
+    }
+
+    const video = backgroundLayerElement.querySelector('video');
+    if (video && ensureSettings().animatedBackgroundAutoplay) {
+        const playPromise = video.play();
+        if (playPromise?.catch) {
+            playPromise.catch(() => {});
+        }
+    }
+
+    scheduleBackgroundSync();
+}
+
+function attachBackgroundLifecycleHandlers() {
+    if (backgroundLifecycleHandlersAttached) {
+        return;
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            suspendAnimatedBackgroundMedia();
+        } else {
+            resumeAnimatedBackgroundMedia();
+        }
+    });
+    window.addEventListener('pagehide', suspendAnimatedBackgroundMedia, { passive: true });
+    window.addEventListener('pageshow', resumeAnimatedBackgroundMedia, { passive: true });
+    backgroundLifecycleHandlersAttached = true;
 }
 
 function syncAnimatedBackgroundLayer() {
@@ -986,7 +1049,7 @@ function syncAnimatedBackgroundLayer() {
         video.controls = settings.animatedBackgroundShowControls;
         video.autoplay = settings.animatedBackgroundAutoplay;
         video.playsInline = true;
-        video.preload = 'auto';
+        video.preload = isIOSWebKit() ? 'metadata' : 'auto';
         video.volume = settings.animatedBackgroundMuted ? 0 : settings.animatedBackgroundVolume / 100;
         video.style.objectFit = getObjectFitValue();
         backgroundLayerElement.appendChild(video);
