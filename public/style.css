@@ -924,7 +924,6 @@ body .panelControlBar {
     overflow-x: hidden;
     padding-bottom: 0;
     overflow-y: scroll;
-    overflow-anchor: none;
     display: flex;
     bottom: 10px;
     backdrop-filter: blur(var(--SmartThemeBlurStrength));
