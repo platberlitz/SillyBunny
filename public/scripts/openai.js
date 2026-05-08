@@ -204,6 +204,7 @@ let biasCache = undefined;
 export let model_list = [];
 let openAiStaticModelGroups = null;
 let hasShownPresetConnectionBindingReminder = false;
+let settingsPresetChangeGeneration = 0;
 
 export const chat_completion_sources = {
     OPENAI: 'openai',
@@ -6636,6 +6637,7 @@ async function onLogitBiasPresetDeleteClick() {
 
 // Load OpenAI preset settings
 function onSettingsPresetChange() {
+    const changeGeneration = ++settingsPresetChangeGeneration;
     const presetNameBefore = oai_settings.preset_settings_openai;
 
     const presetName = $('#settings_preset_openai').find(':selected').text();
@@ -6650,7 +6652,7 @@ function onSettingsPresetChange() {
     const updateCheckbox = (selector, value) => $(selector).prop('checked', value).trigger('input', { source: 'preset' });
 
     // Allow subscribers to alter the preset before applying deltas
-    eventSource.emit(event_types.OAI_PRESET_CHANGED_BEFORE, {
+    return eventSource.emit(event_types.OAI_PRESET_CHANGED_BEFORE, {
         preset: preset,
         presetName: presetName,
         settingsToUpdate: settingsToUpdate,
@@ -6658,6 +6660,10 @@ function onSettingsPresetChange() {
         savePreset: saveOpenAIPreset,
         presetNameBefore: presetNameBefore,
     }).finally(async () => {
+        if (changeGeneration !== settingsPresetChangeGeneration) {
+            return;
+        }
+
         if (oai_settings.bind_preset_to_connection) {
             $('.model_custom_select').empty();
         }

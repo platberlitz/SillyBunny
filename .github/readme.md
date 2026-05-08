@@ -7,7 +7,7 @@
 
 ---
 
-An elegant fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern), designed with a cleaner, graphical shell UI; Bun-based backend; built-in tutorials, presets, extensions, and a quick-start dashboard; and a lightweight agentic system to faciliate modern agent functionality.
+An elegant fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern), designed with a cleaner, graphical shell UI; Bun-based backend; built-in tutorials, presets, extensions, and a quick-start dashboard; and a lightweight agnetic system to faciliate modern agent functionality.
 
 > [!WARNING]
 > This is an in-dev fork, and is considered beta quality. [Please direct SillyBunny-specific issues to this project's issue tracker.](https://github.com/platberlitz/SillyBunny/issues) If an issue is reproducible in upstream SillyTavern, please report it upstream instead.
@@ -56,6 +56,7 @@ These screenshots show the graphical shell UI across Workspace, Customize, Agent
 * [Project Goals](#project-goals-aka-why-we-made-this-fork)
 * [Changes Compared to SillyTavern](#changes-vs-sillytavern)
 * [Latest Update](#latest-update)
+    * [v1.5.4 (2026-05-08)](#v154-2026-05-08)
     * [v1.5.3 (2026-05-03)](#v153-2026-05-03)
     * [v1.5.2 (2026-04-30)](#v152-2026-04-30)
     * [v1.5.1 (2026-04-29)](#v151-2026-04-29)
@@ -146,7 +147,7 @@ Our primary goals for SillyBunny are as follows:
 
 1) **Simple by default; powerful when needed.** Directly inspired by KDE Plasma's main driving philosophy, SillyBunny is aimed to be simple to understand and intuitive to use by default, with most of the complex settings hidden away from the default workspace. Sane defaults are implemented while all the extra complexity is hidden behind UI elements: still there, but less obtrusive. Our graphical shell best embodies this philosophy.
 2) **A focus on roleplay and storytelling.** SillyBunny has a more opinionated purpose compared to upstream SillyTavern. Our goals align closely with the creative writing scene for models, and the general direction of the fork is aimed for that use case. We facilitate this with pre-bundled tutorials/add-ons/presets designed to get you started with LLM creative writing in fun ways.
-3) **Modernised features.** We aim to implement new features that can greatly take advantage of modern models and their strong, agentic capabilities. Currently, this includes full support for In-Chat pre and post gen agents that complement the main generation. Models work best on smaller individual tasks, and this is best shown through in-chat agents and their capabilities. We're also looking into features like an RPG game mode that can take advantage of these agents.
+3) **Modernised features.** We aim to implement new features that can greatly take advantage of modern models and their strong, agnetic capabilities. Currently, this includes full support for In-Chat pre and post gen agents that complement the main generation. Models work best on smaller individual tasks, and this is best shown through in-chat agents and their capabilities. We're also looking into features like an RPG game mode that can take advantage of these agents.
 4) **Better performance.** Base SillyTavern relies on node.js for its runtime environment. While robust, this is not ideal for performance. We've switched to a Bun runtime to increase general performance and startup times, while optimising for lower power devices like smartphones.
 5) **Compatibility**. We remain as closely backwards compatible with upstream SillyTavern as possible. This facilitates easy synchronizing with upstream. We aim to not remove any pre-existing features, unless replacing with a direct alternative. The backend is already very solid, so primary work is done in the frontend space. In addition, we aim to make all our new features compatible with models of all sizes, not just the frontier, SOTA ones. Simplicity is key.
 
@@ -170,9 +171,9 @@ The original SillyTavern layout is replaced with a custom, easy-to-navigate grap
 
 We primarily use Bun as a runtime, instead of node.js. This results in consistently faster startups, overall performance, and automatic launcher bootstraping. Node.js is still fully functional as a legacy fallback system.
 
-### In-Chat agentic Support
+### In-Chat Agnetic Support
 
-SillyBunny has support for In-Chat Agents. These are custom prompt fields that can run separately from the main generation, which allows for a lot of extra flexibility. Included are several pre-built prompts designed for trackers, post-gen cleanup, anti-slop, and more. Agents can use the main model or a different connection profile, allowing for a fast, smaller model to run long agentic tasks with ease while a large, main model writes the actual story content. These are designed to fill the gap between full extensions and simple, modular agentic functionality.
+SillyBunny has support for In-Chat Agents. These are custom prompt fields that can run separately from the main generation, which allows for a lot of extra flexibility. Included are several pre-built prompts designed for trackers, post-gen cleanup, anti-slop, and more. Agents can use the main model or a different connection profile, allowing for a fast, smaller model to run long agnetic tasks with ease while a large, main model writes the actual story content. These are designed to fill the gap between full extensions and simple, modular agnetic functionality.
 
 **Pipeline:**
 
@@ -219,6 +220,23 @@ SillyBunny includes some extras by default to help you get started right away:
 ---
 
 ## Latest Update
+
+### v1.5.4 (2026-05-08)
+
+This update stabilizes preset and connection profile switching, keeps existing chats pinned to the latest message on load, and updates SillyBunny release metadata to 1.5.4.
+
+**Presets And Connection Profiles**
+* Connection profile changes now serialize in order, abort superseded applications cleanly, and save only after the latest selected profile finishes applying.
+* OpenAI preset changes now wait for linked provider/model updates before profile application continues, keeping API-to-preset links together during rapid switching.
+* Preset slash-command and welcome flows now wait for supported preset changes to finish applying before continuing.
+* Connection profile create, update, delete, reload, and profile slash commands now flush settings immediately so rapid preset/API swaps persist reliably.
+
+**Chat Loading**
+* Existing chats now force-scroll to the latest message on initial load across desktop and mobile, even when the normal auto-scroll preference is disabled.
+* Streaming and other non-forced chat scrolling still respect the user's auto-scroll preference and mobile manual-scroll suppression.
+
+**Release Metadata**
+* Updated app, Horde client, bundled extension, package, lockfile, and README metadata to 1.5.4.
 
 ### v1.5.3 (2026-05-03)
 

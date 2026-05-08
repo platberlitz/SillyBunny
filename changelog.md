@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.5.4
+
+Date: 2026-05-08
+
+This update stabilizes preset and connection profile switching, keeps existing chats pinned to the latest message on load, and updates SillyBunny release metadata to 1.5.4.
+
+### Presets And Connection Profiles
+- Connection profile changes now serialize in order, abort superseded applications cleanly, and save only after the latest selected profile finishes applying.
+- OpenAI preset changes now expose an awaitable completion path and ignore stale async preset applications, keeping linked provider/model settings from being overwritten by older selections.
+- Preset slash-command and welcome flows now wait for the active preset manager to finish applying supported preset changes before continuing.
+- Connection profile create, update, delete, reload, and profile slash commands now flush settings immediately so rapid preset/API swaps persist reliably.
+
+### Chat Loading
+- Existing chats now force-scroll to the latest message on initial load across desktop and mobile, even when the normal auto-scroll preference is disabled.
+- Streaming and other non-forced chat scrolling still respect the user's auto-scroll preference and mobile manual-scroll suppression.
+
+### Release Metadata
+- Updated app, Horde client, bundled extension, package, lockfile, and README metadata to 1.5.4.
+
+### Local Commits
+- `fix(settings): stabilize presets and chat loading`
+
 ## v1.5.3
 
 Date: 2026-05-03

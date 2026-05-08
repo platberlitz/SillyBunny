@@ -54,6 +54,7 @@ These screenshots show the graphical shell UI across Workspace, Customize, Agent
 * [Project Goals](#project-goals-aka-why-we-made-this-fork)
 * [Changes Compared to SillyTavern](#changes-vs-sillytavern)
 * [Latest Update](#latest-update)
+    * [v1.5.4 (2026-05-08)](#v154-2026-05-08)
     * [v1.5.3 (2026-05-03)](#v153-2026-05-03)
     * [v1.5.2 (2026-04-30)](#v152-2026-04-30)
     * [v1.5.1 (2026-04-29)](#v151-2026-04-29)
@@ -217,6 +218,23 @@ SillyBunny includes some extras by default to help you get started right away:
 ---
 
 ## Latest Update
+
+### v1.5.4 (2026-05-08)
+
+This update stabilizes preset and connection profile switching, keeps existing chats pinned to the latest message on load, and updates SillyBunny release metadata to 1.5.4.
+
+**Presets And Connection Profiles**
+* Connection profile changes now serialize in order, abort superseded applications cleanly, and save only after the latest selected profile finishes applying.
+* OpenAI preset changes now wait for linked provider/model updates before profile application continues, keeping API-to-preset links together during rapid switching.
+* Preset slash-command and welcome flows now wait for supported preset changes to finish applying before continuing.
+* Connection profile create, update, delete, reload, and profile slash commands now flush settings immediately so rapid preset/API swaps persist reliably.
+
+**Chat Loading**
+* Existing chats now force-scroll to the latest message on initial load across desktop and mobile, even when the normal auto-scroll preference is disabled.
+* Streaming and other non-forced chat scrolling still respect the user's auto-scroll preference and mobile manual-scroll suppression.
+
+**Release Metadata**
+* Updated app, Horde client, bundled extension, package, lockfile, and README metadata to 1.5.4.
 
 ### v1.5.3 (2026-05-03)
 

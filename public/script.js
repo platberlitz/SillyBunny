@@ -454,7 +454,7 @@ export let isChatSaving = false;
 export let firstRun = false;
 export let settingsReady = false;
 let currentVersion = '0.0.0';
-const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.5.3';
+const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.5.4';
 
 export let displayVersion = SILLYBUNNY_UI_VERSION;
 
@@ -496,7 +496,7 @@ export function getSillyBunnyFrontendIconSrc({ absolute = false } = {}) {
 export let system_avatar = getSillyBunnyFrontendIconSrc();
 export const comment_avatar = 'img/quill.png';
 export const default_user_avatar = 'img/user-default.png';
-export let CLIENT_VERSION = 'SillyBunny:v1.5.3:platberlitz'; // For Horde header
+export let CLIENT_VERSION = 'SillyBunny:v1.5.4:platberlitz'; // For Horde header
 
 function applySillyBunnyFrontendIcon(iconId = getStoredSillyBunnyFrontendIcon()) {
     const normalizedIconId = normalizeSillyBunnyFrontendIcon(iconId);
@@ -3530,10 +3530,10 @@ let requestId = null;
  * Scrolls the chat to the bottom if configured to do so.
  * @param {object} [options] Options
  * @param {boolean} [options.waitForFrame] If true, waits for the animation frame before scrolling
- * @param {boolean} [options.force=false] If true, bypasses temporary mobile manual-scroll suppression
+ * @param {boolean} [options.force=false] If true, bypasses the auto-scroll preference and temporary mobile manual-scroll suppression
  */
 export function scrollChatToBottom({ waitForFrame, force = false } = {}) {
-    if (!power_user.auto_scroll_chat_to_bottom) {
+    if (!force && !power_user.auto_scroll_chat_to_bottom) {
         return;
     }
 

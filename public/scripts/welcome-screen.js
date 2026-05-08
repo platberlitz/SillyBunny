@@ -1256,7 +1256,7 @@ async function applyOpenAiPreset(name) {
         return false;
     }
 
-    presetManager.selectPreset(presetValue);
+    await presetManager.selectPreset(presetValue);
     saveSettingsDebounced();
     return true;
 }

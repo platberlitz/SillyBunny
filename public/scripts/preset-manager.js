@@ -42,11 +42,13 @@ import {
 import { download, ensurePlainObject, equalsIgnoreCaseAndAccents, getSanitizedFilename, parseJsonFile, waitUntilCondition } from './utils.js';
 
 const presetManagers = {};
+const PRESET_CHANGE_EVENT_APIS = new Set(['kobold', 'novel', 'openai', 'textgenerationwebui']);
+const PRESET_CHANGE_TIMEOUT_MS = 10000;
 
 /**
  * Automatically select a preset for current API based on character or group name.
  */
-function autoSelectPreset() {
+async function autoSelectPreset() {
     const presetManager = getPresetManager();
 
     if (!presetManager) {
@@ -71,8 +73,38 @@ function autoSelectPreset() {
 
     if (preset !== undefined && preset !== null) {
         console.log(`Preset found for API: ${main_api}, name: ${name}`);
-        presetManager.selectPreset(preset);
+        await presetManager.selectPreset(preset);
     }
+}
+
+/**
+ * Resolves once the requested preset manager emits its change event.
+ * @param {PresetManager} presetManager Preset manager
+ * @returns {Promise<void>}
+ */
+function waitForPresetChange(presetManager) {
+    if (!PRESET_CHANGE_EVENT_APIS.has(presetManager.apiId)) {
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+        let timeout;
+        const listener = (data = {}) => {
+            if (data.apiId !== presetManager.apiId) {
+                return;
+            }
+
+            eventSource.removeListener(event_types.PRESET_CHANGED, listener);
+            clearTimeout(timeout);
+            resolve();
+        };
+        timeout = setTimeout(() => {
+            eventSource.removeListener(event_types.PRESET_CHANGED, listener);
+            resolve();
+        }, PRESET_CHANGE_TIMEOUT_MS);
+
+        eventSource.on(event_types.PRESET_CHANGED, listener);
+    });
 }
 
 /**
@@ -428,13 +460,17 @@ class PresetManager {
     /**
      * Selects a preset by option value.
      * @param {string} value Preset option value
+     * @returns {Promise<void>}
      */
-    selectPreset(value) {
-        const option = $(this.select).filter(function () {
-            return $(this).val() === value;
+    async selectPreset(value) {
+        const option = $(this.select).find('option').filter(function () {
+            return String($(this).val()) === String(value);
         });
+        const presetName = option.text();
+        const waitForChange = presetName ? waitForPresetChange(this) : Promise.resolve();
         option.prop('selected', true);
         $(this.select).val(value).trigger('change');
+        await waitForChange;
     }
 
     /**
@@ -1088,7 +1124,7 @@ async function presetCommandCallback(_, name) {
             const presetValue = presetManager.findPreset(exactMatch);
 
             if (presetValue) {
-                presetManager.selectPreset(presetValue);
+                await presetManager.selectPreset(presetValue);
                 shouldReconnect && await waitForConnection();
             }
         }
@@ -1111,7 +1147,7 @@ async function presetCommandCallback(_, name) {
             console.log('Found fuzzy preset match', fuzzyPresetName);
 
             if (currentPreset !== fuzzyPresetName) {
-                presetManager.selectPreset(fuzzyPresetValue);
+                await presetManager.selectPreset(fuzzyPresetValue);
                 shouldReconnect && await waitForConnection();
             }
         }
@@ -1383,7 +1419,7 @@ export async function initPresetManager() {
             await presetManager.deletePreset();
             await presetManager.savePreset(name, data.preset, { restoreDefault: true });
             const option = presetManager.findPreset(name);
-            presetManager.selectPreset(option);
+            await presetManager.selectPreset(option);
             const successToast = !presetManager.isAdvancedFormatting() ? t`Default preset restored` : t`Default template restored`;
             toastr.success(successToast);
         } else {
@@ -1396,7 +1432,7 @@ export async function initPresetManager() {
             }
 
             const option = presetManager.findPreset(name);
-            presetManager.selectPreset(option);
+            await presetManager.selectPreset(option);
             const successToast = !presetManager.isAdvancedFormatting() ? t`Preset restored` : t`Template restored`;
             toastr.success(successToast);
         }

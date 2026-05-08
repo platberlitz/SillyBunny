@@ -1,6 +1,6 @@
 import { DOMPurify, Fuse } from '../../../lib.js';
 
-import { activateSendButtons, deactivateSendButtons, event_types, eventSource, main_api, online_status, saveSettingsDebounced } from '../../../script.js';
+import { activateSendButtons, deactivateSendButtons, event_types, eventSource, main_api, online_status, saveSettings } from '../../../script.js';
 import { extension_settings, getContext, renderExtensionTemplateAsync } from '../../extensions.js';
 import { callGenericPopup, Popup, POPUP_RESULT, POPUP_TYPE } from '../../popup.js';
 import { SlashCommand } from '../../slash-commands/SlashCommand.js';
@@ -23,6 +23,8 @@ import { formatReasoning } from '/scripts/reasoning.js';
 const MODULE_NAME = 'connection-manager';
 const NONE = '<None>';
 const EMPTY = '<Empty>';
+const PROFILE_APPLICATION_ABORTED = 'Profile application aborted';
+let profileApplySequence = 0;
 
 const DEFAULT_SETTINGS = {
     profiles: [],
@@ -116,7 +118,15 @@ class ConnectionManagerSpinner {
     }
 
     stop() {
-        this.spinnerElement.classList.add('hidden');
+        const index = ConnectionManagerSpinner.abortControllers.indexOf(this.abortController);
+        if (index === -1) {
+            return;
+        }
+
+        ConnectionManagerSpinner.abortControllers.splice(index, 1);
+        if (ConnectionManagerSpinner.abortControllers.length === 0) {
+            this.spinnerElement.classList.add('hidden');
+        }
     }
 
     isAborted() {
@@ -128,7 +138,17 @@ class ConnectionManagerSpinner {
             controller.abort();
         }
         ConnectionManagerSpinner.abortControllers = [];
+        document.getElementById('connection_profile_spinner')?.classList.add('hidden');
     }
+}
+
+/**
+ * Checks if an error came from a superseded profile application.
+ * @param {unknown} error Error-like value
+ * @returns {boolean}
+ */
+function isProfileApplicationAbort(error) {
+    return error instanceof Error && error.message === PROFILE_APPLICATION_ABORTED;
 }
 
 /**
@@ -342,7 +362,7 @@ async function deleteConnectionProfile() {
 
     extension_settings.connectionManager.profiles.splice(index, 1);
     extension_settings.connectionManager.selectedProfile = null;
-    saveSettingsDebounced();
+    await saveSettings();
 
     await eventSource.emit(event_types.CONNECTION_PROFILE_DELETED, profile);
 }
@@ -416,7 +436,7 @@ async function deleteAllConnectionProfiles() {
     if (selectedIds.has(extension_settings.connectionManager.selectedProfile)) {
         extension_settings.connectionManager.selectedProfile = null;
     }
-    saveSettingsDebounced();
+    await saveSettings();
 
     for (const profile of profilesToDelete) {
         await eventSource.emit(event_types.CONNECTION_PROFILE_DELETED, profile);
@@ -480,25 +500,35 @@ async function applyConnectionProfile(profile) {
     const spinner = new ConnectionManagerSpinner();
     spinner.start();
 
-    for (const command of commands) {
-        if (spinner.isAborted()) {
-            throw new Error('Profile application aborted');
-        }
+    try {
+        for (const command of commands) {
+            if (spinner.isAborted()) {
+                throw new Error(PROFILE_APPLICATION_ABORTED);
+            }
 
-        const argument = profile[command];
-        const allowEmpty = ALLOW_EMPTY.includes(command);
-        if (!argument && !(allowEmpty && argument === '')) {
-            continue;
+            const argument = profile[command];
+            const allowEmpty = ALLOW_EMPTY.includes(command);
+            if (!argument && !(allowEmpty && argument === '')) {
+                continue;
+            }
+            try {
+                const args = getNamedArguments(allowEmpty ? { force: 'true' } : {});
+                await SlashCommandParser.commands[command].callback(args, argument);
+            } catch (error) {
+                if (spinner.isAborted()) {
+                    throw new Error(PROFILE_APPLICATION_ABORTED);
+                }
+
+                console.error(`Failed to execute command: ${command} ${argument}`, error);
+            }
+
+            if (spinner.isAborted()) {
+                throw new Error(PROFILE_APPLICATION_ABORTED);
+            }
         }
-        try {
-            const args = getNamedArguments(allowEmpty ? { force: 'true' } : {});
-            await SlashCommandParser.commands[command].callback(args, argument);
-        } catch (error) {
-            console.error(`Failed to execute command: ${command} ${argument}`, error);
-        }
+    } finally {
+        spinner.stop();
     }
-
-    spinner.stop();
 }
 
 /**
@@ -832,6 +862,7 @@ export async function init() {
     toggleProfileSpecificButtons();
 
     profiles.addEventListener('change', async function () {
+        const applySequence = ++profileApplySequence;
         const selectedProfile = profiles.selectedOptions[0];
         if (!selectedProfile) {
             // Safety net for preventing the command getting stuck
@@ -841,13 +872,13 @@ export async function init() {
 
         const profileId = selectedProfile.value;
         extension_settings.connectionManager.selectedProfile = profileId;
-        saveSettingsDebounced();
         await renderDetailsContent(detailsContent);
 
         toggleProfileSpecificButtons();
 
         // None option selected
         if (!profileId) {
+            await saveSettings();
             await eventSource.emit(event_types.CONNECTION_PROFILE_LOADED, NONE);
             return;
         }
@@ -859,7 +890,20 @@ export async function init() {
             return;
         }
 
-        await applyConnectionProfile(profile);
+        try {
+            await applyConnectionProfile(profile);
+        } catch (error) {
+            if (!isProfileApplicationAbort(error)) {
+                console.error('Failed to apply connection profile', error);
+            }
+            return;
+        }
+
+        if (applySequence !== profileApplySequence) {
+            return;
+        }
+
+        await saveSettings();
         await eventSource.emit(event_types.CONNECTION_PROFILE_LOADED, profile.name);
     });
 
@@ -875,8 +919,17 @@ export async function init() {
             console.log('No profile selected');
             return;
         }
-        await applyConnectionProfile(profile);
+        ++profileApplySequence;
+        try {
+            await applyConnectionProfile(profile);
+        } catch (error) {
+            if (!isProfileApplicationAbort(error)) {
+                console.error('Failed to reload connection profile', error);
+            }
+            return;
+        }
         await renderDetailsContent(detailsContent);
+        await saveSettings();
         await eventSource.emit(event_types.CONNECTION_PROFILE_LOADED, profile.name);
         toastr.success('Connection profile reloaded', '', { timeOut: 1500 });
     });
@@ -889,7 +942,7 @@ export async function init() {
         }
         extension_settings.connectionManager.profiles.push(profile);
         extension_settings.connectionManager.selectedProfile = profile.id;
-        saveSettingsDebounced();
+        await saveSettings();
         renderConnectionProfiles(profiles);
         await renderDetailsContent(detailsContent);
         toggleProfileSpecificButtons();
@@ -912,7 +965,7 @@ export async function init() {
         const oldProfile = structuredClone(profile);
         await updateConnectionProfile(profile);
         await renderDetailsContent(detailsContent);
-        saveSettingsDebounced();
+        await saveSettings();
         await eventSource.emit(event_types.CONNECTION_PROFILE_UPDATED, oldProfile, profile);
         await eventSource.emit(event_types.CONNECTION_PROFILE_LOADED, profile.name);
         toastr.success('Connection profile updated', '', { timeOut: 1500 });
@@ -1013,7 +1066,7 @@ export async function init() {
             profile.name = newName;
         }
 
-        saveSettingsDebounced();
+        await saveSettings();
         await eventSource.emit(event_types.CONNECTION_PROFILE_UPDATED, oldProfile, profile);
         renderConnectionProfiles(profiles);
         await renderDetailsContent(detailsContent);
@@ -1132,7 +1185,7 @@ export async function init() {
             }
             extension_settings.connectionManager.profiles.push(profile);
             extension_settings.connectionManager.selectedProfile = profile.id;
-            saveSettingsDebounced();
+            await saveSettings();
             renderConnectionProfiles(profiles);
             await renderDetailsContent(detailsContent);
             toggleProfileSpecificButtons();
@@ -1154,7 +1207,7 @@ export async function init() {
             const oldProfile = structuredClone(profile);
             await updateConnectionProfile(profile);
             await renderDetailsContent(detailsContent);
-            saveSettingsDebounced();
+            await saveSettings();
             await eventSource.emit(event_types.CONNECTION_PROFILE_UPDATED, oldProfile, profile);
             return profile.name;
         },
