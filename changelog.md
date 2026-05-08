@@ -7,6 +7,7 @@ Date: 2026-05-03
 This update adds the Black Orange theme and desktop character drawer tiles, improves managed shell coexistence, restores Moving UI control over the character drawer size, and quiets expected Pathfinder sidecar aborts.
 
 ### Mobile UI Polish
+- Restored chat scroll anchoring so scrolling up no longer skips over batches of earlier messages.
 - Lengthened the slim mobile Persona bottom chat bar to match the Image #2 near-full-width footprint while preserving its compact height.
 - Slimmed the mobile Persona bottom chat bar so the Bottom Bar Size slider can make it visually thinner while keeping the controls centered in one row.
 - Narrowed the mobile Persona bottom chat bar so it no longer spans edge-to-edge on phone and landscape mobile layouts.
