@@ -568,12 +568,18 @@ const sbState = {
     bottomChatBar: {
         chatSelect: null,
         personaBubble: null,
+        searchField: null,
         searchInput: null,
         searchStatus: null,
+        searchToggleButton: null,
+        collapseToggleButton: null,
+        secondaryRow: null,
         scrollTopButton: null,
         scrollBottomButton: null,
         massDeleteButton: null,
         autoNameButton: null,
+        secondaryOpen: true,
+        searchOpen: false,
         bindingRetryTimer: 0,
         boundEventSource: null,
         windowBindingsAttached: false,
@@ -4388,6 +4394,110 @@ function createBottomChatSearchField() {
     input.addEventListener('input', () => setChatSearchQuery(input.value, { source: input }));
 
     return { field, input, status };
+}
+
+function setBottomChatButtonIcon(button, iconClass) {
+    if (!(button instanceof HTMLElement)) {
+        return;
+    }
+
+    const icon = button.querySelector('i');
+    if (icon instanceof HTMLElement) {
+        icon.className = `fa-solid ${iconClass}`;
+    }
+}
+
+function syncBottomChatBarSecondaryState() {
+    const bottomChatBarState = getBottomChatBarState();
+    const container = document.getElementById('sb-bottom-chat-bar');
+    const isOpen = Boolean(bottomChatBarState.secondaryOpen);
+    const isHiddenOnMobile = !isOpen && isMobileViewport();
+
+    container?.classList.toggle('sb-bottom-chat-secondary-collapsed', !isOpen);
+
+    if (bottomChatBarState.secondaryRow instanceof HTMLElement) {
+        bottomChatBarState.secondaryRow.hidden = isHiddenOnMobile;
+    }
+
+    const button = bottomChatBarState.collapseToggleButton;
+    if (button instanceof HTMLElement) {
+        const title = isOpen ? 'Hide chat actions' : 'Show chat actions';
+
+        button.title = title;
+        button.setAttribute('aria-label', title);
+        button.setAttribute('aria-expanded', String(isOpen));
+        setBottomChatButtonIcon(button, isOpen ? 'fa-chevron-up' : 'fa-chevron-down');
+    }
+}
+
+function syncBottomChatBarSearchState({ focusInput = false } = {}) {
+    const bottomChatBarState = getBottomChatBarState();
+    const container = document.getElementById('sb-bottom-chat-bar');
+    const isOpen = Boolean(bottomChatBarState.searchOpen);
+    const isMobileHidden = !isOpen && isMobileViewport();
+
+    container?.classList.toggle('sb-bottom-chat-search-open', isOpen);
+
+    if (bottomChatBarState.searchField instanceof HTMLElement) {
+        bottomChatBarState.searchField.hidden = isMobileHidden;
+    }
+
+    if (bottomChatBarState.searchInput instanceof HTMLElement) {
+        if (isMobileHidden) {
+            bottomChatBarState.searchInput.setAttribute('tabindex', '-1');
+        } else {
+            bottomChatBarState.searchInput.removeAttribute('tabindex');
+        }
+    }
+
+    const button = bottomChatBarState.searchToggleButton;
+    if (button instanceof HTMLElement) {
+        const title = isOpen ? 'Hide chat search' : 'Search chat';
+
+        button.title = title;
+        button.setAttribute('aria-label', title);
+        setButtonPressed(button, isOpen);
+    }
+
+    if (focusInput && isOpen && bottomChatBarState.searchInput instanceof HTMLInputElement) {
+        window.requestAnimationFrame(() => {
+            bottomChatBarState.searchInput.focus({ preventScroll: true });
+            bottomChatBarState.searchInput.select();
+        });
+    }
+}
+
+function setBottomChatSecondaryOpen(open, { focusSearch = false } = {}) {
+    const bottomChatBarState = getBottomChatBarState();
+    const searchInput = bottomChatBarState.searchInput;
+
+    bottomChatBarState.secondaryOpen = Boolean(open);
+    if (!bottomChatBarState.secondaryOpen) {
+        bottomChatBarState.searchOpen = false;
+        if (searchInput instanceof HTMLElement && searchInput === document.activeElement) {
+            searchInput.blur();
+        }
+    } else if (focusSearch) {
+        bottomChatBarState.searchOpen = true;
+    }
+
+    syncBottomChatBarSecondaryState();
+    syncBottomChatBarSearchState({ focusInput: focusSearch });
+}
+
+function setBottomChatSearchOpen(open, { focusInput = false } = {}) {
+    const bottomChatBarState = getBottomChatBarState();
+    const searchInput = bottomChatBarState.searchInput;
+
+    bottomChatBarState.searchOpen = Boolean(open);
+    if (bottomChatBarState.searchOpen && !bottomChatBarState.secondaryOpen) {
+        bottomChatBarState.secondaryOpen = true;
+    } else if (!bottomChatBarState.searchOpen && searchInput instanceof HTMLElement && searchInput === document.activeElement) {
+        searchInput.blur();
+    }
+
+    syncBottomChatBarSecondaryState();
+    syncBottomChatBarSearchState({ focusInput });
 }
 
 function initChatSearchObserver() {
@@ -10210,9 +10320,27 @@ function buildBottomChatBar() {
         void openChatById(chatSelect.value);
     });
 
+    const collapseToggleBtn = createBottomChatButton({ icon: 'fa-chevron-up', title: 'Hide chat actions', className: 'sb-bottom-chat-collapse-toggle' }, () => {
+        setBottomChatSecondaryOpen(!getBottomChatBarState().secondaryOpen);
+    });
+    collapseToggleBtn.setAttribute('aria-controls', 'sb-bottom-chat-secondary-row');
+    collapseToggleBtn.setAttribute('aria-expanded', 'true');
+
     const search = createBottomChatSearchField();
+    const searchToggleBtn = createBottomChatButton({ icon: 'fa-magnifying-glass', title: 'Search chat', className: 'sb-bottom-chat-search-toggle' }, () => {
+        const shouldOpen = !getBottomChatBarState().searchOpen;
+        setBottomChatSearchOpen(shouldOpen, { focusInput: shouldOpen });
+    });
+    searchToggleBtn.setAttribute('aria-controls', 'sb-bottom-chat-search-field');
     const navCluster = createElement('div', { className: 'sb-bottom-chat-nav-actions' });
     const managementCluster = createElement('div', { className: 'sb-bottom-chat-management-actions' });
+    const secondaryRow = createElement('div', {
+        id: 'sb-bottom-chat-secondary-row',
+        className: 'sb-bottom-chat-secondary-row',
+        attrs: {
+            'aria-label': 'Chat actions',
+        },
+    });
 
     const topBtn = createBottomChatButton({ icon: 'fa-arrow-up', title: 'Go to top of chat' }, scrollCurrentChatToTop);
     const bottomBtn = createBottomChatButton({ icon: 'fa-arrow-down', title: 'Go to bottom of chat' }, scrollCurrentChatToBottom);
@@ -10224,19 +10352,26 @@ function buildBottomChatBar() {
 
     navCluster.append(topBtn, bottomBtn);
     managementCluster.append(newBtn, massDeleteBtn, autoNameBtn, renameBtn, deleteBtn);
-    container.append(personaBubble, chatSelect, search.field, navCluster, managementCluster);
+    secondaryRow.append(searchToggleBtn, managementCluster);
+    container.append(personaBubble, chatSelect, search.field, navCluster, collapseToggleBtn, secondaryRow);
 
     // Store references for refresh and late context binding retries.
     Object.assign(getBottomChatBarState(), {
         chatSelect,
         personaBubble,
+        searchField: search.field,
         searchInput: search.input,
         searchStatus: search.status,
+        searchToggleButton: searchToggleBtn,
+        collapseToggleButton: collapseToggleBtn,
+        secondaryRow,
         scrollTopButton: topBtn,
         scrollBottomButton: bottomBtn,
         massDeleteButton: massDeleteBtn,
         autoNameButton: autoNameBtn,
     });
+    syncBottomChatBarSecondaryState();
+    syncBottomChatBarSearchState();
 
     // Defer initial persona bubble update in case user_avatar isn't ready yet
     setTimeout(() => updatePersonaBubble(personaBubble), 100);
@@ -10274,6 +10409,7 @@ async function refreshBottomChatSelect() {
     const chatContext = getChatUiContext();
 
     setButtonDisabled(sbState.bottomChatBar?.searchInput, !chatContext.hasChat);
+    setButtonDisabled(sbState.bottomChatBar?.searchToggleButton, !chatContext.hasChat);
     setButtonDisabled(sbState.bottomChatBar?.scrollTopButton, !chatContext.hasChat);
     setButtonDisabled(sbState.bottomChatBar?.scrollBottomButton, !chatContext.hasChat);
     setButtonDisabled(sbState.bottomChatBar?.massDeleteButton, !chatContext.canBrowseChats);
@@ -10400,6 +10536,8 @@ function bindBottomChatBarWindowEvents() {
     }
 
     const refreshWithContext = () => {
+        syncBottomChatBarSecondaryState();
+        syncBottomChatBarSearchState();
         scheduleBottomChatBarRefresh(0);
         window.requestAnimationFrame(() => updatePersonaBubble(bottomChatBarState.personaBubble));
         bindBottomChatBarEvents();
@@ -10407,6 +10545,7 @@ function bindBottomChatBarWindowEvents() {
 
     window.addEventListener('pageshow', refreshWithContext, { passive: true });
     window.addEventListener('focus', refreshWithContext, { passive: true });
+    window.addEventListener('resize', refreshWithContext, { passive: true });
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
             refreshWithContext();

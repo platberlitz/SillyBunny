@@ -4,7 +4,7 @@
 
 Date: 2026-05-08
 
-This update stabilizes preset and connection profile switching, keeps existing chats pinned to the latest message on load, and updates SillyBunny release metadata to 1.5.4.
+This update stabilizes preset and connection profile switching, adds bottom chat navigation and search polish from recent staging PRs, trims the mobile Persona bar with collapsible actions, makes Bun launcher updates recover from stale lockfiles, and updates SillyBunny release metadata to 1.5.4.
 
 ### Presets And Connection Profiles
 - Connection profile changes now serialize in order, abort superseded applications cleanly, and save only after the latest selected profile finishes applying.
@@ -12,15 +12,35 @@ This update stabilizes preset and connection profile switching, keeps existing c
 - Preset slash-command and welcome flows now wait for the active preset manager to finish applying supported preset changes before continuing.
 - Connection profile create, update, delete, reload, and profile slash commands now flush settings immediately so rapid preset/API swaps persist reliably.
 
-### Chat Loading
+### Chat Loading And Search
 - Existing chats now force-scroll to the latest message on initial load across desktop and mobile, even when the normal auto-scroll preference is disabled.
 - Streaming and other non-forced chat scrolling still respect the user's auto-scroll preference and mobile manual-scroll suppression.
+- Bottom chat navigation now includes go-to-top and go-to-bottom controls for the active chat.
+- Bottom-bar chat search stays synchronized with desktop and mobile chat search controls, searches the full chat data including hidden or not-yet-rendered messages, and reports whether matches are visible, hidden, data-only, or absent.
+- Mobile chat scrolling stays anchored while loading older messages or dragging SillyBunny shell tabs, with tab scrolling constrained horizontally to avoid page jumps.
+
+### Mobile Bottom Chat Bar
+- Added a mobile-only collapse button that hides or restores the second-row chat actions while preserving 44px touch targets.
+- Moved bottom chat search behind a second-row search icon so the full search field only expands when requested, reducing persistent bar height on phones.
+- Kept the desktop bottom chat bar layout unchanged while aligning mobile persona, chat select, action, and search controls symmetrically.
+
+### Runtime And Updates
+- Bun launchers now retry dependency installs without `--frozen-lockfile` if the locked install fails, so users no longer need to delete `bun.lock` after an update.
+- Clean Git checkouts restore the tracked `bun.lock` after a local Bun lockfile refresh so future launcher self-updates are not blocked by a dirty lockfile.
+- Server admin status, update, and branch handling now supports linked Git worktrees and stable branch tracking for runtime worktrees.
 
 ### Release Metadata
+- The welcome panel now uses the dynamic current-release label instead of a stale hardcoded 1.4.2 eyebrow.
 - Updated app, Horde client, bundled extension, package, lockfile, and README metadata to 1.5.4.
+
+### Merged Staging PRs
+- PR #36 `fix: support runtime worktrees in admin updates` added runtime-worktree-aware server admin update handling.
+- PR #39 `fix: stabilize mobile chat scroll` stabilized mobile chat scrolling during tab drags and older-message loading.
+- PR #40 `feat: add chat navigation and hidden search` added bottom chat navigation and full-chat search coverage.
 
 ### Local Commits
 - `fix(settings): stabilize presets and chat loading`
+- `fix(ui): tighten mobile chat bar and update flow`
 
 ## v1.5.3
 

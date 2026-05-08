@@ -198,6 +198,7 @@ has_existing_dev_dependencies() {
 export NODE_ENV=production
 install_args=()
 restore_package_lock_after_install=0
+restore_bun_lock_after_install=0
 dependency_profile="${runtime_kind}-production"
 if [[ "$runtime_kind" == node ]]; then
     if [[ -f package-lock.json ]]; then
@@ -229,7 +230,36 @@ else
     if is_termux; then
         install_args+=(--backend=copyfile)
     fi
+
+    if command -v git >/dev/null 2>&1 \
+        && git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+        && git ls-files --error-unmatch bun.lock >/dev/null 2>&1 \
+        && git diff --quiet -- bun.lock; then
+        restore_bun_lock_after_install=1
+    fi
 fi
+
+run_package_install() {
+    if [[ "$runtime_kind" != bun ]]; then
+        "$PACKAGE_MANAGER_CMD" "${install_args[@]}"
+        return
+    fi
+
+    if "$PACKAGE_MANAGER_CMD" "${install_args[@]}"; then
+        return
+    fi
+
+    local fallback_args=()
+    local arg
+    for arg in "${install_args[@]}"; do
+        if [[ "$arg" != --frozen-lockfile ]]; then
+            fallback_args+=("$arg")
+        fi
+    done
+
+    echo "Bun lockfile check failed; retrying without --frozen-lockfile so bun.lock can refresh."
+    "$PACKAGE_MANAGER_CMD" "${fallback_args[@]}"
+}
 
 if ! "$RUNTIME_CMD" "$SCRIPT_DIR/scripts/dependency-state.js" check "$dependency_profile" >/dev/null 2>&1; then
     if [[ "$dependency_profile" == *development ]]; then
@@ -244,11 +274,16 @@ if ! "$RUNTIME_CMD" "$SCRIPT_DIR/scripts/dependency-state.js" check "$dependency
         echo "Installing Bun packages..."
     fi
 
-    "$PACKAGE_MANAGER_CMD" "${install_args[@]}"
+    run_package_install
 
     if (( restore_package_lock_after_install )) && ! git diff --quiet -- package-lock.json; then
         echo "Restoring tracked package-lock.json after npm metadata rewrite..."
         git restore -- package-lock.json
+    fi
+
+    if (( restore_bun_lock_after_install )) && ! git diff --quiet -- bun.lock; then
+        echo "Restoring tracked bun.lock after Bun lockfile refresh..."
+        git restore -- bun.lock
     fi
 
     "$RUNTIME_CMD" "$SCRIPT_DIR/scripts/dependency-state.js" mark "$dependency_profile"

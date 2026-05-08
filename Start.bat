@@ -55,17 +55,42 @@ set NODE_ENV=production
 set NODE_NO_WARNINGS=1
 set SILLYBUNNY_LAUNCHER=1
 set "_dependency_profile=bun-production"
+set "_bun_install_args=--frozen-lockfile --production --no-progress --no-summary"
+set "_bun_fallback_args=--production --no-progress --no-summary"
 if exist node_modules\eslint\package.json set "_dependency_profile=bun-development"
+if "!_dependency_profile!"=="bun-development" (
+    set "_bun_install_args=--frozen-lockfile --no-progress --no-summary"
+    set "_bun_fallback_args=--no-progress --no-summary"
+)
 bun scripts\dependency-state.js check !_dependency_profile! > nul 2>&1
 if !errorlevel! neq 0 (
     if "!_dependency_profile!"=="bun-development" (
         echo Installing Bun packages including development tooling...
-        call bun install --frozen-lockfile --no-progress --no-summary
     ) else (
         echo Installing Bun packages...
-        call bun install --frozen-lockfile --production --no-progress --no-summary
+    )
+    set "_restore_bun_lock=0"
+    if exist .git if exist bun.lock (
+        git ls-files --error-unmatch bun.lock > nul 2>&1
+        if !errorlevel! equ 0 (
+            git diff --quiet -- bun.lock > nul 2>&1
+            if !errorlevel! equ 0 set "_restore_bun_lock=1"
+        )
+    )
+    call bun install !_bun_install_args!
+    if !errorlevel! neq 0 (
+        echo Bun lockfile check failed; retrying without --frozen-lockfile so bun.lock can refresh.
+        call bun install !_bun_fallback_args!
     )
     if !errorlevel! neq 0 goto end
+    if "!_restore_bun_lock!"=="1" (
+        git diff --quiet -- bun.lock > nul 2>&1
+        if !errorlevel! neq 0 (
+            echo Restoring tracked bun.lock after Bun lockfile refresh...
+            git restore -- bun.lock
+            if !errorlevel! neq 0 goto end
+        )
+    )
     bun scripts\dependency-state.js mark !_dependency_profile!
     if !errorlevel! neq 0 goto end
 ) else (
