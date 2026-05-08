@@ -34,5 +34,9 @@
 
 ## PR And Release Notes
 - PRs normally target `staging`; `release` is only for docs, GitHub Actions, or critical hotfixes that must also be backported to `staging`.
+- Keep `D:/AIStuff/SillyBunny` on `staging` as the runtime/update checkout; do not switch it to Codex feature branches unless the user explicitly asks.
+- For Codex PR work in this workspace, create or reuse separate worktrees under `D:/AIStuff/SillyBunny Contribution/` and open PRs from those worktree branches.
 - Use CONTRIBUTING.md PR title prefixes (`fix`, `chore`, `feat`, `sync`, `docs`) when drafting PRs.
 - For normal releases, update user-facing version strings and the root README changelog, then run `bash scripts/sync-readme-mirror.sh`; hotfixes skip version/changelog/Discord-release-copy work.
+- Before planning or editing, read `lessons.md` and apply its history-derived guardrails; do not repeat known SillyBunny mistakes.
+- If you start a temporary dev/debug server, record its PID/port and shut it down before ending the task.
