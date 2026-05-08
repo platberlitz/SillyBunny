@@ -523,6 +523,8 @@ const sbState = {
     },
     characterDrawer: {
         rightLocked: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.characterDrawerRightLocked), false),
+        stateObserver: null,
+        observedOpen: null,
     },
     mobileModal: {
         syncFrame: 0,
@@ -5173,17 +5175,64 @@ function resetCharacterPanelView() {
     }
 }
 
+function setCharacterDrawerHostOverflow(shouldOpen) {
+    const host = document.getElementById('rightNavHolder');
+
+    if (host instanceof HTMLElement) {
+        host.style.overflow = shouldOpen ? 'visible' : '';
+    }
+}
+
+function syncCharacterDrawerStateFromDom({ force = false } = {}) {
+    const panel = document.getElementById('right-nav-panel');
+
+    if (!(panel instanceof HTMLElement)) {
+        return;
+    }
+
+    const isOpen = panel.classList.contains('openDrawer');
+    if (!force && sbState.characterDrawer.observedOpen === isOpen) {
+        return;
+    }
+
+    sbState.characterDrawer.observedOpen = isOpen;
+    setCharacterDrawerHostOverflow(isOpen);
+    syncDrawerIconState('#rightNavDrawerIcon', isOpen);
+
+    if (!isOpen && document.activeElement instanceof HTMLElement && panel.contains(document.activeElement)) {
+        document.activeElement.blur();
+    }
+
+    syncChatbarVisibilityState();
+    queueMobileModalStateSync();
+}
+
+function bindCharacterDrawerStateObserver() {
+    const panel = document.getElementById('right-nav-panel');
+
+    if (!(panel instanceof HTMLElement)) {
+        return;
+    }
+
+    sbState.characterDrawer.stateObserver?.disconnect();
+    sbState.characterDrawer.stateObserver = new MutationObserver(() => syncCharacterDrawerStateFromDom());
+    sbState.characterDrawer.stateObserver.observe(panel, {
+        attributes: true,
+        attributeFilter: ['class'],
+    });
+    syncCharacterDrawerStateFromDom({ force: true });
+}
+
 function closeCharacterPanel() {
     const panel = document.getElementById('right-nav-panel');
 
     if (panel instanceof HTMLElement && panel.classList.contains('openDrawer')) {
         forceDrawerState(panel, false, '#rightNavDrawerIcon');
-
-        // Restore overflow:hidden on parent after closing (iOS Safari fix)
-        const host = document.getElementById('rightNavHolder');
-        if (host) host.style.overflow = '';
+    } else if (panel instanceof HTMLElement && document.activeElement instanceof HTMLElement && panel.contains(document.activeElement)) {
+        document.activeElement.blur();
     }
 
+    setCharacterDrawerHostOverflow(false);
     syncChatbarVisibilityState();
     queueMobileModalStateSync();
 }
@@ -5234,8 +5283,7 @@ function toggleCharacterPanel() {
 
     // iOS Safari clips position:fixed inside overflow:hidden ancestors.
     // Temporarily allow overflow on the parent so the panel renders.
-    const host = document.getElementById('rightNavHolder');
-    if (host) host.style.overflow = 'visible';
+    setCharacterDrawerHostOverflow(true);
 
     triggerDrawerToggle('#rightNavHolder > .drawer-toggle');
 
@@ -10853,6 +10901,7 @@ function initAll() {
     buildMobileChatTools();
     injectCharacterDrawerControls();
     bindCharacterEditorExitButton();
+    bindCharacterDrawerStateObserver();
     setShellTheme(sbState.theme, { persist: false });
     setFrontendIconPreference(sbState.frontendIcon, { persist: false });
     setSurfaceTransparency(sbState.surfaceTransparency, { persist: false });

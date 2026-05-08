@@ -39,3 +39,4 @@
 - Use CONTRIBUTING.md PR title prefixes (`fix`, `chore`, `feat`, `sync`, `docs`) when drafting PRs.
 - For normal releases, update user-facing version strings and the root README changelog, then run `bash scripts/sync-readme-mirror.sh`; hotfixes skip version/changelog/Discord-release-copy work.
 - Before planning or editing, read `lessons.md` and apply its history-derived guardrails; do not repeat known SillyBunny mistakes.
+- If you start a temporary dev/debug server, record its PID/port and shut it down before ending the task.
