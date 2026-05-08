@@ -241,5 +241,6 @@ Takeaway: the current direction is toward agent-friendly worktrees, mobile shell
 - Treat bundled defaults as versioned product behavior.
 - Treat upstream syncs as migrations with compatibility acceptance criteria.
 - Treat cache and performance work as lifecycle-specific work.
+- Treat temporary debug servers as owned resources: record the PID and port when starting them, then verify both process exit and port release before ending the task.
 - Keep docs clean by separating raw agent analysis from curated user-facing text.
 - Prefer short, scoped patches, but make each patch carry its verification proof.
