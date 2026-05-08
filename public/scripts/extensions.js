@@ -566,6 +566,10 @@ function getExtensionType(externalId) {
     return id ? extensionTypes[id] : '';
 }
 
+function isExternalExtension(externalId) {
+    return ['local', 'global'].includes(getExtensionType(externalId));
+}
+
 /**
  * Performs a fetch of the Extras API.
  * @param {string|URL} endpoint Extras API endpoint
@@ -1429,7 +1433,7 @@ function getExtensionData(extension) {
     const manifest = extension[1];
     const isActive = activeExtensions.has(name);
     const isDisabled = extension_settings.disabledExtensions.includes(name);
-    const isExternal = name.startsWith('third-party');
+    const isExternal = isExternalExtension(name);
 
     const checkboxClass = isDisabled ? 'checkbox_disabled' : '';
 
@@ -2273,7 +2277,7 @@ function processVersionCheckQueue() {
  */
 async function checkForUpdatesManual(sortFn, abortSignal) {
     const promises = [];
-    for (const id of Object.keys(manifests).filter(x => x.startsWith('third-party')).sort((a, b) => sortFn(manifests[a], manifests[b]))) {
+    for (const id of Object.keys(manifests).filter(isExternalExtension).sort((a, b) => sortFn(manifests[a], manifests[b]))) {
         const externalId = id.replace('third-party', '');
         const promise = enqueueVersionCheck(async () => {
             try {
@@ -2357,7 +2361,7 @@ async function checkForExtensionUpdates(force) {
             continue;
         }
 
-        if (manifest.auto_update && id.startsWith('third-party')) {
+        if (manifest.auto_update && isExternalExtension(id)) {
             const promise = enqueueVersionCheck(async () => {
                 try {
                     const data = await getExtensionVersion(id.replace('third-party', ''));
@@ -2385,7 +2389,7 @@ async function checkForExtensionUpdates(force) {
  * @returns {Promise<void>}
  */
 async function autoUpdateExtensions(forceAll) {
-    if (!Object.values(manifests).some(x => x.auto_update)) {
+    if (!Object.entries(manifests).some(([id, manifest]) => isExternalExtension(id) && (forceAll || manifest.auto_update))) {
         return;
     }
 
@@ -2404,7 +2408,7 @@ async function autoUpdateExtensions(forceAll) {
             console.debug(`Skipping global extension: ${manifest.display_name} (${id}) for non-admin user`);
             continue;
         }
-        if ((forceAll || manifest.auto_update) && id.startsWith('third-party')) {
+        if ((forceAll || manifest.auto_update) && isExternalExtension(id)) {
             console.debug(`Auto-updating 3rd-party extension: ${manifest.display_name} (${id})`);
             promises.push(updateExtension(id.replace('third-party', ''), true, autoUpdateTimeout));
         }

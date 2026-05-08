@@ -11,6 +11,9 @@ import { getConfigValue, isValidUrl } from '../util.js';
 import { createGitClient } from '../git/client.js';
 
 const gitBackend = getConfigValue('git.backend', 'auto');
+const BUNDLED_THIRD_PARTY_EXTENSIONS = new Set([
+    'BunnyPresetTools',
+]);
 
 /**
  * @type {Partial<import('simple-git').SimpleGitOptions>}
@@ -158,6 +161,19 @@ async function ensureExtensionRepo(extensionPath, isGlobal = false) {
     } finally {
         fs.rmSync(snapshotPath, { recursive: true, force: true });
     }
+}
+
+function isBundledThirdPartyExtension(extensionName) {
+    return BUNDLED_THIRD_PARTY_EXTENSIONS.has(sanitize(extensionName));
+}
+
+function rejectBundledThirdPartyExtension(extensionName, response, action) {
+    if (!isBundledThirdPartyExtension(extensionName)) {
+        return false;
+    }
+
+    response.status(400).send(`Bad Request: ${extensionName} is bundled with SillyBunny and cannot be ${action} through the extension updater.`);
+    return true;
 }
 
 /**
@@ -315,6 +331,9 @@ router.post('/update', async (request, response) => {
         if (!extensionNameSanitized) {
             return response.status(400).send('Bad Request: A valid extensionName is required in the request body.');
         }
+        if (rejectBundledThirdPartyExtension(extensionNameSanitized, response, 'updated')) {
+            return;
+        }
 
         if (global && !request.user.profile.admin) {
             console.error(`User ${request.user.profile.handle} does not have permission to update global extensions.`);
@@ -392,6 +411,9 @@ router.post('/branches', async (request, response) => {
         if (!extensionNameSanitized) {
             return response.status(400).send('Bad Request: A valid extensionName is required in the request body.');
         }
+        if (rejectBundledThirdPartyExtension(extensionNameSanitized, response, 'managed')) {
+            return;
+        }
 
         if (global && !request.user.profile.admin) {
             console.error(`User ${request.user.profile.handle} does not have permission to list branches of global extensions.`);
@@ -442,6 +464,9 @@ router.post('/switch', async (request, response) => {
         const extensionNameSanitized = sanitize(extensionName);
         if (!extensionNameSanitized || !branch) {
             return response.status(400).send('Bad Request: A valid extensionName and branch are required in the request body.');
+        }
+        if (rejectBundledThirdPartyExtension(extensionNameSanitized, response, 'switched')) {
+            return;
         }
 
         if (global && !request.user.profile.admin) {
@@ -508,6 +533,9 @@ router.post('/move', async (request, response) => {
         if (!extensionNameSanitized || !source || !destination) {
             return response.status(400).send('Bad Request: A valid extensionName, source, and destination are required in the request body.');
         }
+        if (rejectBundledThirdPartyExtension(extensionNameSanitized, response, 'moved')) {
+            return;
+        }
 
         if (!request.user.profile.admin) {
             console.error(`User ${request.user.profile.handle} does not have permission to move extensions.`);
@@ -566,6 +594,9 @@ router.post('/version', async (request, response) => {
         if (!extensionNameSanitized) {
             return response.status(400).send('Bad Request: A valid extensionName is required in the request body.');
         }
+        if (isBundledThirdPartyExtension(extensionNameSanitized)) {
+            return response.send({ currentBranchName: '', currentCommitHash: '', isUpToDate: true, remoteUrl: '' });
+        }
 
         const basePath = global ? PUBLIC_DIRECTORIES.globalExtensions : request.user.directories.extensions;
         const extensionPath = path.join(basePath, extensionNameSanitized);
@@ -623,6 +654,9 @@ router.post('/delete', async (request, response) => {
         if (!extensionNameSanitized) {
             return response.status(400).send('Bad Request: A valid extensionName is required in the request body.');
         }
+        if (rejectBundledThirdPartyExtension(extensionNameSanitized, response, 'deleted')) {
+            return;
+        }
 
         if (global && !request.user.profile.admin) {
             console.error(`User ${request.user.profile.handle} does not have permission to delete global extensions.`);
@@ -670,6 +704,7 @@ router.get('/discover', function (request, response) {
     const userExtensions = fs
         .readdirSync(path.join(request.user.directories.extensions))
         .filter(f => fs.statSync(path.join(request.user.directories.extensions, f)).isDirectory())
+        .filter(f => !isBundledThirdPartyExtension(f))
         .map(f => ({ type: 'local', name: `third-party/${f}` }));
 
     // Get all folders in global extensions folder
@@ -677,7 +712,7 @@ router.get('/discover', function (request, response) {
     const globalExtensions = fs
         .readdirSync(PUBLIC_DIRECTORIES.globalExtensions)
         .filter(f => fs.statSync(path.join(PUBLIC_DIRECTORIES.globalExtensions, f)).isDirectory())
-        .map(f => ({ type: 'global', name: `third-party/${f}` }))
+        .map(f => ({ type: isBundledThirdPartyExtension(f) ? 'system' : 'global', name: `third-party/${f}` }))
         .filter(f => !userExtensions.some(e => e.name === f.name));
 
     // Combine all extensions
