@@ -430,6 +430,7 @@ export const settingsToUpdate = {
     new_example_chat_prompt: ['#newexamplechat_prompt_textarea', 'new_example_chat_prompt', false, false],
     continue_nudge_prompt: ['#continue_nudge_prompt_textarea', 'continue_nudge_prompt', false, false],
     bias_preset_selected: ['#openai_logit_bias_preset', 'bias_preset_selected', false, false],
+    bias_presets: ['', 'bias_presets', false, false],
     reverse_proxy: ['#openai_reverse_proxy', 'reverse_proxy', false, true],
     wi_format: ['#wi_format_textarea', 'wi_format', false, false],
     scenario_format: ['#scenario_format_textarea', 'scenario_format', false, false],
@@ -5970,22 +5971,8 @@ function loadOpenAISettings(data, settings) {
     $('#vertexai_service_account_json').val('');
     updateVertexAIServiceAccountStatus();
 
-    $('#openai_logit_bias_preset').empty();
-    for (const preset of Object.keys(oai_settings.bias_presets)) {
-        // Backfill missing IDs
-        if (Array.isArray(oai_settings.bias_presets[preset])) {
-            oai_settings.bias_presets[preset].forEach((bias) => {
-                if (bias && !bias.id) {
-                    bias.id = uuidv4();
-                }
-            });
-        }
-        const option = document.createElement('option');
-        option.innerText = preset;
-        option.value = preset;
-        option.selected = preset === oai_settings.bias_preset_selected;
-        $('#openai_logit_bias_preset').append(option);
-    }
+    normalizeLogitBiasState();
+    refreshLogitBiasPresetOptions();
     $('#openai_logit_bias_preset').trigger('change');
 
     setNamesBehaviorControls();
@@ -6223,6 +6210,82 @@ export function getChatCompletionPreset(settings = oai_settings) {
     return structuredClone(presetBody);
 }
 
+function normalizeLogitBiasEntry(entry) {
+    if (typeof entry !== 'object' || entry === null || !Object.hasOwn(entry, 'text') || !Object.hasOwn(entry, 'value')) {
+        return null;
+    }
+
+    const value = Number(entry.value);
+
+    return {
+        ...entry,
+        id: entry.id || uuidv4(),
+        text: String(entry.text ?? ''),
+        value: Number.isFinite(value) ? value : 0,
+    };
+}
+
+function normalizeLogitBiasPresets(source, { includeDefaults = false } = {}) {
+    const presets = includeDefaults ? structuredClone(default_bias_presets) : {};
+
+    if (source && typeof source === 'object' && !Array.isArray(source)) {
+        for (const [name, entries] of Object.entries(source)) {
+            if (!Array.isArray(entries)) {
+                continue;
+            }
+
+            presets[name] = entries.map(normalizeLogitBiasEntry).filter(Boolean);
+        }
+    }
+
+    return presets;
+}
+
+function normalizeLogitBiasState(selectedPreset = oai_settings.bias_preset_selected) {
+    oai_settings.bias_presets = normalizeLogitBiasPresets(oai_settings.bias_presets, { includeDefaults: true });
+
+    let selected = typeof selectedPreset === 'string' && selectedPreset.trim()
+        ? selectedPreset
+        : oai_settings.bias_preset_selected;
+
+    if (!selected || !Array.isArray(oai_settings.bias_presets[selected])) {
+        selected = Object.keys(oai_settings.bias_presets).find(name => Array.isArray(oai_settings.bias_presets[name])) || default_bias;
+    }
+
+    if (!Array.isArray(oai_settings.bias_presets[selected])) {
+        oai_settings.bias_presets[selected] = [];
+    }
+
+    oai_settings.bias_preset_selected = selected;
+    return oai_settings.bias_presets[selected];
+}
+
+function applyLogitBiasPresetSettings(preset) {
+    const hasBiasPresets = preset && typeof preset === 'object' && Object.hasOwn(preset, 'bias_presets');
+
+    if (hasBiasPresets) {
+        oai_settings.bias_presets = normalizeLogitBiasPresets(preset.bias_presets, { includeDefaults: true });
+    }
+
+    normalizeLogitBiasState(hasBiasPresets ? preset.bias_preset_selected : oai_settings.bias_preset_selected);
+}
+
+function refreshLogitBiasPresetOptions() {
+    const selectedPreset = oai_settings.bias_preset_selected;
+    const select = $('#openai_logit_bias_preset');
+
+    select.empty();
+    for (const preset of Object.keys(oai_settings.bias_presets)) {
+        const option = document.createElement('option');
+        option.innerText = preset;
+        option.value = preset;
+        option.selected = preset === selectedPreset;
+        select.append(option);
+    }
+
+    select.val(oai_settings.bias_preset_selected);
+}
+
 /**
  * Persist a settings preset with the given name
  *
@@ -6268,15 +6331,10 @@ async function saveOpenAIPreset(name, settings, triggerUi = true) {
 }
 
 function onLogitBiasPresetChange() {
-    const value = String($('#openai_logit_bias_preset').find(':selected').val());
-    const preset = oai_settings.bias_presets[value];
+    const value = String($('#openai_logit_bias_preset').find(':selected').val() ?? oai_settings.bias_preset_selected ?? default_bias);
+    const preset = normalizeLogitBiasState(value);
+    refreshLogitBiasPresetOptions();
 
-    if (!Array.isArray(preset)) {
-        console.error('Preset not found');
-        return;
-    }
-
-    oai_settings.bias_preset_selected = value;
     const list = $('.openai_logit_bias_list');
     list.empty();
 
@@ -6313,7 +6371,7 @@ function onLogitBiasPresetChange() {
 
 function createNewLogitBiasEntry() {
     const entry = { id: uuidv4(), text: '', value: 0 };
-    oai_settings.bias_presets[oai_settings.bias_preset_selected].push(entry);
+    normalizeLogitBiasState().push(entry);
     biasCache = undefined;
     createLogitBiasListItem(entry);
     saveSettingsDebounced();
@@ -6352,7 +6410,7 @@ function createLogitBiasListItem(entry) {
     });
     template.find('.openai_logit_bias_remove').on('click', function () {
         $(this).closest('.openai_logit_bias_form').remove();
-        const preset = oai_settings.bias_presets[oai_settings.bias_preset_selected];
+        const preset = normalizeLogitBiasState();
         const index = preset.findIndex(item => item.id === id);
         if (index >= 0) {
             preset.splice(index, 1);
@@ -6382,12 +6440,8 @@ async function createNewLogitBiasPreset() {
 }
 
 function addLogitBiasPresetOption(name) {
-    const option = document.createElement('option');
-    option.innerText = name;
-    option.value = name;
-    option.selected = true;
-
-    $('#openai_logit_bias_preset').append(option);
+    normalizeLogitBiasState(name);
+    refreshLogitBiasPresetOptions();
     $('#openai_logit_bias_preset').trigger('change');
 }
 
@@ -6561,7 +6615,7 @@ async function onLogitBiasPresetImportFileChange(e) {
         }
     }
 
-    oai_settings.bias_presets[name] = validEntries;
+    oai_settings.bias_presets[name] = validEntries.map(normalizeLogitBiasEntry).filter(Boolean);
     oai_settings.bias_preset_selected = name;
 
     addLogitBiasPresetOption(name);
@@ -6676,6 +6730,15 @@ function onSettingsPresetChange() {
             // Extensions don't need UI updates and shouldn't fallback to current settings
             if (key === 'extensions') {
                 oai_settings.extensions = preset.extensions || {};
+                continue;
+            }
+
+            if (key === 'bias_preset_selected') {
+                continue;
+            }
+
+            if (key === 'bias_presets') {
+                applyLogitBiasPresetSettings(preset);
                 continue;
             }
 

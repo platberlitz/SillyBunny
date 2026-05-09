@@ -11065,7 +11065,7 @@ function getEditableAlternateGreetings() {
         return create_save.alternate_greetings;
     }
 
-    const chid = getAlternateGreetingsEditorChid();
+    const chid = getAlternateGreetingsEditorChid() ?? this_chid;
     if (chid === undefined || !characters[chid]) {
         return null;
     }
@@ -11076,6 +11076,27 @@ function getEditableAlternateGreetings() {
     }
 
     return characters[chid].data.alternate_greetings;
+}
+
+function getSubmittedAlternateGreetings() {
+    const greetings = getEditableAlternateGreetings();
+    if (!Array.isArray(greetings)) {
+        return [];
+    }
+
+    const editor = $('#character_greetings_editor');
+    if (!editor.length) {
+        return greetings;
+    }
+
+    const fields = editor.find('.alternate_greeting_text');
+    if (!fields.length) {
+        return greetings;
+    }
+
+    const currentValues = fields.toArray().map(field => String($(field).val()));
+    greetings.splice(0, greetings.length, ...currentValues);
+    return greetings;
 }
 
 function syncAlternateGreetingsEditor() {
@@ -12233,7 +12254,7 @@ export async function createOrEditCharacter(e) {
             }
 
             formData.delete('alternate_greetings');
-            for (const value of create_save.alternate_greetings) {
+            for (const value of getSubmittedAlternateGreetings()) {
                 formData.append('alternate_greetings', value);
             }
 
@@ -12324,11 +12345,8 @@ export async function createOrEditCharacter(e) {
             }
 
             formData.delete('alternate_greetings');
-            const chid = $('.open_alternate_greetings').data('chid');
-            if (characters[chid] && Array.isArray(characters[chid]?.data?.alternate_greetings)) {
-                for (const value of characters[chid].data.alternate_greetings) {
-                    formData.append('alternate_greetings', value);
-                }
+            for (const value of getSubmittedAlternateGreetings()) {
+                formData.append('alternate_greetings', value);
             }
 
             const fetchResult = await fetch(url, {

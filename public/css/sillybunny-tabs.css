@@ -3415,7 +3415,7 @@ body.sb-shell-resizing * {
         grid-row: 2;
         display: flex;
         align-items: center;
-        justify-content: flex-end;
+        justify-content: center;
         width: 100%;
         min-width: 0;
         gap: var(--sb-bottom-chat-mobile-gap);

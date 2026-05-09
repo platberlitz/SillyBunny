@@ -17,6 +17,7 @@ const SB_STORAGE_KEYS = Object.freeze({
     shortcutLeft: 'sb-shortcut-left',
     shortcutRight: 'sb-shortcut-right',
     bottomBarScale: 'sb-bottom-bar-scale',
+    bottomChatSecondaryOpen: 'sb-bottom-chat-secondary-open',
     mobileButtonScale: 'sb-mobile-button-scale',
     settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
     compactMode: 'sb-compact-mode',
@@ -580,7 +581,7 @@ const sbState = {
         scrollBottomButton: null,
         massDeleteButton: null,
         autoNameButton: null,
-        secondaryOpen: true,
+        secondaryOpen: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.bottomChatSecondaryOpen), true),
         searchOpen: false,
         bindingRetryTimer: 0,
         boundEventSource: null,
@@ -4474,6 +4475,7 @@ function setBottomChatSecondaryOpen(open, { focusSearch = false } = {}) {
     const searchInput = bottomChatBarState.searchInput;
 
     bottomChatBarState.secondaryOpen = Boolean(open);
+    safeSetItem(SB_STORAGE_KEYS.bottomChatSecondaryOpen, String(bottomChatBarState.secondaryOpen));
     if (!bottomChatBarState.secondaryOpen) {
         bottomChatBarState.searchOpen = false;
         if (searchInput instanceof HTMLElement && searchInput === document.activeElement) {

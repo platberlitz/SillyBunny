@@ -4,13 +4,14 @@
 
 Date: 2026-05-08
 
-This update stabilizes preset and connection profile switching, adds bottom chat navigation and search polish from recent staging PRs, trims the mobile Persona bar with collapsible actions, makes Bun launcher updates recover from stale lockfiles, and updates SillyBunny release metadata to 1.5.4.
+This update stabilizes preset and connection profile switching, preserves OpenAI logit bias presets, saves character alternate greetings reliably, adds bottom chat navigation and search polish from recent staging PRs, trims the mobile Persona bar with collapsible actions, makes Bun launcher updates recover from stale lockfiles, and updates SillyBunny release metadata to 1.5.4.
 
 ### Presets And Connection Profiles
 - Connection profile changes now serialize in order, abort superseded applications cleanly, and save only after the latest selected profile finishes applying.
 - OpenAI preset changes now expose an awaitable completion path and ignore stale async preset applications, keeping linked provider/model settings from being overwritten by older selections.
 - Preset slash-command and welcome flows now wait for the active preset manager to finish applying supported preset changes before continuing.
 - Connection profile create, update, delete, reload, and profile slash commands now flush settings immediately so rapid preset/API swaps persist reliably.
+- OpenAI preset saves and imports now carry `bias_presets`, so selected logit bias libraries and their editable entries persist with the preset instead of snapping back to the base file.
 
 ### Chat Loading And Search
 - Existing chats now force-scroll to the latest message on initial load across desktop and mobile, even when the normal auto-scroll preference is disabled.
@@ -26,6 +27,10 @@ This update stabilizes preset and connection profile switching, adds bottom chat
 - Placed the mobile chat search icon directly before the trash action in the expanded additional-actions row.
 - Fixed the mobile bottom chat bar breakpoint and first-row grid sizing so the chat dropdown, up/down controls, and collapse button no longer overlap on wider phone/tablet layouts.
 - Kept the desktop bottom chat bar layout unchanged while aligning mobile persona, chat select, action, and search controls symmetrically.
+- Remembered the mobile bottom chat action collapse state across reloads and centered the visible action row when it is shown.
+
+### Character Editor
+- Character alternate greetings now save from the live editor contents, so edited greetings persist instead of falling back to stale array state.
 
 ### Runtime And Updates
 - Bun launchers now retry dependency installs without `--frozen-lockfile` if the locked install fails, so users no longer need to delete `bun.lock` after an update.
@@ -40,12 +45,16 @@ This update stabilizes preset and connection profile switching, adds bottom chat
 - PR #36 `fix: support runtime worktrees in admin updates` added runtime-worktree-aware server admin update handling.
 - PR #39 `fix: stabilize mobile chat scroll` stabilized mobile chat scrolling during tab drags and older-message loading.
 - PR #40 `feat: add chat navigation and hidden search` added bottom chat navigation and full-chat search coverage.
+- PR #41 `fix(extensions): treat Bunny Preset Tools as bundled` kept bundled Bunny Preset Tools from being handled like removable extensions.
+- PR #42 `fix(mobile): release inputs after character drawer closes` restored mobile input handling after the character drawer is dismissed.
+- PR #43 `docs: add server hygiene lesson` added the server hygiene lesson to the docs set.
 
 ### Local Commits
 - `fix(settings): stabilize presets and chat loading`
 - `fix(ui): tighten mobile chat bar and update flow`
 - `fix(mobile): align bottom chat controls`
 - `fix(mobile): prevent bottom chat overlap`
+- `fix(ui): persist mobile chat collapse, character greetings, and logit bias edits`
 
 ## v1.5.3
 
