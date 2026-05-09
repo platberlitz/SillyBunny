@@ -5,7 +5,6 @@
     "top_p": 0.99,
     "claude_disable_temperature": false,
     "claude_disable_top_p": false,
-    "claude_disable_top_k": false,
     "top_k": 0,
     "top_a": 0,
     "min_p": 0.05,

@@ -8,8 +8,6 @@ export class MockServer {
     port;
     /** @type {import('http').Server} */
     server;
-    /** @type {object[]} */
-    requests = [];
 
     /**
      * Creates an instance of MockServer.
@@ -152,26 +150,10 @@ export class MockServer {
                 try {
                     const body = await readAllChunks(req);
                     const jsonBody = tryParse(body.toString());
-                    this.requests.push({
-                        method: req.method,
-                        url: req.url,
-                        body: jsonBody,
-                        headers: req.headers,
-                    });
                     if (req.method === 'POST' && req.url === '/v1/chat/completions') {
                         const mockResponse = this.handleChatCompletions(jsonBody);
                         res.writeHead(200, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify(mockResponse));
-                    } else if (req.method === 'POST' && req.url === '/v1/messages') {
-                        res.writeHead(200, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({
-                            content: [
-                                {
-                                    type: 'text',
-                                    text: String(jsonBody?.messages?.at?.(-1)?.content ?? 'No prompt messages.'),
-                                },
-                            ],
-                        }));
                     } else if (req.method === 'GET' && req.url === '/v1/models') {
                         const mockResponse = this.handleModels();
                         res.writeHead(200, { 'Content-Type': 'application/json' });

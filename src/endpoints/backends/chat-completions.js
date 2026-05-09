@@ -382,10 +382,6 @@ async function sendClaudeRequest(request, response) {
             delete requestBody.top_p;
         }
 
-        if (request.body.claude_disable_top_k) {
-            delete requestBody.top_k;
-        }
-
         const reasoningEffort = request.body.reasoning_effort;
         const budgetTokens = calculateClaudeBudgetTokens(requestBody.max_tokens, reasoningEffort, requestBody.stream, isAdaptiveModel);
 
