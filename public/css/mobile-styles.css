@@ -48,7 +48,7 @@
 
     #right-nav-panel #CharListButtonAndHotSwaps {
         display: grid;
-        grid-template-columns: 36px minmax(0, 1fr) 36px 36px;
+        grid-template-columns: var(--sb-mobile-touch-target, 44px) minmax(0, 1fr) var(--sb-mobile-touch-target, 44px) var(--sb-mobile-touch-target, 44px);
         align-items: center;
         gap: 6px;
         width: 100%;
@@ -62,8 +62,8 @@
         align-items: center;
         justify-content: center;
         gap: 0;
-        width: 36px;
-        min-width: 36px;
+        width: var(--sb-mobile-touch-target, 44px);
+        min-width: var(--sb-mobile-touch-target, 44px);
     }
 
     #right-nav-panel #HotSwapWrapper {
@@ -542,10 +542,10 @@
         position: absolute;
         top: 5px;
         right: 5px;
-        width: 30px;
-        height: 30px;
-        background-color: rgba(0, 0, 0, 0.4);
-        color: white;
+        width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        background-color: color-mix(in srgb, var(--SmartThemeShadowColor) 58%, transparent);
+        color: var(--SmartThemeBodyColor);
         border-radius: 6px;
         z-index: 3;
         cursor: pointer;

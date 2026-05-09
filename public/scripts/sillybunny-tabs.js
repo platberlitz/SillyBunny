@@ -74,6 +74,14 @@ const SB_STORAGE_PREFIX = 'sb-';
 const SB_STORAGE_WRITE_DEBOUNCE_MS = 120;
 const SB_MOBILE_NAV_OPEN_GRACE_MS = 450;
 const SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX = 6;
+const SB_SHELL_FOCUSABLE_SELECTOR = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+].join(',');
 
 let sbInlineDrawerPersistenceObserver = null;
 let sbInlineDrawerPersistenceQueued = false;
@@ -1196,6 +1204,86 @@ function isMobileViewport() {
 
 function prefersReducedMotion() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function getShellProxyButton(shellKey) {
+    const shellConfig = getShellConfig(shellKey);
+    const proxyButton = shellConfig?.proxyButtonId ? document.getElementById(shellConfig.proxyButtonId) : null;
+    return proxyButton instanceof HTMLElement ? proxyButton : null;
+}
+
+function getShellActivePanel(shellState) {
+    return shellState?.tabs.get(shellState.activeTabId)?.panel ?? null;
+}
+
+function getShellFocusTarget(shellState) {
+    if (shellState?.headerTitle instanceof HTMLElement) {
+        return shellState.headerTitle;
+    }
+
+    const panel = getShellActivePanel(shellState);
+    const focusable = Array.from(panel?.querySelectorAll(SB_SHELL_FOCUSABLE_SELECTOR) ?? [])
+        .find(element => element instanceof HTMLElement
+            && isActuallyVisible(element)
+            && !element.closest('[hidden], [aria-hidden="true"], [inert]'));
+
+    if (focusable instanceof HTMLElement) {
+        return focusable;
+    }
+
+    return shellState?.nav instanceof HTMLElement ? shellState.nav : null;
+}
+
+function focusShellPanel(shellKey, { force = false } = {}) {
+    const shellState = getShellState(shellKey);
+    const shellRoot = shellState?.root;
+
+    if (!(shellRoot instanceof HTMLElement) || !shellRoot.classList.contains('openDrawer')) {
+        return;
+    }
+
+    const activeElement = document.activeElement;
+    if (!force && activeElement instanceof HTMLElement && shellRoot.contains(activeElement)) {
+        return;
+    }
+
+    const target = getShellFocusTarget(shellState);
+    if (target instanceof HTMLElement) {
+        target.focus({ preventScroll: true });
+    }
+}
+
+function rememberShellFocusOrigin(shellKey) {
+    const shellState = getShellState(shellKey);
+    const shellRoot = shellState?.root;
+    const activeElement = document.activeElement;
+
+    if (!shellState || !(activeElement instanceof HTMLElement)) {
+        return;
+    }
+
+    if (shellRoot instanceof HTMLElement && shellRoot.contains(activeElement)) {
+        return;
+    }
+
+    shellState.restoreFocusTarget = activeElement;
+}
+
+function restoreShellFocus(shellKey) {
+    const shellState = getShellState(shellKey);
+    const restoreTarget = shellState?.restoreFocusTarget;
+    const proxyButton = getShellProxyButton(shellKey);
+    const target = restoreTarget instanceof HTMLElement && document.contains(restoreTarget)
+        ? restoreTarget
+        : proxyButton;
+
+    if (shellState) {
+        delete shellState.restoreFocusTarget;
+    }
+
+    if (target instanceof HTMLElement && !target.hasAttribute('disabled')) {
+        target.focus({ preventScroll: true });
+    }
 }
 
 function scrollShellTabButtonIntoView(nav, button, { smooth = false } = {}) {
@@ -5334,6 +5422,7 @@ function toggleShellPanel(shellKey, tabId = null) {
         return;
     }
 
+    rememberShellFocusOrigin(shellKey);
     closeAllDropdowns({ except: shellKey });
     window.requestAnimationFrame(() => openShell(shellKey, tabId));
 }
@@ -5745,6 +5834,27 @@ function createShellPanel(tabConfig) {
     panel.appendChild(scroller);
 
     return { panel, scroller };
+}
+
+function closeFocusedShell() {
+    const activeElement = document.activeElement;
+
+    if (!(activeElement instanceof HTMLElement)) {
+        return false;
+    }
+
+    const shellRoot = activeElement.closest('.sb-shell-root.openDrawer');
+    if (!(shellRoot instanceof HTMLElement)) {
+        return false;
+    }
+
+    const shellKey = shellRoot.dataset.sbShellKey;
+    if (!shellKey || !getShellState(shellKey)) {
+        return false;
+    }
+
+    closeShell(shellKey);
+    return true;
 }
 
 function moveChildrenIntoContainer(sourceElement, targetElement) {
@@ -9185,6 +9295,8 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
 
     if (focusButton) {
         activeTab.button?.focus();
+    } else if (isShellOpen(shellKey)) {
+        window.requestAnimationFrame(() => focusShellPanel(shellKey, { force: true }));
     }
 
     if (previousTab && previousTab.id !== activeTab.id) {
@@ -9208,6 +9320,7 @@ function openShell(shellKey, tabId = null) {
     }
 
     closeMobileNav();
+    rememberShellFocusOrigin(shellKey);
 
     if (tabId) {
         setActiveTab(shellKey, tabId);
@@ -9216,11 +9329,13 @@ function openShell(shellKey, tabId = null) {
     shellState.lastOpenedAt = performance.now();
 
     if (isDrawerActuallyOpen(shellRoot)) {
+        window.requestAnimationFrame(() => focusShellPanel(shellKey));
         return;
     }
 
     if (shellRoot.classList.contains('openDrawer')) {
         forceDrawerState(shellRoot, true, shellConfig.hostIconSelector);
+        window.requestAnimationFrame(() => focusShellPanel(shellKey));
         return;
     }
 
@@ -9230,6 +9345,7 @@ function openShell(shellKey, tabId = null) {
             if (!isDrawerActuallyOpen(shellRoot)) {
                 forceDrawerState(shellRoot, true, shellConfig.hostIconSelector);
             }
+            focusShellPanel(shellKey);
         });
     }
 }
@@ -9250,12 +9366,18 @@ function closeShell(shellKey) {
         return;
     }
 
-    if (document.activeElement instanceof HTMLElement && shellRoot.contains(document.activeElement)) {
+    const shouldRestoreFocus = document.activeElement instanceof HTMLElement && shellRoot.contains(document.activeElement);
+    if (shouldRestoreFocus) {
         document.activeElement.blur();
     }
 
     // Managed shells do not need the legacy drawer toggle close animation.
     forceDrawerState(shellRoot, false, shellConfig.hostIconSelector);
+    if (shouldRestoreFocus) {
+        window.requestAnimationFrame(() => restoreShellFocus(shellKey));
+    } else {
+        delete shellState?.restoreFocusTarget;
+    }
 }
 
 function buildShell(shellKey) {
@@ -9418,7 +9540,7 @@ function buildShell(shellKey) {
         },
     });
     const eyebrow = createElement('div', { className: 'sb-shell-kicker', text: shellConfig.title });
-    const title = createElement('h2', { className: 'sb-shell-title', text: shellConfig.baseTab.label });
+    const title = createElement('h2', { className: 'sb-shell-title', text: shellConfig.baseTab.label, attrs: { tabindex: '-1' } });
     const subtitle = createElement('p', { className: 'sb-shell-subtitle', text: shellConfig.baseTab.description });
     const shellDescription = createElement('p', { className: 'sb-shell-description', text: shellConfig.subtitle });
     const panelBody = createElement('div', { className: 'sb-shell-body' });
@@ -9431,6 +9553,16 @@ function buildShell(shellKey) {
 
     closeButton.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
     closeButton.addEventListener('click', () => closeShell(shellKey));
+    shellRoot.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') {
+            return;
+        }
+
+        if (closeFocusedShell()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    });
     bindShellResizeHandle(resizeHandle, shellKey);
 
     header.append(closeButton, eyebrow, title, subtitle, shellDescription);
@@ -9469,6 +9601,7 @@ function buildShell(shellKey) {
             activeTab?.onActivate?.();
             dispatchShellTabActivated(shellKey, activeTab);
             updateNavScrollIndicators();
+            window.requestAnimationFrame(() => focusShellPanel(shellKey));
             queueMobileModalStateSync();
             return;
         }

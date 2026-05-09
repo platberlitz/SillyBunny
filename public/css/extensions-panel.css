@@ -66,15 +66,15 @@ label[for="extensions_notify_updates"] input[type="checkbox"] {
 }
 
 .extensions_info .disabled {
-    color: lightgray;
+    color: var(--sb-muted-fg, color-mix(in srgb, var(--SmartThemeBodyColor) 58%, transparent));
 }
 
 .extensions_info .toggle_enable {
-    color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 88%, white 12%);
+    color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 88%, var(--SmartThemeBodyColor) 12%);
 }
 
 .extensions_info .toggle_disable {
-    color: rgb(238, 144, 144);
+    color: var(--sb-danger, color-mix(in srgb, #fb7185 88%, var(--SmartThemeBodyColor) 12%));
 }
 
 .extensions_info .extension_enabled {
@@ -82,11 +82,11 @@ label[for="extensions_notify_updates"] input[type="checkbox"] {
 }
 
 .extensions_info .extension_disabled {
-    color: lightgray;
+    color: var(--sb-muted-fg, color-mix(in srgb, var(--SmartThemeBodyColor) 58%, transparent));
 }
 
 .extensions_info .extension_missing {
-    color: gray;
+    color: var(--sb-muted-fg, color-mix(in srgb, var(--SmartThemeBodyColor) 48%, transparent));
 }
 
 .extensions_info .extension_modules {
