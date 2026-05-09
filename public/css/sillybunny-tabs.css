@@ -299,6 +299,46 @@ body.sb-topbar-compact #sb-chatbar-layer {
     flex-wrap: wrap;
 }
 
+.sb-topbar-logo-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--sb-proxy-button-height);
+    min-width: var(--sb-proxy-button-height);
+    height: var(--sb-proxy-button-height);
+    min-height: var(--sb-proxy-button-height);
+    flex: 0 0 var(--sb-proxy-button-height);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--SmartThemeBodyColor);
+    opacity: 0.9;
+    text-decoration: none;
+    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, opacity 180ms ease;
+}
+
+.sb-topbar-logo-link:hover {
+    opacity: 1;
+    transform: translateY(-1px);
+    background: color-mix(in srgb, var(--sb-button-hover) 74%, transparent);
+}
+
+.sb-topbar-logo-link:focus-visible {
+    outline: none;
+    opacity: 1;
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 42%, var(--sb-shell-border) 58%);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 64%, transparent);
+}
+
+.sb-topbar-logo {
+    width: calc(var(--sb-proxy-button-height) * 0.72);
+    height: calc(var(--sb-proxy-button-height) * 0.72);
+    object-fit: contain;
+    image-rendering: pixelated;
+    border: 0;
+    border-radius: 8px;
+    box-shadow: none;
+}
+
 @media screen and (min-width: 769px) {
     #sb-topbar-primary .sb-topbar-group-right {
         align-items: center;
@@ -4340,7 +4380,8 @@ body.sb-shell-resizing * {
     }
 
     #sb-topbar-primary .sb-proxy-button,
-    #sb-topbar-primary .sb-chatbar-button {
+    #sb-topbar-primary .sb-chatbar-button,
+    #sb-topbar-primary .sb-topbar-logo-link {
         width: var(--sb-mobile-toggle-size) !important;
         min-width: var(--sb-mobile-toggle-size) !important;
         max-width: var(--sb-mobile-toggle-size) !important;
@@ -4353,6 +4394,11 @@ body.sb-shell-resizing * {
         box-sizing: border-box !important;
         line-height: 1 !important;
         aspect-ratio: 1 / 1;
+    }
+
+    #sb-topbar-primary .sb-topbar-logo {
+        width: calc(var(--sb-mobile-toggle-size) * 0.62);
+        height: calc(var(--sb-mobile-toggle-size) * 0.62);
     }
 
     #sb-topbar-primary .sb-proxy-button span,
@@ -5700,6 +5746,7 @@ body.sb-shell-resizing * {
 
 @media (prefers-reduced-motion: reduce) {
     .sb-proxy-button,
+    .sb-topbar-logo-link,
     .sb-shell-tab,
     .sb-search-result,
     .sb-theme-option,

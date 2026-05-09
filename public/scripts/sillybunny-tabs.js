@@ -23,6 +23,7 @@ const SB_STORAGE_KEYS = Object.freeze({
     compactMode: 'sb-compact-mode',
     frontendIcon: 'sb-frontend-icon',
 });
+const SB_GITHUB_REPO_URL = 'https://github.com/platberlitz/SillyBunny';
 
 const SB_SHORTCUT_TARGETS = Object.freeze([
     { value: 'left:presets', label: 'Presets', icon: 'fa-sliders' },
@@ -5701,6 +5702,28 @@ function buildTopBar() {
     const centerGroup = createElement('div', { className: 'sb-topbar-brand' });
     const rightGroup = createElement('div', { className: 'sb-topbar-group sb-topbar-group-right' });
 
+    const repoLink = createElement('a', {
+        id: 'sb-github-logo-link',
+        className: 'sb-topbar-logo-link',
+        attrs: {
+            href: SB_GITHUB_REPO_URL,
+            target: '_blank',
+            rel: 'noopener noreferrer',
+            title: 'Open the SillyBunny GitHub repository',
+            'aria-label': 'Open the SillyBunny GitHub repository',
+        },
+    });
+    const repoLogo = createElement('img', {
+        className: 'sb-topbar-logo',
+        attrs: {
+            src: getFrontendIconSrc(sbState.frontendIcon),
+            alt: 'SillyBunny',
+            'data-sb-frontend-icon': 'true',
+        },
+    });
+    repoLink.appendChild(repoLogo);
+    stopProxyPointerPropagation(repoLink);
+
     const mobileButton = createElement('button', {
         id: 'sb-hamburger',
         className: 'sb-proxy-button sb-mobile-toggle',
@@ -5786,7 +5809,7 @@ function buildTopBar() {
         <div id="sb-topbar-title" class="sb-brand-title">${SB_IDLE_BRAND_LABEL}</div>
     `;
 
-    leftGroup.append(mobileButton, leftButton, rightButton, leftShortcut);
+    leftGroup.append(repoLink, mobileButton, leftButton, rightButton, leftShortcut);
     rightGroup.append(rightShortcut, homeButton, charactersButton);
     topBarInner.append(leftGroup, centerGroup, rightGroup);
     primaryRow.appendChild(topBarInner);
