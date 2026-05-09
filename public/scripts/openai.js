@@ -369,6 +369,7 @@ export const settingsToUpdate = {
     top_p: ['#top_p_openai', 'top_p_openai', false, false],
     claude_disable_temperature: ['#claude_disable_temperature', 'claude_disable_temperature', true, false],
     claude_disable_top_p: ['#claude_disable_top_p', 'claude_disable_top_p', true, false],
+    claude_disable_top_k: ['#claude_disable_top_k', 'claude_disable_top_k', true, false],
     top_k: ['#top_k_openai', 'top_k_openai', false, false],
     top_a: ['#top_a_openai', 'top_a_openai', false, false],
     min_p: ['#min_p_openai', 'min_p_openai', false, false],
@@ -503,6 +504,7 @@ const default_settings = {
     claude_model: 'claude-sonnet-4-5',
     claude_disable_temperature: false,
     claude_disable_top_p: false,
+    claude_disable_top_k: false,
     google_model: 'gemini-2.5-pro',
     vertexai_model: 'gemini-2.5-pro',
     ai21_model: 'jamba-large',
@@ -2826,6 +2828,7 @@ function groupOpenAISettingsIntoDrawers() {
                 '#range_block_openai > .range-block:has(#freq_pen_openai)',
                 '#range_block_openai > .range-block:has(#pres_pen_openai)',
                 '#range_block_openai > .range-block:has(#top_k_openai)',
+                '#range_block_openai > .range-block:has(#claude_disable_top_k)',
                 '#range_block_openai > .range-block:has(#top_p_openai)',
                 '#range_block_openai > .range-block:has(#claude_disable_top_p)',
                 '#range_block_openai > .range-block:has(#repetition_penalty_openai)',
@@ -4577,6 +4580,7 @@ export async function createGenerationParameters(settings, model, type, messages
     if (settings.chat_completion_source === chat_completion_sources.CLAUDE) {
         generate_data.claude_disable_temperature = Boolean(settings.claude_disable_temperature);
         generate_data.claude_disable_top_p = Boolean(settings.claude_disable_top_p);
+        generate_data.claude_disable_top_k = Boolean(settings.claude_disable_top_k);
     }
 
     if (settings.chat_completion_source === chat_completion_sources.XAI) {
@@ -5874,6 +5878,8 @@ export class ChatCompletion {
  * @param {ChatCompletionSettings} settings Settings to migrate
  */
 function migrateChatCompletionSettings(settings) {
+    settings.claude_disable_top_k ??= false;
+
     const migrateMap = [
         { oldKey: 'group_nudge_prompt', oldValue: legacy_group_nudge_prompt, newKey: 'group_nudge_prompt', newValue: default_group_nudge_prompt },
         { oldKey: 'names_in_completion', oldValue: true, newKey: 'names_behavior', newValue: character_names_behavior.COMPLETION },
@@ -8591,6 +8597,11 @@ export function initOpenAI() {
 
     $('#claude_disable_top_p').on('input', function () {
         oai_settings.claude_disable_top_p = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#claude_disable_top_k').on('input', function () {
+        oai_settings.claude_disable_top_k = !!$(this).prop('checked');
         saveSettingsDebounced();
     });
 

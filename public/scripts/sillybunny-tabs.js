@@ -5908,12 +5908,13 @@ const SB_SAMPLING_BACKENDS = Object.freeze([
             '#openai_logit_bias_preset',
             '#temp_openai',
             '#claude_disable_temperature',
-            '#top_p_openai',
-            '#claude_disable_top_p',
             '#repetition_penalty_openai',
             '#freq_pen_openai',
             '#pres_pen_openai',
             '#top_k_openai',
+            '#claude_disable_top_k',
+            '#top_p_openai',
+            '#claude_disable_top_p',
             '#min_p_openai',
             '#top_a_openai',
         ],
@@ -6112,7 +6113,7 @@ function neutralizeChatCompletionSamplers() {
         }
     }
 
-    ['#claude_disable_temperature', '#claude_disable_top_p'].forEach(selector => {
+    ['#claude_disable_temperature', '#claude_disable_top_p', '#claude_disable_top_k'].forEach(selector => {
         const input = document.querySelector(selector);
         if (input instanceof HTMLInputElement) {
             input.checked = false;
