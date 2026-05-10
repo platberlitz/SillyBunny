@@ -4,7 +4,7 @@
     padding: 0;
     top: 0;
     left: 0;
-    z-index: 999999;
+    z-index: var(--sb-z-loader);
     width: 100vw;
     height: 100vh;
     width: 100dvw;
@@ -18,7 +18,7 @@
 
 #load-spinner {
     --spinner-size: 2em;
-    transition: all var(--animation-duration-2x) ease-out;
+    transition: all var(--sb-transition-slow);
     opacity: 1;
     top: calc(50% - var(--spinner-size) / 2);
     left: calc(50% - var(--spinner-size) / 2);
@@ -46,7 +46,7 @@
     cursor: pointer;
     font-size: 1.2em;
     opacity: 0.8;
-    transition: opacity 0.15s ease, color 0.15s ease;
+    transition: opacity var(--sb-transition-fast), color var(--sb-transition-fast);
 }
 
 .action-loader-stop:hover {
@@ -63,7 +63,7 @@
     gap: 4rem;
     width: 100%;
     height: 100%;
-    transition: all var(--animation-duration-2x) ease-out;
+    transition: all var(--sb-transition-slow);
 }
 
 #loader.splash-screen #load-spinner {

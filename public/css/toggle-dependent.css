@@ -430,7 +430,7 @@ body.waifuMode .zoomed_avatar {
     position: absolute;
     padding: 0;
     filter: drop-shadow(2px 2px 2px #51515199);
-    z-index: 29;
+    z-index: var(--sb-z-raised);
     overflow: hidden;
     display: none;
     left: 0;

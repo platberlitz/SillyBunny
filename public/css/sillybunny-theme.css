@@ -11,6 +11,28 @@
     --sb-transition-fast: 180ms cubic-bezier(0.22, 1, 0.36, 1);
     --sb-transition: 240ms cubic-bezier(0.22, 1, 0.36, 1);
     --sb-transition-slow: 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    --sb-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --sb-z-base: 0;
+    --sb-z-raised: 10;
+    --sb-z-dropdown: 100;
+    --sb-z-sticky: 500;
+    --sb-z-shell: 1000;
+    --sb-z-shell-panel: 1100;
+    --sb-z-shell-sidebar: 1200;
+    --sb-z-overlay: 2000;
+    --sb-z-modal: 3000;
+    --sb-z-modal-content: 3100;
+    --sb-z-popout: 4000;
+    --sb-z-toast: 5000;
+    --sb-z-streaming: 6000;
+    --sb-z-context-menu: 8000;
+    --sb-z-loader: 9000;
+    --sb-z-critical: 10000;
+    --sb-color-warning: #facc15;
+    --sb-color-danger: #fb7185;
+    --sb-color-error: #ff6b6b;
+    --sb-color-success: #22c55e;
+    --sb-color-info: #5BC0DE;
     --sb-icon-control-size: 2rem;
     --sb-icon-control-radius: 10px;
     --sb-inline-drawer-icon-size: 2rem;
@@ -22,11 +44,11 @@
     --sb-select-arrow-inset: 14px;
     --sb-row-gap: 10px;
     --sb-section-gap: 14px;
-    --sb-settings-card-padding: 12px 14px;
+    --sb-settings-card-padding: var(--spacing-md) 14px;
     --sb-message-icon-size: 1.75rem;
     --sb-message-meta-line-height: 1.18;
-    --sb-chat-composer-gap: 8px;
-    --sb-chat-composer-edge-gap: 8px;
+    --sb-chat-composer-gap: var(--spacing-sm);
+    --sb-chat-composer-edge-gap: var(--spacing-sm);
     --sb-safe-area-bottom: env(safe-area-inset-bottom, 0px);
     --sb-mobile-safe-area-bottom: max(34px, env(safe-area-inset-bottom, 0px));
     --sb-mobile-touch-target: 44px;
@@ -80,17 +102,17 @@
     --sb-positive-bg: color-mix(in srgb, var(--SmartThemeQuoteColor) 22%, transparent);
     --sb-muted-fg: color-mix(in srgb, var(--SmartThemeBodyColor) 74%, transparent);
     --sb-muted-bg: color-mix(in srgb, var(--SmartThemeBodyColor) 7%, transparent);
-    --sb-state-favorite: color-mix(in srgb, var(--color-warning, var(--warning, #facc15)) 82%, var(--SmartThemeBodyColor) 18%);
+    --sb-state-favorite: color-mix(in srgb, var(--color-warning, var(--sb-color-warning)) 82%, var(--SmartThemeBodyColor) 18%);
     --sb-state-favorite-bg: color-mix(in srgb, var(--sb-state-favorite) 14%, var(--sb-button-bg));
     --sb-state-favorite-border: color-mix(in srgb, var(--sb-state-favorite) 40%, var(--sb-shell-border));
-    --sb-state-attention: color-mix(in srgb, var(--color-danger, var(--danger, #fb7185)) 86%, var(--SmartThemeBodyColor) 14%);
+    --sb-state-attention: color-mix(in srgb, var(--color-danger, var(--sb-color-danger)) 86%, var(--SmartThemeBodyColor) 14%);
     --sb-state-attention-bg: color-mix(in srgb, var(--sb-state-attention) 18%, transparent);
     --sb-state-attention-border: color-mix(in srgb, var(--sb-state-attention) 44%, transparent);
     --sb-on-accent: rgb(0, 0, 0);
     --sb-on-solid-accent: var(--sb-on-accent);
-    --sb-warning-fg: color-mix(in srgb, var(--warning, #ff6b6b) 72%, var(--SmartThemeBodyColor) 28%);
-    --sb-warning-bg: color-mix(in srgb, var(--warning, #ff6b6b) 12%, var(--SmartThemeBlurTintColor) 88%);
-    --sb-warning-border: color-mix(in srgb, var(--warning, #ff6b6b) 42%, var(--SmartThemeBorderColor) 58%);
+    --sb-warning-fg: color-mix(in srgb, var(--color-danger, var(--sb-color-error)) 72%, var(--SmartThemeBodyColor) 28%);
+    --sb-warning-bg: color-mix(in srgb, var(--color-danger, var(--sb-color-error)) 12%, var(--SmartThemeBlurTintColor) 88%);
+    --sb-warning-border: color-mix(in srgb, var(--color-danger, var(--sb-color-error)) 42%, var(--SmartThemeBorderColor) 58%);
     --sb-input-bg: color-mix(in srgb, var(--SmartThemeBlurTintColor) 90%, transparent);
     --sb-input-border: color-mix(in srgb, var(--SmartThemeBorderColor) 92%, transparent);
     --sb-focus-ring: color-mix(in srgb, var(--SmartThemeQuoteColor) 70%, transparent);
@@ -246,7 +268,7 @@ body::before {
         radial-gradient(circle at top left, var(--sb-ambient-a), transparent 28%),
         radial-gradient(circle at top right, var(--sb-ambient-b), transparent 32%);
     opacity: 1;
-    z-index: 0;
+    z-index: var(--sb-z-base);
     will-change: auto;
     contain: layout style paint;
 }
@@ -264,7 +286,7 @@ body::before {
 .popup,
 #sb-mobile-nav {
     position: relative;
-    z-index: 1;
+    z-index: var(--sb-z-raised);
 }
 
 #chat {
@@ -569,7 +591,8 @@ h3:not(.popup h3):not(#chat h3) {
 .menu_button:not(.disabled):not([disabled]):active,
 .menu_button_icon:not(.disabled):not([disabled]):active,
 .right_menu_button:active {
-    transform: none;
+    transform: scale(0.97);
+    transition: transform 100ms var(--sb-ease-out);
 }
 
 .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
@@ -664,6 +687,11 @@ h3:not(.popup h3):not(#chat h3) {
 .drawer-icon.openIcon {
     background: var(--sb-button-hover);
     border-color: color-mix(in srgb, var(--sb-shell-border) 90%, transparent);
+}
+
+.inline-drawer-toggle .inline-drawer-icon,
+.inline-drawer-toggle :is(i, .fa, .fa-solid, .fa-regular, .fa-brands).inline-drawer-icon {
+    transition: color var(--sb-transition-fast), opacity var(--sb-transition-fast);
 }
 
 .text_pole,
@@ -4654,6 +4682,19 @@ input[type='range']::-moz-range-thumb {
     border-radius: var(--sb-radius-md) !important;
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
+    animation: sb-toast-in 240ms var(--sb-ease-out) both;
+}
+
+@keyframes sb-toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 :focus-visible {

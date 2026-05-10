@@ -2005,7 +2005,7 @@ class PromptManager {
                     <span title="Remove" class="prompt-manager-detach-action caution fa-solid fa-chain-broken fa-xs"></span>
                 `;
             } else {
-                detachSpanHtml = '<span class="fa-solid"></span>';
+                detachSpanHtml = '<span class="prompt-manager-control-placeholder" aria-hidden="true"></span>';
             }
 
             let editSpanHtml = '';
@@ -2020,7 +2020,7 @@ class PromptManager {
                     <span title="edit" class="prompt-manager-edit-action fa-solid fa-pencil fa-xs"></span>
                 `;
             } else {
-                editSpanHtml = '<span class="fa-solid"></span>';
+                editSpanHtml = '<span class="prompt-manager-control-placeholder" aria-hidden="true"></span>';
             }
 
             let toggleSpanHtml = '';
@@ -2029,7 +2029,7 @@ class PromptManager {
                     <span class="prompt-manager-toggle-action ${listEntry.enabled ? 'fa-solid fa-toggle-on' : 'fa-solid fa-toggle-off'}"></span>
                 `;
             } else {
-                toggleSpanHtml = '<span class="fa-solid"></span>';
+                toggleSpanHtml = '<span class="prompt-manager-control-placeholder" aria-hidden="true"></span>';
             }
 
             const encodedName = escapeHtml(prompt.name);
@@ -2310,12 +2310,12 @@ class PromptManager {
         if (!this.isDesktopSplitLayout() && window.matchMedia('(max-width: 768px)').matches) {
             setTimeout(() => {
                 if (popup) {
-                    popup.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    // Also scroll the parent container to top
+                    popup.scrollTop = 0;
                     const shellScroller = popup.closest('.sb-shell-scroller');
                     if (shellScroller) {
                         shellScroller.scrollTop = 0;
                     }
+                    window.dispatchEvent(new CustomEvent('sb-mobile-viewport-reset'));
                 }
             }, 250); // Wait for slideDown animation
         }
@@ -2341,7 +2341,7 @@ class PromptManager {
         }
 
         $('#' + this.configuration.prefix + 'prompt_manager_popup').first()
-            .slideUp(200, 'swing')
+            .slideUp(200, 'swing', () => window.dispatchEvent(new CustomEvent('sb-mobile-viewport-reset')))
             .removeClass('openDrawer');
         this.syncEditorPaneState();
         this.syncListSelection();

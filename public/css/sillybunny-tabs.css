@@ -199,7 +199,7 @@
     top: 0 !important;
     left: 0;
     right: 0;
-    z-index: 4100;
+    z-index: var(--sb-z-shell);
     pointer-events: none;
     display: flex;
     align-items: flex-start;
@@ -258,7 +258,7 @@ body.sb-topbar-compact #sb-chatbar-layer {
     position: relative;
     width: 100%;
     transform: translate(var(--sb-topbar-offset-x, 0px), var(--sb-topbar-offset-y, 0px));
-    transition: transform 180ms ease;
+    transition: transform var(--sb-transition-fast);
     contain: layout style;
 }
 
@@ -363,15 +363,15 @@ body.sb-topbar-compact #sb-chatbar-layer {
     justify-content: center;
     width: 100%;
     min-height: var(--sb-topbar-search-row-height);
-    z-index: 12;
+    z-index: var(--sb-z-raised);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
     transform: translateY(calc(var(--sb-topbar-stack-gap) * -0.5)) scale(0.985);
     transform-origin: top center;
     transition:
-        opacity 150ms ease,
-        transform 180ms ease,
+        opacity var(--sb-transition-fast),
+        transform var(--sb-transition-fast),
         visibility 0s linear 180ms;
 }
 
@@ -381,8 +381,8 @@ body.sb-topbar-compact #sb-chatbar-layer {
     pointer-events: auto;
     transform: translateY(0) scale(1);
     transition:
-        opacity 150ms ease,
-        transform 180ms ease,
+        opacity var(--sb-transition-fast),
+        transform var(--sb-transition-fast),
         visibility 0s linear 0s;
 }
 
@@ -460,7 +460,7 @@ body.sb-topbar-compact #sb-chatbar-layer {
     top: calc(100% + var(--sb-topbar-search-panel-gap));
     left: 0;
     right: 0;
-    z-index: 6;
+    z-index: var(--sb-z-raised);
 }
 
 .sb-universal-search:not(.is-open) .sb-universal-search-panel {
@@ -547,7 +547,7 @@ body.sb-topbar-compact #sb-chatbar-layer {
     min-height: 0 !important;
     line-height: 1;
     box-sizing: border-box;
-    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, opacity 160ms ease;
+    transition: transform var(--sb-transition-fast), border-color var(--sb-transition-fast), background-color var(--sb-transition-fast), opacity var(--sb-transition-fast);
 }
 
 .sb-chatbar-button::before,
@@ -699,8 +699,8 @@ body.sb-topbar-compact #sb-chatbar-layer {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    z-index: 6;
-    transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease;
+    z-index: var(--sb-z-raised);
+    transition: opacity var(--sb-transition-fast), transform var(--sb-transition-fast), visibility var(--sb-transition-fast);
 }
 
 #sb-connection-strip::before {
@@ -749,7 +749,7 @@ body.sb-topbar-compact #sb-chatbar-layer {
     font: inherit;
     white-space: nowrap;
     cursor: pointer;
-    transition: transform 160ms ease, border-color 160ms ease, opacity 160ms ease;
+    transition: transform var(--sb-transition-fast), border-color var(--sb-transition-fast), opacity var(--sb-transition-fast);
 }
 
 .sb-connection-strip-connect::before {
@@ -828,7 +828,7 @@ body:not(.movingUI) .drawer-content.maximized {
     width: min(360px, calc(100vw - 32px));
     height: min(70vh, calc(100dvh - var(--sb-topbar-layout-offset) - 24px));
     max-height: calc(100dvh - var(--sb-topbar-layout-offset) - 24px);
-    z-index: 3805;
+    z-index: var(--sb-z-shell-sidebar);
     flex-direction: column;
 }
 
@@ -873,7 +873,7 @@ body:not(.movingUI) .drawer-content.maximized {
     gap: 6px;
     padding: 12px;
     cursor: pointer;
-    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+    transition: transform var(--sb-transition-fast), border-color var(--sb-transition-fast), background-color var(--sb-transition-fast);
 }
 
 .sb-chat-file:hover {
@@ -1067,20 +1067,20 @@ body:not(.movingUI) .drawer-content.maximized {
     color: var(--SmartThemeBodyColor);
     background: transparent;
     cursor: pointer;
-    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, opacity 180ms ease;
+    transition: transform var(--sb-transition-fast), background-color var(--sb-transition-fast), border-color var(--sb-transition-fast), opacity var(--sb-transition-fast);
     opacity: 0.82;
 }
 
 .sb-proxy-button i {
     font-size: var(--sb-proxy-icon-size);
-    transition: transform 180ms ease, color 180ms ease;
+    transition: transform var(--sb-transition-fast), color var(--sb-transition-fast);
 }
 
 .sb-proxy-button span {
     font-size: var(--sb-proxy-label-size);
     font-weight: var(--sb-weight-control);
     white-space: nowrap;
-    transition: transform 180ms ease, opacity 180ms ease;
+    transition: transform var(--sb-transition-fast), opacity var(--sb-transition-fast);
 }
 
 .sb-proxy-button::after {
@@ -1094,7 +1094,7 @@ body:not(.movingUI) .drawer-content.maximized {
     background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary, var(--sb-accent)) 86%, transparent), color-mix(in srgb, var(--color-accent, var(--sb-accent-soft)) 86%, transparent));
     transform: scaleX(0);
     transform-origin: center;
-    transition: transform 180ms ease;
+    transition: transform var(--sb-transition-fast);
 }
 
 .sb-proxy-button:hover {
@@ -1184,7 +1184,7 @@ body:not(.movingUI) .drawer-content.maximized {
     left: 0;
     right: 0;
     pointer-events: none;
-    z-index: 4005;
+    z-index: var(--sb-z-shell-panel);
 }
 
 #top-settings-holder .drawer-content,
@@ -1196,7 +1196,7 @@ body:not(.movingUI) .drawer-content.maximized {
 
 #left-nav-panel select {
     position: relative;
-    z-index: 1;
+    z-index: var(--sb-z-raised);
     touch-action: auto;
 }
 
@@ -1270,7 +1270,7 @@ body:not(.movingUI) .drawer-content.maximized {
     width: 0 !important;
     height: 0 !important;
     overflow: hidden !important;
-    transition: opacity 180ms ease, visibility 0s 180ms, width 0s 180ms, height 0s 180ms, overflow 0s 180ms;
+    transition: opacity var(--sb-transition-fast), visibility 0s 180ms, width 0s 180ms, height 0s 180ms, overflow 0s 180ms;
 }
 
 .sb-shell-root.fillLeft.openDrawer,
@@ -1278,7 +1278,7 @@ body:not(.movingUI) .drawer-content.maximized {
 #right-nav-panel.openDrawer {
     opacity: 1;
     visibility: visible;
-    transition: opacity 180ms ease;
+    transition: opacity var(--sb-transition-fast);
 }
 
 #left-nav-panel.openDrawer,
@@ -1303,7 +1303,7 @@ body:not(.movingUI) .drawer-content.maximized {
 
 .sb-shell-root.fillLeft.openDrawer,
 .sb-shell-root.fillRight.openDrawer {
-    animation: sbShellReveal 240ms ease;
+    animation: sbShellReveal 240ms var(--sb-ease-out);
     transform-origin: center;
 }
 
@@ -1316,7 +1316,7 @@ body:not(.movingUI) .drawer-content.maximized {
     right: 0 !important;
     margin-left: auto !important;
     margin-right: auto !important;
-    animation: sbShellReveal 240ms ease;
+    animation: sbShellReveal 240ms var(--sb-ease-out);
     transform-origin: center;
 }
 
@@ -1338,21 +1338,21 @@ body.movingUI #right-nav-panel.openDrawer > .sb-shell-resize-handle {
 }
 
 .sb-shell-root.openDrawer .sb-shell-nav-wrapper {
-    animation: sbShellContentReveal 280ms ease both;
+    animation: sbShellContentReveal 280ms var(--sb-ease-out) both;
 }
 
 .sb-shell-root.openDrawer .sb-shell-main {
-    animation: sbShellContentReveal 320ms ease both;
+    animation: sbShellContentReveal 320ms var(--sb-ease-out) both;
 }
 
 #right-nav-panel.openDrawer > #CharListButtonAndHotSwaps,
 #right-nav-panel.openDrawer > #rm_PinAndTabs {
-    animation: sbShellContentReveal 280ms ease both;
+    animation: sbShellContentReveal 280ms var(--sb-ease-out) both;
 }
 
 #right-nav-panel.openDrawer > .scrollableInner,
 #right-nav-panel.openDrawer > .scrollableInnerFull {
-    animation: sbShellContentReveal 320ms ease both;
+    animation: sbShellContentReveal 320ms var(--sb-ease-out) both;
 }
 
 .sb-shell-frame {
@@ -1370,7 +1370,7 @@ body.movingUI #right-nav-panel.openDrawer > .sb-shell-resize-handle {
     position: absolute;
     right: 10px;
     bottom: 10px;
-    z-index: 3;
+    z-index: var(--sb-z-raised);
     display: none;
     width: 28px;
     height: 28px;
@@ -1431,7 +1431,7 @@ body.sb-shell-resizing * {
 .sb-shell-nav-scroll {
     position: absolute;
     top: 50%;
-    z-index: 3;
+    z-index: var(--sb-z-raised);
     width: 34px;
     height: 34px;
     display: none;
@@ -1445,7 +1445,7 @@ body.sb-shell-resizing * {
     opacity: 0;
     pointer-events: none;
     transform: translateY(-50%);
-    transition: opacity 180ms ease, transform 180ms ease, background-color 180ms ease;
+    transition: opacity var(--sb-transition-fast), transform var(--sb-transition-fast), background-color var(--sb-transition-fast);
     touch-action: manipulation;
 }
 
@@ -1495,7 +1495,7 @@ body.sb-shell-resizing * {
     pointer-events: none;
     z-index: 2;
     opacity: 0;
-    transition: opacity 200ms ease;
+    transition: opacity var(--sb-transition);
 }
 
 .sb-shell-nav-wrapper::before {
@@ -1589,7 +1589,7 @@ body.sb-shell-resizing * {
     flex-shrink: 1;
     min-width: 0;
     overflow: hidden;
-    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
+    transition: transform var(--sb-transition-fast), background-color var(--sb-transition-fast), border-color var(--sb-transition-fast);
 }
 
 .sb-shell-tab:hover {
@@ -1708,7 +1708,7 @@ body.sb-shell-resizing * {
     justify-content: center;
     cursor: pointer;
     overflow: hidden;
-    transition: transform var(--sb-transition-fast, 180ms ease), background-color var(--sb-transition-fast, 180ms ease), border-color var(--sb-transition-fast, 180ms ease);
+    transition: transform var(--sb-transition-fast), background-color var(--sb-transition-fast), border-color var(--sb-transition-fast);
 }
 
 .sb-shell-close::before {
@@ -2057,7 +2057,7 @@ body.sb-shell-resizing * {
     font: inherit;
     text-align: left;
     cursor: pointer;
-    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+    transition: transform var(--sb-transition-fast), border-color var(--sb-transition-fast), background-color var(--sb-transition-fast);
 }
 
 .sb-search-result:hover,
@@ -2304,19 +2304,19 @@ body.sb-shell-resizing * {
 
 .sb-server-pill[data-tone='good'],
 .sb-server-inline-state[data-state='saved'] {
-    color: color-mix(in srgb, var(--color-success, #22c55e) 88%, white);
-    background: color-mix(in srgb, var(--color-success, #22c55e) 18%, transparent);
+    color: color-mix(in srgb, var(--color-success, var(--sb-color-success)) 88%, white);
+    background: color-mix(in srgb, var(--color-success, var(--sb-color-success)) 18%, transparent);
 }
 
 .sb-server-pill[data-tone='warn'] {
-    color: color-mix(in srgb, var(--color-warning, #f59e0b) 92%, white);
-    background: color-mix(in srgb, var(--color-warning, #f59e0b) 20%, transparent);
+    color: color-mix(in srgb, var(--color-warning, var(--sb-color-warning)) 92%, white);
+    background: color-mix(in srgb, var(--color-warning, var(--sb-color-warning)) 20%, transparent);
 }
 
 .sb-server-pill[data-tone='danger'],
 .sb-server-inline-state[data-state='dirty'] {
-    color: color-mix(in srgb, var(--warning, #ef4444) 92%, white);
-    background: color-mix(in srgb, var(--warning, #ef4444) 16%, transparent);
+    color: color-mix(in srgb, var(--color-danger, var(--sb-color-danger)) 92%, white);
+    background: color-mix(in srgb, var(--color-danger, var(--sb-color-danger)) 16%, transparent);
 }
 
 .sb-server-note {
@@ -2331,15 +2331,15 @@ body.sb-shell-resizing * {
 }
 
 .sb-server-note[data-tone='good'] {
-    border-color: color-mix(in srgb, var(--color-success, #22c55e) 32%, transparent);
+    border-color: color-mix(in srgb, var(--color-success, var(--sb-color-success)) 32%, transparent);
 }
 
 .sb-server-note[data-tone='warn'] {
-    border-color: color-mix(in srgb, var(--color-warning, #f59e0b) 32%, transparent);
+    border-color: color-mix(in srgb, var(--color-warning, var(--sb-color-warning)) 32%, transparent);
 }
 
 .sb-server-note[data-tone='danger'] {
-    border-color: color-mix(in srgb, var(--warning, #ef4444) 32%, transparent);
+    border-color: color-mix(in srgb, var(--color-danger, var(--sb-color-danger)) 32%, transparent);
 }
 
 .sb-server-actions {
@@ -2949,7 +2949,7 @@ body.sb-shell-resizing * {
     color: var(--SmartThemeBodyColor);
     font: inherit;
     cursor: pointer;
-    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+    transition: transform var(--sb-transition-fast), border-color var(--sb-transition-fast), background-color var(--sb-transition-fast);
 }
 
 :root[data-sb-compact-mode='true'] .sb-theme-option {
@@ -3090,7 +3090,7 @@ body.sb-shell-resizing * {
     color: var(--SmartThemeBodyColor);
     cursor: pointer;
     box-sizing: border-box;
-    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+    transition: transform var(--sb-transition-fast), border-color var(--sb-transition-fast), background-color var(--sb-transition-fast);
 }
 
 .sb-compact-mode-option::before {
@@ -3331,7 +3331,7 @@ body.sb-shell-resizing * {
     box-sizing: border-box;
     border-radius: calc(8px * var(--sb-bottom-bar-scale));
     font-size: calc(var(--mainFontSize) * 0.9 * var(--sb-bottom-bar-scale));
-    transition: opacity 180ms ease, background-color 180ms ease;
+    transition: opacity var(--sb-transition-fast), background-color var(--sb-transition-fast);
 }
 
 .sb-bottom-chat-btn:hover {
@@ -3535,7 +3535,7 @@ body.sb-shell-resizing * {
     --sb-chat-delete-vv-height: 100dvh;
     position: fixed;
     inset: 0;
-    z-index: 12000;
+    z-index: var(--sb-z-loader);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3724,7 +3724,7 @@ body.sb-shell-resizing * {
     background-color: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-composer-surface-base, var(--SmartThemeBlurTintColor)));
     cursor: pointer;
     flex-shrink: 0;
-    transition: border-color 180ms ease, transform 180ms ease;
+    transition: border-color var(--sb-transition-fast), transform var(--sb-transition-fast);
 }
 
 #sb-persona-bubble:hover {
@@ -3766,10 +3766,10 @@ body.sb-shell-resizing * {
     border: 1px solid var(--SmartThemeBorderColor);
     border-radius: 12px;
     padding: 6px;
-    z-index: 3010;
+    z-index: var(--sb-z-modal-content);
     backdrop-filter: blur(20px);
     box-shadow: 0 8px 24px color-mix(in srgb, var(--SmartThemeShadowColor) 30%, transparent);
-    animation: sbShellContentReveal 200ms ease;
+    animation: sbShellContentReveal 200ms var(--sb-ease-out);
 }
 
 .sb-persona-option {
@@ -3784,7 +3784,7 @@ body.sb-shell-resizing * {
     border-radius: 8px;
     cursor: pointer;
     text-align: left;
-    transition: background-color 150ms ease;
+    transition: background-color var(--sb-transition-fast);
     font-size: calc(var(--mainFontSize) * 0.85);
     color: var(--SmartThemeBodyColor);
     min-height: 44px;
@@ -3843,7 +3843,7 @@ body.sb-shell-resizing * {
 }
 
 .char-button-group-primary .menu_button[data-label]::after {
-    font-family: 'Public Sans', sans-serif;
+    font-family: var(--mainFontFamily);
 }
 
 .char-button-group-primary .menu_button[data-label] {
@@ -3896,7 +3896,7 @@ body.sb-shell-resizing * {
     background: transparent;
     color: var(--SmartThemeBodyColor);
     cursor: pointer;
-    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+    transition: transform var(--sb-transition-fast), border-color var(--sb-transition-fast), box-shadow var(--sb-transition-fast), background-color var(--sb-transition-fast);
 }
 
 :root[data-sb-compact-mode='true'] .sb-topbar-label-option {
@@ -3992,7 +3992,7 @@ body.sb-shell-resizing * {
 }
 
 .sb-search-hit {
-    animation: sb-search-hit 2.2s ease;
+    animation: sb-search-hit 2.2s var(--sb-ease-out);
 }
 
 @keyframes sbShellReveal {
@@ -4601,7 +4601,7 @@ body.sb-shell-resizing * {
         min-width: 0 !important;
         margin-top: 0 !important;
         border-radius: 22px 22px 0 0 !important;
-        animation: sbMobileShellSheetIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both !important;
+        animation: sbMobileShellSheetIn 220ms var(--sb-ease-out) both !important;
         transform-origin: center bottom;
     }
 
@@ -4623,7 +4623,7 @@ body.sb-shell-resizing * {
         position: absolute;
         top: 6px;
         left: 50%;
-        z-index: 5;
+        z-index: var(--sb-z-raised);
         width: 42px;
         height: 4px;
         border-radius: 999px;
@@ -4882,7 +4882,7 @@ body.sb-shell-resizing * {
         visibility: hidden;
         opacity: 0;
         pointer-events: none;
-        transition: opacity 180ms ease;
+        transition: opacity var(--sb-transition-fast);
     }
 
     #sb-mobile-nav::before {
@@ -4900,7 +4900,7 @@ body.sb-shell-resizing * {
         display: block;
         visibility: visible;
         pointer-events: auto;
-        z-index: 3600;
+        z-index: var(--sb-z-modal);
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
     }
@@ -4926,7 +4926,7 @@ body.sb-shell-resizing * {
         visibility: hidden;
         opacity: 0;
         pointer-events: none;
-        transition: opacity 180ms ease;
+        transition: opacity var(--sb-transition-fast);
         background: transparent;
     }
 
@@ -4935,7 +4935,7 @@ body.sb-shell-resizing * {
         opacity: 1;
         visibility: visible;
         pointer-events: auto;
-        z-index: 3602;
+        z-index: var(--sb-z-modal-content);
         backdrop-filter: blur(22px);
         -webkit-backdrop-filter: blur(22px);
     }
@@ -5026,7 +5026,7 @@ body.sb-shell-resizing * {
         line-height: 1.15;
         text-align: left;
         cursor: pointer;
-        transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+        transition: transform var(--sb-transition-fast), border-color var(--sb-transition-fast), background-color var(--sb-transition-fast);
     }
 
     .sb-nav-item i {
@@ -5151,7 +5151,7 @@ body.sb-shell-resizing * {
         max-height: 0 !important;
         overflow: visible !important;
         pointer-events: auto !important;
-        z-index: 4005 !important;
+        z-index: var(--sb-z-popout) !important;
     }
 
     #top-settings-holder > .drawer,
@@ -5215,7 +5215,7 @@ body.sb-shell-resizing * {
         opacity: 1 !important;
         visibility: visible !important;
         pointer-events: auto !important;
-        z-index: 3500 !important;
+        z-index: var(--sb-z-modal) !important;
         top: var(--sb-topbar-layout-offset) !important;
         height: calc(100dvh - var(--sb-topbar-layout-offset) - 16px) !important;
         max-height: calc(100dvh - var(--sb-topbar-layout-offset) - 16px) !important;

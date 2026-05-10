@@ -471,9 +471,9 @@
     align-items: baseline;
     gap: 0.5em;
     padding: 0.5em 0.75em;
-    background: linear-gradient(90deg, rgba(248, 148, 6, 0.2), transparent);
-    border-left: 3px solid #F89406;
-    border-radius: 0 4px 4px 0;
+    background: color-mix(in srgb, #F89406 8%, transparent);
+    border: 1px solid color-mix(in srgb, #F89406 40%, var(--SmartThemeBorderColor));
+    border-radius: 4px;
     margin-bottom: 0.5em;
     font-size: 0.9em;
     color: #F89406;
@@ -489,9 +489,9 @@
     align-items: baseline;
     gap: 0.5em;
     padding: 0.5em 0.75em;
-    background: linear-gradient(90deg, rgba(91, 192, 222, 0.2), transparent);
-    border-left: 3px solid #5BC0DE;
-    border-radius: 0 4px 4px 0;
+    background: color-mix(in srgb, #5BC0DE 8%, transparent);
+    border: 1px solid color-mix(in srgb, #5BC0DE 40%, var(--SmartThemeBorderColor));
+    border-radius: 4px;
     margin-bottom: 0.5em;
     font-size: 0.9em;
     color: #5BC0DE;
@@ -554,9 +554,9 @@
     align-items: baseline;
     gap: 0.5em;
     padding: 0.5em 0.75em;
-    background: linear-gradient(90deg, var(--ac-color-selectedBackground, var(--SmartThemeQuoteColor)), transparent);
-    border-left: 3px solid var(--ac-color-matchedText, var(--SmartThemeBorderColor));
-    border-radius: 0 4px 4px 0;
+    background: color-mix(in srgb, var(--ac-color-matchedText, var(--SmartThemeBorderColor)) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ac-color-matchedText, var(--SmartThemeBorderColor)) 50%, var(--SmartThemeBorderColor));
+    border-radius: 4px;
     margin-bottom: 0.5em;
     font-size: 0.9em;
 }
