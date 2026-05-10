@@ -1,17 +1,19 @@
 # Agent Notes
 
 ## Runtime And Installs
-- The app is Bun-first (`packageManager: bun@1.3.11`, `bun run start`), but PR CI installs with Node 24 and `npm ci --ignore-scripts`; keep both `bun.lock` and `package-lock.json` implications in mind.
+- The app is Bun-first for direct dev runs (`packageManager: bun@1.3.11`, `bun run start`), but PR CI installs with Node 24 and `npm ci --ignore-scripts`; keep both `bun.lock` and `package-lock.json` implications in mind.
 - Node.js compatibility is required even though Bun is default; do not use Bun-only APIs unless a standard Node fallback is included, and test structural runtime changes under both runtimes.
 - Root deps and test deps are separate: run `npm ci --ignore-scripts` at repo root and `npm ci --ignore-scripts --prefix tests` before matching CI tests.
 - Launchers (`./start.sh`, `Start.command`, `Start.bat`) auto-install/update for users; for direct dev runs prefer `bun run start`, `bun run start:mobile`, `bun run start:global`, or `bun run start:no-csrf`.
+- `start.sh` may choose Node on Termux, macOS, or ARM when Node is available to avoid Bun platform issues; force Bun with `SILLYBUNNY_USE_BUN=1 bash start.sh` or `SILLYBUNNY_TERMUX_RUNTIME=bun bash start.sh` on Termux.
 
 ## Verification
 - Root lint: `npm run lint` or `bun run lint` checks `src/**/*.js`, `public/**/*.js`, `scripts/**/*.js`, and root `*.js` with 4-space indent, single quotes, semicolons, and trailing commas on multiline literals.
 - Tests are in the nested `tests` package, not the root package: `npm run test:unit --prefix tests` matches CI.
 - Run one Jest file with `npm run test:unit --prefix tests -- tests/<file>.test.js`.
+- PR CI also runs `npm run check:frontend-budgets`; run it when changing `public/index.html`, startup assets, large extension assets, or performance-related frontend loading.
 - E2E tests use Playwright against `http://127.0.0.1:4444`; start the app separately before `npm run test:e2e --prefix tests`.
-- `tests/playwright.config.js` currently has `testMatch: '*.e2e.js'`, so only root-level `tests/*.e2e.js` are matched by the default Playwright command unless the config is changed or a file is passed explicitly.
+- `tests/playwright.config.js` matches root-level `tests/*.e2e.js` and explicitly includes `frontend-performance.e2e.js`; pass a file explicitly for anything outside that match.
 
 ## Architecture
 - `server.js` parses CLI/config, sets `globalThis.DATA_ROOT` and `globalThis.COMMAND_LINE_ARGS`, changes cwd to the server directory, then imports `src/server-main.js`.
