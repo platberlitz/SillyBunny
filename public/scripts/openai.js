@@ -4492,7 +4492,7 @@ export async function createGenerationParameters(settings, model, type, messages
     }
 
     if (settings.chat_completion_source === chat_completion_sources.CLAUDE) {
-        generate_data.top_k = Number(settings.top_k_openai);
+        generate_data.top_k = settings.top_k_openai > 0 ? Number(settings.top_k_openai) : undefined;
         generate_data.use_sysprompt = settings.use_sysprompt;
         generate_data.stop = getCustomStoppingStrings(); // Claude shouldn't have limits on stop strings.
         // Don't add a prefill on quiet gens (summarization) and when using continue prefill.
@@ -4504,7 +4504,7 @@ export async function createGenerationParameters(settings, model, type, messages
     }
 
     if (settings.chat_completion_source === chat_completion_sources.OPENROUTER) {
-        generate_data.top_k = Number(settings.top_k_openai);
+        generate_data.top_k = settings.top_k_openai > 0 ? Number(settings.top_k_openai) : undefined;
         generate_data.min_p = Number(settings.min_p_openai);
         generate_data.repetition_penalty = Number(settings.repetition_penalty_openai);
         generate_data.top_a = Number(settings.top_a_openai);
@@ -4517,7 +4517,7 @@ export async function createGenerationParameters(settings, model, type, messages
 
     if ([chat_completion_sources.MAKERSUITE, chat_completion_sources.VERTEXAI].includes(settings.chat_completion_source)) {
         const stopStringsLimit = 5;
-        generate_data.top_k = Number(settings.top_k_openai);
+        generate_data.top_k = settings.top_k_openai > 0 ? Number(settings.top_k_openai) : undefined;
         generate_data.stop = getCustomStoppingStrings(stopStringsLimit).slice(0, stopStringsLimit).filter(x => x.length >= 1 && x.length <= 16);
         generate_data.use_sysprompt = settings.use_sysprompt;
         if (settings.chat_completion_source === chat_completion_sources.VERTEXAI) {
@@ -4547,7 +4547,7 @@ export async function createGenerationParameters(settings, model, type, messages
     if (settings.chat_completion_source === chat_completion_sources.COHERE) {
         // Clamp to 0.01 -> 0.99
         generate_data.top_p = Math.min(Math.max(Number(settings.top_p_openai), 0.01), 0.99);
-        generate_data.top_k = Number(settings.top_k_openai);
+        generate_data.top_k = settings.top_k_openai > 0 ? Number(settings.top_k_openai) : undefined;
         // Clamp to 0 -> 1
         generate_data.frequency_penalty = Math.min(Math.max(Number(settings.freq_pen_openai), 0), 1);
         generate_data.presence_penalty = Math.min(Math.max(Number(settings.pres_pen_openai), 0), 1);
@@ -4555,7 +4555,7 @@ export async function createGenerationParameters(settings, model, type, messages
     }
 
     if (settings.chat_completion_source === chat_completion_sources.PERPLEXITY) {
-        generate_data.top_k = Number(settings.top_k_openai);
+        generate_data.top_k = settings.top_k_openai > 0 ? Number(settings.top_k_openai) : undefined;
         generate_data.frequency_penalty = Number(settings.freq_pen_openai);
         generate_data.presence_penalty = Number(settings.pres_pen_openai);
         delete generate_data.stop;
@@ -4602,7 +4602,7 @@ export async function createGenerationParameters(settings, model, type, messages
 
     // https://docs.electronhub.ai/api-reference/chat/completions
     if (settings.chat_completion_source === chat_completion_sources.ELECTRONHUB) {
-        generate_data.top_k = Number(settings.top_k_openai);
+        generate_data.top_k = settings.top_k_openai > 0 ? Number(settings.top_k_openai) : undefined;
     }
 
     if (settings.chat_completion_source === chat_completion_sources.CHUTES) {
@@ -4645,7 +4645,7 @@ export async function createGenerationParameters(settings, model, type, messages
 
     // https://docs.nano-gpt.com/api-reference/endpoint/chat-completion#temperature-&-nucleus
     if (settings.chat_completion_source === chat_completion_sources.NANOGPT) {
-        generate_data.top_k = Number(settings.top_k_openai);
+        generate_data.top_k = settings.top_k_openai > 0 ? Number(settings.top_k_openai) : undefined;
         generate_data.min_p = Number(settings.min_p_openai);
         generate_data.repetition_penalty = Number(settings.repetition_penalty_openai);
         generate_data.top_a = Number(settings.top_a_openai);
