@@ -109,12 +109,46 @@ function applyBrowserFixes() {
         const viewport = window.visualViewport;
         const isIOSWebKit = /iPad|iPhone|iPod/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         let viewportFixScheduled = false;
+        let viewportResetScheduled = false;
         let lastViewportHeight = Math.round(viewport?.height || window.innerHeight || 0);
         let lastSendInteractionAt = 0;
         let lastSendFocusedAt = 0;
 
         const updateViewportBaseline = () => {
             lastViewportHeight = Math.round(viewport?.height || window.innerHeight || 0);
+        };
+
+        const resetTransientViewportPosition = () => {
+            document.documentElement.style.position = '';
+            document.documentElement.style.top = '';
+            document.documentElement.style.left = '';
+            document.documentElement.style.right = '';
+            document.documentElement.style.bottom = '';
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.left = '';
+            document.body.style.right = '';
+            document.body.style.bottom = '';
+            document.body.style.transform = '';
+        };
+
+        const scheduleViewportReset = () => {
+            if (viewportResetScheduled) {
+                return;
+            }
+
+            viewportResetScheduled = true;
+
+            requestAnimationFrame(() => {
+                resetTransientViewportPosition();
+                updateViewportBaseline();
+
+                window.setTimeout(() => {
+                    resetTransientViewportPosition();
+                    updateViewportBaseline();
+                    viewportResetScheduled = false;
+                }, 80);
+            });
         };
 
         const applyPositionFix = ({ force = false } = {}) => {
@@ -140,7 +174,7 @@ function applyBrowserFixes() {
             console.debug('[Mobile] Device viewport change detected.');
             document.documentElement.style.position = 'fixed';
             requestAnimationFrame(() => {
-                document.documentElement.style.position = '';
+                resetTransientViewportPosition();
                 viewportFixScheduled = false;
             });
         };
@@ -189,7 +223,18 @@ function applyBrowserFixes() {
                 updateViewportBaseline();
             }
         });
-        document.addEventListener('focusout', () => requestAnimationFrame(updateViewportBaseline), true);
+        document.addEventListener('focusout', scheduleViewportReset, true);
+        document.addEventListener('click', (event) => {
+            if (event.target instanceof HTMLElement && event.target.closest('#completion_prompt_manager_popup :is(.menu_button, .popup-button-close, [id$="_close_button"], [id$="_form_close"], [id$="_form_save"])')) {
+                scheduleViewportReset();
+            }
+        }, true);
+        document.addEventListener('transitionend', (event) => {
+            if (event.target instanceof HTMLElement && event.target.id === 'completion_prompt_manager_popup') {
+                scheduleViewportReset();
+            }
+        }, true);
+        window.addEventListener('sb-mobile-viewport-reset', scheduleViewportReset);
     }
 
     addSafariPatch();

@@ -14,13 +14,13 @@
     border: 1px solid var(--SmartThemeBorderColor);
     border-radius: 10px;
     padding: 14px;
-    z-index: 9000;
+    z-index: var(--sb-z-streaming);
     display: flex;
     flex-direction: column;
     gap: 10px;
     opacity: 0;
     transform: translateY(20px);
-    transition: opacity var(--animation-duration, 125ms) ease, transform var(--animation-duration, 125ms) ease;
+    transition: opacity var(--sb-transition-fast), transform var(--sb-transition-fast);
     overflow: hidden;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
     backdrop-filter: blur(12px);
@@ -107,7 +107,7 @@
     align-items: center;
     justify-content: center;
     opacity: 0.6;
-    transition: opacity 0.15s ease, background-color 0.15s ease;
+    transition: opacity var(--sb-transition-fast), background-color var(--sb-transition-fast);
 }
 
 .streaming-display-btn:hover {
@@ -134,7 +134,7 @@
     flex-direction: column;
     gap: 10px;
     overflow: hidden;
-    transition: max-height var(--animation-duration, 125ms) ease, opacity var(--animation-duration, 125ms) ease;
+    transition: max-height var(--sb-transition-fast), opacity var(--sb-transition-fast);
 }
 
 /* Minimized state - hide content sections */
@@ -161,10 +161,10 @@
 
 /* Reasoning (thinking) section */
 .streaming-display-reasoning {
-    background: color-mix(in srgb, var(--SmartThemeBodyColor) 5%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
     border-radius: 6px;
     padding: 8px 10px;
-    border-left: 3px solid color-mix(in srgb, var(--SmartThemeBodyColor) 25%, transparent);
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor) 18%, transparent);
 }
 
 .streaming-display-reasoning-label {
@@ -233,4 +233,11 @@
 .streaming-display-text-content q:before,
 .streaming-display-text-content q:after {
     content: '';
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .streaming-display-led {
+        animation: none !important;
+        opacity: 0.7;
+    }
 }

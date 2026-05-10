@@ -773,7 +773,7 @@
         position: absolute;
         padding: 0;
         filter: drop-shadow(2px 2px 2px #51515199);
-        z-index: 30;
+        z-index: var(--sb-z-raised);
         overflow: hidden;
         right: 0;
         width: fit-content;
@@ -1193,7 +1193,7 @@
         left: 0;
         right: 0;
         filter: drop-shadow(2px 2px 2px #51515199);
-        z-index: 1 !important;
+        z-index: var(--sb-z-raised) !important;
     }
 
     body.waifuMode img.expression {
@@ -1266,7 +1266,7 @@
         position: absolute;
         padding: 0;
         filter: drop-shadow(2px 2px 2px #51515199);
-        z-index: 30;
+        z-index: var(--sb-z-raised);
         overflow: hidden;
         display: none;
         right: 0;
@@ -1384,14 +1384,14 @@
     /* Fix closing artifact - ensure smooth transition */
     .sb-shell-root.fillLeft:not(.openDrawer),
     .sb-shell-root.fillRight:not(.openDrawer) {
-        transition: opacity 180ms ease, visibility 0s 180ms;
+        transition: opacity var(--sb-transition-fast), visibility 0s 180ms;
         opacity: 0;
         visibility: hidden;
     }
 
     .sb-shell-root.fillLeft.openDrawer,
     .sb-shell-root.fillRight.openDrawer {
-        transition: opacity 180ms ease;
+        transition: opacity var(--sb-transition-fast);
         opacity: 1;
         visibility: visible;
     }
@@ -1435,7 +1435,7 @@
         max-width: 100dvw !important;
         height: calc(100dvh - var(--topBarBlockSize)) !important;
         max-height: calc(100dvh - var(--topBarBlockSize)) !important;
-        z-index: 9000 !important;
+        z-index: var(--sb-z-loader) !important;
         overflow-y: auto !important;
         border-radius: 0 !important;
         backdrop-filter: blur(20px);
@@ -1443,7 +1443,7 @@
     }
 
     #character_popup {
-        z-index: 9100 !important;
+        z-index: var(--sb-z-loader) !important;
     }
 
     /*
@@ -1497,7 +1497,7 @@
     }
 
     .select2-dropdown {
-        z-index: 9999 !important;
+        z-index: var(--sb-z-critical) !important;
     }
 
     .select2-container--open .select2-dropdown {

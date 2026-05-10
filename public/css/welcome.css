@@ -932,7 +932,7 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     cursor: pointer;
     border: 1px solid color-mix(in srgb, var(--sb-shell-border, var(--SmartThemeBorderColor)) 80%, transparent);
     background: transparent;
-    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    transition: transform var(--sb-transition-fast), background-color var(--sb-transition-fast), border-color var(--sb-transition-fast), box-shadow var(--sb-transition-fast);
 }
 
 .welcomeRecent .recentChatList .recentChat::before {
@@ -944,7 +944,7 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     pointer-events: none;
     background: var(--sb-welcome-surface-bg);
     opacity: var(--sb-page-control-opacity, 1);
-    transition: background 180ms ease;
+    transition: background var(--sb-transition-fast);
 }
 
 .welcomeRecent .recentChatList .recentChat:hover {
@@ -1358,7 +1358,7 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
 
 .welcomeDeckPanel.is-active {
     display: flex;
-    animation: welcomeDeckFadeIn 180ms ease;
+    animation: welcomeDeckFadeIn 180ms var(--sb-ease-out);
 }
 
 .welcomeAssistantButton {
@@ -2364,5 +2364,19 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
 
     .welcomePanelModeChip {
         min-width: 42px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .welcomeHeroMascot,
+    .welcomeHeroFrame,
+    .welcomeHeroSpark,
+    [class*="welcomeOrbit"] {
+        animation: none !important;
+    }
+
+    .welcomeDeckPanel.is-active {
+        animation: none !important;
+        opacity: 1;
     }
 }

@@ -108,9 +108,9 @@
     border: 1px solid var(--SmartThemeBorderColor);
     border-radius: 14px;
     transition:
-        border-color var(--animation-duration-2x) ease,
-        background-color var(--animation-duration-2x) ease,
-        transform var(--animation-duration-2x) ease;
+        border-color var(--sb-transition-slow),
+        background-color var(--sb-transition-slow),
+        transform var(--sb-transition-slow);
 }
 
 #completion_prompt_manager #completion_prompt_manager_list li.completion_prompt_manager_prompt .prompt_manager_prompt_controls {
@@ -137,20 +137,30 @@
     pointer-events: none;
 }
 
-#completion_prompt_manager #completion_prompt_manager_list li.completion_prompt_manager_prompt span span span {
+#completion_prompt_manager #completion_prompt_manager_list li.completion_prompt_manager_prompt .prompt_manager_prompt_controls > :is(
+    .prompt-manager-send-to-agents-action,
+    .prompt-manager-detach-action,
+    .prompt-manager-edit-action,
+    .prompt-manager-toggle-action
+) {
     align-items: center;
     flex-direction: row;
     justify-content: center;
     margin-left: 0;
     cursor: pointer;
-    transition: background-color var(--animation-duration-2x) ease-in-out, color var(--animation-duration-2x) ease-in-out, opacity var(--animation-duration-2x) ease-in-out;
+    transition: background-color var(--sb-transition-slow), color var(--sb-transition-slow), opacity var(--sb-transition-slow);
     height: 28px;
     width: 28px;
     filter: drop-shadow(0px 0px 2px black);
     opacity: 0.58;
 }
 
-#completion_prompt_manager #completion_prompt_manager_list li.completion_prompt_manager_prompt span span:hover {
+#completion_prompt_manager #completion_prompt_manager_list li.completion_prompt_manager_prompt .prompt_manager_prompt_controls > :is(
+    .prompt-manager-send-to-agents-action,
+    .prompt-manager-detach-action,
+    .prompt-manager-edit-action,
+    .prompt-manager-toggle-action
+):hover {
     opacity: 1;
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 8%, transparent);
 }
@@ -390,7 +400,7 @@
     margin-left: 0.25em;
     font-weight: 600;
     color: var(--SmartThemeBodyColor);
-    transition: var(--animation-duration-2x) ease-in-out;
+    transition: color var(--sb-transition-slow);
     filter: drop-shadow(0px 0px 2px black);
 }
 
@@ -487,7 +497,7 @@
     padding: 1em;
     border: 1px solid var(--SmartThemeBorderColor);
     flex-direction: column;
-    z-index: 9000 !important;
+    z-index: var(--sb-z-loader) !important;
     border-radius: 0;
     backdrop-filter: blur(20px);
     background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 94%, black 6%);

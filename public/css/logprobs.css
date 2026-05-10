@@ -11,7 +11,7 @@
     display: none;
     flex-direction: column;
     box-shadow: 0 0 10px var(--black70a);
-    z-index: 3000;
+    z-index: var(--sb-z-modal);
     left: 0;
     top: 0;
     margin: 0;

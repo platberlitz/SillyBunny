@@ -17,7 +17,7 @@
     right: 0;
     display: flex;
     flex-direction: column;
-    z-index: 3010;
+    z-index: var(--sb-z-modal-content);
     overflow-y: hidden;
     gap: 10px;
 }
@@ -403,7 +403,7 @@
 }
 
 .world_entry .killSwitch.is-disabled i {
-    color: color-mix(in srgb, #d16b6b 78%, var(--SmartThemeBodyColor));
+    color: color-mix(in srgb, var(--sb-color-danger, #d16b6b) 78%, var(--SmartThemeBodyColor));
 }
 
 .world_entry .killSwitch:not(.is-disabled) i {
@@ -512,8 +512,8 @@
 }
 
 .world_entry.wi-entry-state-constant .WIEntryTitleAndStatus select[name="entryStateSelector"] {
-    border-color: color-mix(in srgb, #5aa9ff 58%, transparent);
-    background: color-mix(in srgb, #5aa9ff 12%, transparent);
+    border-color: color-mix(in srgb, var(--sb-color-info, #5aa9ff) 58%, transparent);
+    background: color-mix(in srgb, var(--sb-color-info, #5aa9ff) 12%, transparent);
 }
 
 .world_entry.wi-entry-state-normal .WIEntryTitleAndStatus select[name="entryStateSelector"] {
@@ -521,8 +521,8 @@
 }
 
 .world_entry.wi-entry-state-vectorized .WIEntryTitleAndStatus select[name="entryStateSelector"] {
-    border-color: color-mix(in srgb, #8ecf7a 58%, transparent);
-    background: color-mix(in srgb, #8ecf7a 12%, transparent);
+    border-color: color-mix(in srgb, var(--sb-color-success, #8ecf7a) 58%, transparent);
+    background: color-mix(in srgb, var(--sb-color-success, #8ecf7a) 12%, transparent);
 }
 
 .WIEnteryHeaderControls {
@@ -993,7 +993,7 @@ select.keyselect+span.select2-container .select2-selection--multiple {
         position: fixed;
         top: calc(var(--sb-topbar-layout-offset, var(--topBarBlockSize)) + 18px);
         left: 50%;
-        z-index: 4010;
+        z-index: var(--sb-z-popout);
         box-sizing: border-box;
         width: min(920px, calc(100dvw - 48px));
         max-width: calc(100dvw - 24px);

@@ -32,16 +32,16 @@ dialog {
     -webkit-font-smoothing: subpixel-antialiased;
 
     /* Variables setup */
-    --popup-animation-speed: 200ms;
+    --popup-animation-speed: var(--sb-transition);
 }
 
 /** Popup styles applied to the main popup */
 .popup--animation-fast {
-    --popup-animation-speed: var(--animation-duration);
+    --popup-animation-speed: var(--sb-transition-fast);
 }
 
 .popup--animation-slow {
-    --popup-animation-speed: var(--animation-duration-slow);
+    --popup-animation-speed: var(--sb-transition-slow);
 }
 
 .popup--animation-none {
@@ -94,11 +94,11 @@ dialog {
 
 /* Opening animation */
 .popup[opening] {
-    animation: pop-in var(--popup-animation-speed) ease-in-out;
+    animation: pop-in var(--popup-animation-speed) var(--sb-ease-out);
 }
 
 .popup[opening]::backdrop {
-    animation: fade-in var(--popup-animation-speed) ease-in-out;
+    animation: fade-in var(--popup-animation-speed) var(--sb-ease-out);
 }
 
 /* Fix toast container snapping into the backdrop while the animation is running */
@@ -124,11 +124,11 @@ body.no-blur .popup[open]::backdrop {
 
 /* Closing animation */
 .popup[closing] {
-    animation: pop-out var(--popup-animation-speed) ease-in-out;
+    animation: pop-out var(--popup-animation-speed) var(--sb-ease-out);
 }
 
 .popup[closing]::backdrop {
-    animation: fade-out var(--popup-animation-speed) ease-in-out;
+    animation: fade-out var(--popup-animation-speed) var(--sb-ease-out);
 }
 
 /* Edge inset to match Toastr default spacing */
@@ -226,10 +226,19 @@ body.no-blur .popup[open]::backdrop {
     font-size: 20px;
     padding: 2px 3px 3px 2px;
     opacity: 0.7;
-    transition: opacity 200ms ease;
+    transition: opacity var(--sb-transition);
     backface-visibility: hidden;
 }
 
 .popup .popup-button-close:hover {
     opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .popup[opening],
+    .popup[opening]::backdrop,
+    .popup[closing],
+    .popup[closing]::backdrop {
+        animation-duration: 0.01ms !important;
+    }
 }
