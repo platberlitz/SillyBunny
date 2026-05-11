@@ -1,0 +1,12 @@
+{
+    "display_name": "Input History",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "LenAnderson",
+    "version": "1.6.1",
+    "homePage": "https://github.com/LenAnderson/SillyTavern-InputHistory",
+    "manifest_version": 3
+}

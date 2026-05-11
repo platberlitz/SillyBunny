@@ -61,17 +61,9 @@ const STARTER_PACK_EXTENSIONS = Object.freeze({
         id: 'third-party/sillytavern-character-colors',
         repoUrl: 'https://github.com/platberlitz/sillytavern-character-colors',
     }),
-    quickImageGen: Object.freeze({
-        id: 'third-party/sillytavern-image-gen',
-        repoUrl: 'https://github.com/platberlitz/sillytavern-image-gen',
-    }),
     summarySharder: Object.freeze({
         id: 'third-party/summary-sharder',
         repoUrl: 'https://github.com/Promansis/summary-sharder',
-    }),
-    guidedGenerations: Object.freeze({
-        id: 'third-party/GuidedGenerations-Extension',
-        repoUrl: 'https://github.com/platberlitz/GuidedGenerations-Extension',
     }),
     cssSnippets: Object.freeze({
         id: 'third-party/SillyBunny-CssSnippets',
@@ -92,10 +84,6 @@ const STARTER_PACK_EXTENSIONS = Object.freeze({
     chatCompletionTabs: Object.freeze({
         id: 'third-party/SillyTavern-ChatCompletionTabs',
         repoUrl: 'https://github.com/RivelleDays/SillyTavern-ChatCompletionTabs',
-    }),
-    inputHistory: Object.freeze({
-        id: 'third-party/SillyTavern-InputHistory',
-        repoUrl: 'https://github.com/LenAnderson/SillyTavern-InputHistory',
     }),
     laLib: Object.freeze({
         id: 'third-party/SillyTavern-LALib',
@@ -888,20 +876,6 @@ function buildStarterPackItems() {
                 extensionName: STARTER_PACK_EXTENSIONS.dialogueColors.id,
             }),
             buildExtensionStarterPackItem({
-                title: 'Quick Image Gen',
-                body: `${STARTER_PACK_CREATOR_NAME}'s opt-in image generation companion makes visual moments easier to spin up without hunting through separate tools first.`,
-                icon: 'fa-image',
-                chips: ['Extension', 'Images', 'Opt-in'],
-                extensionName: STARTER_PACK_EXTENSIONS.quickImageGen.id,
-            }),
-            buildExtensionStarterPackItem({
-                title: 'Guided Generations',
-                body: 'A SillyBunny-compatible fork that adds structured generation controls to your chats, letting you guide the AI with specific instructions for each response.',
-                icon: 'fa-compass',
-                chips: ['Extension', 'Generation', 'SillyBunny fork'],
-                extensionName: STARTER_PACK_EXTENSIONS.guidedGenerations.id,
-            }),
-            buildExtensionStarterPackItem({
                 title: 'CSS Snippets',
                 body: 'Manage custom CSS snippets from User Settings. Link snippets to specific themes or chats for per-character styling.',
                 icon: 'fa-palette',
@@ -935,13 +909,6 @@ function buildStarterPackItems() {
                 icon: 'fa-table-columns',
                 chips: ['Extension', 'Recommended', 'Layout'],
                 extensionName: STARTER_PACK_EXTENSIONS.chatCompletionTabs.id,
-            }),
-            buildExtensionStarterPackItem({
-                title: 'Input History',
-                body: 'Keep a recallable history of what you typed so it is easier to retry, revise, or recover longer prompts and roleplay replies without retyping them from scratch.',
-                icon: 'fa-clock-rotate-left',
-                chips: ['Extension', 'Recommended', 'Workflow'],
-                extensionName: STARTER_PACK_EXTENSIONS.inputHistory.id,
             }),
             buildExtensionStarterPackItem({
                 title: 'LALib',

@@ -1,0 +1,12 @@
+{
+  "display_name": "Quick Image Gen",
+  "loading_order": 100,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "platberlitz (vendored by TLD)",
+  "version": "2.0.5",
+  "homePage": "https://github.com/platberlitz/sillytavern-image-gen",
+  "manifest_version": 3
+}

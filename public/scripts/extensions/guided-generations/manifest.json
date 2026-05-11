@@ -1,0 +1,15 @@
+{
+    "display_name": "Guided Generations",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Samueras (vendored by TLD)",
+    "version": "1.7.0",
+    "homePage": "https://github.com/Samueras/GuidedGenerations-Extension",
+    "manifest_version": 3,
+    "hooks": {
+        "activate": "init"
+    }
+}

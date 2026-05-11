@@ -77,10 +77,6 @@ const ignoredExtensionSettingsSelector = ignoredExtensionSettingsSelectors.join(
 const LEGACY_MOONLIT_ECHOES_SETTINGS_KEY = 'SillyTavernMoonlitEchoesTheme';
 const SILLYBUNNY_MOONLIT_ECHOES_EXTENSION_NAME = 'third-party/SillyBunny-MoonlitEchoesTheme';
 const MOONLIT_ECHOES_NOTICE_STORAGE_KEY = 'moonlit_echoes_moved_notice_v1';
-const GUIDED_GENERATIONS_SETTINGS_KEY = 'GuidedGenerations-Extension';
-const SILLYBUNNY_GUIDED_GENERATIONS_EXTENSION_NAME = 'third-party/GuidedGenerations-Extension';
-const SILLYBUNNY_GUIDED_GENERATIONS_REPO_KEY = 'github.com/platberlitz/guidedgenerations-extension';
-const GUIDED_GENERATIONS_NOTICE_STORAGE_KEY = 'guided_generations_fork_notice_v1';
 const genericExtensionSettingsClasses = new Set([
     'alignitemscenter',
     'alignitemsbaseline',
@@ -440,74 +436,6 @@ function maybeShowMoonlitEchoesMovedNotice() {
         },
         onCloseClick() {
             accountStorage.setItem(MOONLIT_ECHOES_NOTICE_STORAGE_KEY, 'true');
-        },
-    });
-}
-
-function getExtensionRepoKey(url) {
-    const normalized = String(url || '')
-        .trim()
-        .toLowerCase()
-        .replace(/\/+$/, '')
-        .replace(/\.git$/, '')
-        .replace(/^git@github\.com:/, 'https://github.com/');
-
-    try {
-        const parsed = new URL(normalized);
-        return `${parsed.hostname}${parsed.pathname}`.replace(/\/+$/, '');
-    } catch {
-        return normalized.replace(/^https?:\/\//, '');
-    }
-}
-
-async function getInstalledExtensionRepoUrl(extensionName) {
-    const externalId = extensionName.replace('third-party', '');
-    const manifestRepoUrl = getExtensionHomePage(manifests[extensionName]);
-    const versionData = await getExtensionVersion(externalId);
-    return versionData?.remoteUrl || manifestRepoUrl;
-}
-
-async function maybeShowGuidedGenerationsForkNotice() {
-    const guidedSettings = extension_settings[GUIDED_GENERATIONS_SETTINGS_KEY];
-    const installedExtension = findExtension(SILLYBUNNY_GUIDED_GENERATIONS_EXTENSION_NAME);
-    if ((!guidedSettings && !installedExtension) || accountStorage.getItem(GUIDED_GENERATIONS_NOTICE_STORAGE_KEY) === 'true') {
-        return;
-    }
-
-    let message = '';
-    if (installedExtension) {
-        const repoUrl = await getInstalledExtensionRepoUrl(installedExtension.name);
-        const isSillyBunnyFork = getExtensionRepoKey(repoUrl) === SILLYBUNNY_GUIDED_GENERATIONS_REPO_KEY;
-
-        if (isSillyBunnyFork && installedExtension.enabled) {
-            return;
-        }
-
-        message = isSillyBunnyFork
-            ? t`Guided Generations needs the SillyBunny-compatible fork enabled to work correctly here. Enable the Guided Generations fork from Launchpad optional installs.`
-            : t`Guided Generations needs the SillyBunny-compatible fork to work correctly here. Delete the current Guided Generations install, then download or install the fork from Launchpad optional installs.`;
-    } else {
-        message = t`Guided Generations needs the SillyBunny-compatible fork to work correctly here. Download or install the Guided Generations fork from Launchpad optional installs.`;
-    }
-
-    const buttonClass = 'guided-generations-launchpad-button';
-    const content = `${message}<br><button type="button" class="menu_button ${buttonClass}">${t`Show in Launchpad`}</button>`;
-    toastr.warning(content, t`Guided Generations fork required`, {
-        timeOut: 0,
-        extendedTimeOut: 0,
-        tapToDismiss: false,
-        closeButton: true,
-        escapeHtml: false,
-        onShown() {
-            const toast = this instanceof HTMLElement ? this : this?.[0];
-            const button = toast?.querySelector?.(`.${buttonClass}`);
-            button?.addEventListener('click', async () => {
-                accountStorage.setItem(GUIDED_GENERATIONS_NOTICE_STORAGE_KEY, 'true');
-                await window.SillyBunnyShell?.highlightLaunchpadItem?.(SILLYBUNNY_GUIDED_GENERATIONS_EXTENSION_NAME);
-            });
-        },
-        onCloseClick() {
-            accountStorage.setItem(GUIDED_GENERATIONS_NOTICE_STORAGE_KEY, 'true');
         },
     });
 }
@@ -2235,8 +2163,6 @@ export async function loadExtensionSettings(settings, versionChanged, enableAuto
     scheduleExtensionAssetPrefetch();
 
     maybeShowMoonlitEchoesMovedNotice();
-    void maybeShowGuidedGenerationsForkNotice();
-
     if (versionChanged && enableAutoUpdate) {
         await autoUpdateExtensions(false);
     }
