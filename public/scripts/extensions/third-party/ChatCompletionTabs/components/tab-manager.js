@@ -359,21 +359,6 @@ export class TabManager {
             content.toggleAttribute('hidden', !isActive);
         });
 
-        // Scroll to top - check multiple possible scroll containers
-        const scrollContainers = [
-            '#left-nav-panel .scrollableInner',
-            '#user-settings-block',
-            '#user-settings-block-content',
-            '.drawer-content',
-        ];
-
-        scrollContainers.forEach(selector => {
-            const container = document.querySelector(selector);
-            if (container) {
-                container.scrollTop = 0;
-            }
-        });
-
         this.activeTab = tabId;
         this.saveTabPreference(tabId);
 
