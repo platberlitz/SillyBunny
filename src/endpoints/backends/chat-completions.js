@@ -1824,7 +1824,7 @@ router.post('/status', async function (request, statusResponse) {
             headers = {};
         } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.CUSTOM) {
             apiUrl = request.body.custom_url;
-            apiKey = readSecret(request.user.directories, SECRET_KEYS.CUSTOM);
+            apiKey = readSecret(request.user.directories, SECRET_KEYS.CUSTOM, request.body.secret_id);
             headers = {};
             mergeObjectWithYaml(headers, request.body.custom_include_headers);
         } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.COHERE) {
@@ -2762,7 +2762,7 @@ router.post('/generate', async function (request, response) {
             }
         } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.CUSTOM) {
             apiUrl = request.body.custom_url;
-            apiKey = readSecret(request.user.directories, SECRET_KEYS.CUSTOM);
+            apiKey = readSecret(request.user.directories, SECRET_KEYS.CUSTOM, request.body.secret_id);
             headers = {};
             bodyParams = {
                 logprobs: request.body.logprobs,
