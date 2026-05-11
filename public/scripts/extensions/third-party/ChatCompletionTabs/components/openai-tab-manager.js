@@ -22,10 +22,9 @@ export class OpenAITabManager {
                     label: 'Parameters',
                     icon: 'fa-solid fa-vial',
                     contentSelectors: [
-                        '#left-nav-panel #range_block_openai',
-                        '#left-nav-panel #openai_settings',
-                        '#left-nav-panel #logit_bias_openai',
-                        '#left-nav-panel [data-source*="openai"]:not(.openai-tab-content):not(.openai-tab-buttons)',
+                        '#left-nav-panel #sb-openai-budget',
+                        '#left-nav-panel #sb-openai-output',
+                        '#left-nav-panel #sb-openai-advanced',
                     ],
                 },
                 prompts: {
@@ -41,7 +40,8 @@ export class OpenAITabManager {
                 return typeof main_api !== 'undefined' &&
                        main_api === 'openai' &&
                        typeof oai_settings !== 'undefined' &&
-                       document.querySelector('#left-nav-panel') !== null;
+                       document.querySelector('#left-nav-panel') !== null &&
+                       document.querySelector('#left-nav-panel #sb-openai-budget') !== null;
             },
         });
 
