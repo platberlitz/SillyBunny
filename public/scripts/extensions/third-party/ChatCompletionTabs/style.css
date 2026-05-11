@@ -31,8 +31,6 @@
 /* Base Tab Buttons */
 .openai-tab-buttons {
     display: flex;
-    position: sticky;
-    top: 0;
     gap: 4px;
     margin-top: 8px;
     padding: 4px;
@@ -41,7 +39,6 @@
     overflow: visible;
     background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, var(--SmartThemeBodyColor) 8%);
     box-shadow: 0 8px 18px color-mix(in srgb, var(--SmartThemeShadowColor, var(--SmartThemeBodyColor)) 10%, transparent);
-    z-index: 1000;
     flex-wrap: nowrap;
 }
 
@@ -106,10 +103,6 @@
 }
 
 @media (max-width: 600px) {
-    .openai-tab-buttons {
-        top: 4px;
-    }
-
     .openai-tab-button {
         min-height: 44px;
         padding-inline: 8px;
