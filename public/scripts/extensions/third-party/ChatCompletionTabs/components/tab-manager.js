@@ -49,6 +49,7 @@ export class TabManager {
             // Double-check removal after a short delay
             setTimeout(() => {
                 if (!this.enabled) {
+                    this.restoreMovedElements(document.querySelector(this.config.containerSelector));
                     this.forceRemoveAllTabElements();
                 }
             }, 100);
@@ -65,10 +66,6 @@ export class TabManager {
         // Remove tab buttons container
         const tabButtons = document.querySelectorAll(`.${this.config.className}-buttons`);
         tabButtons.forEach(el => el.remove());
-
-        // Remove all tab content containers
-        const tabContents = document.querySelectorAll(`.${this.config.className}-content`);
-        tabContents.forEach(el => el.remove());
 
         this.tabButtonsContainer = null;
         this.isTabsCreated = false;
