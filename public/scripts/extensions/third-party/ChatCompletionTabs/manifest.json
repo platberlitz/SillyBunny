@@ -1,0 +1,16 @@
+{
+    "display_name": "Chat Completion Tabs",
+    "author": "Rivelle",
+    "version": "1.0.0",
+    "description": "Adds Parameters/Prompts tabs to the Chat Completion presets panel.",
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "homePage": "https://github.com/RivelleDays/SillyTavern-ChatCompletionTabs",
+    "loading_order": 10,
+    "i18n": {
+        "zh-tw": "i18n/zh-tw.json",
+        "zh-cn": "i18n/zh-cn.json"
+    }
+}
