@@ -75,10 +75,35 @@ function escapeHtml(value) {
 /**
  * Removes user-visible out-of-character blocks from text before prompt assembly.
  * @param {string} text Source text.
+ * @param {boolean} [preserve=false] Whether to keep OOC blocks in this context message.
  * @returns {string} Text without balanced ((...)) blocks.
  */
-export function stripOocBlocksFromContext(text) {
+export function stripOocBlocksFromContext(text, preserve = false) {
+    if (preserve) {
+        return String(text ?? '');
+    }
+
     return replaceBalancedOocBlocks(text, () => '')
+        .replace(/[ \t]{2,}/g, ' ')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+/**
+ * Strips raw HTML tags from older prompt-context messages.
+ * @param {string} text Source text.
+ * @param {boolean} [preserve=false] Whether to keep HTML tags in this context message.
+ * @returns {string} Text with HTML tags removed unless preserved.
+ */
+export function stripHtmlTagsFromContext(text, preserve = false) {
+    const source = String(text ?? '');
+    if (preserve) {
+        return source;
+    }
+
+    return source
+        .replace(/<\/?[a-z][a-z0-9:-]*(?:\s[^>]*)?>/gi, ' ')
         .replace(/[ \t]{2,}/g, ' ')
         .replace(/[ \t]+\n/g, '\n')
         .replace(/\n{3,}/g, '\n\n')

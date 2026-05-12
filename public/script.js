@@ -119,6 +119,7 @@ import {
     extractOocBlocksForDisplay,
     hasTextOrArrayPayload,
     restoreOocBlocksForDisplay,
+    stripHtmlTagsFromContext,
     stripOocBlocksFromContext,
 } from './scripts/ooc-blocks.js';
 
@@ -5456,9 +5457,17 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             regexedMessage = `${regexedMessage}\n\n${titles.join('\n\n')}`;
         }
 
+        const contextDepth = Math.max(0, coreChat.length - index - 1);
+        const oocContextDepth = Math.max(0, Number(power_user.ooc_context_depth) || 0);
+        const htmlContextDepth = Math.max(0, Number(power_user.html_context_depth) || 0);
+        const contextMessage = stripHtmlTagsFromContext(
+            stripOocBlocksFromContext(regexedMessage, contextDepth < oocContextDepth),
+            contextDepth < htmlContextDepth,
+        );
+
         return {
             ...chatItem,
-            mes: stripOocBlocksFromContext(regexedMessage),
+            mes: contextMessage,
             index,
         };
     }));

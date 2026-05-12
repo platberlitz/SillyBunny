@@ -227,6 +227,8 @@ export const power_user = {
     },
     markdown_escape_strings: '',
     chat_truncation: 100,
+    ooc_context_depth: 0,
+    html_context_depth: 0,
     streaming_fps: 30,
     smooth_streaming: false,
     smooth_streaming_no_think: false,
@@ -1864,6 +1866,8 @@ export async function loadPowerUserSettings(settings, data) {
 
     $('#chat_truncation').val(power_user.chat_truncation);
     $('#chat_truncation_counter').val(power_user.chat_truncation);
+    $('#ooc_context_depth').val(power_user.ooc_context_depth);
+    $('#html_context_depth').val(power_user.html_context_depth);
 
     $('#streaming_fps').val(power_user.streaming_fps);
     $('#streaming_fps_counter').val(power_user.streaming_fps);
@@ -3541,6 +3545,18 @@ jQuery(async () => {
     $('#chat_truncation').on('input', function () {
         power_user.chat_truncation = Number($('#chat_truncation').val());
         $('#chat_truncation_counter').val(power_user.chat_truncation);
+        saveSettingsDebounced();
+    });
+
+    $('#ooc_context_depth').on('input', function () {
+        power_user.ooc_context_depth = Math.max(0, Number($(this).val()) || 0);
+        $(this).val(power_user.ooc_context_depth);
+        saveSettingsDebounced();
+    });
+
+    $('#html_context_depth').on('input', function () {
+        power_user.html_context_depth = Math.max(0, Number($(this).val()) || 0);
+        $(this).val(power_user.html_context_depth);
         saveSettingsDebounced();
     });
 
