@@ -5586,6 +5586,7 @@ function hideCharacterMainPanels() {
     const infoPanel = document.getElementById('result_info');
     const pinAndTabs = document.getElementById('rm_PinAndTabs');
     const characterEditor = document.getElementById('rm_ch_create_block');
+    const groupEditor = document.getElementById('rm_group_chats_block');
     const characterList = document.getElementById('rm_characters_block');
 
     if (infoPanel instanceof HTMLElement) {
@@ -5600,6 +5601,12 @@ function hideCharacterMainPanels() {
         characterEditor.style.display = 'none';
         characterEditor.style.visibility = 'hidden';
         characterEditor.style.pointerEvents = 'none';
+    }
+
+    if (groupEditor instanceof HTMLElement) {
+        groupEditor.style.display = 'none';
+        groupEditor.style.visibility = 'hidden';
+        groupEditor.style.pointerEvents = 'none';
     }
 
     if (characterList instanceof HTMLElement) {

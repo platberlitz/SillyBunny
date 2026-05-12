@@ -5031,6 +5031,144 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     }
 }
 
+@media screen and (max-width: 768px), (pointer: coarse) {
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #rm_group_chats_block {
+        padding-inline: 8px;
+        gap: 10px;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #rm_group_top_bar {
+        grid-template-columns: minmax(0, 1fr);
+        justify-items: stretch;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #rm_group_top_bar > div:first-child,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) .sb-group-editor-primary,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) .sb-group-editor-action-cluster,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) .sb-group-editor-name-row label,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #group_tags_div,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) .sb-group-editor-name-row::after {
+        grid-column: 1 / -1;
+        grid-row: auto;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #rm_group_top_bar > div:first-child {
+        justify-self: center;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #rm_group_top_bar .avatar,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #rm_group_top_bar .avatar img {
+        width: 92px !important;
+        min-width: 92px !important;
+        max-width: 92px !important;
+        height: 92px !important;
+        min-height: 92px !important;
+        max-height: 92px !important;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) .sb-group-editor-primary,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) .sb-group-editor-name-row {
+        width: 100%;
+        min-width: 0;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) .sb-group-editor-name-row,
+    #right-nav-panel[data-menu-type="group_edit"] .sb-group-editor-name-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) .sb-group-editor-name-row::after {
+        display: none;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) .sb-group-editor-action-cluster,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) .sb-group-editor-side-actions,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) .sb-group-editor-utility-actions {
+        width: 100%;
+        max-width: 100%;
+        flex-wrap: wrap;
+        justify-content: stretch;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) :is(.sb-group-editor-side-actions, .sb-group-editor-utility-actions) .menu_button,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack .menu_button {
+        width: var(--sb-mobile-touch-target, 44px);
+        min-width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+        max-height: var(--sb-mobile-touch-target, 44px);
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) .sb-group-editor-side-actions :is(#group_favorite_button, #rm_group_scenario),
+    #right-nav-panel[data-menu-type="group_create"] .sb-group-editor-utility-actions #rm_group_submit {
+        flex: 1 1 min(10rem, 100%);
+        min-width: min(10rem, 100%);
+        height: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+        max-height: none;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #group_tags_div {
+        width: 100%;
+        justify-self: stretch;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #group_tags_div .tag_controls {
+        grid-template-columns: minmax(0, 1fr) var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #groupTagInput,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #group_tags_div .tags_view,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #group-chat-lorebook-dropdown,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #rm_group_chat_name {
+        min-height: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack > .flex1,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack > .group_schedule_controls,
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack > .group_schedule_controls > .flex-container:first-child {
+        grid-template-columns: minmax(0, 1fr);
+        width: 100%;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack > .flex1 > :is(#rm_group_automode_label, #rm_group_auto_dm_cooldown_label),
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #rm_group_auto_dm_cooldown_label {
+        grid-template-columns: 18px minmax(0, 1fr) minmax(4.5em, 5.5em) max-content !important;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack > .group_schedule_controls > .flex-container:first-child > .checkbox_label {
+        grid-template-columns: 18px minmax(0, 1fr);
+        width: 100%;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack #rm_group_generate_schedule {
+        width: 100% !important;
+        inline-size: 100% !important;
+        min-width: 0 !important;
+        min-inline-size: 0 !important;
+        min-height: var(--sb-mobile-touch-target, 44px);
+        height: auto;
+        max-height: none;
+        justify-self: stretch;
+        padding-inline: 12px !important;
+        white-space: normal;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack #rm_group_generate_schedule span {
+        min-width: 0;
+        white-space: normal;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #rm_group_ai_schedule {
+        min-height: 9rem;
+    }
+}
+
 #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #rm_group_buttons {
     display: grid;
     grid-template-columns: repeat(2, minmax(140px, 1fr));
@@ -6608,12 +6746,15 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         pointer-events: auto !important;
         z-index: var(--sb-z-modal) !important;
         top: var(--sb-topbar-layout-offset) !important;
+        height: calc(100vh - var(--sb-topbar-layout-offset) - 16px) !important;
         height: calc(100dvh - var(--sb-topbar-layout-offset) - 16px) !important;
+        max-height: calc(100vh - var(--sb-topbar-layout-offset) - 16px) !important;
         max-height: calc(100dvh - var(--sb-topbar-layout-offset) - 16px) !important;
         left: 0 !important;
         right: 0 !important;
         width: 100vw !important;
         width: 100dvw !important;
+        max-width: 100vw !important;
         max-width: 100dvw !important;
         min-width: 0 !important;
         margin: 0 !important;
@@ -6630,14 +6771,15 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         -webkit-overflow-scrolling: auto !important;
     }
 
-    #right-nav-panel.openDrawer * {
-        pointer-events: auto !important;
-    }
-
     #right-nav-panel.openDrawer .right_menu.sb-active-right-menu {
         opacity: 1 !important;
         visibility: visible !important;
         pointer-events: auto !important;
+    }
+
+    #right-nav-panel.openDrawer > :is(.sb-character-shell-nav-wrapper, .sb-character-shell-header, #CharListButtonAndHotSwaps, #rm_PinAndTabs, .scrollableInner, .scrollableInnerFull),
+    #right-nav-panel.openDrawer :is(button, input, select, textarea, label, a, .menu_button, .right_menu_button, .character_select, .group_select, .bogus_folder_select, .inline-drawer-toggle) {
+        pointer-events: auto;
     }
 
     #right-nav-panel.openDrawer > #right-nav-panelheader {
@@ -6655,7 +6797,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     }
 
     #right-nav-panel.openDrawer .sb-character-shell-nav .sb-shell-tab {
-        min-height: 38px;
+        min-height: var(--sb-mobile-touch-target, 44px);
         padding: 7px 10px;
         border-radius: 10px;
     }
@@ -6906,7 +7048,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     }
 
     #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_create {
-        min-height: 42px;
+        min-height: var(--sb-mobile-touch-target, 44px);
         padding-inline: 10px !important;
     }
 
@@ -6944,7 +7086,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         color: var(--color-primary, var(--sb-accent)) !important;
     }
 
-    #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar):has(.tags_inline .tag) {
+    #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) {
         min-height: calc(var(--sb-character-list-avatar-size) + 46px);
     }
 
