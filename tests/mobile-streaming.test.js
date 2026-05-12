@@ -27,6 +27,13 @@ describe('mobile streaming helpers', () => {
         })).toBe(500);
     });
 
+    test('allows iOS WebKit streaming floors to be disabled', () => {
+        expect(getStreamingUpdateInterval(33, {
+            navigatorRef: { platform: 'iPhone', maxTouchPoints: 1 },
+            enabled: false,
+        })).toBe(33);
+    });
+
     test('skips repeated hidden live reasoning renders on reduced DOM platforms', () => {
         expect(shouldRenderLiveReasoningContent({
             isReducedDomWork: true,

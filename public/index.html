@@ -5566,6 +5566,27 @@
                                 <i class="fa-solid fa-flask" data-i18n="[title]Experimental feature. May not work for all backends." title="Experimental feature. May not work for all backends."></i>
                             </label>
 
+                            <div name="IOSWebKitStreamingToggles">
+                                <h4><span data-i18n="iOS Streaming Stability">iOS Streaming Stability</span></h4>
+                                <small data-i18n="iOS Streaming Stability_desc">Controls iPhone and iPad WebKit safeguards for long streamed generations.</small>
+                                <label class="checkbox_label" for="ios_webkit_conservative_streaming" title="Use a lower live update rate and slower live reasoning refreshes on iOS WebKit." data-i18n="[title]Use a lower live update rate and slower live reasoning refreshes on iOS WebKit.">
+                                    <input id="ios_webkit_conservative_streaming" type="checkbox" />
+                                    <small data-i18n="Conservative iOS stream timing">Conservative iOS stream timing</small>
+                                </label>
+                                <label class="checkbox_label" for="ios_webkit_reduce_streaming_work" title="Defer token counts, metadata badges, and swipe metadata snapshots until the final streamed render on iOS WebKit." data-i18n="[title]Defer token counts, metadata badges, and swipe metadata snapshots until the final streamed render on iOS WebKit.">
+                                    <input id="ios_webkit_reduce_streaming_work" type="checkbox" />
+                                    <small data-i18n="Reduce live iOS stream work">Reduce live iOS stream work</small>
+                                </label>
+                                <label class="checkbox_label" for="ios_webkit_disable_smooth_streaming" title="Use normal SSE chunks instead of per-character smooth streaming on iOS WebKit." data-i18n="[title]Use normal SSE chunks instead of per-character smooth streaming on iOS WebKit.">
+                                    <input id="ios_webkit_disable_smooth_streaming" type="checkbox" />
+                                    <small data-i18n="Bypass iOS smooth streaming">Bypass iOS smooth streaming</small>
+                                </label>
+                                <label class="checkbox_label" for="ios_webkit_disable_stream_fade_in" title="Use the lighter live DOM patch path instead of stream fade-in segmentation on iOS WebKit." data-i18n="[title]Use the lighter live DOM patch path instead of stream fade-in segmentation on iOS WebKit.">
+                                    <input id="ios_webkit_disable_stream_fade_in" type="checkbox" />
+                                    <small data-i18n="Bypass iOS stream fade-in">Bypass iOS stream fade-in</small>
+                                </label>
+                            </div>
+
                             <label for="play_message_sound" class="checkbox_label" title="Play a sound when a message generation finishes." data-i18n="[title]Play a sound when a message generation finishes">
                                 <input id="play_message_sound" type="checkbox" />
                                 <audio id="audio_message_sound" src="sounds/message.mp3" hidden></audio>

@@ -4451,7 +4451,8 @@ class StreamingProcessor {
     async onProgressStreaming(messageId, text, isFinal) {
         const isImpersonate = this.type == 'impersonate';
         const isContinue = this.type == 'continue';
-        const shouldReduceIntermediateStreamingWork = !isFinal && isIOSWebKitPlatform();
+        const isIOSWebKit = isIOSWebKitPlatform();
+        const shouldReduceIntermediateStreamingWork = !isFinal && isIOSWebKit && power_user.ios_webkit_reduce_streaming_work;
         const shouldPinMobileBottom = !isImpersonate && shouldPinMobileChatToBottom();
 
         if (!isImpersonate && !isContinue && Array.isArray(this.swipes) && this.swipes.length > 0) {
@@ -4551,7 +4552,9 @@ class StreamingProcessor {
             );
             if (this.messageTextDom instanceof HTMLElement) {
                 if (power_user.stream_fade_in) {
-                    applyStreamFadeIn(this.messageTextDom, formattedText);
+                    applyStreamFadeIn(this.messageTextDom, formattedText, {
+                        bypassFadeIn: isIOSWebKit && power_user.ios_webkit_disable_stream_fade_in,
+                    });
                 } else {
                     this.messageTextDom.innerHTML = formattedText;
                 }
@@ -4713,7 +4716,9 @@ class StreamingProcessor {
         this.stoppingStrings = getStoppingStrings(isImpersonate, isContinue, main_api);
 
         try {
-            const sw = new Stopwatch(getStreamingUpdateInterval(1000 / power_user.streaming_fps));
+            const sw = new Stopwatch(getStreamingUpdateInterval(1000 / power_user.streaming_fps, {
+                enabled: power_user.ios_webkit_conservative_streaming,
+            }));
             const timestamps = [];
             for await (const { text, swipes, logprobs, toolCalls, state } of this.generator()) {
                 const now = Date.now();

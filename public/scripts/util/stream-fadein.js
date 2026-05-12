@@ -1,5 +1,4 @@
 import { morphdom } from '../../lib.js';
-import { isIOSWebKitPlatform } from '../mobile-send-button.js';
 
 /**
  * Check if the current browser supports native segmentation function.
@@ -74,9 +73,11 @@ export function applyStreamDomPatch(messageTextElement, htmlContent) {
  * Apply stream fade-in effect to the given message text element by morphing its content.
  * @param {HTMLElement} messageTextElement Message text element
  * @param {string} htmlContent New HTML content to apply
+ * @param {object} [options]
+ * @param {boolean} [options.bypassFadeIn] Use the lighter DOM patch path instead of segmenting text
  */
-export function applyStreamFadeIn(messageTextElement, htmlContent) {
-    if (isIOSWebKitPlatform()) {
+export function applyStreamFadeIn(messageTextElement, htmlContent, { bypassFadeIn = false } = {}) {
+    if (bypassFadeIn) {
         applyStreamDomPatch(messageTextElement, htmlContent);
         return;
     }

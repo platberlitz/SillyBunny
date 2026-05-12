@@ -380,7 +380,8 @@ export class SmoothEventSourceStream extends EventSourceStream {
 }
 
 export function getEventSourceStream() {
-    if (power_user.smooth_streaming && !isIOSWebKitPlatform()) {
+    const shouldBypassSmoothStreaming = power_user.ios_webkit_disable_smooth_streaming && isIOSWebKitPlatform();
+    if (power_user.smooth_streaming && !shouldBypassSmoothStreaming) {
         return new SmoothEventSourceStream();
     }
 
