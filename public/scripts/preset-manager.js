@@ -488,6 +488,16 @@ class PresetManager {
         }
 
         const name = selected.text();
+        const headerText = !this.isAdvancedFormatting() ? t`Save this preset?` : t`Save this template?`;
+        const bodyText = !this.isAdvancedFormatting()
+            ? t`This will overwrite the selected preset.`
+            : t`This will overwrite the selected template.`;
+        const confirm = await Popup.show.confirm(headerText, bodyText);
+        if (confirm !== POPUP_RESULT.AFFIRMATIVE) {
+            console.debug(!this.isAdvancedFormatting() ? 'Preset update cancelled' : 'Template update cancelled');
+            return;
+        }
+
         await this.savePreset(name, null, option);
 
         const successToast = !this.isAdvancedFormatting() ? t`Preset updated` : t`Template updated`;
