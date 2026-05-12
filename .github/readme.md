@@ -214,7 +214,7 @@ SillyBunny includes some extras by default to help you get started right away:
 * A tutorial that guides you through the SillyBunny interface.
 * Pre-bundled roleplay presets from purachina and Geechan.
 * A character card conversion preset from TLD to help you generate character cards from scratch, or convert from existing cards to a better format.
-* A friendly quick-start guide with optional recommended extensions (Summary Sharder, Dialogue Colours, Quick Image Gen, Guided Generations, CSS Snippets).
+* A friendly quick-start guide with bundled workflow helpers plus optional recommended extensions such as Summary Sharder, Dialogue Colours, and CSS Snippets.
 * Two custom assistants to help you get started - Bunny Guide, and Assistant Nahida.
 
 ---
