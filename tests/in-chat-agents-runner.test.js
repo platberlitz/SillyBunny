@@ -59,6 +59,8 @@ describe('in-chat agent post-processing runner', () => {
             CHARACTER_MESSAGE_RENDERED: 'character_message_rendered',
             IMPERSONATE_READY: 'impersonate_ready',
             MESSAGE_SWIPED: 'message_swiped',
+            GENERATE_AFTER_COMBINE_PROMPTS: 'generate_after_combine_prompts',
+            CHAT_COMPLETION_PROMPT_READY: 'chat_completion_prompt_ready',
             CHAT_COMPLETION_SETTINGS_READY: 'chat_completion_settings_ready',
             WORLDINFO_ENTRIES_LOADED: 'worldinfo_entries_loaded',
             CHAT_CHANGED: 'chat_changed',
@@ -138,7 +140,7 @@ describe('in-chat agent post-processing runner', () => {
                     extra: {},
                 }));
             }),
-            extension_prompt_roles: { SYSTEM: 0 },
+            extension_prompt_roles: { SYSTEM: 0, USER: 1, ASSISTANT: 2 },
             extension_prompt_types: { IN_PROMPT: 0, IN_CHAT: 1 },
             extension_prompts: extensionPrompts,
             setExtensionPrompt: jest.fn((key, value) => {
@@ -195,6 +197,7 @@ describe('in-chat agent post-processing runner', () => {
             getGlobalSettings: jest.fn(() => globalSettings),
             getPromptTransformMode: jest.fn(agent => agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite'),
             isToolAgent: jest.fn(() => false),
+            normalizePreProcessMaxTokens: jest.fn(value => Number.isFinite(Number(value)) ? Math.max(16, Math.min(16000, Number(value))) : 8192),
             normalizePromptTransformMaxTokens: jest.fn(value => Number.isFinite(Number(value)) ? Math.max(16, Math.min(16000, Number(value))) : 8192),
             resolveConnectionProfile: jest.fn(value => value ?? ''),
         }));
@@ -276,6 +279,45 @@ describe('in-chat agent post-processing runner', () => {
                 generationTypes: ['normal'],
             },
         }];
+    }
+
+    function createPreInterceptAgent(overrides = {}) {
+        return {
+            id: overrides.id ?? 'agent-pre-intercept',
+            name: overrides.name ?? 'Pre Intercept',
+            phase: overrides.phase ?? 'pre',
+            prompt: overrides.prompt ?? 'Rewrite the outgoing context.',
+            injection: {
+                position: 0,
+                depth: 4,
+                scan: false,
+                role: 0,
+                order: 100,
+                ...(overrides.injection ?? {}),
+            },
+            preProcess: {
+                mode: 'intercept',
+                applyMode: 'replace',
+                wrapPosition: 'after',
+                wrapPrefix: '',
+                wrapSuffix: '',
+                patchStartTag: '<context_patch>',
+                patchEndTag: '</context_patch>',
+                maxTokens: 8192,
+                ...(overrides.preProcess ?? {}),
+            },
+            postProcess: {
+                enabled: false,
+                promptTransformEnabled: false,
+                ...(overrides.postProcess ?? {}),
+            },
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+                ...(overrides.conditions ?? {}),
+            },
+        };
     }
 
     function useManualTransformAgents() {
@@ -503,6 +545,137 @@ describe('in-chat agent post-processing runner', () => {
 
         expect(extensionPrompts.pathfinder_pipeline_retrieval).toEqual({ value: 'retrieved lore' });
         expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toEqual({ value: 'Use the current scene style.' });
+    });
+
+    test('runs pre-generation intercept agents on text prompts without injecting their prompt', async () => {
+        enabledAgents = [createPreInterceptAgent({
+            preProcess: { applyMode: 'replace', maxTokens: 123 },
+        })];
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+
+        const eventData = { prompt: 'Original outgoing prompt', dryRun: false };
+        await eventSource.emit(eventTypes.GENERATE_AFTER_COMBINE_PROMPTS, eventData);
+
+        expect(extensionPrompts['inchat_agent_agent-pre-intercept']).toBeUndefined();
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(1);
+        expect(generateQuietPrompt.mock.calls[0][0]).toEqual(expect.objectContaining({
+            quietName: 'In-Chat Agent',
+            responseLength: 123,
+            skipWIAN: true,
+            removeReasoning: true,
+        }));
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('Outgoing context:');
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('Original outgoing prompt');
+        expect(eventData.prompt).toBe('quiet result');
+    });
+
+    test('chains multiple pre-generation intercept agents by order', async () => {
+        enabledAgents = [
+            createPreInterceptAgent({
+                id: 'agent-second',
+                name: 'Second',
+                prompt: 'Second pass.',
+                injection: { order: 20 },
+            }),
+            createPreInterceptAgent({
+                id: 'agent-first',
+                name: 'First',
+                prompt: 'First pass.',
+                injection: { order: 10 },
+            }),
+        ];
+        generateQuietPrompt
+            .mockResolvedValueOnce('first output')
+            .mockResolvedValueOnce('second output');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        const eventData = { prompt: 'Original prompt', dryRun: false };
+        await eventSource.emit(eventTypes.GENERATE_AFTER_COMBINE_PROMPTS, eventData);
+
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(2);
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('First pass.');
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('Original prompt');
+        expect(generateQuietPrompt.mock.calls[1][0].quietPrompt).toContain('Second pass.');
+        expect(generateQuietPrompt.mock.calls[1][0].quietPrompt).toContain('first output');
+        expect(eventData.prompt).toBe('second output');
+    });
+
+    test('replaces chat completion prompts when intercept output is a message array', async () => {
+        enabledAgents = [createPreInterceptAgent()];
+        generateQuietPrompt.mockResolvedValue(JSON.stringify([
+            { role: 'system', content: 'rewritten system prompt' },
+            { role: 'user', content: 'rewritten user prompt' },
+        ]));
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        const eventData = {
+            chat: [{ role: 'user', content: 'original user prompt' }],
+            dryRun: false,
+        };
+        await eventSource.emit(eventTypes.CHAT_COMPLETION_PROMPT_READY, eventData);
+
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(1);
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('JSON array of chat-completion messages');
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('original user prompt');
+        expect(eventData.chat).toEqual([
+            { role: 'system', content: 'rewritten system prompt' },
+            { role: 'user', content: 'rewritten user prompt' },
+        ]);
+    });
+
+    test('adds patch messages for chat completion intercept agents in patch mode', async () => {
+        enabledAgents = [createPreInterceptAgent({
+            injection: { role: 1 },
+            preProcess: {
+                applyMode: 'patch',
+                wrapPosition: 'before',
+                patchStartTag: '<patch>',
+                patchEndTag: '</patch>',
+            },
+        })];
+        generateQuietPrompt.mockResolvedValue('patch note');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        const originalMessage = { role: 'user', content: 'original user prompt' };
+        const eventData = { chat: [originalMessage], dryRun: false };
+        await eventSource.emit(eventTypes.CHAT_COMPLETION_PROMPT_READY, eventData);
+
+        expect(eventData.chat).toEqual([
+            { role: 'user', content: '<patch>\npatch note\n</patch>' },
+            originalMessage,
+        ]);
+    });
+
+    test('skips pre-generation intercepts during dry runs and outside active generation', async () => {
+        enabledAgents = [createPreInterceptAgent()];
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        const inactiveEventData = { prompt: 'inactive prompt', dryRun: false };
+        await eventSource.emit(eventTypes.GENERATE_AFTER_COMBINE_PROMPTS, inactiveEventData);
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        const dryRunEventData = { prompt: 'dry run prompt', dryRun: true };
+        await eventSource.emit(eventTypes.GENERATE_AFTER_COMBINE_PROMPTS, dryRunEventData);
+
+        expect(generateQuietPrompt).not.toHaveBeenCalled();
+        expect(inactiveEventData.prompt).toBe('inactive prompt');
+        expect(dryRunEventData.prompt).toBe('dry run prompt');
     });
 
     test('queues manual agent runs while another manual agent is active in sequential mode', async () => {

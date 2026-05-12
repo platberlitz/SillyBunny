@@ -26,6 +26,7 @@ import {
     getGlobalSettings,
     getPromptTransformMode,
     isToolAgent,
+    normalizePreProcessMaxTokens,
     normalizePromptTransformMaxTokens,
     resolveConnectionProfile,
 } from './agent-store.js';
@@ -61,6 +62,7 @@ const PREPEND_PROMPT_TRANSFORM_TEMPLATE_IDS = new Set([
 ]);
 const PREPEND_PROMPT_TRANSFORM_TAG_RE = /\[(?:SCENE|TIME)\|/;
 const ASSISTANT_RESPONSE_WRAPPER_RE = /^\s*<assistant_response>\s*([\s\S]*?)\s*<\/assistant_response>\s*$/i;
+const CONTEXT_INTERCEPT_OUTPUT_RE = /^\s*<context>\s*([\s\S]*?)\s*<\/context>\s*$/i;
 const BODY_GENERATING_FLAG_GRACE_MS = 1500;
 const DEFERRED_POST_PROCESSING_RETRY_MS = 50;
 const LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS = 30000;
@@ -1398,6 +1400,15 @@ function getPromptTransformAgentsForImpersonate(activeAgents) {
     return getPromptTransformAgents(activeAgents).filter(agent => Boolean(agent?.conditions?.runOnImpersonate));
 }
 
+function getPreGenerationInterceptAgents(activeAgents) {
+    return activeAgents.filter(agent =>
+        !isToolAgent(agent) &&
+        (agent.phase === 'pre' || agent.phase === 'both') &&
+        agent.preProcess?.mode === 'intercept' &&
+        String(agent.prompt ?? '').trim(),
+    ).sort((a, b) => Number(a?.injection?.order ?? 100) - Number(b?.injection?.order ?? 100));
+}
+
 function describePromptTransformMode(mode) {
     return mode === 'append' ? 'prompt append' : 'prompt rewrite';
 }
@@ -1671,6 +1682,81 @@ function unwrapAssistantResponseWrapper(value) {
     return text;
 }
 
+function unwrapContextInterceptOutput(value = '') {
+    let text = unwrapAssistantResponseWrapper(value);
+    let previousText = null;
+    let passCount = 0;
+
+    while (text !== previousText && passCount < 8) {
+        previousText = text;
+        const match = text.match(CONTEXT_INTERCEPT_OUTPUT_RE);
+        if (!match) {
+            break;
+        }
+
+        text = match[1];
+        passCount += 1;
+    }
+
+    return text;
+}
+
+function formatContextMessageContent(content) {
+    if (typeof content === 'string') {
+        return content;
+    }
+
+    if (content === null || content === undefined) {
+        return '';
+    }
+
+    return JSON.stringify(content, null, 2);
+}
+
+function serializeChatContext(chatMessages) {
+    return JSON.stringify((Array.isArray(chatMessages) ? chatMessages : []).map(message => ({
+        ...message,
+        content: formatContextMessageContent(message?.content),
+    })), null, 2);
+}
+
+function parseChatContext(value) {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) {
+        throw new Error('Intercepted chat context must be a JSON array of chat messages.');
+    }
+
+    return parsed;
+}
+
+function buildPatchTaggedText(text, preProcess = {}) {
+    const startTag = String(preProcess.patchStartTag ?? '').trim() || '<context_patch>';
+    const endTag = String(preProcess.patchEndTag ?? '').trim() || '</context_patch>';
+    return `${startTag}\n${text}\n${endTag}`;
+}
+
+function applyContextInterceptText(originalText, interceptText, preProcess = {}) {
+    const outputText = unwrapContextInterceptOutput(interceptText);
+    const applyMode = preProcess.applyMode === 'wrap' || preProcess.applyMode === 'patch'
+        ? preProcess.applyMode
+        : 'replace';
+
+    if (applyMode === 'wrap') {
+        const wrappedText = `${String(preProcess.wrapPrefix ?? '')}${outputText}${String(preProcess.wrapSuffix ?? '')}`;
+        if (preProcess.wrapPosition === 'before') {
+            return joinPromptTransformText(wrappedText, originalText);
+        }
+
+        return joinPromptTransformText(originalText, wrappedText);
+    }
+
+    if (applyMode === 'patch') {
+        return joinPromptTransformText(originalText, buildPatchTaggedText(outputText, preProcess));
+    }
+
+    return outputText;
+}
+
 function buildPromptTransformMessages(agentPrompt, messageText, assistantName, generationType, mode) {
     const isImpersonate = isImpersonateGenerationType(generationType);
     const targetLabel = isImpersonate ? 'generated impersonation text' : 'assistant response';
@@ -1690,6 +1776,21 @@ function buildPromptTransformMessages(agentPrompt, messageText, assistantName, g
         {
             role: 'user',
             content: `Assistant name: ${assistantName || 'Assistant'}\nGeneration type: ${generationType}\n\n${responseLabel}:\n<assistant_response>\n${currentAssistantResponse}\n</assistant_response>`,
+        },
+    ];
+}
+
+function buildContextInterceptMessages(agentPrompt, contextText, generationType, contextFormat) {
+    const formatLabel = contextFormat === 'chat' ? 'JSON array of chat-completion messages' : 'plain text completion prompt';
+
+    return [
+        {
+            role: 'system',
+            content: `${agentPrompt}\n\nYou are modifying the complete outgoing context before the main model sees it. Return only the revised context content requested by the instructions above. Do not add commentary, labels, or code fences unless they are part of the context itself. If no changes are needed, return the original context content verbatim.`,
+        },
+        {
+            role: 'user',
+            content: `Generation type: ${generationType}\nContext format: ${formatLabel}\n\nOutgoing context:\n<context>\n${contextText}\n</context>`,
         },
     ];
 }
@@ -2213,7 +2314,10 @@ function clearInChatAgentExtensionPrompts() {
 }
 
 function injectPreGenerationAgentPrompts(activeAgents, generationType) {
-    const promptAgents = activeAgents.filter(agent => agent.phase === 'pre' || agent.phase === 'both');
+    const promptAgents = activeAgents.filter(agent =>
+        (agent.phase === 'pre' || agent.phase === 'both') &&
+        agent.preProcess?.mode !== 'intercept',
+    );
 
     for (const agent of promptAgents) {
         if (isToolAgent(agent)) {
@@ -2737,6 +2841,174 @@ async function runPromptTransformAgentsForText(promptTransformAgents, initialTex
     };
 }
 
+async function runContextInterceptAgentOutput(agent, currentContextText, generationType, contextFormat) {
+    const expandedPrompt = substituteParams(agent.prompt, {
+        original: currentContextText,
+        dynamicMacros: buildPromptDynamicMacros(currentContextText, null, agent, generationType),
+    }).trim();
+
+    if (!expandedPrompt || !currentContextText.trim()) {
+        return null;
+    }
+
+    const promptMessages = buildContextInterceptMessages(expandedPrompt, currentContextText, generationType, contextFormat);
+    const response = await requestPromptTransform(
+        agent,
+        promptMessages,
+        normalizePreProcessMaxTokens(agent.preProcess?.maxTokens),
+    );
+    const outputText = unwrapContextInterceptOutput(response.output).trim();
+
+    if (!outputText) {
+        console.warn(`[InChatAgents] pre-generation intercept agent "${agent.name}" returned an empty response.`);
+        return null;
+    }
+
+    return outputText;
+}
+
+function getGenerationContextSnapshot(generationType = null) {
+    const normalizedGenerationType = normalizeGenerationType(generationType ?? currentMainGenerationType);
+
+    if (pendingGenerationSnapshot?.generationType === normalizedGenerationType) {
+        return cloneActivationSnapshot(pendingGenerationSnapshot, normalizedGenerationType);
+    }
+
+    return buildActivationSnapshot(normalizedGenerationType);
+}
+
+async function runPreGenerationInterceptorsOnText(initialContextText, generationType, contextFormat) {
+    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
+        return initialContextText;
+    }
+
+    let currentContextText = String(initialContextText ?? '');
+    if (!currentContextText.trim()) {
+        return currentContextText;
+    }
+
+    const activationSnapshot = getGenerationContextSnapshot(generationType);
+    const interceptAgents = getPreGenerationInterceptAgents(getSnapshotAgents(activationSnapshot));
+    if (interceptAgents.length === 0) {
+        return currentContextText;
+    }
+
+    for (const agent of interceptAgents) {
+        try {
+            const outputText = await runContextInterceptAgentOutput(agent, currentContextText, activationSnapshot.generationType, contextFormat);
+            if (outputText === null) {
+                continue;
+            }
+
+            currentContextText = applyContextInterceptText(currentContextText, outputText, agent.preProcess);
+        } catch (error) {
+            console.warn(`[InChatAgents] Pre-generation intercept agent "${agent.name}" failed. Leaving context unchanged for this agent.`, error);
+        }
+    }
+
+    return currentContextText;
+}
+
+function getContextInterceptChatRole(agent) {
+    switch (Number(agent?.injection?.role)) {
+        case extension_prompt_roles.USER:
+            return 'user';
+        case extension_prompt_roles.ASSISTANT:
+            return 'assistant';
+        default:
+            return 'system';
+    }
+}
+
+function insertContextInterceptChatMessage(chatMessages, content, agent) {
+    const message = {
+        role: getContextInterceptChatRole(agent),
+        content,
+    };
+
+    if (agent?.preProcess?.wrapPosition === 'before') {
+        chatMessages.unshift(message);
+    } else {
+        chatMessages.push(message);
+    }
+}
+
+async function runPreGenerationInterceptorsOnChat(initialChatMessages, generationType) {
+    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
+        return initialChatMessages;
+    }
+
+    let currentChatMessages = Array.isArray(initialChatMessages) ? [...initialChatMessages] : [];
+    if (currentChatMessages.length === 0) {
+        return currentChatMessages;
+    }
+
+    const activationSnapshot = getGenerationContextSnapshot(generationType);
+    const interceptAgents = getPreGenerationInterceptAgents(getSnapshotAgents(activationSnapshot));
+    if (interceptAgents.length === 0) {
+        return currentChatMessages;
+    }
+
+    for (const agent of interceptAgents) {
+        const contextText = serializeChatContext(currentChatMessages);
+
+        try {
+            const outputText = await runContextInterceptAgentOutput(agent, contextText, activationSnapshot.generationType, 'chat');
+            if (outputText === null) {
+                continue;
+            }
+
+            if (agent.preProcess?.applyMode === 'wrap') {
+                insertContextInterceptChatMessage(
+                    currentChatMessages,
+                    `${String(agent.preProcess?.wrapPrefix ?? '')}${outputText}${String(agent.preProcess?.wrapSuffix ?? '')}`,
+                    agent,
+                );
+                continue;
+            }
+
+            if (agent.preProcess?.applyMode === 'patch') {
+                insertContextInterceptChatMessage(currentChatMessages, buildPatchTaggedText(outputText, agent.preProcess), agent);
+                continue;
+            }
+
+            currentChatMessages = parseChatContext(outputText);
+        } catch (error) {
+            console.warn(`[InChatAgents] Pre-generation intercept agent "${agent.name}" failed. Leaving chat context unchanged for this agent.`, error);
+        }
+    }
+
+    return currentChatMessages;
+}
+
+async function onGenerateAfterCombinePrompts(eventData) {
+    if (eventData?.dryRun || internalPromptTransformDepth > 0 || !isGenerationInProgress) {
+        return;
+    }
+
+    if (!eventData || typeof eventData.prompt !== 'string') {
+        return;
+    }
+
+    eventData.prompt = await runPreGenerationInterceptorsOnText(
+        eventData.prompt,
+        currentMainGenerationType,
+        'text',
+    );
+}
+
+async function onChatCompletionPromptReady(eventData) {
+    if (eventData?.dryRun || internalPromptTransformDepth > 0 || !isGenerationInProgress) {
+        return;
+    }
+
+    if (!eventData || !Array.isArray(eventData.chat)) {
+        return;
+    }
+
+    eventData.chat = await runPreGenerationInterceptorsOnChat(eventData.chat, currentMainGenerationType);
+}
+
 async function onImpersonateReady(text = '') {
     if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
         return;
@@ -2991,6 +3263,14 @@ export function initAgentRunner() {
 
     if (event_types.CHAT_COMPLETION_SETTINGS_READY) {
         eventSource.on(event_types.CHAT_COMPLETION_SETTINGS_READY, onChatCompletionSettingsReady);
+    }
+
+    if (event_types.GENERATE_AFTER_COMBINE_PROMPTS) {
+        eventSource.on(event_types.GENERATE_AFTER_COMBINE_PROMPTS, onGenerateAfterCombinePrompts);
+    }
+
+    if (event_types.CHAT_COMPLETION_PROMPT_READY) {
+        eventSource.on(event_types.CHAT_COMPLETION_PROMPT_READY, onChatCompletionPromptReady);
     }
 
     if (event_types.WORLDINFO_ENTRIES_LOADED) {

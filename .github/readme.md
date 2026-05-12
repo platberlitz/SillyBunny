@@ -177,7 +177,7 @@ SillyBunny has support for In-Chat Agents. These are custom prompt fields that c
 
 **Pipeline:**
 
-1. **Pre-generation agents** injects prompt text before the main reply is generated.
+1. **Pre-generation agents** inject prompt text before the main reply is generated, or run as interceptors that rewrite the assembled outgoing context before it reaches the main model.
 2. **Main Model** writes the main RP reply.
 3. **Post-generation agents** optionally rewrites the contents of the main response, or appends extra content after the reply.
 4. **Post-process utilities** can extract structured data, run regex cleanup/formatting, or preserve machine-readable blocks while showing cleaner UI.
@@ -204,6 +204,7 @@ SillyBunny has support for In-Chat Agents. These are custom prompt fields that c
 **Agent Behaviors and Settings**
 * Agentic prompts feature inline run-order editing, click-to-edit functionality, and fullscreen prompt editors.
 * Agents use the main connection profile by default with an 8192 max token limit. Separate connection profile support is available when explicitly selected.
+* Pre-generation interceptors can replace the outgoing context, wrap or append helper output, or add tagged patches. Multiple interceptors run in agent order.
 * Bundled trackers, including CYOA Choices, are configured for pre-generation. The main model emits clickable options directly in the response.
 * All bundled tracker and menu agents default to the User injection role to maintain compatibility with models that deprioritize System injections.
 * Built-in groups are available for the full preset, trackers only, and randomizers only.

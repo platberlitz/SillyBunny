@@ -122,6 +122,16 @@ const AGENT_PHASE_LABELS = {
     post: 'post',
     both: 'pre + post',
 };
+const DEFAULT_PRE_PROCESS = {
+    mode: 'inject',
+    applyMode: 'replace',
+    wrapPosition: 'after',
+    wrapPrefix: '',
+    wrapSuffix: '',
+    patchStartTag: '<context_patch>',
+    patchEndTag: '</context_patch>',
+    maxTokens: DEFAULT_AGENT_MAX_TOKENS,
+};
 
 function getTemplateAssetUrl(filename) {
     return `/scripts/extensions/${MODULE_NAME}/templates/${filename}?v=${encodeURIComponent(CLIENT_VERSION || 'dev')}`;
@@ -349,6 +359,20 @@ function hasPromptTransform(agent) {
     );
 }
 
+function getAgentPreProcess(agent) {
+    return {
+        ...DEFAULT_PRE_PROCESS,
+        ...(agent?.preProcess ?? {}),
+    };
+}
+
+function isPreGenerationInterceptAgent(agent) {
+    return Boolean(
+        ['pre', 'both'].includes(String(agent?.phase ?? '')) &&
+        getAgentPreProcess(agent).mode === 'intercept',
+    );
+}
+
 function canPreviewPreGenerationPrompt(agent) {
     return Boolean(
         !isPathfinderAgent(agent) &&
@@ -371,9 +395,12 @@ async function previewPreGenerationPrompt(agent, promptOverride = null) {
     const previewText = substituteParams(prompt, {
         dynamicMacros: buildPromptDynamicMacros('', null, agent, 'normal'),
     });
+    const previewNote = isPreGenerationInterceptAgent(agent)
+        ? 'Preview shows the agent instruction after macro substitution. At runtime, intercept mode also receives the assembled outgoing context and can rewrite it before the main model sees it.'
+        : 'Preview uses the current chat context with no generated assistant message yet. Random macros are evaluated now and may differ when the agent runs.';
     const previewHtml = $(
         `<div class="ica--prompt-preview">
-            <div class="ica--regex-note">Preview uses the current chat context with no generated assistant message yet. Random macros are evaluated now and may differ when the agent runs.</div>
+            <div class="ica--regex-note">${escapeHtml(previewNote)}</div>
             <pre>${escapeHtml(previewText || '(empty after macro substitution)')}</pre>
         </div>`,
     );
@@ -1288,8 +1315,9 @@ function renderAgentList() {
             const regexCount = getAgentRegexScripts(agent).length;
             const promptTransformEnabled = hasPromptTransform(agent);
             const promptTransformLabel = getPromptTransformLabel(agent);
+            const preInterceptEnabled = isPreGenerationInterceptAgent(agent);
             const previewPromptButton = canPreviewPreGenerationPrompt(agent)
-                ? '<button type="button" class="ica--card-btn ica--btn-preview-prompt" title="Preview this pre-generation prompt after macro substitution"><i class="fa-solid fa-eye"></i> Preview Prompt</button>'
+                ? `<button type="button" class="ica--card-btn ica--btn-preview-prompt" title="Preview this pre-generation prompt after macro substitution"><i class="fa-solid fa-eye"></i> ${preInterceptEnabled ? 'Preview Instruction' : 'Preview Prompt'}</button>`
                 : '';
             const connectionProfileLabel = agent.connectionProfile
                 ? profileNames.get(agent.connectionProfile) || `Missing profile (${agent.connectionProfile})`
@@ -1316,7 +1344,8 @@ function renderAgentList() {
                     <div class="ica--card-desc">${escapeHtml(desc)}</div>
                     <div class="ica--card-meta">
                         ${agent.conditions.triggerProbability < 100 ? `<span class="ica--card-pill"><i class="fa-solid fa-dice fa-xs"></i> ${agent.conditions.triggerProbability}%</span>` : ''}
-                        ${agent.injection.position === 1 ? `<span class="ica--card-pill">depth ${agent.injection.depth}</span>` : ''}
+                        ${preInterceptEnabled ? '<span class="ica--card-pill"><i class="fa-solid fa-shuffle fa-xs"></i> pre intercept</span>' : ''}
+                        ${!preInterceptEnabled && agent.injection.position === 1 ? `<span class="ica--card-pill">depth ${agent.injection.depth}</span>` : ''}
                         ${promptTransformEnabled ? `<span class="ica--card-pill"><i class="fa-solid fa-robot fa-xs"></i> ${promptTransformLabel}</span>` : ''}
                         ${regexCount > 0 ? `<span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${regexCount} regex</span>` : ''}
                         ${connectionProfileLabel ? `<span class="ica--card-pill"><i class="fa-solid fa-plug fa-xs"></i> ${escapeHtml(connectionProfileLabel)}</span>` : ''}
@@ -1576,6 +1605,15 @@ async function openEditor(agentId = null) {
     editorEl.find('#ica--editor-role').val(agent.injection.role);
     editorEl.find('#ica--editor-order').val(agent.injection.order);
     editorEl.find('#ica--editor-scan').prop('checked', agent.injection.scan);
+    const preProcess = getAgentPreProcess(agent);
+    editorEl.find('#ica--editor-pre-mode').val(preProcess.mode);
+    editorEl.find('#ica--editor-pre-applyMode').val(preProcess.applyMode);
+    editorEl.find('#ica--editor-pre-wrapPosition').val(preProcess.wrapPosition);
+    editorEl.find('#ica--editor-pre-wrapPrefix').val(preProcess.wrapPrefix);
+    editorEl.find('#ica--editor-pre-wrapSuffix').val(preProcess.wrapSuffix);
+    editorEl.find('#ica--editor-pre-patchStartTag').val(preProcess.patchStartTag);
+    editorEl.find('#ica--editor-pre-patchEndTag').val(preProcess.patchEndTag);
+    editorEl.find('#ica--editor-pre-maxTokens').val(preProcess.maxTokens ?? DEFAULT_AGENT_MAX_TOKENS);
 
     // Post-process
     const postProcessType = agent.postProcess.type === 'append' ? 'append' : 'extract';
@@ -1611,8 +1649,24 @@ async function openEditor(agentId = null) {
         const phase = editorEl.find('#ica--editor-phase').val();
         editorEl.find('#ica--injection-section').toggle(phase === 'pre' || phase === 'both');
         editorEl.find('#ica--postprocess-section').toggle(phase === 'post' || phase === 'both');
+        updatePreProcessVisibility();
     }
     editorEl.find('#ica--editor-phase').on('change', updatePhaseVisibility);
+
+    function updatePreProcessVisibility() {
+        const phase = editorEl.find('#ica--editor-phase').val();
+        const preGenerationVisible = phase === 'pre' || phase === 'both';
+        const preMode = editorEl.find('#ica--editor-pre-mode').val()?.toString() || 'inject';
+        const applyMode = editorEl.find('#ica--editor-pre-applyMode').val()?.toString() || 'replace';
+        const interceptVisible = preGenerationVisible && preMode === 'intercept';
+
+        editorEl.find('#ica--pre-intercept-options').toggle(interceptVisible);
+        editorEl.find('#ica--pre-injection-note').toggle(preGenerationVisible && preMode !== 'intercept');
+        editorEl.find('#ica--pre-wrap-position-row').toggle(interceptVisible && (applyMode === 'wrap' || applyMode === 'patch'));
+        editorEl.find('#ica--pre-wrap-options').toggle(interceptVisible && applyMode === 'wrap');
+        editorEl.find('#ica--pre-patch-options').toggle(interceptVisible && applyMode === 'patch');
+    }
+    editorEl.find('#ica--editor-pre-mode, #ica--editor-pre-applyMode').on('change', updatePreProcessVisibility);
     updatePhaseVisibility();
 
     // Show/hide post-process options
@@ -1822,6 +1876,10 @@ async function openEditor(agentId = null) {
             ...agent,
             name: editorEl.find('#ica--editor-name').val()?.toString().trim() || agent.name,
             phase: editorEl.find('#ica--editor-phase').val()?.toString() || agent.phase,
+            preProcess: {
+                ...getAgentPreProcess(agent),
+                mode: editorEl.find('#ica--editor-pre-mode').val()?.toString() || 'inject',
+            },
         };
         await previewPreGenerationPrompt(previewAgent, editorEl.find('#ica--editor-prompt').val()?.toString() || '');
     });
@@ -1851,6 +1909,24 @@ async function openEditor(agentId = null) {
     agent.injection.role = Number(editorEl.find('#ica--editor-role').val());
     agent.injection.order = Number(editorEl.find('#ica--editor-order').val());
     agent.injection.scan = editorEl.find('#ica--editor-scan').prop('checked');
+    agent.preProcess = {
+        ...getAgentPreProcess(agent),
+        mode: editorEl.find('#ica--editor-pre-mode').val()?.toString() === 'intercept' ? 'intercept' : 'inject',
+        applyMode: ['replace', 'wrap', 'patch'].includes(editorEl.find('#ica--editor-pre-applyMode').val()?.toString())
+            ? editorEl.find('#ica--editor-pre-applyMode').val().toString()
+            : 'replace',
+        wrapPosition: editorEl.find('#ica--editor-pre-wrapPosition').val()?.toString() === 'before' ? 'before' : 'after',
+        wrapPrefix: editorEl.find('#ica--editor-pre-wrapPrefix').val()?.toString() ?? '',
+        wrapSuffix: editorEl.find('#ica--editor-pre-wrapSuffix').val()?.toString() ?? '',
+        patchStartTag: editorEl.find('#ica--editor-pre-patchStartTag').val()?.toString() || DEFAULT_PRE_PROCESS.patchStartTag,
+        patchEndTag: editorEl.find('#ica--editor-pre-patchEndTag').val()?.toString() || DEFAULT_PRE_PROCESS.patchEndTag,
+        maxTokens: Number(editorEl.find('#ica--editor-pre-maxTokens').val()) || DEFAULT_AGENT_MAX_TOKENS,
+    };
+
+    if (['pre', 'both'].includes(agent.phase) && agent.preProcess.mode === 'intercept' && !agent.prompt.trim()) {
+        toastr.warning('Pre-generation intercept mode needs an agent prompt.');
+        return;
+    }
 
     if (editorEl.find('#ica--editor-pp-promptEnabled').prop('checked') && !agent.prompt.trim()) {
         toastr.warning('Prompt-based post-generation passes need an agent prompt.');
