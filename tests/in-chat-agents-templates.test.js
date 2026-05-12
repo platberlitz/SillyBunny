@@ -8,10 +8,11 @@ function readTemplate(filename) {
 }
 
 describe('in-chat agent bundled templates', () => {
-    test('keeps tracker source files synced with the template browser catalog', () => {
+    test('keeps source files synced with the template browser catalog', () => {
         const catalog = readTemplate('index.json');
         const sourceFilenames = [
             'achievements-tracker.json',
+            'npc-motivator.json',
             'scene-tracker.json',
         ];
 
@@ -20,5 +21,25 @@ describe('in-chat agent bundled templates', () => {
             const catalogTemplate = catalog.find(template => template.id === source.id);
             expect(catalogTemplate).toEqual(source);
         }
+    });
+
+    test('bundles NPC Motivator as a pre-generation intercept patch agent', () => {
+        const template = readTemplate('npc-motivator.json');
+
+        expect(template).toEqual(expect.objectContaining({
+            id: 'tpl-npc-motivator',
+            name: 'NPC Motivator',
+            author: 'Sheep',
+            phase: 'pre',
+            enabled: false,
+        }));
+        expect(template.preProcess).toEqual(expect.objectContaining({
+            mode: 'intercept',
+            applyMode: 'patch',
+            patchStartTag: '<npc_motivation_plan>',
+            patchEndTag: '</npc_motivation_plan>',
+            maxTokens: 4096,
+        }));
+        expect(template.conditions.generationTypes).toEqual(['normal', 'continue', 'impersonate']);
     });
 });

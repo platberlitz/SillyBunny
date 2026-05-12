@@ -138,6 +138,53 @@ describe('in-chat agent scoped enabled state', () => {
         });
     });
 
+    test('normalizes pre-generation intercept settings with safe defaults', async () => {
+        const store = await importStore();
+        store.loadAgents([{
+            id: 'agent-intercept',
+            name: 'Intercept Agent',
+            preProcess: {
+                mode: 'intercept',
+                applyMode: 'patch',
+                wrapPosition: 'before',
+                wrapPrefix: 'prefix',
+                wrapSuffix: 'suffix',
+                patchStartTag: '',
+                patchEndTag: '<done>',
+                maxTokens: 999999,
+            },
+        }]);
+
+        expect(store.getAgentById('agent-intercept').preProcess).toEqual(expect.objectContaining({
+            mode: 'intercept',
+            applyMode: 'patch',
+            wrapPosition: 'before',
+            wrapPrefix: 'prefix',
+            wrapSuffix: 'suffix',
+            patchStartTag: '<context_patch>',
+            patchEndTag: '<done>',
+            maxTokens: 16000,
+        }));
+
+        store.loadAgents([{
+            id: 'agent-invalid-intercept',
+            name: 'Invalid Intercept Agent',
+            preProcess: {
+                mode: 'unknown',
+                applyMode: 'unknown',
+                wrapPosition: 'middle',
+                maxTokens: 'not-a-number',
+            },
+        }]);
+
+        expect(store.getAgentById('agent-invalid-intercept').preProcess).toEqual(expect.objectContaining({
+            mode: 'inject',
+            applyMode: 'replace',
+            wrapPosition: 'after',
+            maxTokens: store.DEFAULT_AGENT_MAX_TOKENS,
+        }));
+    });
+
     test('preserves disabled Pathfinder summary tool toggles while normalizing agents', async () => {
         const store = await importStore();
         store.loadAgents([

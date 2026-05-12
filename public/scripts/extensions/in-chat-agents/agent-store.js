@@ -17,6 +17,18 @@ import {
  */
 
 /**
+ * @typedef {object} AgentPreProcess
+ * @property {'inject'|'intercept'} mode - Inject is the existing setExtensionPrompt flow; intercept rewrites the assembled outgoing context.
+ * @property {'replace'|'wrap'|'patch'} applyMode
+ * @property {'before'|'after'} wrapPosition
+ * @property {string} wrapPrefix
+ * @property {string} wrapSuffix
+ * @property {string} patchStartTag
+ * @property {string} patchEndTag
+ * @property {number} maxTokens
+ */
+
+/**
  * @typedef {object} AgentPostProcess
  * @property {boolean} enabled
  * @property {'regex'|'append'|'extract'} type
@@ -70,6 +82,7 @@ import {
  * @property {string} prompt
  * @property {'pre'|'post'|'both'} phase
  * @property {AgentInjection} injection
+ * @property {AgentPreProcess} preProcess
  * @property {AgentPostProcess} postProcess
  * @property {AgentRegexScript[]} regexScripts
  * @property {string} connectionProfile
@@ -588,6 +601,14 @@ export function normalizePromptTransformMaxTokens(value) {
     return Math.max(16, Math.min(16000, Number(value)));
 }
 
+export function normalizePreProcessMaxTokens(value) {
+    if (!Number.isFinite(Number(value))) {
+        return DEFAULT_AGENT_MAX_TOKENS;
+    }
+
+    return Math.max(16, Math.min(16000, Number(value)));
+}
+
 const TRACKER_CATEGORY_TEMPLATE_IDS = new Set([
     'tpl-cyoa-choices',
     'tpl-direction-menu',
@@ -706,6 +727,16 @@ export function createDefaultAgent() {
             order: 100,
             scan: false,
         },
+        preProcess: {
+            mode: 'inject',
+            applyMode: 'replace',
+            wrapPosition: 'after',
+            wrapPrefix: '',
+            wrapSuffix: '',
+            patchStartTag: '<context_patch>',
+            patchEndTag: '</context_patch>',
+            maxTokens: DEFAULT_AGENT_MAX_TOKENS,
+        },
         postProcess: {
             enabled: false,
             type: 'regex',
@@ -761,6 +792,7 @@ export function normalizeToolDef(raw = {}) {
  */
 export function normalizeAgent(rawAgent = {}) {
     const defaults = createDefaultAgent();
+    const rawPreProcess = rawAgent.preProcess && typeof rawAgent.preProcess === 'object' ? rawAgent.preProcess : {};
     const rawPostProcess = rawAgent.postProcess && typeof rawAgent.postProcess === 'object' ? rawAgent.postProcess : {};
     const conditions = rawAgent.conditions && typeof rawAgent.conditions === 'object' ? rawAgent.conditions : {};
 
@@ -785,6 +817,28 @@ export function normalizeAgent(rawAgent = {}) {
         injection: {
             ...defaults.injection,
             ...(rawAgent.injection ?? {}),
+        },
+        preProcess: {
+            ...defaults.preProcess,
+            ...rawPreProcess,
+            mode: ['inject', 'intercept'].includes(String(rawPreProcess.mode))
+                ? String(rawPreProcess.mode)
+                : defaults.preProcess.mode,
+            applyMode: ['replace', 'wrap', 'patch'].includes(String(rawPreProcess.applyMode))
+                ? String(rawPreProcess.applyMode)
+                : defaults.preProcess.applyMode,
+            wrapPosition: ['before', 'after'].includes(String(rawPreProcess.wrapPosition))
+                ? String(rawPreProcess.wrapPosition)
+                : defaults.preProcess.wrapPosition,
+            wrapPrefix: typeof rawPreProcess.wrapPrefix === 'string' ? rawPreProcess.wrapPrefix : defaults.preProcess.wrapPrefix,
+            wrapSuffix: typeof rawPreProcess.wrapSuffix === 'string' ? rawPreProcess.wrapSuffix : defaults.preProcess.wrapSuffix,
+            patchStartTag: typeof rawPreProcess.patchStartTag === 'string' && rawPreProcess.patchStartTag.trim()
+                ? rawPreProcess.patchStartTag
+                : defaults.preProcess.patchStartTag,
+            patchEndTag: typeof rawPreProcess.patchEndTag === 'string' && rawPreProcess.patchEndTag.trim()
+                ? rawPreProcess.patchEndTag
+                : defaults.preProcess.patchEndTag,
+            maxTokens: normalizePreProcessMaxTokens(rawPreProcess.maxTokens),
         },
         postProcess: {
             ...defaults.postProcess,

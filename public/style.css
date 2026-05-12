@@ -7393,6 +7393,18 @@ body:not(.movingUI) .drawer-content.maximized {
     gap: 12px;
 }
 
+.ica-transform-history-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ica-transform-history-section h4 {
+    margin: 0;
+    font-size: calc(var(--mainFontSize) * 0.95);
+    letter-spacing: 0.02em;
+}
+
 .ica-transform-history-entry {
     padding: 12px;
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 55%, transparent);
@@ -7408,6 +7420,15 @@ body:not(.movingUI) .drawer-content.maximized {
     display: block;
     margin-bottom: 8px;
     opacity: 0.72;
+}
+
+.ica-transform-output-title {
+    margin: 10px 0 5px;
+    font-size: calc(var(--mainFontSize) * 0.72);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.68;
 }
 
 .ica-transform-diff {

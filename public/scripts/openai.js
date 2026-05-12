@@ -82,6 +82,7 @@ import { accountStorage } from './util/AccountStorage.js';
 import { COMETAPI_IGNORE_PATTERNS, IGNORE_SYMBOL, MEDIA_DISPLAY, MEDIA_TYPE } from './constants.js';
 import { syncOpenRouterProvidersForModel, updateOpenRouterProvidersWarning } from './textgen-models.js';
 import { hasTextOrArrayPayload, stripOocBlocksFromContext } from './ooc-blocks.js';
+import { checkPostInterceptChatBudget } from './openai-prompt-budget.js';
 
 export {
     openai_messages_count,
@@ -1709,10 +1710,27 @@ export async function prepareOpenAIMessages({
         if (false === dryRun) promptManager.render(false);
     }
 
-    const chat = chatCompletion.getChat();
+    let chat = chatCompletion.getChat();
 
     const eventData = { chat, dryRun };
     await eventSource.emit(event_types.CHAT_COMPLETION_PROMPT_READY, eventData);
+    if (!Array.isArray(eventData.chat)) {
+        chatCompletion.log('Pre-generation intercepts produced an invalid chat payload.');
+        throw new Error('Pre-generation intercepts produced an invalid chat payload.');
+    }
+
+    chat = eventData.chat;
+
+    if (!dryRun) {
+        const { promptTokens, promptTokenBudget, exceeded } = await checkPostInterceptChatBudget(chat, userSettings, countTokensOpenAIAsync);
+        if (exceeded) {
+            toastr.error(t`Pre-generation intercepts exceed the context size.`);
+            chatCompletion.log(`Pre-generation intercepts exceed the context size. Tokens: ${promptTokens}. Budget: ${promptTokenBudget}.`);
+            promptManager.error = t`Pre-generation intercepts made the prompt too large. Reduce intercept output, raise your token limit, or disable the intercept agent.`;
+            promptManager.render(false);
+            throw new TokenBudgetExceededError('pre-generation intercepts');
+        }
+    }
 
     openai_messages_count = chat.filter(x => !x?.tool_calls && ['user', 'assistant', 'tool'].includes(x?.role)).length || 0;
 
