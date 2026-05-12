@@ -4,6 +4,22 @@ export const IOS_STREAMING_UPDATE_INTERVAL_MS = 250;
 export const IOS_REASONING_RENDER_INTERVAL_MS = 1500;
 
 /**
+ * Checks whether Smooth Streaming is effectively active for the current platform.
+ * @param {object} [options]
+ * @param {boolean} [options.smoothStreaming] Whether Smooth Streaming is enabled in settings
+ * @param {boolean} [options.iosWebKitDisableSmoothStreaming] Whether iOS WebKit should bypass Smooth Streaming
+ * @param {Navigator} [options.navigatorRef] Navigator-like object
+ * @returns {boolean}
+ */
+export function isSmoothStreamingEffectivelyEnabled({
+    smoothStreaming = false,
+    iosWebKitDisableSmoothStreaming = false,
+    navigatorRef = globalThis.navigator,
+} = {}) {
+    return Boolean(smoothStreaming) && !(Boolean(iosWebKitDisableSmoothStreaming) && isIOSWebKitPlatform(navigatorRef));
+}
+
+/**
  * Checks whether live streaming DOM work should be reduced for the current browser.
  * @param {Navigator} [navigatorRef] Navigator-like object
  * @param {object} [options]
