@@ -7,6 +7,7 @@ import { eventSource, event_types } from '../../events.js';
 import {
     areAgentsGloballyEnabled,
     getAgents,
+    getEnabledAgents,
     getAgentById,
     getAgentRegexScripts,
     loadAgents,
@@ -431,6 +432,66 @@ function buildAgentFromSnapshot(snapshot) {
         id: uuidv4(),
         enabled: false,
     };
+}
+
+globalThis.SillyBunnyAgents = Object.assign(globalThis.SillyBunnyAgents || {}, {
+    getEnabledAgents,
+});
+
+function getComparableAgentSnapshot(agent) {
+    const snapshot = structuredClone(agent || {});
+    delete snapshot.id;
+    delete snapshot.enabled;
+    delete snapshot.favorite;
+    return snapshot;
+}
+
+function stableAgentComparableValue(value) {
+    if (Array.isArray(value)) {
+        return value.map(stableAgentComparableValue);
+    }
+
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(
+            Object.entries(value)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([key, entryValue]) => [key, stableAgentComparableValue(entryValue)]),
+        );
+    }
+
+    return value;
+}
+
+function getComparableAgentKey(agent) {
+    return JSON.stringify(stableAgentComparableValue(getComparableAgentSnapshot(agent)));
+}
+
+function hasIdenticalAgent(agent, existingAgents = getAgents()) {
+    const candidateKey = getComparableAgentKey(agent);
+    const candidateName = String(agent?.name ?? '').trim();
+
+    return existingAgents.some(existingAgent =>
+        String(existingAgent?.name ?? '').trim() === candidateName &&
+        getComparableAgentKey(existingAgent) === candidateKey,
+    );
+}
+
+async function confirmDuplicateAgentAddition(agent) {
+    if (!hasIdenticalAgent(agent)) {
+        return true;
+    }
+
+    const result = await new Popup(
+        'An identical agent is already active. Add anyway?',
+        POPUP_TYPE.CONFIRM,
+        'Duplicate agent',
+        {
+            okButton: 'Add Anyway',
+            cancelButton: 'Cancel',
+        },
+    ).show();
+
+    return result === POPUP_RESULT.AFFIRMATIVE;
 }
 
 function shouldMigratePathfinderAgentTools(agent, template) {
@@ -2118,6 +2179,11 @@ async function openTemplateBrowser() {
 
         card.on('click', async () => {
             const newAgent = buildAgentFromTemplate(tpl);
+            if (!await confirmDuplicateAgentAddition(newAgent)) {
+                toastr.info('Duplicate agent not added.');
+                return;
+            }
+
             await saveAgent(newAgent);
             renderAgentList();
             toastr.success(`Added "${tpl.name}" to your agents.`);
@@ -2607,6 +2673,7 @@ async function openPromptTransformHistoryPopup(messageIndex) {
         return `
             <div class="ica-transform-history-entry" data-index="${i}">
                 <h5>${escapeHtml(entry.agentName || 'Agent')} <small>(${escapeHtml(entry.mode || 'replace')})</small></h5>
+                <small>${escapeHtml(`Order ${entry.order ?? 'n/a'} | Model: ${entry.modelLabel || entry.profileLabel || 'Current model'}`)}</small>
                 <small>${timestamp}</small>
                 <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(entry.beforeText ?? '', entry.afterText ?? '')}</div>
                 <div class="ica-transform-actions">
@@ -2622,18 +2689,18 @@ async function openPromptTransformHistoryPopup(messageIndex) {
         ${postGenerationEntries ? `<section class="ica-transform-history-section"><h4>Post-Generation Changes</h4>${postGenerationEntries}</section>` : ''}
     </div>`);
 
-    html.find('.ica-undo-btn').on('click', function () {
+    html.find('.ica-undo-btn').on('click', async function () {
         const idx = Number($(this).data('mesid'));
-        if (undoPromptTransform(idx)) {
+        if (await undoPromptTransform(idx)) {
             toastr.success('Transform undone.');
         } else {
             toastr.warning('Could not undo transform.');
         }
     });
 
-    html.find('.ica-redo-btn').on('click', function () {
+    html.find('.ica-redo-btn').on('click', async function () {
         const idx = Number($(this).data('mesid'));
-        if (redoPromptTransform(idx)) {
+        if (await redoPromptTransform(idx)) {
             toastr.success('Transform redone.');
         } else {
             toastr.warning('Could not redo transform.');
