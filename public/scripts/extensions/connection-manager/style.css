@@ -15,11 +15,31 @@
 
 #connection_profile_details_content .profile-summary--two-col li {
     min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(9rem, max-content) minmax(0, 1fr);
+    gap: 4px 8px;
+    overflow-wrap: anywhere;
+}
+
+#connection_profile_details_content .profile-summary-label {
+    min-width: 0;
+}
+
+#connection_profile_details_content .profile-summary-label::after {
+    content: ':';
+}
+
+#connection_profile_details_content .profile-summary-value {
+    min-width: 0;
     overflow-wrap: anywhere;
 }
 
 @media screen and (max-width: 700px) {
     #connection_profile_details_content .profile-summary--two-col {
+        grid-template-columns: 1fr;
+    }
+
+    #connection_profile_details_content .profile-summary--two-col li {
         grid-template-columns: 1fr;
     }
 }

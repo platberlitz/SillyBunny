@@ -284,9 +284,24 @@ async function readProfileFromCommands(mode, profile, cleanUp = false) {
     enrichProfileSnapshot(profile);
 }
 
-function readInputValue(selector) {
+function truncateSummary(value, maxLength = 260) {
+    const text = String(value ?? '').trim();
+    const chars = Array.from(text);
+    return chars.length > maxLength ? `${chars.slice(0, maxLength - 3).join('')}...` : text;
+}
+
+function readInputDisplayValue(selector) {
     const element = document.querySelector(selector);
-    if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement) {
+
+    if (element instanceof HTMLSelectElement) {
+        const selectedText = Array.from(element.selectedOptions)
+            .map(option => String(option.textContent ?? '').trim())
+            .filter(Boolean)
+            .join(', ');
+        return selectedText || String(element.value ?? '').trim();
+    }
+
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
         return String(element.value ?? '').trim();
     }
 
@@ -302,10 +317,9 @@ function getActiveAgentsSummary() {
         return NONE;
     }
 
-    const summary = agents
-        .map(agent => `${agent.name || agent.id} (${agent.enabled === false ? 'disabled' : 'enabled'}, order ${agent.injection?.order ?? 0})`)
-        .join(', ');
-    return summary.length > 260 ? `${summary.slice(0, 257)}...` : summary;
+    return truncateSummary(agents
+        .map(agent => `${agent.name || agent.id} (order ${agent.injection?.order ?? 0})`)
+        .join(', '));
 }
 
 function getSamplerSummary() {
@@ -336,9 +350,9 @@ function getWorldInfoActiveCount() {
 function enrichProfileSnapshot(profile) {
     profile['active-agents'] = getActiveAgentsSummary();
     profile.samplers = getSamplerSummary();
-    profile['instruct-template'] = readInputValue('#instruct_presets') || profile.instruct || NONE;
-    profile['context-template'] = readInputValue('#context_presets') || profile.context || NONE;
-    profile['system-prompt'] = readInputValue('#sysprompt_select') || profile.sysprompt || NONE;
+    profile['instruct-template'] = readInputDisplayValue('#instruct_presets') || profile.instruct || NONE;
+    profile['context-template'] = readInputDisplayValue('#context_presets') || profile.context || NONE;
+    profile['system-prompt'] = readInputDisplayValue('#sysprompt_select') || profile.sysprompt || NONE;
     profile['world-info-active-count'] = String(getWorldInfoActiveCount());
 }
 
