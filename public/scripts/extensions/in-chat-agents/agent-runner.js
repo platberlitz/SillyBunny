@@ -3006,7 +3006,14 @@ async function onChatCompletionPromptReady(eventData) {
         return;
     }
 
-    eventData.chat = await runPreGenerationInterceptorsOnChat(eventData.chat, currentMainGenerationType);
+    const originalChat = eventData.chat;
+    const nextChat = await runPreGenerationInterceptorsOnChat(originalChat, currentMainGenerationType);
+    if (nextChat === originalChat) {
+        return;
+    }
+
+    originalChat.splice(0, originalChat.length, ...nextChat);
+    eventData.chat = originalChat;
 }
 
 async function onImpersonateReady(text = '') {

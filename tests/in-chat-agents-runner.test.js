@@ -619,15 +619,14 @@ describe('in-chat agent post-processing runner', () => {
         initAgentRunner();
 
         await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
-        const eventData = {
-            chat: [{ role: 'user', content: 'original user prompt' }],
-            dryRun: false,
-        };
+        const originalChat = [{ role: 'user', content: 'original user prompt' }];
+        const eventData = { chat: originalChat, dryRun: false };
         await eventSource.emit(eventTypes.CHAT_COMPLETION_PROMPT_READY, eventData);
 
         expect(generateQuietPrompt).toHaveBeenCalledTimes(1);
         expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('JSON array of chat-completion messages');
         expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('original user prompt');
+        expect(eventData.chat).toBe(originalChat);
         expect(eventData.chat).toEqual([
             { role: 'system', content: 'rewritten system prompt' },
             { role: 'user', content: 'rewritten user prompt' },
