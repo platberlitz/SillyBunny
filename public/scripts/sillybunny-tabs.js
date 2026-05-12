@@ -89,8 +89,13 @@ let sbInlineDrawerPersistenceQueued = false;
 let sbChatScriptModulePromise = null;
 let sbStorageFlushTimer = 0;
 let sbStorageFlushEventsBound = false;
+let sbMessageActionEventsBound = false;
 const sbStorageCache = new Map();
 const sbStoragePendingWrites = new Map();
+const SB_EXTENSION_ALIASES = {
+    'stable-diffusion': ['stable-diffusion', 'sd'],
+    'sd': ['stable-diffusion', 'sd'],
+};
 
 function debounceAction(callback, wait = SB_MOBILE_ACTION_DEBOUNCE_MS) {
     let lastRun = 0;
@@ -2240,6 +2245,69 @@ function getSillyTavernContext() {
     } catch {
         return null;
     }
+}
+
+function isExtensionEnabled(name) {
+    const context = getSillyTavernContext();
+    const disabledExtensions = context?.extensionSettings?.disabledExtensions;
+
+    if (!Array.isArray(disabledExtensions)) {
+        return true;
+    }
+
+    const normalizedName = normalizeExtensionName(name);
+    const aliases = new Set(SB_EXTENSION_ALIASES[normalizedName] ?? [normalizedName]);
+    return !disabledExtensions.some(disabled => {
+        const normalizedDisabled = normalizeExtensionName(disabled);
+        return aliases.has(normalizedDisabled);
+    });
+}
+
+function normalizeExtensionName(name) {
+    return String(name || '').replace(/^third-party\//i, '').toLowerCase();
+}
+
+function syncMessageActionExtensionVisibility(root = document) {
+    if (typeof root === 'number') {
+        root = document.querySelector(`.mes[mesid="${root}"]`) || document;
+    }
+
+    if (!root?.querySelectorAll) {
+        return;
+    }
+
+    root.querySelectorAll('[data-requires-extension]').forEach(button => {
+        if (!(button instanceof HTMLElement)) {
+            return;
+        }
+
+        const requiredExtension = button.dataset.requiresExtension;
+        const isEnabled = isExtensionEnabled(requiredExtension);
+        button.classList.toggle('displayNone', !isEnabled);
+        button.toggleAttribute('aria-hidden', !isEnabled);
+        if (!isEnabled) {
+            button.setAttribute('tabindex', '-1');
+        } else if (button.getAttribute('tabindex') === '-1') {
+            button.removeAttribute('tabindex');
+        }
+    });
+}
+
+function bindMessageActionExtensionEvents() {
+    if (sbMessageActionEventsBound) {
+        return;
+    }
+
+    const context = getSillyTavernContext();
+    if (!context?.eventSource || !context?.event_types) {
+        return;
+    }
+
+    sbMessageActionEventsBound = true;
+    context.eventSource.on(context.event_types.EXTENSION_SETTINGS_LOADED, () => syncMessageActionExtensionVisibility());
+    context.eventSource.on(context.event_types.SETTINGS_UPDATED, () => syncMessageActionExtensionVisibility());
+    context.eventSource.on(context.event_types.USER_MESSAGE_RENDERED, data => syncMessageActionExtensionVisibility(data?.element || data));
+    context.eventSource.on(context.event_types.CHARACTER_MESSAGE_RENDERED, data => syncMessageActionExtensionVisibility(data?.element || data));
 }
 
 function getChatScriptModule() {
@@ -11140,6 +11208,8 @@ function initAll() {
     bindTopbarDragEvents();
     bindChatbarEvents();
     bindClearCookiesAndCacheButton();
+    bindMessageActionExtensionEvents();
+    syncMessageActionExtensionVisibility();
     scheduleChatbarRefresh(0);
     interceptDrawerOpeners();
     bindWorldInfoRoute();
@@ -11248,9 +11318,13 @@ if (document.readyState === 'loading') {
 // slow networks where DOMContentLoaded fires but scripts haven't set up UI).
 const ctx = getSillyTavernContext();
 if (ctx?.eventSource && ctx?.event_types) {
+    bindMessageActionExtensionEvents();
     ctx.eventSource.on(ctx.event_types.APP_READY, () => {
         if (!sbState.initialized) {
             initAll();
+        } else {
+            bindMessageActionExtensionEvents();
+            syncMessageActionExtensionVisibility();
         }
     });
 }
