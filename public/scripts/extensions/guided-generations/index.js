@@ -5,7 +5,6 @@ import { guidedImpersonate } from './scripts/guidedImpersonate.js';
 import { guidedResponse } from './scripts/guidedResponse.js';
 import { guidedSwipe } from './scripts/guidedSwipe.js';
 import { simpleSend } from './scripts/simpleSend.js';
-import { recoverInput } from './scripts/inputRecovery.js';
 
 const oldExtensionKey = 'GuidedGenerations-Extension';
 
@@ -14,7 +13,6 @@ const defaultSettings = {
     showGuidedSwipe: true,
     showImpersonate1stPerson: true,
     showSimpleSendButton: true,
-    showRecoverInputButton: true,
     integrateQrBar: true,
     injectionEndRole: 'system',
     debugMode: false,
@@ -50,6 +48,7 @@ function loadSettings() {
         settings._migrated = true;
     }
 
+    delete settings.showRecoverInputButton;
     extension_settings[extensionName] = settings;
 }
 
@@ -271,7 +270,6 @@ function updateExtensionButtons() {
 
     const buttons = [
         settings.showSimpleSendButton && createActionButton('gg_simple_send_button', 'Simple Send', 'fa-solid fa-paper-plane', simpleSend),
-        settings.showRecoverInputButton && createActionButton('gg_recover_input_button', 'Recover Input', 'fa-solid fa-arrow-rotate-left', recoverInput),
         settings.showImpersonate1stPerson && createActionButton('gg_impersonate_button', 'Guided Impersonate', 'fa-solid fa-user', guidedImpersonate),
         settings.showGuidedSwipe && createActionButton('gg_swipe_button', 'Guided Swipe', 'fa-solid fa-forward', guidedSwipe),
         settings.showGuidedResponse && createActionButton('gg_response_button', 'Guided Response', 'fa-solid fa-compass', guidedResponse),
