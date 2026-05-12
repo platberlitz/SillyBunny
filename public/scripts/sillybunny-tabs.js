@@ -74,6 +74,7 @@ const SB_STORAGE_PREFIX = 'sb-';
 const SB_STORAGE_WRITE_DEBOUNCE_MS = 120;
 const SB_MOBILE_NAV_OPEN_GRACE_MS = 450;
 const SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX = 6;
+const SB_MOBILE_ACTION_DEBOUNCE_MS = 140;
 const SB_SHELL_FOCUSABLE_SELECTOR = [
     'a[href]',
     'button:not([disabled])',
@@ -90,6 +91,22 @@ let sbStorageFlushTimer = 0;
 let sbStorageFlushEventsBound = false;
 const sbStorageCache = new Map();
 const sbStoragePendingWrites = new Map();
+
+function debounceAction(callback, wait = SB_MOBILE_ACTION_DEBOUNCE_MS) {
+    let lastRun = 0;
+
+    return function debouncedAction(event) {
+        const now = performance.now();
+        if (now - lastRun < wait) {
+            event?.preventDefault?.();
+            event?.stopPropagation?.();
+            return;
+        }
+
+        lastRun = now;
+        return callback.call(this, event);
+    };
+}
 
 function getShortcutTarget(side) {
     const stored = safeGetItem(side === 'left' ? SB_STORAGE_KEYS.shortcutLeft : SB_STORAGE_KEYS.shortcutRight);
@@ -2711,7 +2728,7 @@ function createProxyButton({ id, icon, label, title, className = '' }, onClick) 
 
     button.innerHTML = `<i class="fa-solid ${icon}" aria-hidden="true"></i><span>${label}</span>`;
     stopProxyPointerPropagation(button);
-    button.addEventListener('click', onClick);
+    button.addEventListener('click', debounceAction(onClick));
 
     return button;
 }
@@ -3335,11 +3352,25 @@ function bindChatDeleteVisualViewport(overlay) {
         animationFrame = 0;
         const fallbackWidth = window.innerWidth || document.documentElement.clientWidth || 0;
         const fallbackHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        const isKeyboardClosed = Math.abs(readViewportNumber(visualViewport.height, fallbackHeight) - fallbackHeight) <= 2
+            && Math.abs(readViewportNumber(visualViewport.offsetTop) || 0) <= 2
+            && Math.abs(readViewportNumber(visualViewport.offsetLeft) || 0) <= 2;
+
+        if (isKeyboardClosed) {
+            overlay.style.removeProperty('--sb-chat-delete-vv-left');
+            overlay.style.removeProperty('--sb-chat-delete-vv-top');
+            overlay.style.removeProperty('--sb-chat-delete-vv-width');
+            overlay.style.removeProperty('--sb-chat-delete-vv-height');
+            overlay.classList.remove('sb-chat-delete-overlay--keyboard-open');
+            return;
+        }
+
         const viewportLeft = Math.max(0, readViewportNumber(visualViewport.offsetLeft));
         const viewportTop = Math.max(0, readViewportNumber(visualViewport.offsetTop));
         const viewportWidth = Math.max(1, readViewportNumber(visualViewport.width, fallbackWidth));
         const viewportHeight = Math.max(1, readViewportNumber(visualViewport.height, fallbackHeight));
 
+        overlay.classList.add('sb-chat-delete-overlay--keyboard-open');
         overlay.style.setProperty('--sb-chat-delete-vv-left', `${viewportLeft}px`);
         overlay.style.setProperty('--sb-chat-delete-vv-top', `${viewportTop}px`);
         overlay.style.setProperty('--sb-chat-delete-vv-width', `${viewportWidth}px`);
@@ -4447,7 +4478,7 @@ function createBottomChatButton({ icon, title, className = '' }, onClick) {
     });
 
     button.innerHTML = `<i class="fa-solid ${icon}" aria-hidden="true"></i>`;
-    button.addEventListener('click', onClick);
+    button.addEventListener('click', debounceAction(onClick));
 
     return button;
 }
@@ -9886,7 +9917,14 @@ function buildMobileNav() {
         return;
     }
 
-    const overlay = createElement('div', { id: 'sb-mobile-nav' });
+    const overlay = createElement('div', {
+        id: 'sb-mobile-nav',
+        attrs: {
+            role: 'dialog',
+            'aria-modal': 'true',
+            'aria-labelledby': 'sb-mobile-nav-title',
+        },
+    });
     const content = createElement('div', { id: 'sb-mobile-nav-content' });
     overlay.hidden = true;
     overlay.setAttribute('aria-hidden', 'true');
@@ -9945,11 +9983,45 @@ function buildMobileNav() {
         content.appendChild(sectionBlock);
     }
 
+    const header = createElement('div', { className: 'sb-mobile-panel-header' });
+    const closeButton = createElement('button', {
+        className: 'sb-mobile-panel-close',
+        attrs: {
+            type: 'button',
+            title: 'Close navigation',
+            'aria-label': 'Close navigation',
+        },
+    });
+    const headerCopy = createElement('div', { className: 'sb-mobile-panel-copy' });
+    const eyebrow = createElement('div', { className: 'sb-shell-kicker', text: 'Workspace' });
+    const title = createElement('h2', {
+        id: 'sb-mobile-nav-title',
+        className: 'sb-shell-title',
+        text: 'Quick Actions',
+        attrs: {
+            tabindex: '-1',
+        },
+    });
+    closeButton.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+    closeButton.addEventListener('click', closeMobileNav);
+    headerCopy.append(eyebrow, title);
+    header.append(headerCopy, closeButton);
+    content.prepend(header);
+
     overlay.appendChild(content);
     overlay.addEventListener('click', event => {
         if (event.target === overlay) {
             closeMobileNav();
         }
+    });
+    overlay.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        closeMobileNav();
     });
 
     document.body.appendChild(overlay);
@@ -10014,6 +10086,8 @@ function setMobileNavOpenState(isOpen) {
         sbState.mobileNav.lastOpenedAt = performance.now();
     }
 
+    const wasOpen = !overlay.hidden && overlay.getAttribute('aria-hidden') === 'false';
+
     overlay.hidden = !shouldOpen;
     overlay.classList.toggle('sb-nav-open', shouldOpen);
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
@@ -10029,6 +10103,14 @@ function setMobileNavOpenState(isOpen) {
         : '<i class="fa-solid fa-bars" aria-hidden="true"></i>';
 
     queueMobileModalStateSync();
+
+    if (shouldOpen) {
+        window.requestAnimationFrame(() => {
+            overlay.querySelector('#sb-mobile-nav-title')?.focus?.({ preventScroll: true });
+        });
+    } else if (wasOpen && document.activeElement && overlay.contains(document.activeElement)) {
+        button.focus({ preventScroll: true });
+    }
 }
 
 function toggleMobileNav() {
