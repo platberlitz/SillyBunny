@@ -1,0 +1,307 @@
+#character_bot_sources_button {
+    min-width: fit-content;
+}
+
+.cbs-browser {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    color: var(--SmartThemeBodyColor);
+    text-align: left;
+}
+
+.cbs-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 2px 2px;
+}
+
+.cbs-eyebrow {
+    color: var(--SmartThemeQuoteColor);
+    font-size: calc(var(--mainFontSize) * 0.72);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.cbs-header h2 {
+    margin: 4px 0;
+    font-size: calc(var(--mainFontSize) * 1.45);
+    line-height: 1.15;
+}
+
+.cbs-header p {
+    max-width: 70ch;
+    margin: 0;
+    color: var(--SmartThemeEmColor);
+    font-size: calc(var(--mainFontSize) * 0.9);
+    line-height: 1.45;
+}
+
+.cbs-source-row {
+    display: flex;
+    gap: 8px;
+    padding-bottom: 2px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.cbs-source {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 7px 12px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 70%, transparent);
+    border-radius: var(--sb-radius-button, 14px);
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 88%, var(--SmartThemeBodyColor) 12%);
+    color: var(--SmartThemeBodyColor);
+    cursor: pointer;
+    font: inherit;
+    white-space: nowrap;
+}
+
+.cbs-source small {
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent);
+    color: var(--SmartThemeEmColor);
+    font-size: calc(var(--mainFontSize) * 0.68);
+}
+
+.cbs-source.is-active {
+    border-color: color-mix(in srgb, var(--SmartThemeQuoteColor) 62%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor) 18%, var(--SmartThemeBlurTintColor) 82%);
+}
+
+.cbs-source.is-active small {
+    color: var(--SmartThemeBodyColor);
+}
+
+.cbs-search {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.4fr) minmax(140px, 0.8fr) auto auto;
+    align-items: end;
+    gap: 10px;
+}
+
+.cbs-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.cbs-field span,
+.cbs-nsfw span {
+    color: var(--SmartThemeEmColor);
+    font-size: calc(var(--mainFontSize) * 0.78);
+}
+
+.cbs-field input {
+    width: 100%;
+}
+
+.cbs-nsfw {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: var(--sb-control-min-height, 30px);
+    padding-bottom: 4px;
+    white-space: nowrap;
+}
+
+.cbs-helper {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 10px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 58%, transparent);
+    border-radius: var(--sb-radius-lg, 16px);
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 76%, transparent);
+    font-size: calc(var(--mainFontSize) * 0.82);
+}
+
+.cbs-helper strong {
+    color: var(--SmartThemeQuoteColor);
+}
+
+.cbs-helper span,
+.cbs-helper code {
+    color: var(--SmartThemeEmColor);
+}
+
+.cbs-helper code {
+    grid-column: 1 / -1;
+    overflow-wrap: anywhere;
+}
+
+.cbs-status {
+    min-height: 1.2em;
+    color: var(--SmartThemeEmColor);
+    font-size: calc(var(--mainFontSize) * 0.82);
+}
+
+.cbs-status.is-error {
+    color: var(--fullred, #ff6f6f);
+}
+
+.cbs-results {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cbs-empty {
+    padding: 22px 14px;
+    border: 1px dashed color-mix(in srgb, var(--SmartThemeBorderColor) 68%, transparent);
+    border-radius: var(--sb-radius-lg, 16px);
+    color: var(--SmartThemeEmColor);
+    text-align: center;
+}
+
+.cbs-card {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: start;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 68%, transparent);
+    border-radius: var(--sb-radius-lg, 16px);
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 86%, var(--SmartThemeBodyColor) 8%);
+}
+
+.cbs-thumb {
+    display: grid;
+    place-items: center;
+    width: 72px;
+    height: 96px;
+    overflow: hidden;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--SmartThemeBorderColor) 34%, transparent);
+    color: var(--SmartThemeEmColor);
+}
+
+.cbs-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cbs-card-main {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.cbs-card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cbs-card h3 {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: calc(var(--mainFontSize) * 1.02);
+    line-height: 1.25;
+}
+
+.cbs-card-title-row a {
+    color: var(--SmartThemeQuoteColor);
+}
+
+.cbs-author,
+.cbs-metrics {
+    color: var(--SmartThemeEmColor);
+    font-size: calc(var(--mainFontSize) * 0.78);
+}
+
+.cbs-card p {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    color: var(--SmartThemeBodyColor);
+    font-size: calc(var(--mainFontSize) * 0.86);
+    line-height: 1.4;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+}
+
+.cbs-tags,
+.cbs-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.cbs-tags span,
+.cbs-metrics span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 9%, transparent);
+}
+
+.cbs-metrics .cbs-nsfw-chip {
+    color: var(--fullred, #ff6f6f);
+}
+
+.cbs-import {
+    align-self: center;
+}
+
+.cbs-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding-top: 2px;
+}
+
+.cbs-pager span {
+    color: var(--SmartThemeEmColor);
+    font-size: calc(var(--mainFontSize) * 0.82);
+}
+
+@media screen and (max-width: 720px) {
+    .cbs-browser {
+        gap: 12px;
+    }
+
+    .cbs-search {
+        grid-template-columns: 1fr;
+    }
+
+    .cbs-nsfw {
+        padding-bottom: 0;
+    }
+
+    .cbs-card {
+        grid-template-columns: 56px minmax(0, 1fr);
+    }
+
+    .cbs-thumb {
+        width: 56px;
+        height: 74px;
+    }
+
+    .cbs-import {
+        grid-column: 1 / -1;
+        width: 100%;
+    }
+}
+
+@media screen and (max-width: 460px) {
+    #character_bot_sources_button span {
+        display: none;
+    }
+
+    .cbs-helper {
+        grid-template-columns: 1fr;
+    }
+}

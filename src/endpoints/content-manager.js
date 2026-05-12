@@ -1248,7 +1248,7 @@ router.post('/importURL', async (request, response) => {
         let type;
 
         const isChub = host.includes('chub.ai') || host.includes('characterhub.org');
-        const isJannnyContent = host.includes('janitorai');
+        const isJannnyContent = host.includes('janitorai') || host.includes('jannyai');
         const isPygmalionContent = host.includes('pygmalion.chat');
         const isAICharacterCardsContent = host.includes('aicharactercards.com');
         const isRisu = host.includes('realm.risuai.net');

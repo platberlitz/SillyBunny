@@ -54,6 +54,8 @@ import { router as imageMetadataRouter } from './endpoints/image-metadata.js';
 import { router as volcengineRouter } from './endpoints/volcengine.js';
 import { router as serverAdminRouter } from './endpoints/server-admin.js';
 import { router as inChatAgentsRouter } from './endpoints/in-chat-agents.js';
+// SillyBunny: Character Bot Sources, online card browser/search aggregator.
+import { router as characterBotSourcesRouter } from './endpoints/character-bot-sources.js';
 
 /**
  * @typedef {object} ServerStartupResult
@@ -119,6 +121,7 @@ export function setupPrivateEndpoints(app) {
     app.use('/api/image-metadata', imageMetadataRouter);
     app.use('/api/server-admin', serverAdminRouter);
     app.use('/api/in-chat-agents', inChatAgentsRouter);
+    app.use('/api/character-bot-sources', characterBotSourcesRouter);
 }
 
 /**
