@@ -88,6 +88,7 @@ let sbInlineDrawerPersistenceQueued = false;
 let sbChatScriptModulePromise = null;
 let sbStorageFlushTimer = 0;
 let sbStorageFlushEventsBound = false;
+let sbMessageActionEventsBound = false;
 const sbStorageCache = new Map();
 const sbStoragePendingWrites = new Map();
 
@@ -2223,6 +2224,57 @@ function getSillyTavernContext() {
     } catch {
         return null;
     }
+}
+
+function isExtensionEnabled(name) {
+    const context = getSillyTavernContext();
+    const disabledExtensions = context?.extensionSettings?.disabledExtensions;
+
+    if (!Array.isArray(disabledExtensions)) {
+        return true;
+    }
+
+    const normalizedName = String(name || '').replace(/^third-party\//i, '').toLowerCase();
+    return !disabledExtensions.some(disabled => {
+        const normalizedDisabled = String(disabled || '').replace(/^third-party\//i, '').toLowerCase();
+        return normalizedDisabled === normalizedName;
+    });
+}
+
+function syncMessageActionExtensionVisibility(root = document) {
+    if (typeof root === 'number') {
+        root = document.querySelector(`.mes[mesid="${root}"]`) || document;
+    }
+
+    if (!root?.querySelectorAll) {
+        return;
+    }
+
+    root.querySelectorAll('[data-requires-extension]').forEach(button => {
+        if (!(button instanceof HTMLElement)) {
+            return;
+        }
+
+        const requiredExtension = button.dataset.requiresExtension;
+        button.classList.toggle('displayNone', !isExtensionEnabled(requiredExtension));
+    });
+}
+
+function bindMessageActionExtensionEvents() {
+    if (sbMessageActionEventsBound) {
+        return;
+    }
+
+    const context = getSillyTavernContext();
+    if (!context?.eventSource || !context?.event_types) {
+        return;
+    }
+
+    sbMessageActionEventsBound = true;
+    context.eventSource.on(context.event_types.EXTENSION_SETTINGS_LOADED, () => syncMessageActionExtensionVisibility());
+    context.eventSource.on(context.event_types.SETTINGS_UPDATED, () => syncMessageActionExtensionVisibility());
+    context.eventSource.on(context.event_types.USER_MESSAGE_RENDERED, data => syncMessageActionExtensionVisibility(data?.element || data));
+    context.eventSource.on(context.event_types.CHARACTER_MESSAGE_RENDERED, data => syncMessageActionExtensionVisibility(data?.element || data));
 }
 
 function getChatScriptModule() {
@@ -11058,6 +11110,8 @@ function initAll() {
     bindTopbarDragEvents();
     bindChatbarEvents();
     bindClearCookiesAndCacheButton();
+    bindMessageActionExtensionEvents();
+    syncMessageActionExtensionVisibility();
     scheduleChatbarRefresh(0);
     interceptDrawerOpeners();
     bindWorldInfoRoute();
@@ -11166,9 +11220,13 @@ if (document.readyState === 'loading') {
 // slow networks where DOMContentLoaded fires but scripts haven't set up UI).
 const ctx = getSillyTavernContext();
 if (ctx?.eventSource && ctx?.event_types) {
+    bindMessageActionExtensionEvents();
     ctx.eventSource.on(ctx.event_types.APP_READY, () => {
         if (!sbState.initialized) {
             initAll();
+        } else {
+            bindMessageActionExtensionEvents();
+            syncMessageActionExtensionVisibility();
         }
     });
 }
