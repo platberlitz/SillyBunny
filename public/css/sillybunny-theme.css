@@ -1703,6 +1703,18 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     box-sizing: border-box;
 }
 
+#rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select).is-active-entity:not(.inline_avatar) {
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 58%, var(--sb-shell-border) 42%);
+    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 16%, var(--sb-button-bg) 84%);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 34%, transparent),
+        0 12px 22px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 10%, transparent);
+}
+
+#rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select).is-active-entity:not(.inline_avatar) :is(.ch_name, .group_select_counter) {
+    color: var(--color-primary, var(--sb-accent));
+}
+
 #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) > .avatar {
     grid-column: 1;
     grid-row: 1 / span 2;

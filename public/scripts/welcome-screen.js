@@ -137,9 +137,9 @@ const WELCOME_TUTORIAL_STEPS = Object.freeze([
     },
     {
         title: 'Personalize your workspace',
-        body: 'The Customize menu in the top bar handles your theming and customization needs. You can optionally enable extra extensions, manage personas.',
+        body: 'The Customize menu in the top bar handles your theming and customization needs. You can optionally enable extra extensions, then manage personas from Characters.',
         hint: 'Customization and extensions are optional, but recommended. While we ship a starter pack, nothing turns itself on without your permission.',
-        chips: ['Settings', 'Extensions', 'Persona', 'Background'],
+        chips: ['Settings', 'Extensions', 'Background'],
         actionLabel: 'Open Extensions',
         actionType: 'open-tab',
         actionValue: 'right:extensions',
@@ -167,8 +167,8 @@ const WELCOME_GUIDE_CARDS = Object.freeze([
     },
     {
         title: 'Customize Menu',
-        body: 'Open the Customize button in the top bar when you want to change your workspace setup: app settings, extensions, personas, and the visual feel of SillyBunny.',
-        chips: ['Settings', 'Extensions', 'Persona', 'Background'],
+        body: 'Open the Customize button in the top bar when you want to change your workspace setup: app settings, extensions, backgrounds, and the visual feel of SillyBunny.',
+        chips: ['Settings', 'Extensions', 'Background'],
         icon: 'fa-sliders',
         actionLabel: 'Open the Customize menu',
         actionType: 'open-tab',
@@ -176,8 +176,8 @@ const WELCOME_GUIDE_CARDS = Object.freeze([
     },
     {
         title: 'Characters Menu',
-        body: 'Open the Characters button in the top bar when you want to access, modify, or create character cards. We have a few characters bundled for you to give you an idea of how to create them!',
-        chips: ['Character Cards', 'Create Character', 'Delete Character', 'Open Character'],
+        body: 'Open the Characters button in the top bar when you want to access characters, edit personas, or create character cards. We have a few characters bundled for you to give you an idea of how to create them!',
+        chips: ['Character Cards', 'Persona', 'Create Character', 'Open Character'],
         icon: 'fa-solid fa-id-card',
         actionLabel: 'Open the Characters menu',
         actionType: 'open-characters-menu',
@@ -1117,7 +1117,7 @@ function openShellTab(route) {
         'left:world-info': '#WI-SP-button > .drawer-toggle',
         'right:settings': '#user-settings-button > .drawer-toggle',
         'right:extensions': '#extensions-settings-button > .drawer-toggle',
-        'right:persona': '#persona-management-button > .drawer-toggle',
+        'characters:persona': '#persona-management-button > .drawer-toggle',
         'right:background': '#backgrounds-button > .drawer-toggle',
     }[route];
 

@@ -34,7 +34,7 @@ const SB_SHORTCUT_TARGETS = Object.freeze([
     { value: 'action:search', label: 'Search', icon: 'fa-magnifying-glass' },
     { value: 'right:settings', label: 'Settings', icon: 'fa-sliders' },
     { value: 'right:extensions', label: 'Extensions', icon: 'fa-cubes' },
-    { value: 'right:persona', label: 'Persona', icon: 'fa-face-smile' },
+    { value: 'characters:persona', label: 'Persona', icon: 'fa-face-smile' },
     { value: 'right:background', label: 'Background', icon: 'fa-panorama' },
 ]);
 
@@ -87,6 +87,7 @@ const SB_SHELL_FOCUSABLE_SELECTOR = [
 let sbInlineDrawerPersistenceObserver = null;
 let sbInlineDrawerPersistenceQueued = false;
 let sbChatScriptModulePromise = null;
+let sbMainScriptModulePromise = null;
 let sbStorageFlushTimer = 0;
 let sbStorageFlushEventsBound = false;
 let sbMessageActionEventsBound = false;
@@ -147,6 +148,14 @@ function activateShortcutTarget(target) {
     }
 
     const [shell, tab] = String(target).split(':');
+
+    if (shell === 'characters') {
+        if (!tab || tab === 'characters') {
+            void setCharacterListEntityView('characters');
+        }
+        openCharacterPanelTab(tab);
+        return;
+    }
 
     if (shell && tab) {
         toggleShellPanel(shell, tab);
@@ -340,6 +349,36 @@ const SB_MESSAGE_STYLES = Object.freeze([
     { id: '2', label: 'Document', icon: 'fa-file-lines' },
 ]);
 
+const SB_CHARACTER_TAB_COPY = Object.freeze({
+    characters: {
+        title: 'Character Menu',
+        subtitle: 'Browse, create, and sort locally-stored character cards.',
+        description: 'Manage your personal character cards, groups, and personas here.',
+    },
+    groups: {
+        title: 'Group Menu',
+        subtitle: 'Browse, create, and sort locally-stored group chats here, using multiple character cards.',
+        description: 'Manage your personal character cards, groups, and personas here.',
+    },
+    editor: {
+        title: 'Card Editor',
+        subtitle: 'Edit or make changes to your selected character card or group chat here.',
+        description: 'Manage your personal character cards, groups, and personas here.',
+    },
+    persona: {
+        title: 'Persona',
+        subtitle: 'Manage your in-chat persona details and other configuration options.',
+        description: 'Manage your personal character cards, groups, and personas here.',
+    },
+    import: {
+        title: 'Import',
+        subtitle: 'Import character cards from files, search a website for uploaded character cards, or import them directly from a URL.',
+        description: 'Manage your personal character cards, groups, and personas here.',
+    },
+});
+
+const SB_PERSONA_HELP_LINK_HTML = '<a class="notes-link sb-character-title-help" href="https://docs.sillytavern.app/usage/core-concepts/personas/" target="_blank"><span class="fa-solid fa-circle-question note-link-span"></span></a>';
+
 const SB_SHELLS = Object.freeze({
     left: {
         rootPanelId: 'left-nav-panel',
@@ -409,9 +448,9 @@ const SB_SHELLS = Object.freeze({
         proxyIcon: 'fa-gear',
         proxyLabel: 'Customize',
         title: 'Customize',
-        subtitle: 'Personalize your workspace, add/remove extensions, change personas, modify server settings, or check logs here.',
-        searchPlaceholder: 'Search themes, top bar, personas, backgrounds, or extensions',
-        searchExamples: ['theme', 'top bar', 'Appearance', 'notify extension updates', 'persona'],
+        subtitle: 'Personalize your workspace, add/remove extensions, modify server settings, or check logs here.',
+        searchPlaceholder: 'Search themes, top bar, backgrounds, or extensions',
+        searchExamples: ['theme', 'top bar', 'Appearance', 'notify extension updates'],
         storageKey: SB_STORAGE_KEYS.rightTab,
         defaultTabId: 'settings',
         baseTab: {
@@ -429,14 +468,6 @@ const SB_SHELLS = Object.freeze({
                 icon: 'fa-cubes',
                 searchPlaceholder: 'Search themes, Quick Reply, Dialogue Colors, or Image Gen',
                 searchExamples: ['themes', 'Quick Reply', 'Dialogue Colors', 'Image Gen'],
-            },
-            {
-                id: 'persona',
-                drawerId: 'persona-management-button',
-                label: 'Persona',
-                icon: 'fa-face-smile',
-                searchPlaceholder: 'Search default persona, avatar, description, or lock',
-                searchExamples: ['default persona', 'avatar', 'description', 'lock'],
             },
             {
                 id: 'background',
@@ -472,7 +503,7 @@ const SB_DRAWER_ROUTES = Object.freeze({
     'advanced-formatting-button': { shell: 'left', tab: 'advanced-formatting' },
     'WI-SP-button': { shell: 'left', tab: 'world-info' },
     'extensions-settings-button': { shell: 'right', tab: 'extensions' },
-    'persona-management-button': { shell: 'right', tab: 'persona' },
+    'persona-management-button': { shell: 'characters', tab: 'persona' },
     'backgrounds-button': { shell: 'right', tab: 'background' },
 });
 
@@ -556,6 +587,7 @@ const sbState = {
         rightLocked: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.characterDrawerRightLocked), false),
         stateObserver: null,
         observedOpen: null,
+        lastTab: 'characters',
     },
     mobileModal: {
         syncFrame: 0,
@@ -2316,6 +2348,14 @@ function getChatScriptModule() {
     }
 
     return sbChatScriptModulePromise;
+}
+
+function getMainScriptModule() {
+    if (!sbMainScriptModulePromise) {
+        sbMainScriptModulePromise = import('../script.js');
+    }
+
+    return sbMainScriptModulePromise;
 }
 
 function getCookieClearDomains(hostname) {
@@ -5299,16 +5339,429 @@ function hasActiveCharacterChat(context = getSillyTavernContext()) {
     );
 }
 
-function showCharacterListView() {
+async function setCharacterListEntityView(view) {
+    try {
+        const module = await getMainScriptModule();
+        module.setCharacterMenuEntityView?.(view);
+    } catch (error) {
+        console.warn('[SillyBunny] Could not set character list entity view.', error);
+    }
+}
+
+function syncCharacterListControls(view) {
+    const normalizedView = view === 'groups' ? 'groups' : 'characters';
+    const createCharacterButton = document.getElementById('rm_button_create');
+    const createGroupButton = document.getElementById('rm_button_group_chats');
+    const bulkEditButton = document.getElementById('bulkEditButton');
+    const bulkSelectAllButton = document.getElementById('bulkSelectAllButton');
+    const bulkDeleteButton = document.getElementById('bulkDeleteButton');
+
+    if (createCharacterButton instanceof HTMLElement) {
+        createCharacterButton.hidden = normalizedView === 'groups';
+    }
+
+    if (createGroupButton instanceof HTMLElement) {
+        createGroupButton.hidden = normalizedView !== 'groups';
+    }
+
+    for (const button of [bulkEditButton, bulkSelectAllButton, bulkDeleteButton]) {
+        if (button instanceof HTMLElement) {
+            button.hidden = false;
+        }
+    }
+
+    if (bulkEditButton instanceof HTMLElement) {
+        bulkEditButton.classList.toggle('disabled', normalizedView === 'groups');
+        bulkEditButton.setAttribute('aria-disabled', String(normalizedView === 'groups'));
+        bulkEditButton.title = normalizedView === 'groups'
+            ? 'Bulk edit for groups is not available yet'
+            : 'Bulk edit characters\n\nClick to toggle characters\nShift + Click to select/deselect a range of characters\nRight-click for actions';
+    }
+}
+
+function ensureCharacterListToolbarLayout() {
+    const fixedTop = document.getElementById('charListFixedTop');
+    const buttonBar = document.getElementById('rm_button_bar');
+    const createButton = document.getElementById('rm_button_create');
+    const createGroupButton = document.getElementById('rm_button_group_chats');
+    const searchButton = document.getElementById('rm_button_search');
+    const pagination = document.getElementById('rm_print_characters_pagination');
+
+    if (!(fixedTop instanceof HTMLElement) || !(buttonBar instanceof HTMLElement)) {
+        return;
+    }
+
+    let actionBar = fixedTop.querySelector('.sb-character-create-bar');
+    if (!(actionBar instanceof HTMLElement)) {
+        actionBar = createElement('div', { className: 'sb-character-create-bar' });
+        fixedTop.prepend(actionBar);
+    }
+
+    if (createButton instanceof HTMLElement && createButton.parentElement !== actionBar) {
+        actionBar.prepend(createButton);
+    }
+
+    if (createGroupButton instanceof HTMLElement && createGroupButton.parentElement !== actionBar) {
+        const afterCreate = createButton instanceof HTMLElement && createButton.parentElement === actionBar
+            ? createButton.nextSibling
+            : actionBar.firstChild;
+        actionBar.insertBefore(createGroupButton, afterCreate);
+    }
+
+    if (buttonBar.parentElement !== actionBar) {
+        const actionButton = createGroupButton instanceof HTMLElement && createGroupButton.parentElement === actionBar
+            ? createGroupButton
+            : createButton;
+        const afterAction = actionButton instanceof HTMLElement && actionButton.parentElement === actionBar
+            ? actionButton.nextSibling
+            : actionBar.firstChild;
+        actionBar.insertBefore(buttonBar, afterAction);
+    }
+
+    if (pagination instanceof HTMLElement && pagination.parentElement !== actionBar) {
+        actionBar.insertBefore(pagination, buttonBar.nextSibling);
+    }
+
+    if (searchButton instanceof HTMLElement && searchButton.parentElement !== buttonBar) {
+        buttonBar.appendChild(searchButton);
+    }
+
+    const bulkEditButton = document.getElementById('bulkEditButton');
+    if (bulkEditButton instanceof HTMLElement && bulkEditButton.dataset.sbGroupsGuardBound !== 'true') {
+        bulkEditButton.dataset.sbGroupsGuardBound = 'true';
+        bulkEditButton.addEventListener('click', (event) => {
+            const panel = document.getElementById('right-nav-panel');
+            if (panel instanceof HTMLElement && panel.dataset.menuType === 'groups') {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                globalThis.toastr?.info?.('Bulk edit for groups is not available yet.');
+            }
+        }, { capture: true });
+    }
+}
+
+async function showCharacterListView(view = 'characters') {
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    setCharacterImportPanelVisible(false);
+    const panel = document.getElementById('right-nav-panel');
+    const normalizedView = view === 'groups' ? 'groups' : 'characters';
+    sbState.characterDrawer.lastTab = normalizedView;
+
+    if (panel instanceof HTMLElement) {
+        panel.dataset.menuType = normalizedView;
+    }
+
+    syncCharacterListControls(normalizedView);
+    await setCharacterListEntityView(normalizedView);
+
     const backButton = document.getElementById('rm_button_back');
 
     if (backButton instanceof HTMLElement) {
         backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        if (panel instanceof HTMLElement) {
+            panel.dataset.menuType = normalizedView;
+        }
+        syncCharacterListControls(normalizedView);
+        syncCharacterShellTabs(normalizedView);
         return true;
     }
 
     resetCharacterPanelView();
+    if (panel instanceof HTMLElement) {
+        panel.dataset.menuType = normalizedView;
+    }
+    syncCharacterListControls(normalizedView);
+    syncCharacterShellTabs(normalizedView);
     return true;
+}
+
+function showCharacterEditorEmptyState() {
+    const panel = document.getElementById('right-nav-panel');
+    const infoPanel = document.getElementById('result_info');
+    const pinAndTabs = document.getElementById('rm_PinAndTabs');
+    const characterEditor = document.getElementById('rm_ch_create_block');
+    const groupEditor = document.getElementById('rm_group_chats_block');
+    const characterList = document.getElementById('rm_characters_block');
+
+    panel?.setAttribute('data-menu-type', 'editor_empty');
+    setCharacterPersonaPanelVisible(false);
+    setCharacterImportPanelVisible(false);
+    syncCharacterListControls('characters');
+    setCharacterEditorEmptyState(true);
+
+    if (infoPanel instanceof HTMLElement) {
+        infoPanel.style.display = 'none';
+    }
+
+    if (pinAndTabs instanceof HTMLElement) {
+        pinAndTabs.style.display = 'none';
+    }
+
+    if (characterEditor instanceof HTMLElement) {
+        characterEditor.classList.remove('sb-active-right-menu');
+        characterEditor.style.display = 'none';
+        characterEditor.style.visibility = 'hidden';
+        characterEditor.style.pointerEvents = 'none';
+    }
+
+    if (groupEditor instanceof HTMLElement) {
+        groupEditor.classList.remove('sb-active-right-menu');
+        groupEditor.style.display = 'none';
+        groupEditor.style.visibility = 'hidden';
+        groupEditor.style.pointerEvents = 'none';
+    }
+
+    if (characterList instanceof HTMLElement) {
+        characterList.classList.remove('sb-active-right-menu');
+        characterList.style.display = 'none';
+        characterList.style.visibility = 'hidden';
+        characterList.style.pointerEvents = 'none';
+    }
+
+    syncCharacterShellTabs('editor');
+}
+
+function setCharacterEditorEmptyState(visible) {
+    const emptyState = document.getElementById('sb_character_editor_empty');
+
+    if (emptyState instanceof HTMLElement) {
+        emptyState.hidden = !visible;
+    }
+
+    syncCharacterTitlebarVisibility();
+}
+
+function syncCharacterTitlebarVisibility() {
+    const panel = document.getElementById('right-nav-panel');
+    const pinAndTabs = document.getElementById('rm_PinAndTabs');
+
+    if (!(panel instanceof HTMLElement) || !(pinAndTabs instanceof HTMLElement)) {
+        return;
+    }
+
+    const shouldHide = ['characters', 'groups', 'editor_empty', 'persona', 'import'].includes(panel.dataset.menuType ?? '');
+    pinAndTabs.style.display = shouldHide ? 'none' : '';
+}
+
+function ensureCharacterPersonaPanel() {
+    const host = document.getElementById('sb_character_persona_panel');
+    const drawer = document.getElementById('persona-management-button');
+    const content = document.getElementById('PersonaManagement');
+
+    if (!(host instanceof HTMLElement) || !(drawer instanceof HTMLElement) || !(content instanceof HTMLElement)) {
+        return null;
+    }
+
+    drawer.classList.add('sb-embedded-drawer');
+    drawer.querySelector(':scope > .drawer-toggle')?.classList.add('sb-hidden-toggle');
+    content.classList.remove('drawer-content', 'openDrawer', 'closedDrawer', 'fillLeft', 'fillRight', 'pinnedOpen');
+    content.classList.add('sb-managed', 'sb-shell-embedded-content');
+    content.removeAttribute('style');
+
+    if (drawer.parentElement !== host) {
+        host.appendChild(drawer);
+    }
+
+    return host;
+}
+
+function setCharacterPersonaPanelVisible(visible) {
+    const host = ensureCharacterPersonaPanel() ?? document.getElementById('sb_character_persona_panel');
+
+    if (host instanceof HTMLElement) {
+        host.hidden = !visible;
+    }
+}
+
+function setCharacterImportPanelVisible(visible) {
+    const host = document.getElementById('sb_character_import_panel');
+
+    if (host instanceof HTMLElement) {
+        host.hidden = !visible;
+    }
+}
+
+function hideCharacterMainPanels() {
+    const infoPanel = document.getElementById('result_info');
+    const pinAndTabs = document.getElementById('rm_PinAndTabs');
+    const characterEditor = document.getElementById('rm_ch_create_block');
+    const characterList = document.getElementById('rm_characters_block');
+
+    if (infoPanel instanceof HTMLElement) {
+        infoPanel.style.display = 'none';
+    }
+
+    if (pinAndTabs instanceof HTMLElement) {
+        pinAndTabs.style.display = 'none';
+    }
+
+    if (characterEditor instanceof HTMLElement) {
+        characterEditor.style.display = 'none';
+        characterEditor.style.visibility = 'hidden';
+        characterEditor.style.pointerEvents = 'none';
+    }
+
+    if (characterList instanceof HTMLElement) {
+        characterList.style.display = 'none';
+        characterList.style.visibility = 'hidden';
+        characterList.style.pointerEvents = 'none';
+    }
+}
+
+function openCharacterPersonaTab() {
+    const panel = document.getElementById('right-nav-panel');
+    sbState.characterDrawer.lastTab = 'persona';
+
+    panel?.setAttribute('data-menu-type', 'persona');
+    setCharacterEditorEmptyState(false);
+    setCharacterImportPanelVisible(false);
+    syncCharacterListControls('characters');
+    setCharacterPersonaPanelVisible(true);
+    hideCharacterMainPanels();
+
+    syncCharacterShellTabs('persona');
+    syncCharacterTitlebarVisibility();
+}
+
+function openCharacterImportTab() {
+    const panel = document.getElementById('right-nav-panel');
+    sbState.characterDrawer.lastTab = 'import';
+
+    panel?.setAttribute('data-menu-type', 'import');
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    syncCharacterListControls('characters');
+    setCharacterImportPanelVisible(true);
+    hideCharacterMainPanels();
+
+    syncCharacterShellTabs('import');
+    syncCharacterTitlebarVisibility();
+}
+
+function preserveCharacterImportTab() {
+    const panel = document.getElementById('right-nav-panel');
+
+    if (panel instanceof HTMLElement && panel.dataset.menuType !== 'import') {
+        return;
+    }
+
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    syncCharacterListControls('characters');
+    setCharacterImportPanelVisible(true);
+    hideCharacterMainPanels();
+    syncCharacterShellTabs('import');
+    syncCharacterTitlebarVisibility();
+}
+
+function openCharacterPanelTab(tabId) {
+    const normalizedTabId = ['persona', 'import', 'groups', 'editor'].includes(tabId) ? tabId : 'characters';
+    sbState.characterDrawer.lastTab = normalizedTabId;
+
+    if (!isCharacterPanelOpen()) {
+        toggleCharacterPanel();
+    } else {
+        closeShell('left');
+        closeShell('right');
+    }
+
+    window.requestAnimationFrame(() => {
+        if (tabId === 'persona') {
+            openCharacterPersonaTab();
+        } else if (tabId === 'import') {
+            openCharacterImportTab();
+        } else if (tabId === 'groups') {
+            void showCharacterListView('groups');
+        } else if (tabId === 'editor') {
+            openCharacterEditorTab();
+        } else {
+            void showCharacterListView();
+        }
+    });
+}
+
+function restoreLastCharacterPanelView() {
+    const lastTab = sbState.characterDrawer.lastTab || 'characters';
+
+    if (lastTab === 'persona') {
+        openCharacterPersonaTab();
+    } else if (lastTab === 'import') {
+        openCharacterImportTab();
+    } else if (lastTab === 'groups') {
+        void showCharacterListView('groups');
+    } else if (lastTab === 'editor') {
+        openCharacterEditorTab();
+    } else {
+        void showCharacterListView('characters');
+    }
+}
+
+function openCharacterEditorTab() {
+    sbState.characterDrawer.lastTab = 'editor';
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    setCharacterImportPanelVisible(false);
+
+    if (showActiveCharacterEditor()) {
+        syncCharacterShellTabs('editor');
+        return true;
+    }
+
+    showCharacterEditorEmptyState();
+    return false;
+}
+
+function syncCharacterShellTabs(activeTab = null) {
+    const panel = document.getElementById('right-nav-panel');
+    const menuType = panel?.dataset.menuType;
+    const normalizedTab = activeTab
+        ?? (menuType === 'persona'
+            ? 'persona'
+            : menuType === 'import'
+                ? 'import'
+                : menuType === 'groups'
+                    ? 'groups'
+                    : ['character_edit', 'group_edit', 'create', 'group_create', 'editor_empty'].includes(menuType) ? 'editor' : 'characters');
+
+    if (menuType === 'characters' || menuType === 'groups') {
+        syncCharacterListControls(menuType);
+    }
+
+    syncCharacterHeaderCopy(normalizedTab);
+
+    document.querySelectorAll('#right-nav-panel [data-sb-character-tab]').forEach(tab => {
+        if (!(tab instanceof HTMLElement)) {
+            return;
+        }
+
+        const isActive = tab.dataset.sbCharacterTab === normalizedTab;
+        tab.classList.toggle('is-active', isActive);
+        tab.setAttribute('aria-selected', String(isActive));
+    });
+}
+
+function syncCharacterHeaderCopy(activeTab = 'characters') {
+    const copy = SB_CHARACTER_TAB_COPY[activeTab] ?? SB_CHARACTER_TAB_COPY.characters;
+    const title = document.querySelector('#right-nav-panel .sb-character-shell-header .sb-shell-title');
+    const subtitle = document.querySelector('#right-nav-panel .sb-character-shell-header .sb-shell-subtitle');
+    const description = document.querySelector('#right-nav-panel .sb-character-shell-header .sb-shell-description');
+
+    if (title instanceof HTMLElement) {
+        title.textContent = '';
+        title.append(document.createTextNode(copy.title));
+        if (activeTab === 'persona') {
+            title.insertAdjacentHTML('beforeend', SB_PERSONA_HELP_LINK_HTML);
+        }
+    }
+
+    if (subtitle instanceof HTMLElement) {
+        subtitle.textContent = copy.subtitle;
+    }
+
+    if (description instanceof HTMLElement) {
+        description.textContent = copy.description;
+    }
 }
 
 function showActiveCharacterEditor() {
@@ -5322,6 +5775,10 @@ function showActiveCharacterEditor() {
     }
 
     selectedCharacterButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    setCharacterImportPanelVisible(false);
+    syncCharacterShellTabs('editor');
     return true;
 }
 
@@ -5334,8 +5791,17 @@ function resetCharacterPanelView() {
         selectedTitle.textContent = '';
     }
 
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    setCharacterImportPanelVisible(false);
+
     if (listButton instanceof HTMLElement) {
         listButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        if (panel instanceof HTMLElement) {
+            panel.dataset.menuType = 'characters';
+        }
+        syncCharacterListControls('characters');
+        syncCharacterShellTabs('characters');
         return;
     }
 
@@ -5362,6 +5828,8 @@ function resetCharacterPanelView() {
         characterList.style.visibility = 'visible';
         characterList.style.pointerEvents = 'auto';
     }
+
+    syncCharacterShellTabs('characters');
 }
 
 function setCharacterDrawerHostOverflow(shouldOpen) {
@@ -5404,10 +5872,20 @@ function bindCharacterDrawerStateObserver() {
     }
 
     sbState.characterDrawer.stateObserver?.disconnect();
-    sbState.characterDrawer.stateObserver = new MutationObserver(() => syncCharacterDrawerStateFromDom());
+    sbState.characterDrawer.stateObserver = new MutationObserver((mutations) => {
+        syncCharacterDrawerStateFromDom();
+
+        if (mutations.some(mutation => mutation.attributeName === 'data-menu-type')) {
+            setCharacterEditorEmptyState(panel.dataset.menuType === 'editor_empty');
+            setCharacterPersonaPanelVisible(panel.dataset.menuType === 'persona');
+            setCharacterImportPanelVisible(panel.dataset.menuType === 'import');
+            syncCharacterTitlebarVisibility();
+            syncCharacterShellTabs();
+        }
+    });
     sbState.characterDrawer.stateObserver.observe(panel, {
         attributes: true,
-        attributeFilter: ['class'],
+        attributeFilter: ['class', 'data-menu-type'],
     });
     syncCharacterDrawerStateFromDom({ force: true });
 }
@@ -5452,7 +5930,6 @@ function ensureCharacterResizeHandle() {
 function toggleCharacterPanel() {
     injectCharacterDrawerControls();
     ensureCharacterResizeHandle();
-    const shouldOpenActiveCharacterEditor = hasActiveCharacterChat();
 
     if (isCharacterPanelOpen()) {
         closeCharacterPanel();
@@ -5460,12 +5937,7 @@ function toggleCharacterPanel() {
     }
 
     closeAllDropdowns({ except: 'characters' });
-
-    if (shouldOpenActiveCharacterEditor) {
-        showActiveCharacterEditor();
-    } else {
-        resetCharacterPanelView();
-    }
+    restoreLastCharacterPanelView();
 
     closeShell('left');
     closeShell('right');
@@ -5482,9 +5954,7 @@ function toggleCharacterPanel() {
             forceDrawerState('right-nav-panel', true, '#rightNavDrawerIcon');
         }
 
-        if (shouldOpenActiveCharacterEditor) {
-            showActiveCharacterEditor();
-        }
+        restoreLastCharacterPanelView();
 
         syncChatbarVisibilityState();
         syncDesktopShellSizing();
@@ -9073,7 +9543,7 @@ function getPersonaSearchEntries(tabState) {
             dedupeKey: getSearchEntryDedupeKey(tabState, 'Persona', name, { avatarId }),
             action: () => {
                 // Activate the persona tab and trigger ST's own persona search
-                openShell('right', 'persona');
+                openCharacterPanelTab('persona');
                 window.setTimeout(() => {
                     const searchInput = document.getElementById('persona_search_bar');
                     if (searchInput instanceof HTMLInputElement) {
@@ -9860,6 +10330,20 @@ function routeDrawerTarget(targetId) {
         return false;
     }
 
+    if (route.shell === 'characters') {
+        if (!isCharacterPanelOpen()) {
+            toggleCharacterPanel();
+        } else {
+            closeShell('left');
+            closeShell('right');
+        }
+
+        if (route.tab === 'persona') {
+            openCharacterPersonaTab();
+        }
+        return true;
+    }
+
     openShell(route.shell, route.tab);
     return true;
 }
@@ -10208,73 +10692,93 @@ function closeMobileNav() {
 
 function injectCharacterDrawerControls() {
     document.getElementById('right-nav-panel')?.classList.add('sb-character-drawer-root');
+    ensureCharacterListToolbarLayout();
+
+    const shellCloseButton = document.getElementById('sb_character_shell_close');
+    if (shellCloseButton instanceof HTMLButtonElement && shellCloseButton.dataset.sbBound !== 'true') {
+        shellCloseButton.dataset.sbBound = 'true';
+        shellCloseButton.addEventListener('click', () => closeCharacterPanel());
+    }
+
+    const charactersTab = document.getElementById('sb_character_tab_characters');
+    if (charactersTab instanceof HTMLButtonElement && charactersTab.dataset.sbBound !== 'true') {
+        charactersTab.dataset.sbBound = 'true';
+        charactersTab.addEventListener('click', () => { void showCharacterListView(); });
+    }
+
+    const groupsTab = document.getElementById('sb_character_tab_groups');
+    if (groupsTab instanceof HTMLButtonElement && groupsTab.dataset.sbBound !== 'true') {
+        groupsTab.dataset.sbBound = 'true';
+        groupsTab.addEventListener('click', () => { void showCharacterListView('groups'); });
+    }
+
+    const editorTab = document.getElementById('sb_character_tab_editor');
+    if (editorTab instanceof HTMLButtonElement && editorTab.dataset.sbBound !== 'true') {
+        editorTab.dataset.sbBound = 'true';
+        editorTab.addEventListener('click', () => openCharacterEditorTab());
+    }
+
+    const personaTab = document.getElementById('sb_character_tab_persona');
+    if (personaTab instanceof HTMLButtonElement && personaTab.dataset.sbBound !== 'true') {
+        personaTab.dataset.sbBound = 'true';
+        personaTab.addEventListener('click', () => openCharacterPersonaTab());
+    }
+
+    const importTab = document.getElementById('sb_character_tab_import');
+    if (importTab instanceof HTMLButtonElement && importTab.dataset.sbBound !== 'true') {
+        importTab.dataset.sbBound = 'true';
+        importTab.addEventListener('click', () => openCharacterImportTab());
+    }
+
+    const importFileAction = document.getElementById('sb_character_import_file_action');
+    if (importFileAction instanceof HTMLButtonElement && importFileAction.dataset.sbBound !== 'true') {
+        importFileAction.dataset.sbBound = 'true';
+        importFileAction.addEventListener('click', () => {
+            document.getElementById('character_import_button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+    }
+
+    const importUrlAction = document.getElementById('sb_character_import_url_action');
+    if (importUrlAction instanceof HTMLButtonElement && importUrlAction.dataset.sbBound !== 'true') {
+        importUrlAction.dataset.sbBound = 'true';
+        importUrlAction.addEventListener('click', () => {
+            document.getElementById('external_import_button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+    }
+
+    if (document.documentElement.dataset.sbCharacterImportPreserveBound !== 'true') {
+        document.documentElement.dataset.sbCharacterImportPreserveBound = 'true';
+        document.addEventListener('sillybunny:character-import-tab-preserve', () => {
+            window.requestAnimationFrame(preserveCharacterImportTab);
+        });
+    }
+
+    const emptyBrowseButton = document.getElementById('sb_character_empty_browse');
+    if (emptyBrowseButton instanceof HTMLButtonElement && emptyBrowseButton.dataset.sbBound !== 'true') {
+        emptyBrowseButton.dataset.sbBound = 'true';
+        emptyBrowseButton.addEventListener('click', () => { void showCharacterListView(); });
+    }
+
+    const emptyCreateButton = document.getElementById('sb_character_empty_create');
+    if (emptyCreateButton instanceof HTMLButtonElement && emptyCreateButton.dataset.sbBound !== 'true') {
+        emptyCreateButton.dataset.sbBound = 'true';
+        emptyCreateButton.addEventListener('click', () => {
+            setCharacterEditorEmptyState(false);
+            setCharacterPersonaPanelVisible(false);
+            setCharacterImportPanelVisible(false);
+            document.getElementById('rm_button_create')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            syncCharacterShellTabs('editor');
+        });
+    }
+
+    ensureCharacterPersonaPanel();
 
     const target = document.getElementById('CharListButtonAndHotSwaps');
     if (!(target instanceof HTMLElement)) {
         return;
     }
 
-    let lockButton = target.querySelector('#sb-character-right-lock');
-    if (!(lockButton instanceof HTMLButtonElement)) {
-        lockButton = createElement('button', {
-            id: 'sb-character-right-lock',
-            className: 'sb-character-right-lock menu_button menu_button_icon',
-            attrs: {
-                type: 'button',
-                title: 'Lock Characters to right',
-                'aria-label': 'Lock Characters to right',
-                'aria-pressed': 'false',
-            },
-        });
-
-        lockButton.innerHTML = '<i class="fa-solid fa-align-right" aria-hidden="true"></i>';
-        lockButton.addEventListener('click', () => {
-            setCharacterDrawerRightLock(!sbState.characterDrawer.rightLocked);
-            syncDesktopShellSizing();
-        });
-        target.appendChild(lockButton);
-    }
-
-    let backButton = target.querySelector('#sb-character-back-to-list');
-    if (!(backButton instanceof HTMLButtonElement)) {
-        backButton = createElement('button', {
-            id: 'sb-character-back-to-list',
-            className: 'sb-character-back-to-list menu_button menu_button_icon',
-            attrs: {
-                type: 'button',
-                title: 'Back to characters list',
-                'aria-label': 'Back to characters list',
-            },
-        });
-
-        backButton.innerHTML = '<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>';
-        backButton.addEventListener('click', () => {
-            showCharacterListView();
-            syncChatbarVisibilityState();
-        });
-        target.appendChild(backButton);
-    }
-
-    let closeButton = target.querySelector('#sb-character-mobile-close');
-    if (!(closeButton instanceof HTMLButtonElement)) {
-        closeButton = createElement('button', {
-            id: 'sb-character-mobile-close',
-            className: 'sb-character-close menu_button menu_button_icon',
-            attrs: {
-                type: 'button',
-                title: 'Close Characters',
-                'aria-label': 'Close Characters',
-            },
-        });
-
-        closeButton.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
-        closeButton.addEventListener('click', () => {
-            closeCharacterPanel();
-        });
-        target.appendChild(closeButton);
-    }
-
-    syncCharacterDrawerLockButton();
+    syncCharacterShellTabs();
 }
 
 function bindCharacterEditorExitButton() {
@@ -11071,7 +11575,7 @@ async function selectPersonaOption(option, picker, avatarId, context) {
         if (domAvatar instanceof HTMLElement) {
             domAvatar.click();
         } else {
-            openShell('right', 'persona');
+            openCharacterPanelTab('persona');
         }
     }
 
@@ -11235,12 +11739,20 @@ function initAll() {
 
     window.SillyBunnyShell = Object.assign(window.SillyBunnyShell || {}, {
         openTab(shellKey, tabId) {
+            if (shellKey === 'characters') {
+                openCharacterPanelTab(tabId);
+                return;
+            }
+
             if (SB_SHELLS[shellKey]) {
                 openShell(shellKey, tabId);
             }
         },
         openCharacters() {
             toggleCharacterPanel();
+        },
+        closeCharacters() {
+            closeCharacterPanel();
         },
         openGlobalSearch({ focusInput = true } = {}) {
             closeAllDropdowns({ except: 'search' });
