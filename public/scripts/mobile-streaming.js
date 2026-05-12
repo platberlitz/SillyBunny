@@ -1,7 +1,7 @@
 import { isIOSWebKitPlatform } from './mobile-send-button.js';
 
-export const IOS_STREAMING_UPDATE_INTERVAL_MS = 125;
-export const IOS_REASONING_RENDER_INTERVAL_MS = 750;
+export const IOS_STREAMING_UPDATE_INTERVAL_MS = 250;
+export const IOS_REASONING_RENDER_INTERVAL_MS = 1500;
 
 /**
  * Checks whether live streaming DOM work should be reduced for the current browser.

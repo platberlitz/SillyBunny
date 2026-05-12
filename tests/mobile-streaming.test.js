@@ -6,6 +6,11 @@ import {
 } from '../public/scripts/mobile-streaming.js';
 
 describe('mobile streaming helpers', () => {
+    test('uses conservative iOS streaming floors', () => {
+        expect(IOS_STREAMING_UPDATE_INTERVAL_MS).toBe(250);
+        expect(IOS_REASONING_RENDER_INTERVAL_MS).toBe(1500);
+    });
+
     test('keeps desktop streaming intervals unchanged', () => {
         expect(getStreamingUpdateInterval(33, {
             navigatorRef: { platform: 'Linux x86_64', maxTouchPoints: 1 },
@@ -17,9 +22,9 @@ describe('mobile streaming helpers', () => {
             navigatorRef: { platform: 'iPhone', maxTouchPoints: 1 },
         })).toBe(IOS_STREAMING_UPDATE_INTERVAL_MS);
 
-        expect(getStreamingUpdateInterval(250, {
+        expect(getStreamingUpdateInterval(500, {
             navigatorRef: { platform: 'iPhone', maxTouchPoints: 1 },
-        })).toBe(250);
+        })).toBe(500);
     });
 
     test('skips repeated hidden live reasoning renders on reduced DOM platforms', () => {

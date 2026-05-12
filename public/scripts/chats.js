@@ -906,6 +906,8 @@ function expandMessageMedia(messageId, mediaIndex) {
         function getImageElement() {
             const img = document.createElement('img');
             img.src = mediaAttachment.url;
+            img.loading = 'lazy';
+            img.decoding = 'async';
             img.classList.add('img_enlarged');
             return img;
         }

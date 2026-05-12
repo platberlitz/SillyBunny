@@ -4451,6 +4451,7 @@ class StreamingProcessor {
     async onProgressStreaming(messageId, text, isFinal) {
         const isImpersonate = this.type == 'impersonate';
         const isContinue = this.type == 'continue';
+        const shouldReduceIntermediateStreamingWork = !isFinal && isIOSWebKitPlatform();
         const shouldPinMobileBottom = !isImpersonate && shouldPinMobileChatToBottom();
 
         if (!isImpersonate && !isContinue && Array.isArray(this.swipes) && this.swipes.length > 0) {
@@ -4507,28 +4508,36 @@ class StreamingProcessor {
 
             // Token count update.
             const shouldRefreshTokenCount = isFinal && power_user.message_token_count_enabled;
-            const { outputTokens: currentTokenCount } = await updateMessageTokenAccounting(chat[messageId], {
-                reasoning: this.reasoningHandler.reasoning,
-                reasoningTokens: Math.max(getPositiveTokenCount(this.reasoningTokens), getPositiveTokenCount(chat[messageId].extra.reasoning_tokens)),
-                countOutput: shouldRefreshTokenCount,
-                countReasoning: shouldRefreshTokenCount,
-            });
+            let currentTokenCount = getPositiveTokenCount(chat[messageId].extra.token_count);
+            if (!shouldReduceIntermediateStreamingWork) {
+                const { outputTokens } = await updateMessageTokenAccounting(chat[messageId], {
+                    reasoning: this.reasoningHandler.reasoning,
+                    reasoningTokens: Math.max(getPositiveTokenCount(this.reasoningTokens), getPositiveTokenCount(chat[messageId].extra.reasoning_tokens)),
+                    countOutput: shouldRefreshTokenCount,
+                    countReasoning: shouldRefreshTokenCount,
+                });
+                currentTokenCount = outputTokens;
+            }
             if (shouldRefreshTokenCount) {
                 if (this.messageTokenCounterDom instanceof HTMLElement) {
                     this.messageTokenCounterDom.textContent = `${currentTokenCount}t`;
                 }
             }
 
-            updateMessageMetaBadges(this.messageDom, chat[messageId]);
+            if (!shouldReduceIntermediateStreamingWork) {
+                updateMessageMetaBadges(this.messageDom, chat[messageId]);
+            }
 
             if ((this.type == 'swipe' || this.type === 'continue') && Array.isArray(chat[messageId].swipes)) {
                 chat[messageId].swipes[chat[messageId].swipe_id] = processedText;
-                chat[messageId].swipe_info[chat[messageId].swipe_id] = {
-                    'send_date': chat[messageId].send_date,
-                    'gen_started': chat[messageId].gen_started,
-                    'gen_finished': chat[messageId].gen_finished,
-                    'extra': structuredClone(chat[messageId].extra),
-                };
+                if (!shouldReduceIntermediateStreamingWork) {
+                    chat[messageId].swipe_info[chat[messageId].swipe_id] = {
+                        'send_date': chat[messageId].send_date,
+                        'gen_started': chat[messageId].gen_started,
+                        'gen_finished': chat[messageId].gen_finished,
+                        'extra': structuredClone(chat[messageId].extra),
+                    };
+                }
             }
 
             const formattedText = messageFormatting(
@@ -4554,7 +4563,9 @@ class StreamingProcessor {
                 this.messageTimerDom.title = timePassed.timerTitle;
             }
 
-            this.setFirstSwipe(messageId);
+            if (!shouldReduceIntermediateStreamingWork) {
+                this.setFirstSwipe(messageId);
+            }
         }
 
         if (shouldPinMobileBottom) {

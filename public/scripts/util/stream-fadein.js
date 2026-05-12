@@ -1,4 +1,5 @@
 import { morphdom } from '../../lib.js';
+import { isIOSWebKitPlatform } from '../mobile-send-button.js';
 
 /**
  * Check if the current browser supports native segmentation function.
@@ -75,6 +76,11 @@ export function applyStreamDomPatch(messageTextElement, htmlContent) {
  * @param {string} htmlContent New HTML content to apply
  */
 export function applyStreamFadeIn(messageTextElement, htmlContent) {
+    if (isIOSWebKitPlatform()) {
+        applyStreamDomPatch(messageTextElement, htmlContent);
+        return;
+    }
+
     const targetElement = /** @type {HTMLElement} */ (messageTextElement.cloneNode());
     segmentTextInElement(targetElement, htmlContent);
     morphdom(messageTextElement, targetElement);
