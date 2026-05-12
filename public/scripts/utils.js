@@ -2623,7 +2623,8 @@ export async function showFontAwesomePicker(customList = null) {
                 qry.placeholder = 'Filter icons';
                 qry.autofocus = true;
                 const qryDebounced = debounce(() => {
-                    const result = faList.filter(fa => fa.find(className => className.includes(qry.value.toLowerCase())));
+                    const query = qry.value.trim().toLowerCase();
+                    const result = faList.filter(fa => fa.find(className => className.includes(query)));
                     const resultSet = new Set(result);
                     for (const fa of faList) {
                         if (!resultSet.has(fa)) {
@@ -2633,7 +2634,7 @@ export async function showFontAwesomePicker(customList = null) {
                         }
                     }
 
-                    const ordered = qry.value.trim()
+                    const ordered = query
                         ? [...result, ...faList.filter(fa => !resultSet.has(fa))]
                         : faList;
                     grid.append(...ordered.map(fa => fas[fa]).filter(Boolean));
