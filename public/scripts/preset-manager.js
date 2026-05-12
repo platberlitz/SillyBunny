@@ -44,6 +44,17 @@ import { download, ensurePlainObject, equalsIgnoreCaseAndAccents, getSanitizedFi
 const presetManagers = {};
 const PRESET_CHANGE_EVENT_APIS = new Set(['kobold', 'novel', 'openai', 'textgenerationwebui']);
 const PRESET_CHANGE_TIMEOUT_MS = 10000;
+const PRESET_TEXT_FIELD_SELECTOR = 'textarea, input[type="text"]';
+const PRESET_TEXT_FIELD_PANEL_SELECTORS = Object.freeze({
+    kobold: '#kobold_api-settings',
+    novel: '#range_block_novel, #novel_api-settings',
+    openai: '#range_block_openai, #openai_settings',
+    textgenerationwebui: '#textgenerationwebui_api-settings',
+    context: '#ContextSettings',
+    instruct: '#InstructSettingsColumn',
+    sysprompt: '#SystemPromptBlock',
+    reasoning: '#reasoning_prefix, #reasoning_suffix, #reasoning_separator',
+});
 
 /**
  * Automatically select a preset for current API based on character or group name.
@@ -141,6 +152,18 @@ function registerPresetManagers() {
     });
 }
 
+function snapshotAllPresetManagers() {
+    Object.values(presetManagers).forEach(manager => manager.scheduleSnapshotTextFields());
+}
+
+function registerPresetDirtySnapshots() {
+    eventSource.on(event_types.SETTINGS_LOADED, snapshotAllPresetManagers);
+    eventSource.on(event_types.APP_READY, snapshotAllPresetManagers);
+    eventSource.on(event_types.PRESET_CHANGED, (data = {}) => {
+        getPresetManager(data.apiId)?.snapshotTextFields();
+    });
+}
+
 function injectRestoreDefaultPresetButtons() {
     $('[data-preset-manager-restore]').each((_, element) => {
         const apiId = $(element).data('preset-manager-restore');
@@ -165,6 +188,17 @@ class PresetManager {
     constructor(select, apiId) {
         this.select = select;
         this.apiId = apiId;
+        this._textSnapshot = new Map();
+        this._dirty = false;
+        this._previousSelectValue = this.getSelectedPreset();
+        this._beforeUnloadHandler = null;
+        this._snapshotTimer = null;
+        this._isApplyingPresetChange = false;
+        this._allowPresetSelectChange = false;
+        this._textInputHandler = () => this._checkDirty();
+        this._selectChangeHandler = (event) => this._handleSelectChange(event);
+        this._capturePreviousSelectValueHandler = () => this._capturePreviousSelectValue();
+        this._bindDirtyGuard();
     }
 
     static masterSections = {
@@ -457,6 +491,202 @@ class PresetManager {
         return $(this.select).find('option:selected').text();
     }
 
+    _bindDirtyGuard() {
+        const selectElement = $(this.select)[0];
+        if (!(selectElement instanceof HTMLSelectElement)) {
+            return;
+        }
+
+        selectElement.addEventListener('focus', this._capturePreviousSelectValueHandler, true);
+        selectElement.addEventListener('pointerdown', this._capturePreviousSelectValueHandler, true);
+        selectElement.addEventListener('keydown', this._capturePreviousSelectValueHandler, true);
+        selectElement.addEventListener('change', this._selectChangeHandler, true);
+    }
+
+    _capturePreviousSelectValue() {
+        this._previousSelectValue = this.getSelectedPreset();
+    }
+
+    _getAssociatedPanels() {
+        const selector = PRESET_TEXT_FIELD_PANEL_SELECTORS[this.apiId];
+        if (!selector) {
+            return [];
+        }
+
+        return Array.from(document.querySelectorAll(selector));
+    }
+
+    _getAssociatedTextFields() {
+        const fields = new Set();
+
+        for (const panel of this._getAssociatedPanels()) {
+            if (panel.matches(PRESET_TEXT_FIELD_SELECTOR)) {
+                fields.add(panel);
+                continue;
+            }
+
+            panel.querySelectorAll(PRESET_TEXT_FIELD_SELECTOR).forEach(element => fields.add(element));
+        }
+
+        return Array.from(fields).filter(element => element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement);
+    }
+
+    snapshotTextFields() {
+        this._clearScheduledSnapshot();
+
+        for (const element of this._textSnapshot.keys()) {
+            element.removeEventListener('input', this._textInputHandler);
+        }
+
+        this._textSnapshot.clear();
+        this._dirty = false;
+        this._isApplyingPresetChange = false;
+        this._previousSelectValue = this.getSelectedPreset();
+
+        for (const element of this._getAssociatedTextFields()) {
+            this._textSnapshot.set(element, element.value);
+            element.addEventListener('input', this._textInputHandler);
+        }
+
+        this._updateBeforeUnload();
+    }
+
+    scheduleSnapshotTextFields() {
+        this._isApplyingPresetChange = true;
+
+        if (this._snapshotTimer) {
+            clearTimeout(this._snapshotTimer);
+        }
+
+        this._snapshotTimer = setTimeout(() => {
+            this._snapshotTimer = null;
+            this.snapshotTextFields();
+        }, 0);
+    }
+
+    _clearScheduledSnapshot() {
+        if (this._snapshotTimer) {
+            clearTimeout(this._snapshotTimer);
+            this._snapshotTimer = null;
+        }
+    }
+
+    _checkDirty({ force = false } = {}) {
+        if (this._isApplyingPresetChange && !force) {
+            return;
+        }
+
+        let dirty = false;
+
+        for (const [element, savedValue] of this._textSnapshot) {
+            if (!element.isConnected) {
+                continue;
+            }
+
+            if (element.value !== savedValue) {
+                dirty = true;
+                break;
+            }
+        }
+
+        if (dirty && !this._dirty) {
+            this._previousSelectValue = this.getSelectedPreset();
+        } else if (!dirty) {
+            this._previousSelectValue = this.getSelectedPreset();
+        }
+
+        this._dirty = dirty;
+        this._updateBeforeUnload();
+    }
+
+    _updateBeforeUnload() {
+        if (this._dirty && !this._beforeUnloadHandler) {
+            this._beforeUnloadHandler = (event) => {
+                event.preventDefault();
+                event.returnValue = '';
+                return '';
+            };
+            window.addEventListener('beforeunload', this._beforeUnloadHandler);
+        } else if (!this._dirty && this._beforeUnloadHandler) {
+            window.removeEventListener('beforeunload', this._beforeUnloadHandler);
+            this._beforeUnloadHandler = null;
+        }
+    }
+
+    _runInternalPresetSelectChange(callback) {
+        this._allowPresetSelectChange = true;
+
+        try {
+            return callback();
+        } finally {
+            this._allowPresetSelectChange = false;
+        }
+    }
+
+    _triggerPresetSelectChange(value) {
+        this.scheduleSnapshotTextFields();
+        this._runInternalPresetSelectChange(() => {
+            const selectElement = $(this.select)[0];
+            $(this.select).val(value);
+
+            if (selectElement instanceof HTMLSelectElement) {
+                selectElement.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+            } else {
+                $(this.select).trigger('change');
+            }
+        });
+    }
+
+    _handleSelectChange(event) {
+        if (!this._allowPresetSelectChange) {
+            this._clearScheduledSnapshot();
+            this._isApplyingPresetChange = false;
+            this._checkDirty({ force: true });
+        }
+
+        if (this._allowPresetSelectChange || !this._dirty) {
+            this.scheduleSnapshotTextFields();
+            return;
+        }
+
+        const selectElement = event.currentTarget;
+        if (!(selectElement instanceof HTMLSelectElement)) {
+            return;
+        }
+
+        const newValue = selectElement.value;
+        const previousValue = this._previousSelectValue;
+
+        if (previousValue === undefined || previousValue === null) {
+            this.scheduleSnapshotTextFields();
+            return;
+        }
+
+        if (String(newValue) === String(previousValue)) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        $(selectElement).val(previousValue);
+        this._confirmDiscardAndSelect(newValue);
+    }
+
+    async _confirmDiscardAndSelect(newValue) {
+        const bodyText = !this.isAdvancedFormatting()
+            ? t`You have unsaved changes to this preset. Discard them?`
+            : t`You have unsaved changes to this template. Discard them?`;
+        const confirm = await Popup.show.confirm(t`Unsaved changes`, bodyText);
+
+        if (confirm !== POPUP_RESULT.AFFIRMATIVE) {
+            return;
+        }
+
+        this._dirty = false;
+        this._updateBeforeUnload();
+        this._triggerPresetSelectChange(newValue);
+    }
+
     /**
      * Selects a preset by option value.
      * @param {string} value Preset option value
@@ -469,8 +699,9 @@ class PresetManager {
         const presetName = option.text();
         const waitForChange = presetName ? waitForPresetChange(this) : Promise.resolve();
         option.prop('selected', true);
-        $(this.select).val(value).trigger('change');
+        this._triggerPresetSelectChange(value);
         await waitForChange;
+        this.snapshotTextFields();
     }
 
     /**
@@ -488,7 +719,18 @@ class PresetManager {
         }
 
         const name = selected.text();
+        const headerText = !this.isAdvancedFormatting() ? t`Save this preset?` : t`Save this template?`;
+        const bodyText = !this.isAdvancedFormatting()
+            ? t`This will overwrite the selected preset.`
+            : t`This will overwrite the selected template.`;
+        const confirm = await Popup.show.confirm(headerText, bodyText);
+        if (confirm !== POPUP_RESULT.AFFIRMATIVE) {
+            console.debug(!this.isAdvancedFormatting() ? 'Preset update cancelled' : 'Template update cancelled');
+            return;
+        }
+
         await this.savePreset(name, null, option);
+        this.snapshotTextFields();
 
         const successToast = !this.isAdvancedFormatting() ? t`Preset updated` : t`Template updated`;
         toastr.success(successToast);
@@ -508,6 +750,7 @@ class PresetManager {
         }
 
         await this.savePreset(name);
+        this.snapshotTextFields();
 
         const successToast = !this.isAdvancedFormatting() ? t`Preset saved` : t`Template saved`;
         toastr.success(successToast);
@@ -668,12 +911,12 @@ class PresetManager {
             if (this.isKeyedApi()) {
                 presets[preset_names.indexOf(name)] = preset;
                 $(this.select).find(`option[value="${name}"]`).prop('selected', true);
-                $(this.select).val(name).trigger('change');
+                this._triggerPresetSelectChange(name);
             } else {
                 const value = preset_names[name];
                 presets[value] = preset;
                 $(this.select).find(`option[value="${value}"]`).prop('selected', true);
-                $(this.select).val(value).trigger('change');
+                this._triggerPresetSelectChange(value);
             }
         } else {
             presets.push(preset);
@@ -683,12 +926,12 @@ class PresetManager {
                 preset_names[value] = name;
                 const option = $('<option></option>', { value: name, text: name, selected: true });
                 $(this.select).append(option);
-                $(this.select).val(name).trigger('change');
+                this._triggerPresetSelectChange(name);
             } else {
                 preset_names[name] = value;
                 const option = $('<option></option>', { value: value, text: name, selected: true });
                 $(this.select).append(option);
-                $(this.select).val(value).trigger('change');
+                this._triggerPresetSelectChange(value);
             }
         }
     }
@@ -866,7 +1109,7 @@ class PresetManager {
             const nextPresetName = Object.keys(preset_names)[0];
             const newValue = preset_names[nextPresetName];
             $(this.select).find(`option[value="${newValue}"]`).attr('selected', 'true');
-            $(this.select).trigger('change');
+            this._triggerPresetSelectChange(newValue);
         }
 
         const response = await fetch('/api/presets/delete', {
@@ -1170,6 +1413,8 @@ async function waitForConnection() {
 export async function initPresetManager() {
     eventSource.on(event_types.CHAT_CHANGED, autoSelectPreset);
     registerPresetManagers();
+    registerPresetDirtySnapshots();
+    snapshotAllPresetManagers();
     injectRestoreDefaultPresetButtons();
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'preset',
