@@ -703,15 +703,6 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="range-block" data-source="claude">
-                                    <label for="claude_disable_temperature" class="checkbox_label widthFreeExpand" title="Omit temperature from Claude requests." data-i18n="[title]Omit temperature from Claude requests.">
-                                        <input id="claude_disable_temperature" type="checkbox" />
-                                        <span data-i18n="Disable temperature">Disable temperature</span>
-                                    </label>
-                                    <div class="toggle-description justifyLeft">
-                                        <span data-i18n="When enabled, Claude requests leave temperature unset instead of sending a numeric value.">When enabled, Claude requests leave temperature unset instead of sending a numeric value.</span>
-                                    </div>
-                                </div>
                                 <div class="range-block" data-source="openai,aimlapi,openrouter,custom,cohere,perplexity,groq,siliconflow,mistralai,electronhub,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,chutes,workers_ai">
                                     <div class="range-block-title" data-i18n="Frequency Penalty">
                                         Frequency Penalty
@@ -764,15 +755,6 @@
                                         <div class="range-block-counter">
                                             <input type="number" min="0" max="1" step="0.01" data-for="top_p_openai" id="top_p_counter_openai">
                                         </div>
-                                    </div>
-                                </div>
-                                <div class="range-block" data-source="claude">
-                                    <label for="claude_disable_top_p" class="checkbox_label widthFreeExpand" title="Omit top_p from Claude requests." data-i18n="[title]Omit top_p from Claude requests.">
-                                        <input id="claude_disable_top_p" type="checkbox" />
-                                        <span data-i18n="Disable top_p">Disable top_p</span>
-                                    </label>
-                                    <div class="toggle-description justifyLeft">
-                                        <span data-i18n="When enabled, Claude requests leave top_p unset instead of sending a numeric value.">When enabled, Claude requests leave top_p unset instead of sending a numeric value.</span>
                                     </div>
                                 </div>
                                 <div class="range-block" data-source="openrouter,nanogpt,chutes,workers_ai">
@@ -5776,6 +5758,18 @@
                                     <input id="encode_tags" type="checkbox" />
                                     <small data-i18n="Show tags in responses">Show &lt;tags&gt; in responses</small>
                                 </label>
+                                <div class="flex-container alignitemscenter gap10">
+                                    <label for="ooc_context_depth" class="flex1" title="Keep OOC ((...)) blocks in the last N context messages. 0 strips all OOC blocks from prompt context." data-i18n="[title]Keep OOC blocks in the last N context messages. 0 strips all OOC blocks from prompt context.">
+                                        <small data-i18n="OOC context depth">OOC context depth</small>
+                                    </label>
+                                    <input id="ooc_context_depth" class="text_pole widthUnset" type="number" min="0" step="1" value="0" />
+                                </div>
+                                <div class="flex-container alignitemscenter gap10">
+                                    <label for="html_context_depth" class="flex1" title="Keep raw HTML tags in the last N context messages. 0 strips HTML tags from prompt context." data-i18n="[title]Keep raw HTML tags in the last N context messages. 0 strips HTML tags from prompt context.">
+                                        <small data-i18n="HTML tag context depth">HTML tag context depth</small>
+                                    </label>
+                                    <input id="html_context_depth" class="text_pole widthUnset" type="number" min="0" step="1" value="0" />
+                                </div>
                                 <label class="checkbox_label" for="experimental_macro_engine" title="Experimental new Macro Engine.&NewLine;&NewLine;Allows nested macros to be resolved correctly and has a dedicated, logical replacement order.&NewLine;The new engine is designed to cleanly replace the old regex-based macro system.">
                                     <input id="experimental_macro_engine" type="checkbox" />
                                     <small data-i18n="Experimental Macro Engine">Experimental Macro Engine</small>
@@ -7891,9 +7885,9 @@
                         <div class="mes_buttons">
                             <div title="Message Actions" class="mes_button extraMesButtonsHint fa-solid fa-ellipsis" data-i18n="[title]Message Actions"></div>
                             <div class="extraMesButtons">
-                                <div title="Translate message" class="mes_button mes_translate fa-solid fa-language" data-i18n="[title]Translate message"></div>
-                                <div title="Generate Image" class="mes_button sd_message_gen fa-solid fa-paintbrush" data-i18n="[title]Generate Image"></div>
-                                <div title="Narrate" class="mes_button mes_narrate fa-solid fa-bullhorn" data-i18n="[title]Narrate"></div>
+                                <div title="Translate message" class="mes_button mes_translate fa-solid fa-language" data-i18n="[title]Translate message" data-requires-extension="translate"></div>
+                                <div title="Generate Image" class="mes_button sd_message_gen fa-solid fa-paintbrush" data-i18n="[title]Generate Image" data-requires-extension="stable-diffusion"></div>
+                                <div title="Narrate" class="mes_button mes_narrate fa-solid fa-bullhorn" data-i18n="[title]Narrate" data-requires-extension="tts"></div>
                                 <div title="Prompt" class="mes_button mes_prompt fa-solid fa-square-poll-horizontal " data-i18n="[title]Prompt" style="display: none;"></div>
                                 <div title="View agent changes" class="mes_button mes_view_agent_changes fa-solid fa-file-lines" data-i18n="[title]View agent changes" style="display: none;"></div>
                                 <div title="Exclude message from prompts" class="mes_button mes_hide fa-solid fa-eye" data-i18n="[title]Exclude message from prompts"></div>
