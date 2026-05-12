@@ -1672,8 +1672,9 @@
         width: 100% !important;
         min-width: 0 !important;
         min-height: var(--sb-mobile-composer-input-height) !important;
-        height: var(--sb-mobile-composer-input-height) !important;
+        field-sizing: content !important;
         max-height: 42dvh !important;
+        overflow-y: auto !important;
         padding: 8px 10px !important;
         font-size: 16px !important;
         line-height: 1.25 !important;
@@ -1683,7 +1684,6 @@
 
     :root[data-sb-compact-mode='true'] #send_textarea {
         min-height: var(--sb-mobile-composer-input-height) !important;
-        height: var(--sb-mobile-composer-input-height) !important;
         padding: 7px 9px !important;
         line-height: 1.22 !important;
     }
