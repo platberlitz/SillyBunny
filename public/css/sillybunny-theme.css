@@ -1049,6 +1049,9 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 #send_textarea {
     min-height: 68px;
     height: auto;
+    field-sizing: content;
+    max-height: min(50vh, 28rem);
+    overflow-y: auto;
     padding: var(--input-padding-y, 14px) var(--input-padding-x, 16px);
     line-height: 1.56;
     border-radius: var(--sb-radius-md);
