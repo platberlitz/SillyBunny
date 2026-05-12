@@ -1,0 +1,48 @@
+{
+    "id": "tpl-word-replacer",
+    "name": "Word Replacer",
+    "description": "Rewrite the latest response to replace a configured list of banned words or constructions",
+    "icon": "",
+    "category": "content",
+    "tags": [
+        "editing",
+        "replacement",
+        "quality"
+    ],
+    "version": 1,
+    "author": "SillyBunny",
+    "prompt": "### Word Replacer\nRewrite the current assistant response by replacing only the configured banned words, phrases, or constructions below. Before enabling this template, edit the replacement list.\n\nReplacement list:\n- [banned word or phrase] -> [replacement or instruction]\n- [banned construction] -> [replacement or instruction]\n\nRules:\n- Preserve meaning, speaker intent, tense, POV, names, facts, and formatting.\n- Change only text that matches the replacement list or a clearly equivalent construction.\n- If the list is still placeholder text or no replacements are needed, return the original response verbatim.\n- Return only the final rewritten response.",
+    "phase": "post",
+    "injection": {
+        "position": 1,
+        "depth": 1,
+        "role": 0,
+        "order": 100,
+        "scan": false
+    },
+    "postProcess": {
+        "enabled": false,
+        "type": "regex",
+        "regexFind": "",
+        "regexReplace": "",
+        "regexFlags": "g",
+        "appendText": "",
+        "extractPattern": "",
+        "extractVariable": "",
+        "promptTransformEnabled": true,
+        "promptTransformShowNotifications": true,
+        "promptTransformMode": "rewrite",
+        "promptTransformMaxTokens": 8192
+    },
+    "enabled": false,
+    "conditions": {
+        "triggerKeywords": [],
+        "triggerProbability": 100,
+        "generationTypes": [
+            "normal",
+            "continue",
+            "impersonate"
+        ],
+        "runOnImpersonate": true
+    }
+}

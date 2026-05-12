@@ -1272,6 +1272,287 @@
     }
   },
   {
+    "id": "tpl-instruction-checker",
+    "name": "Instruction Checker",
+    "description": "Append a compact compliance check for the latest response",
+    "icon": "",
+    "category": "content",
+    "tags": [
+      "instructions",
+      "audit",
+      "quality"
+    ],
+    "version": 1,
+    "author": "SillyBunny",
+    "prompt": "### Instruction Checker\nCheck the current assistant response against the active user and character instructions visible in the response itself. Do not invent hidden requirements. If the needed instruction is not present, say that the check is limited.\n\nReturn only this block:\n[INSTRUCTION CHECK]\nstatus: PASS | NEEDS REVISION | LIMITED\nissues:\n- concise issue, or none\nfix:\n- concise action, or none\n[/INSTRUCTION CHECK]\n\nRules:\n- Do not rewrite the response.\n- Focus on concrete instruction conflicts, missing required format, forbidden content, POV violations, and output-contract drift.\n- If no clear issue is visible, use PASS and write \"none\" for issues and fix.",
+    "phase": "post",
+    "injection": {
+      "position": 0,
+      "depth": 4,
+      "role": 1,
+      "order": 100,
+      "scan": false
+    },
+    "postProcess": {
+      "enabled": false,
+      "type": "regex",
+      "regexFind": "",
+      "regexReplace": "",
+      "regexFlags": "g",
+      "appendText": "",
+      "extractPattern": "",
+      "extractVariable": "",
+      "promptTransformEnabled": true,
+      "promptTransformShowNotifications": true,
+      "promptTransformMode": "append",
+      "promptTransformMaxTokens": 2048
+    },
+    "enabled": false,
+    "conditions": {
+      "triggerKeywords": [],
+      "triggerProbability": 100,
+      "generationTypes": [
+        "normal",
+        "continue"
+      ]
+    }
+  },
+  {
+    "id": "tpl-word-replacer",
+    "name": "Word Replacer",
+    "description": "Rewrite the latest response to replace a configured list of banned words or constructions",
+    "icon": "",
+    "category": "content",
+    "tags": [
+      "editing",
+      "replacement",
+      "quality"
+    ],
+    "version": 1,
+    "author": "SillyBunny",
+    "prompt": "### Word Replacer\nRewrite the current assistant response by replacing only the configured banned words, phrases, or constructions below. Before enabling this template, edit the replacement list.\n\nReplacement list:\n- [banned word or phrase] -> [replacement or instruction]\n- [banned construction] -> [replacement or instruction]\n\nRules:\n- Preserve meaning, speaker intent, tense, POV, names, facts, and formatting.\n- Change only text that matches the replacement list or a clearly equivalent construction.\n- If the list is still placeholder text or no replacements are needed, return the original response verbatim.\n- Return only the final rewritten response.",
+    "phase": "post",
+    "injection": {
+      "position": 1,
+      "depth": 1,
+      "role": 0,
+      "order": 100,
+      "scan": false
+    },
+    "postProcess": {
+      "enabled": false,
+      "type": "regex",
+      "regexFind": "",
+      "regexReplace": "",
+      "regexFlags": "g",
+      "appendText": "",
+      "extractPattern": "",
+      "extractVariable": "",
+      "promptTransformEnabled": true,
+      "promptTransformShowNotifications": true,
+      "promptTransformMode": "rewrite",
+      "promptTransformMaxTokens": 8192
+    },
+    "enabled": false,
+    "conditions": {
+      "triggerKeywords": [],
+      "triggerProbability": 100,
+      "generationTypes": [
+        "normal",
+        "continue",
+        "impersonate"
+      ],
+      "runOnImpersonate": true
+    }
+  },
+  {
+    "id": "tpl-repetition-fixer",
+    "name": "Repetition Fixer",
+    "description": "Rewrite the latest response to reduce repeated phrasing, beats, and sentence patterns",
+    "icon": "",
+    "category": "content",
+    "tags": [
+      "editing",
+      "repetition",
+      "quality"
+    ],
+    "version": 1,
+    "author": "SillyBunny",
+    "prompt": "### Repetition Fixer\nRewrite the current assistant response to remove visible repetition while preserving the scene's facts, intent, formatting, and character voice.\n\nTarget:\n- repeated words or phrases that stand out without purpose\n- repeated sentence openings or paragraph rhythms\n- duplicated emotional beats\n- redundant explanations of the same action, thought, or relationship state\n- stock filler that repeats information already present in the response\n\nRules:\n- Do not summarize the response.\n- Do not add new events, dialogue, or continuity facts.\n- Keep deliberate repetition when it is clearly rhetorical, character-voiced, or format-required.\n- Prefer small local rewrites over broad style replacement.\n- If no meaningful repetition is present, return the original response verbatim.\n- Return only the final rewritten response.",
+    "phase": "post",
+    "injection": {
+      "position": 1,
+      "depth": 1,
+      "role": 0,
+      "order": 100,
+      "scan": false
+    },
+    "postProcess": {
+      "enabled": false,
+      "type": "regex",
+      "regexFind": "",
+      "regexReplace": "",
+      "regexFlags": "g",
+      "appendText": "",
+      "extractPattern": "",
+      "extractVariable": "",
+      "promptTransformEnabled": true,
+      "promptTransformShowNotifications": true,
+      "promptTransformMode": "rewrite",
+      "promptTransformMaxTokens": 8192
+    },
+    "enabled": false,
+    "conditions": {
+      "triggerKeywords": [],
+      "triggerProbability": 100,
+      "generationTypes": [
+        "normal",
+        "continue",
+        "impersonate"
+      ],
+      "runOnImpersonate": true
+    }
+  },
+  {
+    "id": "tpl-translator",
+    "name": "Translator",
+    "description": "Translate the latest response into a configured target language",
+    "icon": "",
+    "category": "content",
+    "tags": [
+      "translation",
+      "language",
+      "rewrite"
+    ],
+    "version": 1,
+    "author": "SillyBunny",
+    "prompt": "### Translator\nTranslate the current assistant response into the target language below. Before enabling this template, edit the target language.\n\nTarget language: [set target language here]\n\nRules:\n- Preserve names, lore terms, numbers, markdown, tags, and structural formatting.\n- Preserve character voice, register, politeness level, and implied tone as much as the target language allows.\n- Do not add explanations, translator notes, glossaries, or alternate versions.\n- If the target language is still placeholder text, return the original response verbatim.\n- Return only the translated response.",
+    "phase": "post",
+    "injection": {
+      "position": 1,
+      "depth": 1,
+      "role": 0,
+      "order": 100,
+      "scan": false
+    },
+    "postProcess": {
+      "enabled": false,
+      "type": "regex",
+      "regexFind": "",
+      "regexReplace": "",
+      "regexFlags": "g",
+      "appendText": "",
+      "extractPattern": "",
+      "extractVariable": "",
+      "promptTransformEnabled": true,
+      "promptTransformShowNotifications": true,
+      "promptTransformMode": "rewrite",
+      "promptTransformMaxTokens": 8192
+    },
+    "enabled": false,
+    "conditions": {
+      "triggerKeywords": [],
+      "triggerProbability": 100,
+      "generationTypes": [
+        "normal",
+        "continue",
+        "impersonate"
+      ],
+      "runOnImpersonate": true
+    }
+  },
+  {
+    "id": "tpl-logic-checker",
+    "name": "Logic Checker",
+    "description": "Append a compact check for visible spatial, temporal, and causal errors",
+    "icon": "",
+    "category": "content",
+    "tags": [
+      "logic",
+      "continuity",
+      "audit"
+    ],
+    "version": 1,
+    "author": "SillyBunny",
+    "prompt": "### Logic Checker\nCheck the current assistant response for visible spatial, temporal, causal, and continuity problems. Use only evidence available in the response and any explicit context included with it. Do not invent missing context.\n\nReturn only this block:\n[LOGIC CHECK]\nstatus: PASS | NEEDS REVISION | LIMITED\nissues:\n- concise issue, or none\nfix:\n- concise fix direction, or none\n[/LOGIC CHECK]\n\nRules:\n- Do not rewrite the response.\n- Flag contradictions in location, timing, object possession, injuries, character presence, cause/effect, impossible transitions, and unsupported knowledge.\n- If context is insufficient to judge, use LIMITED.\n- If no clear issue is visible, use PASS and write \"none\" for issues and fix.",
+    "phase": "post",
+    "injection": {
+      "position": 0,
+      "depth": 4,
+      "role": 1,
+      "order": 100,
+      "scan": false
+    },
+    "postProcess": {
+      "enabled": false,
+      "type": "regex",
+      "regexFind": "",
+      "regexReplace": "",
+      "regexFlags": "g",
+      "appendText": "",
+      "extractPattern": "",
+      "extractVariable": "",
+      "promptTransformEnabled": true,
+      "promptTransformShowNotifications": true,
+      "promptTransformMode": "append",
+      "promptTransformMaxTokens": 2048
+    },
+    "enabled": false,
+    "conditions": {
+      "triggerKeywords": [],
+      "triggerProbability": 100,
+      "generationTypes": [
+        "normal",
+        "continue"
+      ]
+    }
+  },
+  {
+    "id": "tpl-disco-elysium-cyoa",
+    "name": "Disco Elysium CYOA",
+    "description": "Append surreal detective-RPG choice prompts without copying source text",
+    "icon": "",
+    "category": "tracker",
+    "tags": [
+      "choices",
+      "cyoa",
+      "style"
+    ],
+    "version": 1,
+    "author": "SillyBunny",
+    "prompt": "### Disco Elysium CYOA\nAppend 3-5 numbered choices for {{user}} after the current response. Use a bleakly funny, introspective, detective-RPG menu voice: sharp internal pressure, social risk, bodily unease, bad ideas with conviction, and practical consequences. Do not quote Disco Elysium, name its skills, copy its phrasing, or mention the game.\n\nReturn only this block:\n[CHOICES]\n1. [choice text]\n2. [choice text]\n3. [choice text]\n[/CHOICES]\n\nRules:\n- Choices must be actions {{user}} can take next.\n- At least one choice should be cautious, one socially risky, and one strange but actionable.\n- Keep each choice under 28 words.\n- Do not continue the scene outside the choices block.",
+    "phase": "post",
+    "injection": {
+      "position": 0,
+      "depth": 4,
+      "role": 1,
+      "order": 100,
+      "scan": false
+    },
+    "postProcess": {
+      "enabled": false,
+      "type": "regex",
+      "regexFind": "",
+      "regexReplace": "",
+      "regexFlags": "g",
+      "appendText": "",
+      "extractPattern": "",
+      "extractVariable": "",
+      "promptTransformEnabled": true,
+      "promptTransformShowNotifications": true,
+      "promptTransformMode": "append",
+      "promptTransformMaxTokens": 2048
+    },
+    "enabled": false,
+    "conditions": {
+      "triggerKeywords": [],
+      "triggerProbability": 100,
+      "generationTypes": [
+        "normal"
+      ]
+    }
+  },
+  {
     "id": "tpl-pathfinder",
     "name": "Pathfinder",
     "description": "Automatic agentic lorebook retrieval. Lets a model actively browse, search, and modify your lorebook using function tools. (Tool agent - requires API with tool calling support)",

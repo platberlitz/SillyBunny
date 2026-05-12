@@ -12,8 +12,14 @@ describe('in-chat agent bundled templates', () => {
         const catalog = readTemplate('index.json');
         const sourceFilenames = [
             'achievements-tracker.json',
+            'disco-elysium-cyoa.json',
+            'instruction-checker.json',
+            'logic-checker.json',
             'npc-motivator.json',
+            'repetition-fixer.json',
             'scene-tracker.json',
+            'translator.json',
+            'word-replacer.json',
         ];
 
         for (const filename of sourceFilenames) {

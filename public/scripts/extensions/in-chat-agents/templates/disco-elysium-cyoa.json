@@ -1,0 +1,45 @@
+{
+    "id": "tpl-disco-elysium-cyoa",
+    "name": "Disco Elysium CYOA",
+    "description": "Append surreal detective-RPG choice prompts without copying source text",
+    "icon": "",
+    "category": "tracker",
+    "tags": [
+        "choices",
+        "cyoa",
+        "style"
+    ],
+    "version": 1,
+    "author": "SillyBunny",
+    "prompt": "### Disco Elysium CYOA\nAppend 3-5 numbered choices for {{user}} after the current response. Use a bleakly funny, introspective, detective-RPG menu voice: sharp internal pressure, social risk, bodily unease, bad ideas with conviction, and practical consequences. Do not quote Disco Elysium, name its skills, copy its phrasing, or mention the game.\n\nReturn only this block:\n[CHOICES]\n1. [choice text]\n2. [choice text]\n3. [choice text]\n[/CHOICES]\n\nRules:\n- Choices must be actions {{user}} can take next.\n- At least one choice should be cautious, one socially risky, and one strange but actionable.\n- Keep each choice under 28 words.\n- Do not continue the scene outside the choices block.",
+    "phase": "post",
+    "injection": {
+        "position": 0,
+        "depth": 4,
+        "role": 1,
+        "order": 100,
+        "scan": false
+    },
+    "postProcess": {
+        "enabled": false,
+        "type": "regex",
+        "regexFind": "",
+        "regexReplace": "",
+        "regexFlags": "g",
+        "appendText": "",
+        "extractPattern": "",
+        "extractVariable": "",
+        "promptTransformEnabled": true,
+        "promptTransformShowNotifications": true,
+        "promptTransformMode": "append",
+        "promptTransformMaxTokens": 2048
+    },
+    "enabled": false,
+    "conditions": {
+        "triggerKeywords": [],
+        "triggerProbability": 100,
+        "generationTypes": [
+            "normal"
+        ]
+    }
+}

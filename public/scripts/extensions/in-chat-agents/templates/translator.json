@@ -1,0 +1,48 @@
+{
+    "id": "tpl-translator",
+    "name": "Translator",
+    "description": "Translate the latest response into a configured target language",
+    "icon": "",
+    "category": "content",
+    "tags": [
+        "translation",
+        "language",
+        "rewrite"
+    ],
+    "version": 1,
+    "author": "SillyBunny",
+    "prompt": "### Translator\nTranslate the current assistant response into the target language below. Before enabling this template, edit the target language.\n\nTarget language: [set target language here]\n\nRules:\n- Preserve names, lore terms, numbers, markdown, tags, and structural formatting.\n- Preserve character voice, register, politeness level, and implied tone as much as the target language allows.\n- Do not add explanations, translator notes, glossaries, or alternate versions.\n- If the target language is still placeholder text, return the original response verbatim.\n- Return only the translated response.",
+    "phase": "post",
+    "injection": {
+        "position": 1,
+        "depth": 1,
+        "role": 0,
+        "order": 100,
+        "scan": false
+    },
+    "postProcess": {
+        "enabled": false,
+        "type": "regex",
+        "regexFind": "",
+        "regexReplace": "",
+        "regexFlags": "g",
+        "appendText": "",
+        "extractPattern": "",
+        "extractVariable": "",
+        "promptTransformEnabled": true,
+        "promptTransformShowNotifications": true,
+        "promptTransformMode": "rewrite",
+        "promptTransformMaxTokens": 8192
+    },
+    "enabled": false,
+    "conditions": {
+        "triggerKeywords": [],
+        "triggerProbability": 100,
+        "generationTypes": [
+            "normal",
+            "continue",
+            "impersonate"
+        ],
+        "runOnImpersonate": true
+    }
+}

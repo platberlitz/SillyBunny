@@ -1,0 +1,46 @@
+{
+    "id": "tpl-instruction-checker",
+    "name": "Instruction Checker",
+    "description": "Append a compact compliance check for the latest response",
+    "icon": "",
+    "category": "content",
+    "tags": [
+        "instructions",
+        "audit",
+        "quality"
+    ],
+    "version": 1,
+    "author": "SillyBunny",
+    "prompt": "### Instruction Checker\nCheck the current assistant response against the active user and character instructions visible in the response itself. Do not invent hidden requirements. If the needed instruction is not present, say that the check is limited.\n\nReturn only this block:\n[INSTRUCTION CHECK]\nstatus: PASS | NEEDS REVISION | LIMITED\nissues:\n- concise issue, or none\nfix:\n- concise action, or none\n[/INSTRUCTION CHECK]\n\nRules:\n- Do not rewrite the response.\n- Focus on concrete instruction conflicts, missing required format, forbidden content, POV violations, and output-contract drift.\n- If no clear issue is visible, use PASS and write \"none\" for issues and fix.",
+    "phase": "post",
+    "injection": {
+        "position": 0,
+        "depth": 4,
+        "role": 1,
+        "order": 100,
+        "scan": false
+    },
+    "postProcess": {
+        "enabled": false,
+        "type": "regex",
+        "regexFind": "",
+        "regexReplace": "",
+        "regexFlags": "g",
+        "appendText": "",
+        "extractPattern": "",
+        "extractVariable": "",
+        "promptTransformEnabled": true,
+        "promptTransformShowNotifications": true,
+        "promptTransformMode": "append",
+        "promptTransformMaxTokens": 2048
+    },
+    "enabled": false,
+    "conditions": {
+        "triggerKeywords": [],
+        "triggerProbability": 100,
+        "generationTypes": [
+            "normal",
+            "continue"
+        ]
+    }
+}

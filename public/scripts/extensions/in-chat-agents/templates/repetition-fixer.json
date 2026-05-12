@@ -1,0 +1,48 @@
+{
+    "id": "tpl-repetition-fixer",
+    "name": "Repetition Fixer",
+    "description": "Rewrite the latest response to reduce repeated phrasing, beats, and sentence patterns",
+    "icon": "",
+    "category": "content",
+    "tags": [
+        "editing",
+        "repetition",
+        "quality"
+    ],
+    "version": 1,
+    "author": "SillyBunny",
+    "prompt": "### Repetition Fixer\nRewrite the current assistant response to remove visible repetition while preserving the scene's facts, intent, formatting, and character voice.\n\nTarget:\n- repeated words or phrases that stand out without purpose\n- repeated sentence openings or paragraph rhythms\n- duplicated emotional beats\n- redundant explanations of the same action, thought, or relationship state\n- stock filler that repeats information already present in the response\n\nRules:\n- Do not summarize the response.\n- Do not add new events, dialogue, or continuity facts.\n- Keep deliberate repetition when it is clearly rhetorical, character-voiced, or format-required.\n- Prefer small local rewrites over broad style replacement.\n- If no meaningful repetition is present, return the original response verbatim.\n- Return only the final rewritten response.",
+    "phase": "post",
+    "injection": {
+        "position": 1,
+        "depth": 1,
+        "role": 0,
+        "order": 100,
+        "scan": false
+    },
+    "postProcess": {
+        "enabled": false,
+        "type": "regex",
+        "regexFind": "",
+        "regexReplace": "",
+        "regexFlags": "g",
+        "appendText": "",
+        "extractPattern": "",
+        "extractVariable": "",
+        "promptTransformEnabled": true,
+        "promptTransformShowNotifications": true,
+        "promptTransformMode": "rewrite",
+        "promptTransformMaxTokens": 8192
+    },
+    "enabled": false,
+    "conditions": {
+        "triggerKeywords": [],
+        "triggerProbability": 100,
+        "generationTypes": [
+            "normal",
+            "continue",
+            "impersonate"
+        ],
+        "runOnImpersonate": true
+    }
+}

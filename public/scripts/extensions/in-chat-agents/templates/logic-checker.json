@@ -1,0 +1,46 @@
+{
+    "id": "tpl-logic-checker",
+    "name": "Logic Checker",
+    "description": "Append a compact check for visible spatial, temporal, and causal errors",
+    "icon": "",
+    "category": "content",
+    "tags": [
+        "logic",
+        "continuity",
+        "audit"
+    ],
+    "version": 1,
+    "author": "SillyBunny",
+    "prompt": "### Logic Checker\nCheck the current assistant response for visible spatial, temporal, causal, and continuity problems. Use only evidence available in the response and any explicit context included with it. Do not invent missing context.\n\nReturn only this block:\n[LOGIC CHECK]\nstatus: PASS | NEEDS REVISION | LIMITED\nissues:\n- concise issue, or none\nfix:\n- concise fix direction, or none\n[/LOGIC CHECK]\n\nRules:\n- Do not rewrite the response.\n- Flag contradictions in location, timing, object possession, injuries, character presence, cause/effect, impossible transitions, and unsupported knowledge.\n- If context is insufficient to judge, use LIMITED.\n- If no clear issue is visible, use PASS and write \"none\" for issues and fix.",
+    "phase": "post",
+    "injection": {
+        "position": 0,
+        "depth": 4,
+        "role": 1,
+        "order": 100,
+        "scan": false
+    },
+    "postProcess": {
+        "enabled": false,
+        "type": "regex",
+        "regexFind": "",
+        "regexReplace": "",
+        "regexFlags": "g",
+        "appendText": "",
+        "extractPattern": "",
+        "extractVariable": "",
+        "promptTransformEnabled": true,
+        "promptTransformShowNotifications": true,
+        "promptTransformMode": "append",
+        "promptTransformMaxTokens": 2048
+    },
+    "enabled": false,
+    "conditions": {
+        "triggerKeywords": [],
+        "triggerProbability": 100,
+        "generationTypes": [
+            "normal",
+            "continue"
+        ]
+    }
+}
