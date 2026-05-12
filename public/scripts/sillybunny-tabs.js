@@ -9917,7 +9917,14 @@ function buildMobileNav() {
         return;
     }
 
-    const overlay = createElement('div', { id: 'sb-mobile-nav' });
+    const overlay = createElement('div', {
+        id: 'sb-mobile-nav',
+        attrs: {
+            role: 'dialog',
+            'aria-modal': 'true',
+            'aria-labelledby': 'sb-mobile-nav-title',
+        },
+    });
     const content = createElement('div', { id: 'sb-mobile-nav-content' });
     overlay.hidden = true;
     overlay.setAttribute('aria-hidden', 'true');
@@ -9987,7 +9994,14 @@ function buildMobileNav() {
     });
     const headerCopy = createElement('div', { className: 'sb-mobile-panel-copy' });
     const eyebrow = createElement('div', { className: 'sb-shell-kicker', text: 'Workspace' });
-    const title = createElement('h2', { className: 'sb-shell-title', text: 'Quick Actions' });
+    const title = createElement('h2', {
+        id: 'sb-mobile-nav-title',
+        className: 'sb-shell-title',
+        text: 'Quick Actions',
+        attrs: {
+            tabindex: '-1',
+        },
+    });
     closeButton.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
     closeButton.addEventListener('click', closeMobileNav);
     headerCopy.append(eyebrow, title);
@@ -9999,6 +10013,15 @@ function buildMobileNav() {
         if (event.target === overlay) {
             closeMobileNav();
         }
+    });
+    overlay.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        closeMobileNav();
     });
 
     document.body.appendChild(overlay);
@@ -10063,6 +10086,8 @@ function setMobileNavOpenState(isOpen) {
         sbState.mobileNav.lastOpenedAt = performance.now();
     }
 
+    const wasOpen = !overlay.hidden && overlay.getAttribute('aria-hidden') === 'false';
+
     overlay.hidden = !shouldOpen;
     overlay.classList.toggle('sb-nav-open', shouldOpen);
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
@@ -10078,6 +10103,14 @@ function setMobileNavOpenState(isOpen) {
         : '<i class="fa-solid fa-bars" aria-hidden="true"></i>';
 
     queueMobileModalStateSync();
+
+    if (shouldOpen) {
+        window.requestAnimationFrame(() => {
+            overlay.querySelector('#sb-mobile-nav-title')?.focus?.({ preventScroll: true });
+        });
+    } else if (wasOpen && document.activeElement && overlay.contains(document.activeElement)) {
+        button.focus({ preventScroll: true });
+    }
 }
 
 function toggleMobileNav() {
