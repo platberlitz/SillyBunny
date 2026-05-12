@@ -1,4 +1,5 @@
 import { power_user } from './power-user.js';
+import { isIOSWebKitPlatform } from './mobile-send-button.js';
 import { delay } from './utils.js';
 
 // Symbol for not primary swipe error
@@ -379,7 +380,8 @@ export class SmoothEventSourceStream extends EventSourceStream {
 }
 
 export function getEventSourceStream() {
-    if (power_user.smooth_streaming) {
+    const shouldBypassSmoothStreaming = power_user.ios_webkit_disable_smooth_streaming && isIOSWebKitPlatform();
+    if (power_user.smooth_streaming && !shouldBypassSmoothStreaming) {
         return new SmoothEventSourceStream();
     }
 

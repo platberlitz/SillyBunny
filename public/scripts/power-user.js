@@ -232,6 +232,10 @@ export const power_user = {
     smooth_streaming_no_think: false,
     smooth_streaming_speed: 50,
     stream_fade_in: false,
+    ios_webkit_conservative_streaming: true,
+    ios_webkit_reduce_streaming_work: true,
+    ios_webkit_disable_smooth_streaming: true,
+    ios_webkit_disable_stream_fade_in: true,
 
     fast_ui_mode: true,
     avatar_style: avatar_styles.ROUND,
@@ -1869,6 +1873,10 @@ export async function loadPowerUserSettings(settings, data) {
     $('#smooth_streaming_speed').val(power_user.smooth_streaming_speed);
 
     $('#stream_fade_in').prop('checked', power_user.stream_fade_in);
+    $('#ios_webkit_conservative_streaming').prop('checked', power_user.ios_webkit_conservative_streaming);
+    $('#ios_webkit_reduce_streaming_work').prop('checked', power_user.ios_webkit_reduce_streaming_work);
+    $('#ios_webkit_disable_smooth_streaming').prop('checked', power_user.ios_webkit_disable_smooth_streaming);
+    $('#ios_webkit_disable_stream_fade_in').prop('checked', power_user.ios_webkit_disable_stream_fade_in);
 
     $('#font_scale').val(power_user.font_scale);
     $('#font_scale_counter').val(power_user.font_scale);
@@ -3559,6 +3567,26 @@ jQuery(async () => {
 
     $('#stream_fade_in').on('input', function () {
         power_user.stream_fade_in = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#ios_webkit_conservative_streaming').on('input', function () {
+        power_user.ios_webkit_conservative_streaming = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#ios_webkit_reduce_streaming_work').on('input', function () {
+        power_user.ios_webkit_reduce_streaming_work = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#ios_webkit_disable_smooth_streaming').on('input', function () {
+        power_user.ios_webkit_disable_smooth_streaming = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#ios_webkit_disable_stream_fade_in').on('input', function () {
+        power_user.ios_webkit_disable_stream_fade_in = !!$(this).prop('checked');
         saveSettingsDebounced();
     });
 

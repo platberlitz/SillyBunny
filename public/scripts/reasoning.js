@@ -670,8 +670,11 @@ export class ReasoningHandler {
         setDatasetProperty(this.messageReasoningDetailsDom, 'type', this.type);
 
         const now = Date.now();
+        const shouldReduceReasoningDomWork = shouldReduceStreamingDomWork(globalThis.navigator, {
+            enabled: power_user.ios_webkit_conservative_streaming,
+        });
         const shouldRenderReasoning = shouldRenderLiveReasoningContent({
-            isReducedDomWork: shouldReduceStreamingDomWork(),
+            isReducedDomWork: shouldReduceReasoningDomWork,
             state: this.state,
             detailsOpen: Boolean(this.messageReasoningDetailsDom.open),
             hasRenderedContent: Boolean(this.messageReasoningContentDom.childNodes.length),
@@ -686,7 +689,11 @@ export class ReasoningHandler {
             const displayReasoning = messageFormatting(reasoning, '', false, false, messageId, {}, true);
 
             if (power_user.stream_fade_in) {
-                applyStreamFadeIn(this.messageReasoningContentDom, displayReasoning);
+                applyStreamFadeIn(this.messageReasoningContentDom, displayReasoning, {
+                    bypassFadeIn: shouldReduceStreamingDomWork(globalThis.navigator, {
+                        enabled: power_user.ios_webkit_disable_stream_fade_in,
+                    }),
+                });
             } else {
                 applyStreamDomPatch(this.messageReasoningContentDom, displayReasoning);
             }
