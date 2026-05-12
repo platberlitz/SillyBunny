@@ -4956,13 +4956,13 @@ body.sb-shell-resizing * {
     #sb-mobile-nav-content {
         position: relative;
         isolation: isolate;
-        width: min(100%, 420px);
+        width: min(100%, 620px);
         max-height: calc(100dvh - var(--sb-topbar-layout-offset) - 32px);
         margin: 0 auto;
-        padding: 12px;
+        padding: 14px;
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 12px;
         overflow-y: auto;
         border-radius: 20px;
         border: 1px solid color-mix(in srgb, var(--sb-shell-border) 88%, transparent);
@@ -4983,6 +4983,31 @@ body.sb-shell-resizing * {
         opacity: var(--sb-shell-surface-opacity);
     }
 
+    .sb-mobile-panel-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) var(--sb-mobile-touch-target, 44px);
+        gap: 12px;
+        align-items: start;
+        padding: 2px 2px 4px;
+    }
+
+    .sb-mobile-panel-copy {
+        min-width: 0;
+    }
+
+    .sb-mobile-panel-close {
+        appearance: none;
+        width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        border: 1px solid color-mix(in srgb, var(--sb-shell-border) 85%, transparent);
+        border-radius: var(--sb-radius-md, 16px);
+        background: var(--sb-card-bg);
+        color: var(--SmartThemeBodyColor);
+        display: inline-grid;
+        place-items: center;
+        cursor: pointer;
+    }
+
     .sb-mobile-section {
         display: flex;
         flex-direction: column;
@@ -5001,7 +5026,7 @@ body.sb-shell-resizing * {
 
     .sb-mobile-section-list {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
     }
 
@@ -5064,6 +5089,10 @@ body.sb-shell-resizing * {
 }
 
 @media screen and (max-width: 450px) {
+    .sb-mobile-section-list {
+        grid-template-columns: 1fr;
+    }
+
     #sb-hamburger,
     #sb-api-toggle,
     #sb-home-toggle,
