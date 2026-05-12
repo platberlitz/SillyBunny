@@ -2624,13 +2624,19 @@ export async function showFontAwesomePicker(customList = null) {
                 qry.autofocus = true;
                 const qryDebounced = debounce(() => {
                     const result = faList.filter(fa => fa.find(className => className.includes(qry.value.toLowerCase())));
+                    const resultSet = new Set(result);
                     for (const fa of faList) {
-                        if (!result.includes(fa)) {
+                        if (!resultSet.has(fa)) {
                             fas[fa].classList.add('hidden');
                         } else {
                             fas[fa].classList.remove('hidden');
                         }
                     }
+
+                    const ordered = qry.value.trim()
+                        ? [...result, ...faList.filter(fa => !resultSet.has(fa))]
+                        : faList;
+                    grid.append(...ordered.map(fa => fas[fa]).filter(Boolean));
                 });
                 qry.addEventListener('input', () => qryDebounced());
                 search.append(qry);
