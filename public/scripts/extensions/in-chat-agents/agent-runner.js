@@ -51,6 +51,7 @@ const MESSAGE_EXTRA_KEY = 'inChatAgents';
 const POST_PROCESSING_RUNS_EXTRA_KEY = 'inChatAgentPostRuns';
 export const PROMPT_RUNS_EXTRA_KEY = 'inChatAgentPromptRuns';
 export const PROMPT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
+export const PRE_GENERATION_INTERCEPT_HISTORY_KEY = 'inChatAgentPreGenerationInterceptHistory';
 const MAX_TRANSFORM_HISTORY = 10;
 const pendingRefreshTimeouts = new Map();
 const pendingRegexSnapshotSaves = new WeakSet();
@@ -90,6 +91,7 @@ let activeManualAgentRun = null;
 let parallelManualRunCount = 0;
 let agentGenerationCancelRevision = 0;
 const promptTransformIdleResolvers = new Set();
+let pendingPreGenerationInterceptRuns = [];
 let generationStartChatLength = 0;
 let generationStartLastAssistantIndex = -1;
 let generationStartLastAssistantMessage = null;
@@ -1625,13 +1627,8 @@ function shouldRefreshTransformHistoryUi(messageIndex, message) {
         return false;
     }
 
-    const history = getPromptTransformHistoryForText(getAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY), message.mes);
-    if (history.length === 0) {
-        return false;
-    }
-
     const messageElement = document.querySelector(`.mes[mesid="${numericMessageIndex}"]`);
-    return Boolean(messageElement && !messageElement.querySelector('.agent-transform-badge'));
+    return Boolean(messageElement && hasAgentDocumentHistory(message) && !messageElement.querySelector('.agent-transform-badge'));
 }
 
 function getPromptTransformHistoryForText(history, currentText) {
@@ -1661,6 +1658,23 @@ function getPromptTransformHistoryForText(history, currentText) {
 export function getPromptTransformHistoryForMessage(message) {
     const storedHistory = getAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY);
     return getPromptTransformHistoryForText(storedHistory, message?.mes);
+}
+
+function getPreGenerationInterceptHistoryFromValue(history) {
+    return Array.isArray(history)
+        ? history.filter(entry => entry && typeof entry === 'object')
+        : [];
+}
+
+export function getPreGenerationInterceptHistoryForMessage(message) {
+    return getPreGenerationInterceptHistoryFromValue(
+        getAgentExtraValue(message, PRE_GENERATION_INTERCEPT_HISTORY_KEY),
+    );
+}
+
+function hasAgentDocumentHistory(message) {
+    return getPromptTransformHistoryForMessage(message).length > 0 ||
+        getPreGenerationInterceptHistoryForMessage(message).length > 0;
 }
 
 function unwrapAssistantResponseWrapper(value) {
@@ -1859,6 +1873,52 @@ function sanitizePromptTransformRunForStorage(result) {
     const storedResult = { ...result };
     delete storedResult.outputText;
     return storedResult;
+}
+
+function sanitizePreGenerationInterceptRunForStorage(result) {
+    if (!result || typeof result !== 'object') {
+        return result;
+    }
+
+    return {
+        agentId: result.agentId,
+        agentName: result.agentName,
+        applyMode: result.applyMode,
+        contextFormat: result.contextFormat,
+        status: result.status,
+        changed: Boolean(result.changed),
+        beforeText: normalizeContentText(result.beforeText),
+        afterText: normalizeContentText(result.afterText),
+        outputText: normalizeContentText(result.outputText),
+        profileId: result.profileId ?? '',
+        runner: result.runner ?? '',
+        role: result.role ?? '',
+        timestamp: result.timestamp,
+        error: result.error,
+    };
+}
+
+function takePendingPreGenerationInterceptRuns() {
+    const runs = pendingPreGenerationInterceptRuns;
+    pendingPreGenerationInterceptRuns = [];
+    return runs;
+}
+
+function storePreGenerationInterceptHistory(message, runs) {
+    if (!message || !Array.isArray(runs) || runs.length === 0) {
+        return false;
+    }
+
+    const storedRuns = runs
+        .map(result => sanitizePreGenerationInterceptRunForStorage(result))
+        .filter(result => result && typeof result === 'object' && result.status !== 'skipped-empty-prompt');
+
+    if (storedRuns.length === 0) {
+        return false;
+    }
+
+    setAgentExtraValue(message, PRE_GENERATION_INTERCEPT_HISTORY_KEY, storedRuns.slice(-MAX_TRANSFORM_HISTORY));
+    return true;
 }
 
 function consolidateAppendPromptTransformOutputs(baseText, agents, results) {
@@ -2364,6 +2424,7 @@ function onGenerationStarted(generationType, _options, dryRun) {
     clearPostGenerationRecoveryCheck();
     clearMissedGenerationEndRecoveryCheck();
     clearAllPromptTransformRunningToasts();
+    takePendingPreGenerationInterceptRuns();
     pendingGenerationSnapshot = buildActivationSnapshot(currentMainGenerationType);
     generationStartChatLength = chat.length;
     const latestAssistantMessageIndex = getLatestAssistantMessageIndex();
@@ -2415,6 +2476,7 @@ function onGenerationStopped() {
     clearMissedGenerationEndRecoveryCheck();
     clearDeferredPostProcessing();
     clearAllPromptTransformRunningToasts();
+    takePendingPreGenerationInterceptRuns();
     abortActivePathfinderRetrieval('Pathfinder retrieval cancelled because generation stopped.');
 }
 
@@ -2536,6 +2598,10 @@ async function processReceivedMessage(messageIndex, generationType, activationSn
 
     let chatStateChanged = false;
     let messageDisplayChanged = false;
+    if (storePreGenerationInterceptHistory(message, takePendingPreGenerationInterceptRuns())) {
+        chatStateChanged = true;
+        messageDisplayChanged = true;
+    }
 
     const promptRuns = [];
     let currentPromptTransformText = unwrapAssistantResponseWrapper(message.mes);
@@ -2841,14 +2907,34 @@ async function runPromptTransformAgentsForText(promptTransformAgents, initialTex
     };
 }
 
-async function runContextInterceptAgentOutput(agent, currentContextText, generationType, contextFormat) {
+async function runContextInterceptAgent(agent, currentContextText, generationType, contextFormat) {
+    const beforeText = normalizeContentText(currentContextText);
+    const applyMode = ['wrap', 'patch'].includes(String(agent?.preProcess?.applyMode))
+        ? String(agent.preProcess.applyMode)
+        : 'replace';
+    const baseResult = {
+        agentId: agent.id,
+        agentName: agent.name,
+        applyMode,
+        contextFormat,
+        changed: false,
+        beforeText,
+        afterText: beforeText,
+        outputText: '',
+        profileId: '',
+        runner: 'none',
+        timestamp: new Date().toISOString(),
+    };
     const expandedPrompt = substituteParams(agent.prompt, {
         original: currentContextText,
         dynamicMacros: buildPromptDynamicMacros(currentContextText, null, agent, generationType),
     }).trim();
 
     if (!expandedPrompt || !currentContextText.trim()) {
-        return null;
+        return {
+            ...baseResult,
+            status: 'skipped-empty-prompt',
+        };
     }
 
     const promptMessages = buildContextInterceptMessages(expandedPrompt, currentContextText, generationType, contextFormat);
@@ -2861,10 +2947,22 @@ async function runContextInterceptAgentOutput(agent, currentContextText, generat
 
     if (!outputText) {
         console.warn(`[InChatAgents] pre-generation intercept agent "${agent.name}" returned an empty response.`);
-        return null;
+        return {
+            ...baseResult,
+            status: 'empty-response',
+            profileId: response.profileId,
+            runner: response.runner,
+        };
     }
 
-    return outputText;
+    return {
+        ...baseResult,
+        status: 'changed',
+        changed: true,
+        outputText,
+        profileId: response.profileId,
+        runner: response.runner,
+    };
 }
 
 function getGenerationContextSnapshot(generationType = null) {
@@ -2879,34 +2977,55 @@ function getGenerationContextSnapshot(generationType = null) {
 
 async function runPreGenerationInterceptorsOnText(initialContextText, generationType, contextFormat) {
     if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
-        return initialContextText;
+        return { text: initialContextText, runs: [] };
     }
 
     let currentContextText = String(initialContextText ?? '');
     if (!currentContextText.trim()) {
-        return currentContextText;
+        return { text: currentContextText, runs: [] };
     }
 
     const activationSnapshot = getGenerationContextSnapshot(generationType);
     const interceptAgents = getPreGenerationInterceptAgents(getSnapshotAgents(activationSnapshot));
     if (interceptAgents.length === 0) {
-        return currentContextText;
+        return { text: currentContextText, runs: [] };
     }
 
+    const runs = [];
     for (const agent of interceptAgents) {
         try {
-            const outputText = await runContextInterceptAgentOutput(agent, currentContextText, activationSnapshot.generationType, contextFormat);
-            if (outputText === null) {
+            const result = await runContextInterceptAgent(agent, currentContextText, activationSnapshot.generationType, contextFormat);
+            if (result.status !== 'changed') {
+                runs.push(result);
                 continue;
             }
 
-            currentContextText = applyContextInterceptText(currentContextText, outputText, agent.preProcess);
+            currentContextText = applyContextInterceptText(currentContextText, result.outputText, agent.preProcess);
+            result.afterText = currentContextText;
+            result.changed = result.afterText !== result.beforeText;
+            result.status = result.changed ? 'changed' : 'unchanged';
+            runs.push(result);
         } catch (error) {
             console.warn(`[InChatAgents] Pre-generation intercept agent "${agent.name}" failed. Leaving context unchanged for this agent.`, error);
+            runs.push({
+                agentId: agent.id,
+                agentName: agent.name,
+                applyMode: ['wrap', 'patch'].includes(String(agent?.preProcess?.applyMode)) ? String(agent.preProcess.applyMode) : 'replace',
+                contextFormat,
+                changed: false,
+                status: 'error',
+                error: error instanceof Error ? error.message : String(error),
+                beforeText: currentContextText,
+                afterText: currentContextText,
+                outputText: '',
+                profileId: '',
+                runner: 'error',
+                timestamp: new Date().toISOString(),
+            });
         }
     }
 
-    return currentContextText;
+    return { text: currentContextText, runs };
 }
 
 function getContextInterceptChatRole(agent) {
@@ -2935,50 +3054,81 @@ function insertContextInterceptChatMessage(chatMessages, content, agent) {
 
 async function runPreGenerationInterceptorsOnChat(initialChatMessages, generationType) {
     if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
-        return initialChatMessages;
+        return { chat: initialChatMessages, runs: [] };
     }
 
     let currentChatMessages = Array.isArray(initialChatMessages) ? [...initialChatMessages] : [];
     if (currentChatMessages.length === 0) {
-        return currentChatMessages;
+        return { chat: currentChatMessages, runs: [] };
     }
 
     const activationSnapshot = getGenerationContextSnapshot(generationType);
     const interceptAgents = getPreGenerationInterceptAgents(getSnapshotAgents(activationSnapshot));
     if (interceptAgents.length === 0) {
-        return currentChatMessages;
+        return { chat: currentChatMessages, runs: [] };
     }
 
+    const runs = [];
     for (const agent of interceptAgents) {
         const contextText = serializeChatContext(currentChatMessages);
 
         try {
-            const outputText = await runContextInterceptAgentOutput(agent, contextText, activationSnapshot.generationType, 'chat');
-            if (outputText === null) {
+            const result = await runContextInterceptAgent(agent, contextText, activationSnapshot.generationType, 'chat');
+            if (result.status !== 'changed') {
+                runs.push(result);
                 continue;
             }
 
             if (agent.preProcess?.applyMode === 'wrap') {
                 insertContextInterceptChatMessage(
                     currentChatMessages,
-                    `${String(agent.preProcess?.wrapPrefix ?? '')}${outputText}${String(agent.preProcess?.wrapSuffix ?? '')}`,
+                    `${String(agent.preProcess?.wrapPrefix ?? '')}${result.outputText}${String(agent.preProcess?.wrapSuffix ?? '')}`,
                     agent,
                 );
+                result.afterText = serializeChatContext(currentChatMessages);
+                result.changed = result.afterText !== result.beforeText;
+                result.status = result.changed ? 'changed' : 'unchanged';
+                result.role = getContextInterceptChatRole(agent);
+                runs.push(result);
                 continue;
             }
 
             if (agent.preProcess?.applyMode === 'patch') {
-                insertContextInterceptChatMessage(currentChatMessages, buildPatchTaggedText(outputText, agent.preProcess), agent);
+                insertContextInterceptChatMessage(currentChatMessages, buildPatchTaggedText(result.outputText, agent.preProcess), agent);
+                result.afterText = serializeChatContext(currentChatMessages);
+                result.changed = result.afterText !== result.beforeText;
+                result.status = result.changed ? 'changed' : 'unchanged';
+                result.role = getContextInterceptChatRole(agent);
+                runs.push(result);
                 continue;
             }
 
-            currentChatMessages = parseChatContext(outputText);
+            currentChatMessages = parseChatContext(result.outputText);
+            result.afterText = serializeChatContext(currentChatMessages);
+            result.changed = result.afterText !== result.beforeText;
+            result.status = result.changed ? 'changed' : 'unchanged';
+            runs.push(result);
         } catch (error) {
             console.warn(`[InChatAgents] Pre-generation intercept agent "${agent.name}" failed. Leaving chat context unchanged for this agent.`, error);
+            runs.push({
+                agentId: agent.id,
+                agentName: agent.name,
+                applyMode: ['wrap', 'patch'].includes(String(agent?.preProcess?.applyMode)) ? String(agent.preProcess.applyMode) : 'replace',
+                contextFormat: 'chat',
+                changed: false,
+                status: 'error',
+                error: error instanceof Error ? error.message : String(error),
+                beforeText: contextText,
+                afterText: contextText,
+                outputText: '',
+                profileId: '',
+                runner: 'error',
+                timestamp: new Date().toISOString(),
+            });
         }
     }
 
-    return currentChatMessages;
+    return { chat: currentChatMessages, runs };
 }
 
 async function onGenerateAfterCombinePrompts(eventData) {
@@ -2990,11 +3140,13 @@ async function onGenerateAfterCombinePrompts(eventData) {
         return;
     }
 
-    eventData.prompt = await runPreGenerationInterceptorsOnText(
+    const result = await runPreGenerationInterceptorsOnText(
         eventData.prompt,
         currentMainGenerationType,
         'text',
     );
+    eventData.prompt = result.text;
+    pendingPreGenerationInterceptRuns.push(...result.runs);
 }
 
 async function onChatCompletionPromptReady(eventData) {
@@ -3007,7 +3159,9 @@ async function onChatCompletionPromptReady(eventData) {
     }
 
     const originalChat = eventData.chat;
-    const nextChat = await runPreGenerationInterceptorsOnChat(originalChat, currentMainGenerationType);
+    const result = await runPreGenerationInterceptorsOnChat(originalChat, currentMainGenerationType);
+    const nextChat = result.chat;
+    pendingPreGenerationInterceptRuns.push(...result.runs);
     if (nextChat === originalChat) {
         return;
     }

@@ -441,6 +441,7 @@ const MESSAGE_SCREENSHOT_INPUT_IDS = Object.freeze({
     end: 'message_screenshot_end_id',
 });
 const IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
+const IN_CHAT_AGENT_PRE_GENERATION_INTERCEPT_HISTORY_KEY = 'inChatAgentPreGenerationInterceptHistory';
 /** @type {ChatMessage[]} */
 export let chat = [];
 
@@ -3417,13 +3418,20 @@ function updateMessageMetaBadges(messageElement, message) {
 
 function hasPromptTransformHistoryForActiveSwipe(message) {
     const storedHistory = getActiveSwipeExtraValue(message, IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY);
-    return Array.isArray(storedHistory) && storedHistory.some(entry => {
+    const hasPostGenerationHistory = Array.isArray(storedHistory) && storedHistory.some(entry => {
         if (!entry || typeof entry !== 'object') {
             return false;
         }
 
         return normalizeContentText(entry.afterText) === normalizeContentText(message?.mes);
     });
+
+    if (hasPostGenerationHistory) {
+        return true;
+    }
+
+    const preGenerationHistory = getActiveSwipeExtraValue(message, IN_CHAT_AGENT_PRE_GENERATION_INTERCEPT_HISTORY_KEY);
+    return Array.isArray(preGenerationHistory) && preGenerationHistory.some(entry => entry && typeof entry === 'object');
 }
 
 function getActiveSwipeExtraValue(message, key) {
@@ -4497,6 +4505,7 @@ class StreamingProcessor {
             }
             if (this.type === 'swipe') {
                 delete chat[messageId].extra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
+                delete chat[messageId].extra[IN_CHAT_AGENT_PRE_GENERATION_INTERCEPT_HISTORY_KEY];
             }
             chat[messageId].extra.time_to_first_token = this.timeToFirstToken;
 
@@ -4588,6 +4597,7 @@ class StreamingProcessor {
             delete swipeInfoExtra.reasoning_duration;
             delete swipeInfoExtra.reasoning_tokens;
             delete swipeInfoExtra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
+            delete swipeInfoExtra[IN_CHAT_AGENT_PRE_GENERATION_INTERCEPT_HISTORY_KEY];
             const swipeInfo = {
                 send_date: message.send_date,
                 gen_started: message.gen_started,
@@ -7717,6 +7727,7 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
             lastMessage.extra.reasoning_duration = null;
             lastMessage.extra.reasoning_signature = reasoningSignature;
             delete lastMessage.extra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
+            delete lastMessage.extra[IN_CHAT_AGENT_PRE_GENERATION_INTERCEPT_HISTORY_KEY];
             await processImageAttachment(lastMessage, { imageUrls });
             await updateMessageTokenAccounting(lastMessage, { reasoning, reasoningTokens });
             const chat_id = (chat.length - 1);
@@ -7842,6 +7853,7 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
         delete swipeInfoExtra.reasoning_duration;
         delete swipeInfoExtra.reasoning_tokens;
         delete swipeInfoExtra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
+        delete swipeInfoExtra[IN_CHAT_AGENT_PRE_GENERATION_INTERCEPT_HISTORY_KEY];
         const swipeInfo = {
             send_date: item.send_date,
             gen_started: item.gen_started,
@@ -12598,6 +12610,7 @@ export async function swipe(event, direction, { source, repeated, message = chat
             delete message.extra.title;
             delete message.extra.append_title;
             delete message.extra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
+            delete message.extra[IN_CHAT_AGENT_PRE_GENERATION_INTERCEPT_HISTORY_KEY];
         }
         delete message.gen_started;
         delete message.gen_finished;

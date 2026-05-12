@@ -45,6 +45,7 @@ import {
     initAgentRunner,
     isAgentGenerationActive,
     onAgentGenerationStateChanged,
+    getPreGenerationInterceptHistoryForMessage,
     getPromptTransformHistoryForMessage,
     runAgentOnMessage,
     syncToolAgentRegistrations,
@@ -2556,19 +2557,52 @@ function buildPromptTransformDiffMarkup(beforeText, afterText) {
     }).join('');
 }
 
+function getPreGenerationInterceptModeLabel(entry) {
+    const mode = String(entry?.applyMode ?? 'replace');
+    if (mode === 'wrap') {
+        return 'wrap';
+    }
+    if (mode === 'patch') {
+        return 'patch';
+    }
+    return 'replace';
+}
+
+function buildPreGenerationInterceptEntryMarkup(entry, i) {
+    const timestamp = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
+    const status = String(entry.status ?? 'changed');
+    const statusText = status === 'error'
+        ? `Error: ${escapeHtml(entry.error || 'unknown error')}`
+        : `${entry.changed ? 'Changed' : 'No visible change'} the ${entry.contextFormat === 'chat' ? 'chat message array' : 'text prompt'}`;
+    const modeLabel = getPreGenerationInterceptModeLabel(entry);
+    const output = String(entry.outputText ?? '').trim();
+
+    return `
+        <div class="ica-transform-history-entry ica-preintercept-history-entry" data-index="${i}">
+            <h5>${escapeHtml(entry.agentName || 'Agent')} <small>(pre-gen ${escapeHtml(modeLabel)})</small></h5>
+            <small>${escapeHtml(timestamp)}${timestamp ? ' · ' : ''}${escapeHtml(statusText)}</small>
+            ${output ? `<div class="ica-transform-output-title">Agent output</div><div class="ica-transform-diff">${escapeHtml(output)}</div>` : ''}
+            <div class="ica-transform-output-title">Context diff</div>
+            <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(entry.beforeText ?? '', entry.afterText ?? '')}</div>
+        </div>
+    `;
+}
+
 async function openPromptTransformHistoryPopup(messageIndex) {
     if (!Number.isInteger(Number(messageIndex)) || !chat[messageIndex]) {
         return;
     }
 
     const message = chat[Number(messageIndex)];
+    const preGenerationHistory = getPreGenerationInterceptHistoryForMessage(message);
     const history = getPromptTransformHistoryForMessage(message);
-    if (!Array.isArray(history) || history.length === 0) {
-        toastr.info('No transform history available.');
+    if ((!Array.isArray(preGenerationHistory) || preGenerationHistory.length === 0) && (!Array.isArray(history) || history.length === 0)) {
+        toastr.info('No agent document history available.');
         return;
     }
 
-    const entries = history.map((entry, i) => {
+    const preGenerationEntries = preGenerationHistory.map(buildPreGenerationInterceptEntryMarkup).join('');
+    const postGenerationEntries = history.map((entry, i) => {
         const timestamp = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
         return `
             <div class="ica-transform-history-entry" data-index="${i}">
@@ -2583,7 +2617,10 @@ async function openPromptTransformHistoryPopup(messageIndex) {
         `;
     }).join('');
 
-    const html = $(`<div class="ica-transform-history">${entries}</div>`);
+    const html = $(`<div class="ica-transform-history">
+        ${preGenerationEntries ? `<section class="ica-transform-history-section"><h4>Pre-Generation Intercepts</h4>${preGenerationEntries}</section>` : ''}
+        ${postGenerationEntries ? `<section class="ica-transform-history-section"><h4>Post-Generation Changes</h4>${postGenerationEntries}</section>` : ''}
+    </div>`);
 
     html.find('.ica-undo-btn').on('click', function () {
         const idx = Number($(this).data('mesid'));

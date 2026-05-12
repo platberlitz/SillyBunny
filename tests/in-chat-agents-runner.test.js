@@ -572,6 +572,30 @@ describe('in-chat agent post-processing runner', () => {
         expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('Outgoing context:');
         expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('Original outgoing prompt');
         expect(eventData.prompt).toBe('quiet result');
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Final assistant reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await waitFor(() => Array.isArray(chat[0].extra.inChatAgentPreGenerationInterceptHistory));
+
+        expect(chat[0].extra.inChatAgentPreGenerationInterceptHistory).toEqual([expect.objectContaining({
+            agentId: 'agent-pre-intercept',
+            agentName: 'Pre Intercept',
+            applyMode: 'replace',
+            contextFormat: 'text',
+            beforeText: 'Original outgoing prompt',
+            outputText: 'quiet result',
+            afterText: 'quiet result',
+            changed: true,
+            status: 'changed',
+        })]);
+        expect(chat[0].swipe_info[0].extra.inChatAgentPreGenerationInterceptHistory).toEqual(chat[0].extra.inChatAgentPreGenerationInterceptHistory);
     });
 
     test('chains multiple pre-generation intercept agents by order', async () => {
@@ -657,6 +681,27 @@ describe('in-chat agent post-processing runner', () => {
             { role: 'user', content: '<patch>\npatch note\n</patch>' },
             originalMessage,
         ]);
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Chat reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await waitFor(() => Array.isArray(chat[0].extra.inChatAgentPreGenerationInterceptHistory));
+
+        expect(chat[0].extra.inChatAgentPreGenerationInterceptHistory).toEqual([expect.objectContaining({
+            applyMode: 'patch',
+            contextFormat: 'chat',
+            outputText: 'patch note',
+            role: 'user',
+            status: 'changed',
+        })]);
+        expect(chat[0].extra.inChatAgentPreGenerationInterceptHistory[0].beforeText).toContain('original user prompt');
+        expect(JSON.parse(chat[0].extra.inChatAgentPreGenerationInterceptHistory[0].afterText)[0].content).toBe('<patch>\npatch note\n</patch>');
     });
 
     test('skips pre-generation intercepts during dry runs and outside active generation', async () => {
@@ -675,6 +720,45 @@ describe('in-chat agent post-processing runner', () => {
         expect(generateQuietPrompt).not.toHaveBeenCalled();
         expect(inactiveEventData.prompt).toBe('inactive prompt');
         expect(dryRunEventData.prompt).toBe('dry run prompt');
+    });
+
+    test('exposes pre-generation intercept history for message document UI', async () => {
+        const { getPreGenerationInterceptHistoryForMessage } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        const message = {
+            name: 'Assistant',
+            mes: 'Visible swipe',
+            is_user: false,
+            is_system: false,
+            swipe_id: 1,
+            swipes: ['Other swipe', 'Visible swipe'],
+            swipe_info: [
+                { extra: {} },
+                {
+                    extra: {
+                        inChatAgentPreGenerationInterceptHistory: [{
+                            agentId: 'agent-pre-intercept',
+                            agentName: 'Pre Intercept',
+                            applyMode: 'patch',
+                            contextFormat: 'chat',
+                            status: 'changed',
+                            outputText: 'visible plan',
+                        }],
+                    },
+                },
+            ],
+            extra: {
+                inChatAgentPreGenerationInterceptHistory: [{
+                    agentId: 'stale',
+                    agentName: 'Stale',
+                    outputText: 'hidden plan',
+                }],
+            },
+        };
+
+        expect(getPreGenerationInterceptHistoryForMessage(message)).toEqual([expect.objectContaining({
+            agentId: 'agent-pre-intercept',
+            outputText: 'visible plan',
+        })]);
     });
 
     test('queues manual agent runs while another manual agent is active in sequential mode', async () => {
