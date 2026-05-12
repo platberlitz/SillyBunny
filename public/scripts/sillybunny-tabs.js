@@ -91,6 +91,10 @@ let sbStorageFlushEventsBound = false;
 let sbMessageActionEventsBound = false;
 const sbStorageCache = new Map();
 const sbStoragePendingWrites = new Map();
+const SB_EXTENSION_ALIASES = {
+    'stable-diffusion': ['stable-diffusion', 'sd'],
+    'sd': ['stable-diffusion', 'sd'],
+};
 
 function getShortcutTarget(side) {
     const stored = safeGetItem(side === 'left' ? SB_STORAGE_KEYS.shortcutLeft : SB_STORAGE_KEYS.shortcutRight);
@@ -2234,11 +2238,16 @@ function isExtensionEnabled(name) {
         return true;
     }
 
-    const normalizedName = String(name || '').replace(/^third-party\//i, '').toLowerCase();
+    const normalizedName = normalizeExtensionName(name);
+    const aliases = new Set(SB_EXTENSION_ALIASES[normalizedName] ?? [normalizedName]);
     return !disabledExtensions.some(disabled => {
-        const normalizedDisabled = String(disabled || '').replace(/^third-party\//i, '').toLowerCase();
-        return normalizedDisabled === normalizedName;
+        const normalizedDisabled = normalizeExtensionName(disabled);
+        return aliases.has(normalizedDisabled);
     });
+}
+
+function normalizeExtensionName(name) {
+    return String(name || '').replace(/^third-party\//i, '').toLowerCase();
 }
 
 function syncMessageActionExtensionVisibility(root = document) {
@@ -2256,7 +2265,14 @@ function syncMessageActionExtensionVisibility(root = document) {
         }
 
         const requiredExtension = button.dataset.requiresExtension;
-        button.classList.toggle('displayNone', !isExtensionEnabled(requiredExtension));
+        const isEnabled = isExtensionEnabled(requiredExtension);
+        button.classList.toggle('displayNone', !isEnabled);
+        button.toggleAttribute('aria-hidden', !isEnabled);
+        if (!isEnabled) {
+            button.setAttribute('tabindex', '-1');
+        } else if (button.getAttribute('tabindex') === '-1') {
+            button.removeAttribute('tabindex');
+        }
     });
 }
 
