@@ -6,6 +6,24 @@
     margin: 0;
 }
 
+#connection_profile_details_content .profile-summary--two-col {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 14px;
+    padding-left: 18px;
+}
+
+#connection_profile_details_content .profile-summary--two-col li {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+@media screen and (max-width: 700px) {
+    #connection_profile_details_content .profile-summary--two-col {
+        grid-template-columns: 1fr;
+    }
+}
+
 #connection_profile_spinner {
     margin-left: 5px;
 }
