@@ -657,6 +657,60 @@ describe('in-chat agent post-processing runner', () => {
         ]);
     });
 
+    test('leaves chat completion prompts unchanged when intercept output has invalid messages', async () => {
+        const invalidReplacementChats = [
+            ['a non-object entry', ['bad message']],
+            ['an unsupported role', [{ role: 'developer', content: 'bad role' }]],
+            ['missing content', [{ role: 'user' }]],
+            ['a tool message without an id', [{ role: 'tool', content: 'tool output' }]],
+        ];
+        enabledAgents = [createPreInterceptAgent()];
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        try {
+            const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+            initAgentRunner();
+
+            for (const [caseName, replacementChat] of invalidReplacementChats) {
+                generateQuietPrompt.mockResolvedValueOnce(JSON.stringify(replacementChat));
+
+                await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+                const originalMessage = { role: 'user', content: `original user prompt for ${caseName}` };
+                const originalChat = [originalMessage];
+                const eventData = { chat: originalChat, dryRun: false };
+                await eventSource.emit(eventTypes.CHAT_COMPLETION_PROMPT_READY, eventData);
+
+                expect(eventData.chat).toBe(originalChat);
+                expect(eventData.chat).toEqual([originalMessage]);
+                expect(warnSpy).toHaveBeenCalledWith(
+                    expect.stringContaining('Leaving chat context unchanged'),
+                    expect.any(Error),
+                );
+
+                const messageIndex = chat.length;
+                chat.push({
+                    name: 'Assistant',
+                    mes: `Chat reply for ${caseName}`,
+                    is_user: false,
+                    is_system: false,
+                    extra: {},
+                });
+                await eventSource.emit(eventTypes.MESSAGE_RECEIVED, messageIndex, 'normal');
+                await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+                await waitFor(() => Array.isArray(chat[messageIndex].extra.inChatAgentPreGenerationInterceptHistory));
+
+                expect(chat[messageIndex].extra.inChatAgentPreGenerationInterceptHistory).toEqual([expect.objectContaining({
+                    status: 'error',
+                    changed: false,
+                    beforeText: JSON.stringify(originalChat, null, 2),
+                    afterText: JSON.stringify(originalChat, null, 2),
+                })]);
+            }
+        } finally {
+            warnSpy.mockRestore();
+        }
+    });
+
     test('adds patch messages for chat completion intercept agents in patch mode', async () => {
         enabledAgents = [createPreInterceptAgent({
             injection: { role: 1 },

@@ -1740,6 +1740,27 @@ function parseChatContext(value) {
         throw new Error('Intercepted chat context must be a JSON array of chat messages.');
     }
 
+    const allowedRoles = new Set(['system', 'user', 'assistant', 'tool']);
+    for (const [index, message] of parsed.entries()) {
+        if (!message || typeof message !== 'object' || Array.isArray(message)) {
+            throw new Error(`Intercepted chat message at index ${index} must be an object.`);
+        }
+
+        if (!allowedRoles.has(message.role)) {
+            throw new Error(`Intercepted chat message at index ${index} has an unsupported role.`);
+        }
+
+        const hasContent = typeof message.content === 'string' || Array.isArray(message.content);
+        const hasToolCalls = Array.isArray(message.tool_calls);
+        if (!hasContent && !hasToolCalls) {
+            throw new Error(`Intercepted chat message at index ${index} must include content or tool_calls.`);
+        }
+
+        if (message.role === 'tool' && typeof message.tool_call_id !== 'string') {
+            throw new Error(`Intercepted chat message at index ${index} must include tool_call_id for tool role.`);
+        }
+    }
+
     return parsed;
 }
 
