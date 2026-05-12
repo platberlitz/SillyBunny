@@ -139,6 +139,28 @@ bash start.sh
 
 ---
 
+## Troubleshooting
+
+### Blank Screen Or Stale UI After Update
+
+1. Hard refresh the tab: `Ctrl+Shift+R` on Windows/Linux or `Cmd+Shift+R` on macOS.
+2. If the old UI still appears, clear site data for the SillyBunny address in your browser settings or DevTools.
+3. Temporarily disable browser extensions such as ad blockers, script blockers, and privacy filters, then reload.
+
+Clearing cookies/site data signs you out and resets browser-local UI state for that address, so try a hard refresh first.
+
+### Connection Or Fetch Errors
+
+- Confirm the SillyBunny server window is still running.
+- Open `http://127.0.0.1:4444` directly in the same browser.
+- Check whether a firewall, VPN, proxy, or browser extension is blocking localhost traffic.
+
+### Bun Install Fails During Update
+
+The launcher retries dependency installs without `--frozen-lockfile` when a stale Bun lockfile blocks startup. If startup still fails after that retry, close the server window, delete `bun.lock`, and run the launcher again.
+
+---
+
 ## Project Goals (AKA, why we made this fork)
 
 Our primary goals for SillyBunny are as follows:
