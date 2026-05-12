@@ -3548,14 +3548,16 @@ jQuery(async () => {
         saveSettingsDebounced();
     });
 
+    const normalizeContextDepthInput = input => Math.max(0, Math.floor(Number(input) || 0));
+
     $('#ooc_context_depth').on('input', function () {
-        power_user.ooc_context_depth = Math.max(0, Number($(this).val()) || 0);
+        power_user.ooc_context_depth = normalizeContextDepthInput($(this).val());
         $(this).val(power_user.ooc_context_depth);
         saveSettingsDebounced();
     });
 
     $('#html_context_depth').on('input', function () {
-        power_user.html_context_depth = Math.max(0, Number($(this).val()) || 0);
+        power_user.html_context_depth = normalizeContextDepthInput($(this).val());
         $(this).val(power_user.html_context_depth);
         saveSettingsDebounced();
     });
