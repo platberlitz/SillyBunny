@@ -1500,6 +1500,31 @@ export function initDefaultSlashCommands() {
         aliases: ['default'],
         helpString: t`Sets the message style to flat chat mode.`,
     }));
+    registerChatStyleSlashCommand({
+        name: 'echostyle',
+        callback: setEchoModeCallback,
+        helpString: t`Sets the message style to Echo mode.`,
+    });
+    registerChatStyleSlashCommand({
+        name: 'whisperstyle',
+        callback: setWhisperModeCallback,
+        helpString: t`Sets the message style to Whisper mode.`,
+    });
+    registerChatStyleSlashCommand({
+        name: 'hushstyle',
+        callback: setHushModeCallback,
+        helpString: t`Sets the message style to Hush mode.`,
+    });
+    registerChatStyleSlashCommand({
+        name: 'ripplestyle',
+        callback: setRippleModeCallback,
+        helpString: t`Sets the message style to Ripple mode.`,
+    });
+    registerChatStyleSlashCommand({
+        name: 'tidestyle',
+        callback: setTideModeCallback,
+        helpString: t`Sets the message style to Tide mode.`,
+    });
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'continue',
         callback: continueChatCallback,
@@ -5743,6 +5768,39 @@ function setBubbleModeCallback() {
 function setFlatModeCallback() {
     $('#chat_display').val(chat_styles.DEFAULT).trigger('change');
     return '';
+}
+
+function setEchoModeCallback() {
+    $('#chat_display').val(chat_styles.ECHO).trigger('change');
+    return '';
+}
+
+function setWhisperModeCallback() {
+    $('#chat_display').val(chat_styles.WHISPER).trigger('change');
+    return '';
+}
+
+function setHushModeCallback() {
+    $('#chat_display').val(chat_styles.HUSH).trigger('change');
+    return '';
+}
+
+function setRippleModeCallback() {
+    $('#chat_display').val(chat_styles.RIPPLE).trigger('change');
+    return '';
+}
+
+function setTideModeCallback() {
+    $('#chat_display').val(chat_styles.TIDE).trigger('change');
+    return '';
+}
+
+function registerChatStyleSlashCommand(command) {
+    if (Object.hasOwn(SlashCommandParser.commands, command.name)) {
+        return;
+    }
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps(command));
 }
 
 async function setNarratorName(_, text) {

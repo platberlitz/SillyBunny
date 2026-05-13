@@ -1,6 +1,39 @@
 /* SillyBunny mobile shell foundation: final sheet contract for modal drawers.
  * Keep this at the end of the shell sheet so it beats older mobile drawer rules. */
 @media screen and (max-width: 1000px) {
+    #form_sheld {
+        width: 100%;
+        max-width: 100%;
+        left: 0;
+        right: 0;
+        transform: none;
+        box-sizing: border-box;
+        margin: var(--sb-chat-composer-gap) auto 0;
+    }
+
+    #send_form {
+        margin-bottom: 0;
+        border-width: 1px 0 0;
+        border-radius: 10px 10px 0 0;
+        border-color: color-mix(in srgb, var(--SmartThemeBodyColor) 18%, transparent);
+        box-shadow: 0 -10px 28px color-mix(in srgb, var(--SmartThemeShadowColor) 16%, transparent);
+    }
+
+    #send_form:focus-within {
+        border-top-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 56%, transparent);
+        box-shadow:
+            0 -10px 28px color-mix(in srgb, var(--SmartThemeShadowColor) 16%, transparent),
+            inset 0 1px 0 color-mix(in srgb, var(--color-primary, var(--sb-accent)) 34%, transparent);
+    }
+
+    body:has([data-slide-toggle="shown"]) #send_form {
+        border-radius: 0 !important;
+    }
+
+    #send_textarea::placeholder {
+        font-size: 14px;
+    }
+
     body.sb-mobile-modal-open {
         overflow: hidden !important;
     }
@@ -340,6 +373,18 @@
     .sb-shell-root.openDrawer,
     #right-nav-panel.openDrawer {
         padding-bottom: env(keyboard-inset-height, 0px) !important;
+    }
+}
+
+@supports (-webkit-overflow-scrolling: touch) {
+    @media screen and (max-width: 1000px) {
+        #form_sheld {
+            width: 100%;
+            min-width: 100%;
+            max-width: 100%;
+            left: 0;
+            right: 0;
+        }
     }
 }
 
