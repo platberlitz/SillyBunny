@@ -6955,11 +6955,11 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #result_info {
         grid-area: meta;
         display: grid !important;
-        grid-template-columns: minmax(0, 1fr) repeat(3, var(--sb-mobile-touch-target, 44px));
+        grid-template-columns: minmax(0, 1fr) repeat(4, minmax(34px, 40px));
         align-items: center;
         justify-content: stretch;
         gap: 4px;
-        min-height: var(--sb-mobile-touch-target, 44px);
+        min-height: 40px;
         padding: 0;
         font-size: calc(var(--mainFontSize) * 0.74);
     }
@@ -6969,7 +6969,18 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         line-height: 1.05;
     }
 
-    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #result_info .right_menu_button,
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #result_info .right_menu_button {
+        width: 100%;
+        min-width: 34px;
+        max-width: 40px;
+        height: 40px;
+        min-height: 40px;
+        max-height: 40px;
+        margin: 0;
+        padding: 0 !important;
+        border-radius: 8px;
+    }
+
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #sb_character_editor_exit {
         width: var(--sb-mobile-touch-target, 44px);
         min-width: var(--sb-mobile-touch-target, 44px);
@@ -6990,6 +7001,23 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     #right-nav-panel.openDrawer:not([data-menu-type="character_edit"]):not([data-menu-type="create"]) #rm_button_selected_ch,
     #right-nav-panel.openDrawer:not([data-menu-type="character_edit"]):not([data-menu-type="create"]) #result_info {
         display: none !important;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) .sb-character-editor-controls-row {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls {
+        flex-basis: 100%;
+        padding-block: 0;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls .char-button-group-icons {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        max-width: 100%;
+        overflow: visible;
     }
 
     #right-nav-panel.openDrawer > .scrollableInner,
@@ -7142,7 +7170,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         grid-row: 1 / -1;
         display: grid !important;
         grid-template-columns: minmax(0, 1fr);
-        align-items: center;
+        align-items: start;
         gap: 2px;
         width: 100%;
         min-width: 0;
@@ -7291,6 +7319,11 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         text-align: left;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    #right-nav-panel.openDrawer #rm_print_characters_block :is(.ch_name, .group_select_counter) {
+        line-height: 1.35;
+        padding-block-start: 1px;
     }
 
     #right-nav-panel.openDrawer #rm_print_characters_block .character_name_block_sub_line {
