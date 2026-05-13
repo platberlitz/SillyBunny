@@ -1,684 +1,1311 @@
-/* Built-in SillyBunny ports of Moonlit Echoes chat layouts. Keep this scoped
-   to chat style body classes so the Moonlit Echoes extension remains optional. */
+/* Built-in SillyBunny ports of Moonlit Echoes chat layouts.
+   Extracted from SillyBunny-MoonlitEchoesTheme/style.css and kept scoped to
+   the native Echo, Whisper, Hush, Ripple, and Tide body classes. */
 
 :root {
-    --sb-native-chat-avatar-size: 40px;
-    --sb-native-chat-avatar-frame-size: calc(var(--sb-native-chat-avatar-size) + 8px);
-    --sb-native-big-avatar-width: calc(var(--sb-native-chat-avatar-size) * var(--big-avatar-width-factor));
-    --sb-native-big-avatar-height: calc(var(--sb-native-chat-avatar-size) * var(--big-avatar-height-factor));
-    --sb-native-big-avatar-frame-width: calc(var(--sb-native-big-avatar-width) + 8px);
-    --sb-native-big-avatar-frame-height: calc(var(--sb-native-big-avatar-height) + 8px);
-    --sb-native-echo-name-offset: calc(var(--sb-native-chat-avatar-frame-size) + 13px);
-    --sb-native-accent: var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor)));
-    --sb-native-muted-panel: color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent);
-    --sb-native-muted-panel-soft: color-mix(in srgb, var(--SmartThemeBodyColor) 5%, transparent);
-    --sb-native-border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent);
-    --sb-native-last-context-border: 1px solid var(--sb-native-accent);
-    --sb-native-radius: 15px;
-    --sb-native-message-padding: 1em;
-    --sb-native-message-font-size: var(--mainFontSize);
-    --sb-native-message-line-height: 1.55;
-    --sb-native-paragraph-space-top: 0.4em;
-    --sb-native-paragraph-space-bottom: 0.6em;
-    --sb-native-echo-avatar-width: clamp(72px, 25%, 240px);
-    --sb-native-echo-avatar-height: 300px;
-    --sb-native-echo-avatar-mobile-width: clamp(58px, 23%, 110px);
-    --sb-native-echo-avatar-mobile-height: 250px;
-    --sb-native-whisper-avatar-width: clamp(140px, 50%, 420px);
-    --sb-native-ripple-avatar-width: clamp(128px, 18vw, 180px);
-    --sb-native-ripple-avatar-mobile-width: clamp(74px, 25vw, 100px);
-    --sb-native-ripple-avatar-ratio: 1.5;
+    /* SillyBunny: Moonlit defaults required when the extension settings JS is absent. */
+    --custom-ChatAvatar: 40px;
+    --custom-chat-avatar-size: var(--custom-ChatAvatar, 40px);
+    --custom-chat-avatar-frame-size: calc(var(--custom-chat-avatar-size) + 8px);
+    --custom-big-chat-avatar-width: calc(var(--custom-chat-avatar-size) * var(--big-avatar-width-factor));
+    --custom-big-chat-avatar-height: calc(var(--custom-chat-avatar-size) * var(--big-avatar-height-factor));
+    --custom-big-chat-avatar-frame-width: calc(var(--custom-big-chat-avatar-width) + 8px);
+    --custom-big-chat-avatar-frame-height: calc(var(--custom-big-chat-avatar-height) + 8px);
+    --customThemeColor: rgba(81, 160, 222, 1);
+    --customBgColor1: rgba(255, 255, 255, 0.1);
+    --customBgColor2: rgba(255, 255, 255, 0.05);
+    --customMesPadding: 1em;
+    --customRippleAvatarRatio: 1.5;
+    --custom-echo-avatar: var(--custom-chat-avatar-frame-size);
+    --mesParagraphSpacingTop: 0.4em;
+    --mesParagraphSpacingBottom: 0.6em;
+    --charNameFontSize: inherit;
+    --userNameFontSize: inherit;
+    --messageTextFontSize: 15px;
+    --messageLineHeight: calc(var(--mainFontSize) + .5rem);
+    --messageTextLetterSpacing: inherit;
+    --customlastInContext: 1px solid var(--customThemeColor);
+    --custom-EchoAvatarWidth: 25%;
+    --custom-EchoAvatarHeight: 300px;
+    --custom-EchoAvatarMobileWidth: 25%;
+    --custom-EchoAvatarMobileHeight: 250px;
+    --customWhisperAvatarWidth: 50%;
+    --customWhisperAvatarAlign: center;
+    --customRippleAvatarWidth: 180px;
+    --customRippleAvatarMobileWidth: 100px;
+    --moonlit-sb-avatar-column-width: max(var(--custom-ChatAvatar, 40px), 56px);
+    --moonlit-sb-ripple-avatar-mobile-height: calc(var(--moonlit-sb-ripple-avatar-mobile-width) * var(--customRippleAvatarRatio, 1.5));
+    --moonlit-sb-ripple-avatar-mobile-width: var(--customRippleAvatarMobileWidth, 100px);
+    --moonlit-sb-ripple-avatar-desktop-width: min(var(--customRippleAvatarWidth, 180px), 35%);
+    --moonlit-sb-ripple-left-bottom-gap: 10px;
+    --moonlit-sb-swipe-control-size: 24px;
+    --moonlit-sb-swipe-counter-width: 38px;
+    --moonlit-sb-swipe-edge-offset: 8px;
+    --moonlit-sb-swipe-gap: 4px;
+    --moonlit-sb-swipe-inline-offset: 24px;
+}
+body.hideChatAvatars.echostyle #chat,
+body.hideChatAvatars.whisperstyle #chat,
+body.hideChatAvatars.hushstyle #chat,
+body.hideChatAvatars.tidestyle #chat {
+    .ch_name {
+        margin-left: 10px;
+    }
 }
 
-body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .mes {
-    color: var(--SmartThemeBodyColor);
+body.hideChatAvatars.flatchat #chat,
+body.hideChatAvatars.bubblechat #chat,
+body.hideChatAvatars.ripplestyle #chat {
+    .ch_name {
+        margin-left: unset;
+    }
 }
 
-body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
-    display: flex;
-    flex: 0 0 var(--sb-native-chat-avatar-frame-size);
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    inline-size: var(--sb-native-chat-avatar-frame-size);
-    min-inline-size: var(--sb-native-chat-avatar-frame-size);
-    min-block-size: 45px;
-    box-sizing: border-box;
+/* 漣漪訊息修正 */
+body.hideChatAvatars.ripplestyle #chat {
+    .mes .mesAvatarWrapper {
+        margin-top: 35px;
+        top: 35px;
+    }
+    .mes_text {
+        margin-top: unset;
+    }
 }
 
-body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar {
-    display: flex;
-    flex: 0 0 var(--sb-native-chat-avatar-frame-size);
-    align-items: center;
-    justify-content: center;
-    inline-size: var(--sb-native-chat-avatar-frame-size) !important;
-    block-size: var(--sb-native-chat-avatar-frame-size) !important;
-    min-inline-size: var(--sb-native-chat-avatar-frame-size) !important;
-    min-block-size: var(--sb-native-chat-avatar-frame-size) !important;
-    max-inline-size: var(--sb-native-chat-avatar-frame-size) !important;
-    max-block-size: var(--sb-native-chat-avatar-frame-size) !important;
-    overflow: hidden !important;
-    box-sizing: border-box;
+/* --- Chat Style: Echo 聊天風格：「回聲」 --- */
+
+body.echostyle #chat {
+    .mes {
+        display: block;
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+        color: var(--SmartThemeBodyColor);
+        position: relative;
+        padding: 0;
+        margin-top: 5px;
+        margin-bottom: 0;
+        border-radius: 15px;
+
+        &::before {
+            overflow: hidden;
+            border-radius: 15px;
+        }
+
+        .mes_block {
+            display: block;
+            padding: 0;
+            overflow: visible;
+            position: relative;
+            transform: translateY(
+            calc(var(--custom-ChatAvatar) * (-1 + 0.325))
+            ) !important;
+            background-color: unset !important;
+            box-shadow: none !important;
+        }
+
+        .mes_text {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            max-width: 100%;
+            min-height: 200px;
+            overflow: hidden;
+            margin-top: calc(var(--custom-ChatAvatar) * 0.35);
+            border-radius: 10px;
+            backdrop-filter: blur(calc(var(--SmartThemeBlurStrength)));
+            -webkit-backdrop-filter: blur(calc(var(--SmartThemeBlurStrength)));
+            box-shadow: 3px 3px 8px rgba(0, 0, 0, 3%);
+        }
+
+        .mes_timer,
+        .mesIDDisplay,
+        .tokenCounterDisplay {
+            display: inline-block;
+            transform: translateY(calc(var(--custom-ChatAvatar) * -0.35));
+        }
+
+        /* Echo: User Message 回聲：使用者訊息 */
+        &[is_user="true"] {
+            .avatar {
+                margin-right: 0;
+            }
+            .mesAvatarWrapper {
+                flex-direction: row-reverse;
+                padding-right: 0 !important;
+                margin-left: 2%;
+                margin-right: 0;
+            }
+            .ch_name {
+                flex-direction: row-reverse;
+                float: right;
+                clear: both;
+                margin-right: calc(var(--custom-echo-avatar) + 5px + 8px);
+                margin-left: 0;
+                width: calc(100% - (var(--custom-echo-avatar) + 5px + 8px));
+
+                .flex-container {
+                    flex-direction: row-reverse;
+                    margin-top: -0.5px;
+                }
+            }
+
+            .mes_text {
+                float: right;
+                clear: both;
+                position: relative;
+                right: 0;
+                left: auto;
+                border-radius: 10px;
+                overflow: hidden;
+                background-color: var(--SmartThemeUserMesBlurTintColor);
+
+                &::before {
+                    content: "";
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: var(--custom-EchoAvatarWidth, 25%);
+                    height: var(--custom-EchoAvatarHeight, 30px);
+                    background: var(--mes-avatar-original-url, var(--mes-avatar-url)) center no-repeat;
+                    background-size: cover;
+                    background-attachment: fixed;
+                    -webkit-mask-image:
+                    linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,1) 0%),
+                    linear-gradient(to left, rgba(0,0,0,0), rgba(0,0,0,1) 30%),
+                    linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,1) 0%),
+                    linear-gradient(to top, rgba(0,0,0,0), rgba(0,0,0,1) 40%);
+                    mask-image:
+                    linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,1) 0%),
+                    linear-gradient(to left, rgba(0,0,0,0), rgba(0,0,0,1) 30%),
+                    linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,1) 0%),
+                    linear-gradient(to top, rgba(0,0,0,0), rgba(0,0,0,1) 40%);
+                    -webkit-mask-composite: destination-in;
+                    mask-composite: intersect;
+                    border-radius: 10px 0 0 10px;
+                    z-index: 3;
+
+                    @media screen and (max-width: 1000px) {
+                        width: var(--custom-EchoAvatarMobileWidth, 25%);
+                        height: var(--custom-EchoAvatarMobileHeight, 250px);
+                    }
+                }
+            }
+            .name_text {
+                margin-right: 0;
+                text-align: right;
+            }
+
+            .mes_text,
+            .last_mes .mes_text {
+                padding: 10px 20px 10px var(--custom-EchoAvatarWidth, 25%) !important;
+                background-color: var(--SmartThemeUserMesBlurTintColor);
+
+                @media screen and (max-width: 1000px) {
+                    padding: 10px 20px 10px var(--custom-EchoAvatarMobileWidth, 25%) !important;
+                }
+            }
+        }
+
+        /* Echo: Character Message 回聲：角色訊息 */
+        &[is_user="false"] {
+            .mes_text {
+                background-color: var(--SmartThemeBotMesBlurTintColor);
+
+                &::before {
+                    content: "";
+                    position: absolute;
+                    top: 0;
+                    right: 0;
+                    width: var(--custom-EchoAvatarWidth, 25%);
+                    height: var(--custom-EchoAvatarHeight, 30px);
+                    background: var(--mes-avatar-original-url, var(--mes-avatar-url)) center no-repeat;
+                    background-size: cover;
+                    background-attachment: fixed;
+                    -webkit-mask-image:
+                    linear-gradient(to left, rgba(0,0,0,0), rgba(0,0,0,1) 0%),
+                    linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,1) 30%),
+                    linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,1) 0%),
+                    linear-gradient(to top, rgba(0,0,0,0), rgba(0,0,0,1) 40%);
+                    mask-image:
+                    linear-gradient(to left, rgba(0,0,0,0), rgba(0,0,0,1) 0%),
+                    linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,1) 30%),
+                    linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,1) 0%),
+                    linear-gradient(to top, rgba(0,0,0,0), rgba(0,0,0,1) 40%);
+                    -webkit-mask-composite: destination-in;
+                    mask-composite: intersect;
+                    border-radius: 0 10px 10px 0;
+                    z-index: 3;
+
+                    @media screen and (max-width: 1000px) {
+                        width: var(--custom-EchoAvatarMobileWidth, 25%);
+                        height: var(--custom-EchoAvatarMobileHeight, 250px);
+                    }
+                }
+            }
+            .mes_text,
+            .last_mes .mes_text {
+                padding: 10px var(--custom-EchoAvatarWidth, 25%) 10px 20px !important;
+
+                @media screen and (max-width: 1000px) {
+                    padding: 10px var(--custom-EchoAvatarMobileWidth, 25%) 10px 20px !important;
+                }
+            }
+        }
+    }
+
+    .mesAvatarWrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        min-height: 45px;
+        padding-top: 5px;
+    }
+    .mesIDDisplay {
+        background: rgba(225, 225, 225, 0.2);
+        padding: 0 8px;
+        border-radius: 8px;
+        opacity: 0.8;
+    }
+    .timestamp {
+        font-size: calc(var(--mainFontSize) * 0.7);
+        font-weight: 400;
+        white-space: nowrap;
+        margin-right: 5px;
+    }
+
+    .mes_reasoning_summary {
+        left: calc(var(--custom-echo-avatar) + 5px + 8px);
+    }
+    .mes_reasoning_header > .icon-svg {
+        display: block;
+        opacity: 0.8 !important;
+        margin-right: 3px;
+    }
+
+    .last_mes {
+        .mes_text {
+            margin-bottom: 10px;
+        }
+
+        .mesAvatarWrapper {
+            padding-bottom: unset;
+        }
+        .swipe_right,
+        .swipe_left {
+            opacity: 0.6;
+            transform: scale(0.8);
+        }
+        .swipe_left,
+        .swipeRightBlock {
+            bottom: 10px !important;
+        }
+        .swipeRightBlock {
+            position: absolute;
+            display: flex;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+            right: 0px;
+        }
+        .swipes-counter {
+            width: 60px;
+            text-align: center;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            opacity: 0.9 !important;
+            letter-spacing: 1.5px;
+        }
+    }
+
+    /* Desktop: keep swipe controls inside the message without clipping content. */
+    @media screen and (min-width: 1001px) {
+        .last_mes .swipeRightBlock {
+            right: 15px;
+        }
+    }
+
+    .lastInContext {
+        border-top: var(--customlastInContext) !important;
+        opacity: 1 !important;
+        border-radius: 0;
+    }
 }
 
-body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar > img {
-    display: block;
-    inline-size: var(--sb-native-chat-avatar-size) !important;
-    block-size: var(--sb-native-chat-avatar-size) !important;
-    min-inline-size: var(--sb-native-chat-avatar-size) !important;
-    min-block-size: var(--sb-native-chat-avatar-size) !important;
-    max-inline-size: var(--sb-native-chat-avatar-size) !important;
-    max-block-size: var(--sb-native-chat-avatar-size) !important;
-    object-fit: cover;
-    object-position: center;
-    box-sizing: border-box;
+/* --- Chat Style: Whisper 聊天風格：「低語」 --- */
+
+body.whisperstyle #chat {
+    .mes {
+        display: block;
+        flex-direction: column;
+        align-items: flex-start;
+        margin-top: 10px;
+        width: 100%;
+        color: var(--SmartThemeBodyColor);
+        position: relative;
+        padding: 1em;
+        padding-top: 45px !important;
+        border-radius: 15px;
+
+        &::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: var(--customWhisperAvatarWidth, 50%);
+            height: 100px;
+            background: var(--mes-avatar-original-url, var(--mes-avatar-url)) var(--customWhisperAvatarAlign) no-repeat;
+            background-size: cover;
+            mask-image: linear-gradient(to bottom, black 60%, rgba(0, 0, 0, 0) 100%);
+            mask-size: 100% 100%;
+            mask-repeat: no-repeat;
+            -webkit-mask-image: linear-gradient(to left, black 60%, rgba(0, 0, 0, 0) 100%);
+            -webkit-mask-size: 100% 100%;
+            -webkit-mask-repeat: no-repeat;
+            z-index: 0;
+            border-radius: 0 15px 0 0 !important;
+            opacity: 0.8;
+        }
+        &.last_mes::before {
+            filter: none;
+        }
+        &::after {
+            content: "";
+            position: absolute;
+            top: 70px;
+            right: 0;
+            width: 5px;
+            height: 30px;
+            opacity: 0.9;
+            z-index: 3;
+        }
+        @media screen and (max-width: 1000px) {
+            &::before {
+                top: 0;
+                width: 55%;
+                min-height: 125px !important;
+            }
+            &::after {
+                top: 95px;
+            }
+
+        }
+
+        /* Whisper: User Message 低語：使用者訊息 */
+        &[is_user="true"] {
+            background-color: var(--SmartThemeUserMesBlurTintColor) !important;
+
+            &::after {
+                border-right: 3.5px solid var(--customThemeColor);
+            }
+        }
+        /* Whisper: Character Message 低語：角色訊息 */
+        &[is_user="false"] {
+            background-color: var(--SmartThemeBotMesBlurTintColor) !important;
+
+            &::after {
+                border-right: 3.5px solid var(--SmartThemeBodyColor);
+            }
+        }
+
+        .lastInContext {
+            border: 0px;
+            box-shadow: none !important;
+            border-radius: 0;
+        }
+
+        .mesAvatarWrapper,
+        .mes_buttons,
+        .mes_edit_buttons,
+        .mes_reasoning_details{
+            z-index: 2;
+        }
+        .mes_block {
+            display: block;
+            padding: 0 !important;
+            overflow: visible;
+            position: relative;
+            transform: translateY(calc(var(--custom-ChatAvatar) * (-1 + 0.325))) !important;
+            background-color: unset !important;
+            box-shadow: unset !important;
+        }
+
+        .mes_text {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            max-width: 100%;
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+
+        .mes_timer,
+        .mesIDDisplay,
+        .tokenCounterDisplay {
+            display: inline-block;
+            transform: translateY(calc(var(--custom-ChatAvatar) * -0.375));
+        }
+    }
+
+    .ch_name {
+        margin-bottom: 10px;
+
+        .name_text {
+            display: inline-block !important;
+            margin-right: 5px;
+        }
+    }
+
+    .mesAvatarWrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        min-height: 45px;
+    }
+    .mesIDDisplay {
+        background: var(--customBgColor1);
+        padding: 0 8px;
+        border-radius: 8px;
+        opacity: 0.8;
+    }
+    .timestamp {
+        font-size: calc(var(--mainFontSize) * 0.7);
+        font-weight: 400;
+        white-space: nowrap;
+        margin-right: 5px;
+    }
+    .mes_reasoning_summary {
+        left: calc(var(--custom-echo-avatar) + 5px + 8px);
+
+    }
+
+    .last_mes {
+        padding-bottom: 5px !important;
+
+        .mesAvatarWrapper {
+            padding-bottom: unset;
+        }
+
+        .swipe_right,
+        .swipe_left {
+            opacity: 0.6;
+            transform: scale(0.8);
+        }
+
+        .swipe_left,
+        .swipeRightBlock {
+            bottom: 10px !important;
+        }
+        .swipeRightBlock {
+            position: absolute;
+            display: flex;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+            right: 20px;
+        }
+        .swipes-counter {
+            width: 60px;
+            text-align: center;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            opacity: 0.9 !important;
+            letter-spacing: 1.5px;
+        }
+    }
+
+    /* Desktop: keep swipe controls inside the message without clipping content. */
+    @media screen and (min-width: 1001px) {
+        .last_mes .swipeRightBlock {
+            right: 30px;
+        }
+    }
+
+    .menu_button {
+        background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 25%, transparent);
+    }
 }
 
-body.big-avatars:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
-    flex-basis: var(--sb-native-big-avatar-frame-width);
-    inline-size: var(--sb-native-big-avatar-frame-width);
-    min-inline-size: var(--sb-native-big-avatar-frame-width) !important;
+/* --- Chat Style: Hush 聊天風格：「輕聲」 --- */
+
+body.hushstyle #chat {
+    .mes {
+        display: block;
+        flex-direction: column;
+        align-items: flex-start;
+        margin-top: 10px;
+        width: 100%;
+        color: var(--SmartThemeBodyColor);
+        position: relative;
+        padding: 1.3em 1.2em;
+        border-radius: 15px;
+
+        &.last_mes::before {
+            filter: none;
+        }
+        &::after {
+            content: "";
+            position: absolute;
+            top: 40px;
+            right: 0;
+            width: 5px;
+            height: 30px;
+            opacity: 0.9;
+            z-index: 3;
+        }
+
+        /* Soft: User Message 輕聲：使用者訊息 */
+        &[is_user="true"] {
+            background-color: var(--SmartThemeUserMesBlurTintColor) !important;
+
+            &::after {
+                border-right: 3.5px solid var(--customThemeColor);
+            }
+        }
+        /* Soft: Character Message 輕聲：角色訊息 */
+        &[is_user="false"] {
+            background-color: var(--SmartThemeBotMesBlurTintColor) !important;
+
+            &::after {
+                border-right: 3.5px solid var(--SmartThemeBodyColor);
+            }
+        }
+
+        .lastInContext {
+            border: 0;
+            border-top: var(--customlastInContext) !important;
+            box-shadow: none !important;
+            border-radius: 0;
+        }
+
+        .mesAvatarWrapper,
+        .mes_buttons,
+        .mes_edit_buttons,
+        .mes_reasoning_details{
+            z-index: 2;
+        }
+        .mes_block {
+            display: block;
+            padding: 0 !important;
+            overflow: visible;
+            position: relative;
+            transform: translateY(calc(var(--custom-ChatAvatar) * (-1 + 0.325))) !important;
+            background-color: unset !important;
+            box-shadow: unset !important;
+        }
+
+        .mes_text {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            max-width: 100%;
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+
+        .mes_timer,
+        .mesIDDisplay,
+        .tokenCounterDisplay {
+            display: inline-block;
+            transform: translateY(calc(var(--custom-ChatAvatar) * -0.375));
+        }
+    }
+
+    .ch_name {
+        .name_text {
+            display: inline-block !important;
+            margin-right: 5px;
+        }
+    }
+
+    .mesAvatarWrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        min-height: 45px;
+    }
+    .mesIDDisplay {
+        background: var(--customBgColor1);
+        padding: 0 8px;
+        border-radius: 8px;
+        opacity: 0.8;
+    }
+    .timestamp {
+        font-size: calc(var(--mainFontSize) * 0.7);
+        font-weight: 400;
+        white-space: nowrap;
+        margin-right: 5px;
+    }
+    .mes_reasoning_summary {
+        left: calc(var(--custom-echo-avatar) + 5px + 8px);
+
+    }
+
+    .last_mes {
+        .mesAvatarWrapper {
+            padding-bottom: unset;
+        }
+
+        .swipe_right,
+        .swipe_left {
+            opacity: 0.6;
+            transform: scale(0.8);
+        }
+        .swipe_left,
+        .swipeRightBlock {
+            bottom: 10px !important;
+        }
+        .swipeRightBlock {
+            position: absolute;
+            display: flex;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+            right: 20px;
+        }
+
+        .swipes-counter {
+            width: 60px;
+            text-align: center;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            opacity: 0.9 !important;
+            letter-spacing: 1.5px;
+        }
+    }
+
+    /* Desktop: keep swipe controls inside the message without clipping content. */
+    @media screen and (min-width: 1001px) {
+        .last_mes .swipeRightBlock {
+            right: 30px;
+        }
+    }
 }
 
-body.big-avatars:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar {
-    flex-basis: var(--sb-native-big-avatar-frame-width);
-    inline-size: var(--sb-native-big-avatar-frame-width) !important;
-    block-size: var(--sb-native-big-avatar-frame-height) !important;
-    min-inline-size: var(--sb-native-big-avatar-frame-width) !important;
-    min-block-size: var(--sb-native-big-avatar-frame-height) !important;
-    max-inline-size: var(--sb-native-big-avatar-frame-width) !important;
-    max-block-size: var(--sb-native-big-avatar-frame-height) !important;
+/* --- Chat Style: Ripple 聊天風格：「漣漪」 --- */
+
+body.ripplestyle #chat {
+    .mes {
+        background: var(--SmartThemeBotMesBlurTintColor) !important;
+        border-radius: 15px;
+        padding: 0 !important;
+        margin: 8px 0 !important;
+
+        &[is_user="true"] {
+            background-color: var(--SmartThemeUserMesBlurTintColor) !important;
+        }
+
+        .mesAvatarWrapper {
+            position: sticky;
+            top: 0;
+            padding-bottom: 45px;
+            padding-right: 0;
+
+            /* General Avatar 一般頭像 */
+            .avatar {
+                display: flex;
+                top: 0;
+                justify-content: center;
+                align-items: center;
+                width: var(--customRippleAvatarWidth);
+                height: calc(var(--customRippleAvatarWidth) * var(--customRippleAvatarRatio));
+                min-width:var(--customRippleAvatarWidth);
+                min-height: calc(var(--customRippleAvatarWidth) * var(--customRippleAvatarRatio));
+                aspect-ratio: 2 / 3;
+                border: none !important;
+                margin-right: unset;
+                border-radius: 15px 0 0 0 !important;
+                overflow: hidden;
+                flex: unset !important;
+
+                img {
+                    width: var(--customRippleAvatarWidth);
+                    height: calc(var(--customRippleAvatarWidth) * var(--customRippleAvatarRatio));
+                    min-width:var(--customRippleAvatarWidth);
+                    min-height: calc(var(--customRippleAvatarWidth) * var(--customRippleAvatarRatio));
+                    border: 0 !important;
+                    border-radius: 15px 0 0 0 !important;
+                    -webkit-mask-image:
+                        linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,1) 0%),
+                        linear-gradient(to left, rgba(0,0,0,0), rgba(0,0,0,1) 30%),
+                        linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,1) 0%),
+                        linear-gradient(to top, rgba(0,0,0,0), rgba(0,0,0,1) 40%);
+                    mask-image:
+                        linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,1) 0%),
+                        linear-gradient(to left, rgba(0,0,0,0), rgba(0,0,0,1) 30%),
+                        linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,1) 0%),
+                        linear-gradient(to top, rgba(0,0,0,0), rgba(0,0,0,1) 40%);
+                    -webkit-mask-composite: destination-in;
+                    mask-composite: intersect;
+                }
+            }
+        }
+
+        .mes_block {
+            background: none !important;
+            border: none !important;
+            box-shadow: none !important;
+            box-sizing: border-box;
+            padding-top: 20px;
+            padding-left: 12px;
+            padding-right: 24px;
+
+            .ch_name::after {
+                content: "";
+                width: 100%;
+                border-bottom: 1px solid var(--SmartThemeBodyColor);
+                padding-bottom: 5px;
+                margin-bottom: 5px;
+                opacity: 0.45;
+            }
+        }
+    }
+
+    .last_mes {
+        .swipeRightBlock,
+        .swipe_left {
+            bottom: 10px !important;
+        }
+    }
+
+    /* Desktop: reserve real flex space for Ripple avatars so text cannot slide underneath. */
+    @media screen and (min-width: 1001px) {
+        .mes .mesAvatarWrapper {
+            box-sizing: border-box;
+            flex: 0 0 var(--moonlit-sb-ripple-avatar-desktop-width);
+            min-width: var(--moonlit-sb-ripple-avatar-desktop-width);
+            overflow: visible;
+            width: var(--moonlit-sb-ripple-avatar-desktop-width);
+        }
+        .mes .mesAvatarWrapper .avatar,
+        .mes .mesAvatarWrapper .avatar img {
+            max-width: 100% !important;
+            min-width: 100% !important;
+            width: 100% !important;
+        }
+        .mes .mesAvatarWrapper .avatar {
+            aspect-ratio: 1 / var(--customRippleAvatarRatio);
+            height: auto;
+            max-height: none !important;
+            min-height: 0;
+        }
+        .mes .mesAvatarWrapper .avatar img {
+            height: 100% !important;
+            max-height: none !important;
+            min-height: 100% !important;
+        }
+        .mes .mes_block {
+            flex: 1 1 auto;
+            min-width: 0;
+            width: auto;
+        }
+        .last_mes .swipeRightBlock {
+            right: 15px;
+        }
+    }
+
+    @media screen and (max-width: 1000px) {
+        .mes .avatar {
+            width: var(--customRippleAvatarMobileWidth) !important;
+            height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+            min-width:var(--customRippleAvatarMobileWidth) !important;
+            min-height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+
+            img {
+                width: var(--customRippleAvatarMobileWidth) !important;
+                height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+                min-width: var(--customRippleAvatarMobileWidth) !important;
+                min-height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+            }
+        }
+    }
+}
+body.ripplestyle.no-timer.no-mesIDDisplay.no-tokenCount {
+    #chat .mes .mesAvatarWrapper {
+        padding-bottom: var(--moonlit-sb-ripple-left-bottom-gap) !important;
+    }
+}
+body.ripplestyle.big-avatars #chat .mes {
+    .avatar {
+        width: var(--customRippleAvatarWidth) !important;
+        height: calc(var(--customRippleAvatarWidth) * var(--customRippleAvatarRatio)) !important;
+        min-width:var(--customRippleAvatarWidth) !important;
+        min-height: calc(var(--customRippleAvatarWidth) * var(--customRippleAvatarRatio)) !important;
+
+        img {
+            width: var(--customRippleAvatarWidth) !important;
+            height: calc(var(--customRippleAvatarWidth) * var(--customRippleAvatarRatio)) !important;
+            min-width:var(--customRippleAvatarWidth) !important;
+            min-height: calc(var(--customRippleAvatarWidth) * var(--customRippleAvatarRatio)) !important;
+        }
+    }
+
+    @media screen and (max-width: 1000px) {
+        .avatar {
+            width: var(--customRippleAvatarMobileWidth) !important;
+            height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+            min-width:var(--customRippleAvatarMobileWidth) !important;
+            min-height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+
+            img {
+                width: var(--customRippleAvatarMobileWidth) !important;
+                height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+                min-width: var(--customRippleAvatarMobileWidth) !important;
+                min-height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+            }
+        }
+    }
 }
 
-body.big-avatars:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar > img {
-    inline-size: var(--sb-native-big-avatar-width) !important;
-    block-size: var(--sb-native-big-avatar-height) !important;
-    min-inline-size: var(--sb-native-big-avatar-width) !important;
-    min-block-size: var(--sb-native-big-avatar-height) !important;
-    max-inline-size: var(--sb-native-big-avatar-width) !important;
-    max-block-size: var(--sb-native-big-avatar-height) !important;
+
+/* --- Chat Style: Tide 聊天風格：「潮汐」 --- */
+
+body.tidestyle #chat {
+    padding: 0 15px;
+
+    @media screen and (max-width: 1000px) {
+        padding: 0 1em;
+    }
+
+    .mes {
+        display: block;
+        flex-direction: column;
+        align-items: flex-start;
+        color: var(--SmartThemeBodyColor);
+        position: relative;
+        padding: 0;
+        margin-top: 10px;
+        margin-bottom: 0 !important;
+
+        .ch_name .flex-container {
+            margin-bottom: 5px !important;
+        }
+
+        .mes_block {
+            display: block;
+            padding: 0;
+            overflow: visible;
+            position: relative;
+            transform: translateY(calc(var(--custom-ChatAvatar) * (-1 + 0.325))) !important;
+            background-color: unset !important;
+            box-shadow: none !important;
+
+            .flex-container {
+                flex-wrap: wrap;
+            }
+        }
+
+        .mes_text {
+            position: relative;
+            display: inline-block;
+            overflow: hidden;
+            border-radius: 0;
+            padding-top: 10px;
+            padding-bottom: 0 !important;
+            max-width: 70%;
+
+            p {
+                display: block;
+                width: fit-content;
+                margin: 0;
+                margin-bottom: 8px !important;
+                background: var(--SmartThemeBotMesBlurTintColor);
+                padding: 6px 14px !important;
+                border-radius: 18px;
+            }
+
+            @media screen and (max-width: 1000px) {
+                max-width: 90%;
+            }
+        }
+
+        .mes_timer,
+        .mesIDDisplay,
+        .tokenCounterDisplay {
+            display: inline-block;
+            transform: translateY(calc(var(--custom-ChatAvatar) * -0.375));
+        }
+
+        /* Tide: User Message 潮汐：使用者訊息 */
+        &[is_user="true"] {
+            .avatar {
+                margin-right: 0;
+                margin-left: 5px;
+            }
+            .mesAvatarWrapper {
+                flex-direction: row-reverse;
+                padding-right: 0 !important;
+                padding-left: 2%;
+            }
+            .ch_name {
+                flex-direction: row-reverse;
+                float: right;
+                clear: both;
+                margin-right: calc(var(--custom-echo-avatar) + 5px + 8px);
+                margin-left: 0;
+                width: calc(100% - (var(--custom-echo-avatar) + 5px + 8px));
+
+                .flex-container {
+                    flex-direction: row-reverse;
+                    margin-right: 6px;
+                }
+            }
+
+            .mes_text {
+                float: right;
+                clear: both;
+                position: relative;
+                right: 0;
+                left: auto;
+                border-radius: 10px;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+            }
+            .name_text {
+                margin-right: 0;
+                text-align: right;
+            }
+
+            p {
+                background: var(--SmartThemeUserMesBlurTintColor);
+                border-radius: 18px;
+            }
+        }
+    }
+
+    .ch_name {
+        .name_text {
+            display: inline-block !important;
+            margin-right: 5px;
+        }
+    }
+
+    .mesAvatarWrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        min-height: 45px;
+        padding-top: 10px;
+    }
+    .mesIDDisplay {
+        background: rgba(225, 225, 225, 0.2);
+        padding: 0 8px;
+        border-radius: 8px;
+        opacity: 0.8;
+    }
+    .timestamp {
+        font-size: calc(var(--mainFontSize) * 0.7);
+        font-weight: 400;
+        white-space: nowrap;
+        margin-right: 5px;
+    }
+
+    .mes_reasoning_summary {
+        left: calc(var(--custom-echo-avatar) + 5px + 8px);
+
+    }
+    .mes_reasoning_header > .icon-svg {
+        display: block;
+        opacity: 0.8 !important;
+        margin-right: 3px;
+    }
+
+    .last_mes {
+        .mesAvatarWrapper {
+            padding-bottom: unset;
+        }
+        .swipe_right,
+        .swipe_left {
+            opacity: 0.6;
+            transform: scale(0.8);
+        }
+        .swipe_left,
+        .swipeRightBlock {
+            bottom: 8px !important;
+        }
+        .swipeRightBlock {
+            position: absolute;
+            display: flex;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+            right: 0px;
+        }
+        .swipes-counter {
+            width: 60px;
+            text-align: center;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            opacity: 0.9 !important;
+            letter-spacing: 1.5px;
+        }
+    }
 }
 
-body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mes_block {
-    display: block;
-    position: relative;
-    overflow: visible;
-    padding: 0 !important;
-    transform: translateY(calc(var(--sb-native-chat-avatar-size) * -0.675)) !important;
-    background-color: transparent !important;
-    box-shadow: none !important;
+/* Character Name Field Fix 角色名稱欄位修正 */
+
+body.ripplestyle {
+    .mesAvatarWrapper {
+        display: grid;
+        justify-items: center;
+    }
+}
+body.ripplestyle {
+    .mesIDDisplay {
+        background: var(--customBgColor2) !important;
+        width: fit-content;
+        padding: 0 8px;
+        border-radius: 8px;
+        justify-self: center;
+        text-align: center;
+        margin-top: 5px !important;
+        margin-bottom: 3px;
+    }
 }
 
-body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat :is(.mes_text, .mes_reasoning),
-body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat :is(.mes_text, .mes_reasoning) :where(p, li, blockquote, q, span) {
-    font-family: var(--mainFontFamily, 'Figtree', 'Noto Sans', sans-serif);
+body.echostyle {
+    #chat .mes_text {
+        border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent);
+    }
+}
+body.whisperstyle,
+body.hushstyle,
+body.ripplestyle {
+    #chat .mes {
+        border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent);
+    }
+
+}
+body.tidestyle {
+    #chat .mes_text p {
+        border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent) !important;
+    }
 }
 
-body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .mes_text p {
-    font-size: var(--sb-native-message-font-size) !important;
-    line-height: var(--sb-native-message-line-height) !important;
-    letter-spacing: inherit !important;
-    margin-top: var(--sb-native-paragraph-space-top) !important;
-    margin-bottom: var(--sb-native-paragraph-space-bottom) !important;
+/* 滑動訊息編號 */
+body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle).swipeAllMessages #chat .mes:not(.last_mes) .swipes-counter {
+    opacity: 0.8 !important;
+    margin-bottom: 20px !important;
+    margin-right: var(--customMesPadding) !important;
+}
+body.echostyle.swipeAllMessages .mes:not(.last_mes) .swipes-counter {
+    margin-right: 0 !important;
+    margin-bottom: 10px !important;
 }
 
-body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .ch_name {
-    margin-top: 3px;
-    margin-left: var(--sb-native-echo-name-offset);
+/* 訊息推理區塊間距 */
+body.echostyle,
+body.whisperstyle,
+body.hushstyle,
+body.tidestyle {
+    .mes_reasoning_summary {
+        margin-top: 15px !important;
+    }
 }
 
-body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .ch_name .name_text {
-    display: inline-block !important;
-    margin-right: 5px;
-}
-
-body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes[is_user="true"] .ch_name {
-    float: right;
-    clear: both;
-    width: calc(100% - var(--sb-native-echo-name-offset));
-    margin-right: var(--sb-native-echo-name-offset);
-    margin-left: 0;
-    text-align: right;
-}
-
-body:is(.echostyle, .tidestyle) #chat .mes[is_user="true"] .ch_name .flex-container {
-    flex-direction: row-reverse;
-}
-
-body:is(.echostyle, .tidestyle) #chat .mes[is_user="true"] .name_text {
-    margin-right: 0;
-    text-align: right;
-}
-
-body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mesIDDisplay,
-body.ripplestyle #chat .mesIDDisplay {
-    width: fit-content;
-    padding: 0 8px;
-    border-radius: 8px;
-    background: var(--sb-native-muted-panel);
-    opacity: 0.8;
-}
-
-body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .timestamp {
-    margin-right: 5px;
-    font-size: calc(var(--mainFontSize) * 0.7);
-    font-weight: 400;
-    white-space: nowrap;
-}
-
-body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes_timer,
-body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mesIDDisplay,
-body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .tokenCounterDisplay {
-    display: inline-block;
-    transform: translateY(calc(var(--sb-native-chat-avatar-size) * -0.375));
-}
-
+/* 最大上下文標記 */
 body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .lastInContext {
     margin-top: 15px;
-    border-top: var(--sb-native-last-context-border) !important;
-    border-radius: 0;
     opacity: 1 !important;
+    border-top: var(--customlastInContext) !important;
 }
-
+body.echostyle,
+body.whisperstyle,
+body.hushstyle,
+body.tidestyle {
+    #chat .lastInContext .mes_block {
+        transform: translateY(calc(var(--custom-ChatAvatar) * (-1 + 0.17))) !important;
+    }
+}
 body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .lastInContext .mes_block {
-    transform: translateY(calc(var(--sb-native-chat-avatar-size) * -0.83)) !important;
+    margin-top: 10px;
+}
+body.whisperstyle #chat {
+    .mes {
+        padding-bottom: 0;
+    }
 }
 
-body:is(.echostyle, .whisperstyle, .ripplestyle, .tidestyle) #chat .mes.smallSysMes .mesAvatarWrapper {
-    display: none !important;
+body.echostyle #chat .swipe_left {
+    right: calc(var(--customMesPadding) + 85px) !important;
 }
 
-body.hushstyle #chat .mes.smallSysMes .mesAvatarWrapper {
-    visibility: hidden !important;
+body.whisperstyle #chat .swipe_left {
+    right: calc(var(--customMesPadding) + 105px) !important;
+}
+body.hushstyle #chat .swipe_left {
+    right: calc(var(--customMesPadding) + 105px) !important;
+}
+body.ripplestyle #chat .swipe_left {
+    right: calc(var(--customMesPadding) + 100px) !important;
+}
+body.tidestyle #chat .swipe_left {
+    right: calc(var(--customMesPadding) + 90px) !important;
 }
 
+/* 第一則訊息留白修正 */
+body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) {
+    #chat .mes[mesid="0"] {
+        margin-top: 10px !important;
+    }
+}
+
+/* 角色名稱容器修正 */
+body.echostyle,
+body.whisperstyle,
+body.hushstyle,
+body.tidestyle {
+    #chat .ch_name {
+        margin-top: 3px;
+        margin-left: calc(var(--custom-echo-avatar) + 8px);
+
+        @media screen and (max-width: 1000px) {
+            margin-left: calc(var(--custom-echo-avatar) + 11px)
+        }
+    }
+}
+body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes .ch_name .flex-container {
+    @media screen and (max-width: 1000px) {
+        margin-bottom: 0 !important;
+    }
+}
+body.big-avatars.echostyle #chat {
+    .ch_name {
+        margin-top: -22px !important;
+    }
+    .mes[is_user="false"] .ch_name {
+        padding-left: 8px;
+    }
+    .mes[is_user="true"] .ch_name {
+        padding-right: 5px;
+    }
+    .mesAvatarWrapper {
+        margin-bottom: 20px;
+    }
+    .mes_text {
+        margin-bottom: 15px !important;
+    }
+}
+/* in echo style + big-avatar + hide avatars, -22 is too squished (see above) */
+body.big-avatars.echostyle.hideChatAvatars #chat {
+    .ch_name {
+        margin-top: -15px !important;
+    }
+}
+
+/* Shift these downward if using big avatars, but only if we aren't hiding them */
+body.big-avatars.whisperstyle:not(.hideChatAvatars) #chat,
+body.big-avatars.hushstyle:not(.hideChatAvatars) #chat,
+body.big-avatars.tidestyle:not(.hideChatAvatars) #chat {
+    .mes_timer, .mesIDDisplay, .tokenCounterDisplay {
+        transform: unset !important;
+    }
+    .ch_name {
+        margin-left: calc(var(--custom-echo-avatar) + 18px);
+        margin-bottom: 10px;
+    }
+}
+
+/* System Message Display Fix 系統訊息顯示修正 */
+body.echostyle {
+    #chat .mes[is_system="true"] {
+        .mes_text {
+            min-height: unset;
+        }
+    }
+}
+body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .mes.smallSysMes {
+    .mesAvatarWrapper {
+        display: none !important;
+    }
+}
+body.hushstyle {
+    .mes.smallSysMes {
+        .mesAvatarWrapper {
+            display: unset !important;
+            visibility: hidden !important;
+        }
+    }
+}
 body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .mes.smallSysMes::before,
 body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .mes.smallSysMes::after {
     display: none !important;
 }
 
-body.hideChatAvatars:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .swipe_left,
-body.hideChatAvatars:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .swipeRightBlock {
-    bottom: 30px !important;
+body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .mes[is_user="false"] .name_text {
+    font-size: var(--charNameFontSize, 0.95rem) !important;
+}
+body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .mes[is_user="true"] .name_text {
+    font-size: var(--userNameFontSize, 0.95rem) !important;
 }
 
-body.hideChatAvatars:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .ch_name {
-    margin-left: 10px;
+body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .mes_text p {
+    letter-spacing: var(--messageTextLetterSpacing, 0em) !important;
+    line-height: var(--messageLineHeight, 1.55em) !important;
+    font-size: var(--messageTextFontSize, var(--mainFontSize)) !important;
+    margin-top: var(--mesParagraphSpacingTop, 0.5em) !important;
+    margin-bottom: var(--mesParagraphSpacingBottom, 0.5em) !important;
 }
 
-/* Echo */
-body.echostyle #chat .mes {
-    display: block;
-    position: relative;
-    width: 100%;
-    margin: 5px 0 0;
-    padding: 0;
-    border-radius: var(--sb-native-radius);
-    background: transparent !important;
-}
-
-body.echostyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
-    padding-top: 5px;
-}
-
-body.echostyle #chat .mes:not(.smallSysMes) .mes_text {
-    position: relative;
-    display: inline-block;
-    overflow: hidden;
-    width: 100%;
-    max-width: 100%;
-    min-height: 200px;
-    margin-top: calc(var(--sb-native-chat-avatar-size) * 0.35);
-    border: var(--sb-native-border);
-    border-radius: 10px;
-    box-shadow: 3px 3px 8px color-mix(in srgb, var(--SmartThemeShadowColor) 12%, transparent);
-    backdrop-filter: blur(var(--SmartThemeBlurStrength));
-    -webkit-backdrop-filter: blur(var(--SmartThemeBlurStrength));
-}
-
-body.echostyle #chat .mes[is_user="false"] .mes_text {
-    padding: 10px var(--sb-native-echo-avatar-width) 10px 20px !important;
-    background-color: var(--SmartThemeBotMesBlurTintColor);
-}
-
-body.echostyle #chat .mes[is_user="true"] .mesAvatarWrapper {
-    flex-direction: row-reverse;
-    margin-right: 0;
-    margin-left: 2%;
-    padding-right: 0 !important;
-}
-
-body.echostyle #chat .mes[is_user="true"] .mes_text {
-    float: right;
-    clear: both;
-    right: 0;
-    left: auto;
-    padding: 10px 20px 10px var(--sb-native-echo-avatar-width) !important;
-    background-color: var(--SmartThemeUserMesBlurTintColor);
-}
-
-body.echostyle #chat .mes:not(.smallSysMes) .mes_text::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    z-index: 0;
-    width: var(--sb-native-echo-avatar-width);
-    height: var(--sb-native-echo-avatar-height);
-    pointer-events: none;
-    background: var(--mes-avatar-original-url, var(--mes-avatar-url)) center no-repeat;
-    background-size: cover;
-    background-attachment: fixed;
-    -webkit-mask-image:
-        linear-gradient(to bottom, rgb(0 0 0 / 100%) 0%, rgb(0 0 0 / 100%) 60%, rgb(0 0 0 / 0%) 100%),
-        linear-gradient(to right, rgb(0 0 0 / 100%) 0%, rgb(0 0 0 / 100%) 70%, rgb(0 0 0 / 0%) 100%);
-    mask-image:
-        linear-gradient(to bottom, rgb(0 0 0 / 100%) 0%, rgb(0 0 0 / 100%) 60%, rgb(0 0 0 / 0%) 100%),
-        linear-gradient(to right, rgb(0 0 0 / 100%) 0%, rgb(0 0 0 / 100%) 70%, rgb(0 0 0 / 0%) 100%);
-    -webkit-mask-composite: source-in;
-    mask-composite: intersect;
-}
-
-body.echostyle #chat .mes[is_user="false"] .mes_text::before {
-    right: 0;
-    border-radius: 0 10px 10px 0;
-    transform: scaleX(-1);
-}
-
-body.echostyle #chat .mes[is_user="true"] .mes_text::before {
-    left: 0;
-    border-radius: 10px 0 0 10px;
-}
-
-body.echostyle #chat .mes_text > *,
-body.echostyle #chat .mes_reasoning {
-    position: relative;
-    z-index: 1;
-}
-
-body.echostyle #chat .last_mes .mes_text {
-    margin-bottom: 10px;
-}
-
-body.echostyle #chat .swipe_left {
-    right: calc(var(--sb-native-message-padding) + 85px) !important;
-}
-
-/* Whisper */
-body.whisperstyle #chat .mes {
-    display: block;
-    position: relative;
-    overflow: hidden;
-    width: 100%;
-    margin-top: 10px;
-    padding: 45px var(--sb-native-message-padding) 0 !important;
-    border: var(--sb-native-border);
-    border-radius: var(--sb-native-radius);
-}
-
-body.whisperstyle #chat .mes[is_user="true"] {
-    background-color: var(--SmartThemeUserMesBlurTintColor) !important;
-}
-
-body.whisperstyle #chat .mes[is_user="false"] {
-    background-color: var(--SmartThemeBotMesBlurTintColor) !important;
-}
-
-body.whisperstyle #chat .mes::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    z-index: 0;
-    width: var(--sb-native-whisper-avatar-width);
-    height: 100px;
-    pointer-events: none;
-    border-radius: 0 var(--sb-native-radius) 0 0;
-    background: var(--mes-avatar-original-url, var(--mes-avatar-url)) center no-repeat;
-    background-size: cover;
-    opacity: 0.8;
-    -webkit-mask-image: linear-gradient(to left, rgb(0 0 0 / 100%) 60%, rgb(0 0 0 / 0%) 100%);
-    mask-image: linear-gradient(to bottom, rgb(0 0 0 / 100%) 60%, rgb(0 0 0 / 0%) 100%);
-}
-
-body.whisperstyle #chat .mes::after,
-body.hushstyle #chat .mes::after {
-    content: '';
-    position: absolute;
-    right: 14px;
-    z-index: 2;
-    width: 28px;
-    height: 3px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--sb-native-accent) 70%, var(--SmartThemeBodyColor) 30%);
-    opacity: 0.9;
-}
-
-body.whisperstyle #chat .mes::after {
-    top: 96px;
-}
-
-body.whisperstyle #chat .mes[is_user="false"]::after,
-body.hushstyle #chat .mes[is_user="false"]::after {
-    background: color-mix(in srgb, var(--SmartThemeBodyColor) 70%, transparent);
-}
-
-body.whisperstyle #chat .mes .mesAvatarWrapper,
-body.whisperstyle #chat .mes .mes_buttons,
-body.whisperstyle #chat .mes .mes_edit_buttons,
-body.whisperstyle #chat .mes .mes_reasoning_details,
-body.whisperstyle #chat .mes .mes_block {
-    z-index: 2;
-}
-
-body.whisperstyle #chat .mes_text {
-    position: relative;
-    display: inline-block;
-    width: 100%;
-    max-width: 100%;
-    margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
-}
-
-body.whisperstyle #chat .swipe_left {
-    right: calc(var(--sb-native-message-padding) + 105px) !important;
-}
-
-/* Hush */
-body.hushstyle #chat .mes {
-    display: block;
-    position: relative;
-    overflow: hidden;
-    width: 100%;
-    margin-top: 10px;
-    padding: 1.3em 1.2em !important;
-    border: var(--sb-native-border);
-    border-radius: var(--sb-native-radius);
-}
-
-body.hushstyle #chat .mes[is_user="true"] {
-    background-color: var(--SmartThemeUserMesBlurTintColor) !important;
-}
-
-body.hushstyle #chat .mes[is_user="false"] {
-    background-color: var(--SmartThemeBotMesBlurTintColor) !important;
-}
-
-body.hushstyle #chat .mes::after {
-    top: 40px;
-}
-
-body.hushstyle #chat .mes .mesAvatarWrapper,
-body.hushstyle #chat .mes .mes_buttons,
-body.hushstyle #chat .mes .mes_edit_buttons,
-body.hushstyle #chat .mes .mes_reasoning_details,
-body.hushstyle #chat .mes .mes_block {
-    z-index: 2;
-}
-
-body.hushstyle #chat .mes_text {
-    position: relative;
-    display: inline-block;
-    width: 100%;
-    max-width: 100%;
-    margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
-}
-
-body.hushstyle #chat .swipe_left {
-    right: calc(var(--sb-native-message-padding) + 105px) !important;
-}
-
-/* Ripple */
-body.ripplestyle #chat .mes:not(.smallSysMes) {
-    display: grid !important;
-    grid-template-columns: minmax(0, var(--sb-native-ripple-avatar-width)) minmax(0, 1fr);
-    align-items: start;
-    gap: 0;
-    overflow: hidden;
-    margin: 8px 0 !important;
-    padding: 0 !important;
-    border: var(--sb-native-border);
-    border-radius: var(--sb-native-radius);
-    background: var(--SmartThemeBotMesBlurTintColor) !important;
-}
-
-body.ripplestyle #chat .mes:not(.smallSysMes)[is_user="true"] {
-    background-color: var(--SmartThemeUserMesBlurTintColor) !important;
-}
-
-body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
-    grid-column: 1;
-    align-self: stretch;
-    position: sticky;
-    top: 0;
-    display: grid;
-    justify-items: center;
-    align-content: start;
-    inline-size: var(--sb-native-ripple-avatar-width);
-    min-inline-size: var(--sb-native-ripple-avatar-width);
-    max-inline-size: var(--sb-native-ripple-avatar-width);
-    margin: 0;
-    padding: 0 0 45px !important;
-    overflow: hidden;
-}
-
-body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar {
-    display: flex;
-    flex: 0 0 auto !important;
+body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipeRightBlock {
     align-items: center;
-    justify-content: center;
-    inline-size: var(--sb-native-ripple-avatar-width) !important;
-    block-size: calc(var(--sb-native-ripple-avatar-width) * var(--sb-native-ripple-avatar-ratio)) !important;
-    min-inline-size: var(--sb-native-ripple-avatar-width) !important;
-    min-block-size: calc(var(--sb-native-ripple-avatar-width) * var(--sb-native-ripple-avatar-ratio)) !important;
-    max-inline-size: var(--sb-native-ripple-avatar-width) !important;
-    max-block-size: calc(var(--sb-native-ripple-avatar-width) * var(--sb-native-ripple-avatar-ratio)) !important;
-    aspect-ratio: 2 / 3;
-    margin: 0 !important;
-    border: 0 !important;
-    border-radius: var(--sb-native-radius) 0 0 0 !important;
-    overflow: hidden !important;
+    bottom: var(--moonlit-sb-swipe-edge-offset) !important;
     box-sizing: border-box;
-}
-
-body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar > img {
-    display: block;
-    inline-size: 100% !important;
-    block-size: 100% !important;
-    min-inline-size: 0 !important;
-    min-block-size: 0 !important;
-    max-inline-size: 100% !important;
-    max-block-size: 100% !important;
-    border: 0 !important;
-    border-radius: inherit !important;
-    object-fit: cover;
-    object-position: center;
-}
-
-body.ripplestyle #chat .mes:not(.smallSysMes) .mes_block {
-    grid-column: 2;
-    display: block;
-    width: 100%;
-    min-width: 0;
-    padding: 20px 12px 12px 8px;
-    overflow: visible;
-    color: var(--SmartThemeBodyColor);
-    background: none !important;
-    border: 0 !important;
-    box-shadow: none !important;
-    box-sizing: border-box;
-}
-
-body.ripplestyle #chat .mes:not(.smallSysMes) .mes_text {
-    display: block !important;
-    visibility: visible !important;
-    min-width: 0;
-    min-height: 0;
-    overflow: visible;
-    color: var(--SmartThemeBodyColor);
-    opacity: 1;
-}
-
-body.ripplestyle #chat .mes:not(.smallSysMes) .mes_block .ch_name::after {
-    content: '';
-    width: 100%;
-    margin-bottom: 5px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor) 45%, transparent);
-}
-
-body.ripplestyle.no-timer.no-mesIDDisplay.no-tokenCount #chat .mes .mesAvatarWrapper {
-    padding-bottom: 0 !important;
-}
-
-body.ripplestyle #chat .swipe_left {
-    right: calc(var(--sb-native-message-padding) + 100px) !important;
-}
-
-/* Tide */
-body.tidestyle #chat {
-    padding: 0 15px;
-}
-
-body.tidestyle #chat .mes {
-    display: block;
-    position: relative;
-    width: 100%;
-    margin-top: 10px;
-    margin-bottom: 0 !important;
-    padding: 0;
-    background: transparent !important;
-}
-
-body.tidestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
-    padding-top: 10px;
-}
-
-body.tidestyle #chat .mes_text {
-    position: relative;
-    display: inline-block;
-    overflow: hidden;
-    max-width: 100%;
-    padding-top: 10px;
-    padding-bottom: 0 !important;
-    border-radius: 0;
-}
-
-body.tidestyle #chat .mes_text p {
-    display: block;
-    width: fit-content;
-    margin: 0 0 8px !important;
-    padding: 6px 14px !important;
-    border: var(--sb-native-border) !important;
-    border-radius: 18px;
-    background: var(--SmartThemeBotMesBlurTintColor);
-}
-
-body.tidestyle #chat .mes[is_user="true"] .mesAvatarWrapper {
-    flex-direction: row-reverse;
-    padding-right: 0 !important;
-    padding-left: 2%;
-}
-
-body.tidestyle #chat .mes[is_user="true"] .mes_text {
-    float: right;
-    clear: both;
-    right: 0;
-    left: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    border-radius: 10px;
-}
-
-body.tidestyle #chat .mes[is_user="true"] .mes_text p {
-    background: var(--SmartThemeUserMesBlurTintColor);
-}
-
-body.tidestyle #chat .swipe_left {
-    right: calc(var(--sb-native-message-padding) + 90px) !important;
-}
-
-/* Swipe and last-message controls */
-body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .last_mes .mesAvatarWrapper {
-    padding-bottom: unset;
-}
-
-body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipe_right,
-body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipe_left {
-    opacity: 0.6;
-    transform: scale(0.8);
-}
-
-body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipe_left,
-body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipeRightBlock {
-    bottom: 10px !important;
-}
-
-body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipeRightBlock {
-    position: absolute;
-    right: 0;
-    display: flex;
-    flex-direction: row-reverse;
+    display: flex !important;
+    flex-direction: row-reverse !important;
+    gap: var(--moonlit-sb-swipe-gap);
+    inline-size: calc(var(--moonlit-sb-swipe-control-size) + var(--moonlit-sb-swipe-counter-width) + var(--moonlit-sb-swipe-gap)) !important;
     justify-content: flex-end;
+    left: auto !important;
+    max-inline-size: calc(100% - (var(--moonlit-sb-swipe-inline-offset) * 2));
+    min-inline-size: calc(var(--moonlit-sb-swipe-control-size) + var(--moonlit-sb-swipe-counter-width) + var(--moonlit-sb-swipe-gap));
+    overflow: visible;
+    pointer-events: none;
+    position: absolute !important;
+    right: var(--moonlit-sb-swipe-inline-offset) !important;
 }
 
-body:is(.whisperstyle, .hushstyle) #chat .last_mes .swipeRightBlock {
-    right: 20px;
+body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipe_left {
+    bottom: var(--moonlit-sb-swipe-edge-offset) !important;
+    left: auto !important;
+    position: absolute !important;
+    right: calc(var(--moonlit-sb-swipe-inline-offset) + var(--moonlit-sb-swipe-control-size) + var(--moonlit-sb-swipe-counter-width) + (var(--moonlit-sb-swipe-gap) * 2)) !important;
+}
+
+body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes :is(.swipe_left, .swipe_right) {
+    align-items: center;
+    display: inline-flex;
+    flex: 0 0 var(--moonlit-sb-swipe-control-size);
+    height: var(--moonlit-sb-swipe-control-size);
+    justify-content: center;
+    line-height: 1;
+    min-width: var(--moonlit-sb-swipe-control-size);
+    pointer-events: auto;
+    position: relative !important;
+    right: auto !important;
+    transform: none !important;
+    width: var(--moonlit-sb-swipe-control-size);
 }
 
 body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipes-counter {
-    width: 60px;
+    box-sizing: border-box;
+    flex: 0 0 var(--moonlit-sb-swipe-counter-width);
+    letter-spacing: 0;
+    margin: 0 !important;
+    max-width: var(--moonlit-sb-swipe-counter-width);
+    min-width: var(--moonlit-sb-swipe-counter-width);
     overflow: hidden;
-    text-align: center;
-    white-space: nowrap;
+    padding: 0;
+    pointer-events: auto;
     text-overflow: ellipsis;
-    letter-spacing: 1.5px;
-    opacity: 0.9 !important;
+    width: var(--moonlit-sb-swipe-counter-width) !important;
 }
 
 @media screen and (max-width: 1000px) {
-    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .ch_name {
-        margin-left: calc(var(--sb-native-echo-name-offset) + 3px);
-    }
-
-    body.echostyle #chat .mes:not(.smallSysMes) .mes_text::before {
-        width: var(--sb-native-echo-avatar-mobile-width);
-        height: var(--sb-native-echo-avatar-mobile-height);
-        background-attachment: scroll;
-    }
-
-    body.echostyle #chat .mes[is_user="false"] .mes_text {
-        padding-right: var(--sb-native-echo-avatar-mobile-width) !important;
-    }
-
-    body.echostyle #chat .mes[is_user="true"] .mes_text {
-        padding-left: var(--sb-native-echo-avatar-mobile-width) !important;
-    }
-
-    body.whisperstyle #chat .mes::before {
-        width: 55%;
-        min-height: 125px !important;
-    }
-
-    body.tidestyle #chat {
-        padding: 0 1em;
-    }
-
-    body.tidestyle #chat .mes_text {
-        max-width: 90%;
-    }
-}
-
-@media screen and (max-width: 768px) {
-    :root {
-        --sb-native-chat-avatar-size: 36px;
-        --sb-native-message-font-size: max(14px, var(--mainFontSize));
-        --sb-native-message-line-height: 1.5;
-    }
-
-    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) {
-        border-radius: 12px;
+    body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes {
+        position: relative !important;
     }
 
     body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
@@ -686,8 +1313,12 @@ body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .
         align-items: center;
         gap: 4px 6px;
         min-height: 0;
-        padding-bottom: 0 !important;
         overflow: visible;
+        padding-bottom: 0 !important;
+    }
+
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .last_mes:not(.smallSysMes) .mesAvatarWrapper {
+        padding-bottom: 0 !important;
     }
 
     body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mes_block,
@@ -697,108 +1328,202 @@ body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .
     }
 
     body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes .mesAvatarWrapper > :is(.mesIDDisplay, .mes_timer, .tokenCounterDisplay) {
+        line-height: 1.15;
+        margin: 0;
         max-width: 100%;
         min-width: 0;
-        margin: 0;
         overflow-wrap: anywhere;
-        line-height: 1.15;
-        white-space: normal;
         transform: none !important;
+        white-space: normal;
     }
 
-    body.echostyle #chat .mes:not(.smallSysMes) .mes_text,
-    body.echostyle #chat .mes:not(.smallSysMes).last_mes .mes_text {
-        min-height: 132px;
-        padding-top: 10px !important;
-        padding-bottom: 10px !important;
-    }
-
-    body.echostyle #chat .mes[is_user="true"] .mes_text,
-    body.echostyle #chat .mes[is_user="true"].last_mes .mes_text {
-        padding-right: 14px !important;
-        padding-left: calc(var(--sb-native-echo-avatar-mobile-width) + 8px) !important;
-    }
-
-    body.echostyle #chat .mes[is_user="false"] .mes_text,
-    body.echostyle #chat .mes[is_user="false"].last_mes .mes_text {
-        padding-right: calc(var(--sb-native-echo-avatar-mobile-width) + 8px) !important;
-        padding-left: 14px !important;
-    }
-
-    body.whisperstyle #chat .mes,
-    body.hushstyle #chat .mes {
-        padding-right: 12px !important;
-        padding-left: 12px !important;
-    }
-
-    body.ripplestyle #chat .mes:not(.smallSysMes) {
-        grid-template-columns: minmax(0, var(--sb-native-ripple-avatar-mobile-width)) minmax(0, 1fr) !important;
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) {
         align-items: start;
-        overflow: hidden;
+        column-gap: 10px;
+        display: grid !important;
+        grid-template-columns: minmax(0, var(--moonlit-sb-avatar-column-width)) minmax(0, 1fr) !important;
+        row-gap: 0;
     }
 
-    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
-        position: relative !important;
-        top: auto !important;
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
         align-self: start !important;
-        align-content: start;
-        inline-size: var(--sb-native-ripple-avatar-mobile-width);
-        min-inline-size: var(--sb-native-ripple-avatar-mobile-width);
-        max-inline-size: var(--sb-native-ripple-avatar-mobile-width);
-        min-height: 0 !important;
-        height: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        grid-column: 1;
+        grid-row: 1;
+        justify-content: flex-start;
         margin: 0 !important;
+        max-width: var(--moonlit-sb-avatar-column-width);
         padding: 0 !important;
-        overflow: visible !important;
+        width: var(--moonlit-sb-avatar-column-width);
     }
 
-    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar,
-    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar > img {
-        inline-size: var(--sb-native-ripple-avatar-mobile-width) !important;
-        block-size: calc(var(--sb-native-ripple-avatar-mobile-width) * var(--sb-native-ripple-avatar-ratio)) !important;
-        min-inline-size: var(--sb-native-ripple-avatar-mobile-width) !important;
-        min-block-size: calc(var(--sb-native-ripple-avatar-mobile-width) * var(--sb-native-ripple-avatar-ratio)) !important;
-        max-inline-size: var(--sb-native-ripple-avatar-mobile-width) !important;
-        max-block-size: calc(var(--sb-native-ripple-avatar-mobile-width) * var(--sb-native-ripple-avatar-ratio)) !important;
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar {
+        margin: 0 !important;
     }
 
-    body.ripplestyle #chat .mes:not(.smallSysMes) .mes_block {
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mes_block {
+        clear: none !important;
+        float: none !important;
+        grid-column: 2;
+        grid-row: 1;
+        max-width: 100% !important;
         min-width: 0;
-        padding: 12px 10px 10px !important;
+        overflow: visible;
+        width: 100% !important;
     }
 
-    body.tidestyle #chat {
-        padding-inline: 8px;
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .ch_name {
+        clear: none !important;
+        float: none !important;
+        margin: 0 0 6px 0 !important;
+        max-width: 100% !important;
+        width: auto !important;
+    }
+
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .ch_name .flex-container {
+        margin: 0 !important;
+    }
+
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mes_text {
+        clear: none !important;
+        float: none !important;
+        left: auto !important;
+        margin-top: 0 !important;
+        max-width: 100% !important;
+        min-height: 0 !important;
+        right: auto !important;
+        width: 100% !important;
+    }
+
+    body.tidestyle #chat .mes:not(.smallSysMes) .mes_text {
+        align-items: stretch;
+        display: block;
     }
 
     body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipeRightBlock {
-        right: 8px !important;
-        left: auto !important;
-        bottom: 8px !important;
-        display: flex;
         align-items: center;
+        bottom: var(--moonlit-sb-swipe-edge-offset) !important;
+        display: flex;
+        flex-direction: row-reverse !important;
+        gap: var(--moonlit-sb-swipe-gap);
+        inline-size: calc(var(--moonlit-sb-swipe-control-size) + var(--moonlit-sb-swipe-counter-width) + var(--moonlit-sb-swipe-gap)) !important;
         justify-content: flex-end;
-        gap: 4px;
-        inline-size: auto !important;
-        min-inline-size: 0;
-        max-inline-size: calc(100% - 16px);
+        left: auto !important;
+        max-inline-size: calc(100% - (var(--moonlit-sb-swipe-inline-offset) * 2));
+        min-inline-size: calc(var(--moonlit-sb-swipe-control-size) + var(--moonlit-sb-swipe-counter-width) + var(--moonlit-sb-swipe-gap));
+        pointer-events: none;
+        position: absolute !important;
+        right: var(--moonlit-sb-swipe-inline-offset) !important;
     }
 
     body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipe_left {
-        right: 58px !important;
+        bottom: var(--moonlit-sb-swipe-edge-offset) !important;
         left: auto !important;
-        bottom: 8px !important;
+        position: absolute !important;
+        right: calc(var(--moonlit-sb-swipe-inline-offset) + var(--moonlit-sb-swipe-control-size) + var(--moonlit-sb-swipe-counter-width) + (var(--moonlit-sb-swipe-gap) * 2)) !important;
     }
 
     body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes :is(.swipe_left, .swipe_right) {
+        align-items: center;
+        display: inline-flex;
+        height: var(--moonlit-sb-swipe-control-size);
+        justify-content: center;
+        line-height: 1;
+        min-width: var(--moonlit-sb-swipe-control-size);
+        pointer-events: auto;
+        width: var(--moonlit-sb-swipe-control-size);
         transform: none !important;
     }
 
     body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipes-counter {
-        width: auto !important;
-        min-width: 32px;
-        max-width: 48px;
-        margin: 0 4px 0 0;
         letter-spacing: 0;
+        margin: 0;
+        max-width: var(--moonlit-sb-swipe-counter-width);
+        min-width: var(--moonlit-sb-swipe-counter-width);
+        overflow: hidden;
+        pointer-events: auto;
+        text-overflow: ellipsis;
+        width: var(--moonlit-sb-swipe-counter-width) !important;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) {
+        align-items: start;
+        display: grid !important;
+        grid-template-columns: minmax(0, var(--moonlit-sb-ripple-avatar-mobile-width)) minmax(0, 1fr) !important;
+        gap: 0;
+        overflow: visible;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
+        align-content: start;
+        align-self: start !important;
+        box-sizing: border-box;
+        display: flex !important;
+        flex-direction: column !important;
+        grid-column: 1;
+        grid-row: 1;
+        height: auto !important;
+        justify-content: flex-start;
+        margin: 0 !important;
+        max-width: var(--moonlit-sb-ripple-avatar-mobile-width) !important;
+        min-height: 0 !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+        padding: 0 0 var(--moonlit-sb-ripple-left-bottom-gap) 0 !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 2;
+        width: var(--moonlit-sb-ripple-avatar-mobile-width) !important;
+    }
+
+    body.ripplestyle #chat .last_mes:not(.smallSysMes) .mesAvatarWrapper {
+        padding-bottom: var(--moonlit-sb-ripple-left-bottom-gap) !important;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar,
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar > img {
+        height: var(--moonlit-sb-ripple-avatar-mobile-height) !important;
+        max-height: var(--moonlit-sb-ripple-avatar-mobile-height) !important;
+        max-width: var(--moonlit-sb-ripple-avatar-mobile-width) !important;
+        min-height: var(--moonlit-sb-ripple-avatar-mobile-height) !important;
+        min-width: var(--moonlit-sb-ripple-avatar-mobile-width) !important;
+        width: var(--moonlit-sb-ripple-avatar-mobile-width) !important;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar {
+        overflow: hidden !important;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar > img {
+        display: block;
+        object-fit: cover;
+        overflow: hidden !important;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mes_block {
+        box-sizing: border-box;
+        grid-column: 2;
+        grid-row: 1;
+        margin: 0 !important;
+        min-width: 0;
+        padding: 10px 24px 34px 16px !important;
+        width: 100% !important;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .ch_name {
+        margin: 0 0 8px 0 !important;
+        min-height: 0;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mes_block .ch_name::after {
+        display: block;
+        margin-bottom: 8px;
+        padding-bottom: 0;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mes_text {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
     }
 }
