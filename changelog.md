@@ -29,6 +29,10 @@ This update stabilizes preset and connection profile switching, preserves OpenAI
 - Kept the desktop bottom chat bar layout unchanged while aligning mobile persona, chat select, action, and search controls symmetrically.
 - Remembered the mobile bottom chat action collapse state across reloads and centered the visible action row when it is shown.
 
+### Character Drawer
+- Rotated the character-menu service-worker, shell, and static asset cache keys so iOS WebKit clients load the reworked drawer instead of stale cached files.
+- Restored horizontal scrolling in the mobile character tab strip and trimmed the mobile character header spacing.
+
 ### Character Editor
 - Character alternate greetings now save from the live editor contents, so edited greetings persist instead of falling back to stale array state.
 

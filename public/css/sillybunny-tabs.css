@@ -5883,7 +5883,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     .sb-shell-nav {
         justify-content: flex-start;
         scroll-padding-inline: 24px;
-        touch-action: none;
+        touch-action: pan-x;
     }
 
     .sb-shell-panel-scroller,
@@ -6804,17 +6804,21 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 
     #right-nav-panel.openDrawer > .sb-character-shell-header {
         flex: 0 0 auto;
-        gap: 4px;
-        padding: 12px 54px 12px 12px;
+        gap: 3px;
+        padding: 10px 52px 8px 12px;
     }
 
     #right-nav-panel.openDrawer > .sb-character-shell-header .sb-shell-close {
-        top: 10px;
-        right: 10px;
+        top: 8px;
+        right: 8px;
         width: var(--sb-mobile-touch-target, 44px);
         min-width: var(--sb-mobile-touch-target, 44px);
         height: var(--sb-mobile-touch-target, 44px);
         min-height: var(--sb-mobile-touch-target, 44px);
+    }
+
+    #right-nav-panel.openDrawer > .sb-character-shell-header .sb-shell-kicker {
+        display: none;
     }
 
     #right-nav-panel.openDrawer > .sb-character-shell-header .sb-shell-description {
@@ -7045,6 +7049,32 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_search {
         grid-column: auto !important;
         justify-self: start !important;
+    }
+
+    #right-nav-panel.openDrawer .rm_tag_controls {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 6px;
+        max-height: none;
+        margin-top: 6px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-x: contain;
+        scroll-padding-inline: 8px;
+        touch-action: pan-x;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    #right-nav-panel.openDrawer .rm_tag_controls::-webkit-scrollbar {
+        display: none;
+    }
+
+    #right-nav-panel.openDrawer .rm_tag_controls > .tags {
+        flex: 0 0 auto;
+        flex-wrap: nowrap;
+        align-items: center;
+        min-width: max-content;
     }
 
     #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_create {
