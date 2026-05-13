@@ -1,6 +1,9 @@
-<ul>
+<ul class="profile-summary--two-col">
     {{#each profile}}
-    <li><strong data-i18n="{{@key}}">{{@key}}:</strong>&nbsp;{{this}}</li>
+    <li>
+        <strong class="profile-summary-label" data-i18n="{{@key}}">{{@key}}</strong>
+        <span class="profile-summary-value">{{this}}</span>
+    </li>
     {{/each}}
 </ul>
 {{#if omitted}}

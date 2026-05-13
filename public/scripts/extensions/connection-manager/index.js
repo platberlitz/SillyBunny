@@ -89,6 +89,12 @@ const FANCY_NAMES = {
     'prompt-post-processing': 'Prompt Post-Processing',
     'secret-id': 'Secret',
     'regex-preset': 'Regex Preset',
+    'active-agents': 'Active Agents',
+    'samplers': 'Samplers',
+    'instruct-template': 'Instruct Template',
+    'context-template': 'Context Template',
+    'system-prompt': 'System Prompt',
+    'world-info-active-count': 'World Info Active Entries',
 };
 
 /**
@@ -198,6 +204,12 @@ const profilesProvider = () => [
  * @property {string} [api-url] Server URL
  * @property {string} [secret-id] Secret ID
  * @property {string} [regex-preset] Regex Preset ID
+ * @property {string} [active-agents] Active in-chat agents summary
+ * @property {string} [samplers] Sampler summary
+ * @property {string} [instruct-template] Instruct template name
+ * @property {string} [context-template] Context template name
+ * @property {string} [system-prompt] System prompt name
+ * @property {number|string} [world-info-active-count] Active World Info entries count
  * @property {string[]} [exclude] Commands to exclude
  */
 
@@ -268,6 +280,80 @@ async function readProfileFromCommands(mode, profile, cleanUp = false) {
             delete profile[command];
         }
     }
+
+    enrichProfileSnapshot(profile);
+}
+
+function truncateSummary(value, maxLength = 260) {
+    const text = String(value ?? '').trim();
+    const chars = Array.from(text);
+    return chars.length > maxLength ? `${chars.slice(0, maxLength - 3).join('')}...` : text;
+}
+
+function readInputDisplayValue(selector) {
+    const element = document.querySelector(selector);
+
+    if (element instanceof HTMLSelectElement) {
+        const selectedText = Array.from(element.selectedOptions)
+            .map(option => String(option.textContent ?? '').trim())
+            .filter(Boolean)
+            .join(', ');
+        return selectedText || String(element.value ?? '').trim();
+    }
+
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+        return String(element.value ?? '').trim();
+    }
+
+    return '';
+}
+
+function getActiveAgentsSummary() {
+    const agents = typeof globalThis.SillyBunnyAgents?.getEnabledAgents === 'function'
+        ? globalThis.SillyBunnyAgents.getEnabledAgents()
+        : [];
+
+    if (!Array.isArray(agents) || agents.length === 0) {
+        return NONE;
+    }
+
+    return truncateSummary(agents
+        .map(agent => `${agent.name || agent.id} (order ${agent.injection?.order ?? 0})`)
+        .join(', '));
+}
+
+function getSamplerSummary() {
+    const context = getContext();
+    const isChatCompletion = main_api === 'openai';
+    const settings = isChatCompletion ? context.chatCompletionSettings : context.textCompletionSettings;
+
+    if (!settings) {
+        return NONE;
+    }
+
+    const temperature = isChatCompletion ? settings.temp_openai : settings.temp;
+    const topP = isChatCompletion ? settings.top_p_openai : settings.top_p;
+    const topK = isChatCompletion ? settings.top_k_openai : settings.top_k;
+
+    return [
+        `Temperature: ${temperature ?? NONE}`,
+        `Top P: ${topP ?? NONE}`,
+        `Top K: ${topK ?? NONE}`,
+    ].join(', ');
+}
+
+function getWorldInfoActiveCount() {
+    const values = $('#world_info').val();
+    return Array.isArray(values) ? values.length : values ? 1 : 0;
+}
+
+function enrichProfileSnapshot(profile) {
+    profile['active-agents'] = getActiveAgentsSummary();
+    profile.samplers = getSamplerSummary();
+    profile['instruct-template'] = readInputDisplayValue('#instruct_presets') || profile.instruct || NONE;
+    profile['context-template'] = readInputDisplayValue('#context_presets') || profile.context || NONE;
+    profile['system-prompt'] = readInputDisplayValue('#sysprompt_select') || profile.sysprompt || NONE;
+    profile['world-info-active-count'] = String(getWorldInfoActiveCount());
 }
 
 /**
