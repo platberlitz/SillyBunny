@@ -13,6 +13,7 @@ import {
     stopGeneration,
     streamingProcessor,
     syncMesToSwipe,
+    updateMessageTokenAccounting,
 } from '../../../script.js';
 import { getContext } from '../../extensions.js';
 import { eventSource, event_types } from '../../events.js';
@@ -1552,18 +1553,7 @@ async function syncPromptTransformMessageStateAsync(message, messageIndex) {
         return;
     }
 
-    const context = getContext();
-    const tokenCount = typeof context?.getTokenCountAsync === 'function'
-        ? await context.getTokenCountAsync(message.mes, 0)
-        : 0;
-
-    message.extra ??= {};
-    message.extra.token_count = tokenCount;
-
-    const swipeInfo = getActiveSwipeInfo(message, { create: true });
-    if (swipeInfo?.extra) {
-        swipeInfo.extra.token_count = tokenCount;
-    }
+    await updateMessageTokenAccounting(message);
 }
 
 function syncAssistantMessageStateToSwipe(message, messageIndex) {

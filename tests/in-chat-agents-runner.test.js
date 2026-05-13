@@ -35,6 +35,7 @@ describe('in-chat agent post-processing runner', () => {
     let generateQuietPrompt;
     let runSidecarRetrieval;
     let streamingProcessor;
+    let updateMessageTokenAccounting;
     let globalSettings;
     let documentListeners;
     let windowListeners;
@@ -78,6 +79,21 @@ describe('in-chat agent post-processing runner', () => {
             isStopped: false,
             abortController: { signal: { aborted: false } },
         };
+        updateMessageTokenAccounting = jest.fn(async (message) => {
+            const tokenCount = String(message?.mes ?? '').split(/\s+/).filter(Boolean).length;
+            message.extra ??= {};
+            message.extra.token_count = tokenCount;
+
+            if (typeof message?.swipe_id === 'number' && Array.isArray(message?.swipe_info)) {
+                const swipeInfo = message.swipe_info[message.swipe_id];
+                if (swipeInfo && typeof swipeInfo === 'object') {
+                    swipeInfo.extra ??= {};
+                    swipeInfo.extra.token_count = tokenCount;
+                }
+            }
+
+            return { outputTokens: tokenCount, reasoningTokens: 0 };
+        });
         globalSettings = {
             enabled: true,
             promptTransformShowNotifications: false,
@@ -165,6 +181,7 @@ describe('in-chat agent post-processing runner', () => {
                 targetMessage.swipe_info[targetMessage.swipe_id].extra = structuredClone(targetMessage.extra);
                 return true;
             }),
+            updateMessageTokenAccounting,
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions.js', () => ({
@@ -1124,12 +1141,24 @@ describe('in-chat agent post-processing runner', () => {
             mes: 'Needs rewrite',
             is_user: false,
             is_system: false,
-            extra: {},
+            swipe_id: 0,
+            swipes: ['Needs rewrite'],
+            swipe_info: [{
+                extra: {
+                    token_count: 999,
+                },
+            }],
+            extra: {
+                token_count: 999,
+            },
         });
 
         await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
 
         expect(chat[0].mes).toBe('Swipe-safe rewrite');
+        expect(updateMessageTokenAccounting).toHaveBeenCalledWith(chat[0]);
+        expect(chat[0].extra.token_count).toBe(2);
+        expect(chat[0].swipe_info[0].extra.token_count).toBe(2);
         expect(chat[0].extra.inChatAgentTransformHistory).toHaveLength(1);
         expect(chat[0].swipe_info[0].extra.inChatAgentTransformHistory).toEqual(chat[0].extra.inChatAgentTransformHistory);
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);

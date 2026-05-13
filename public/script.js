@@ -292,7 +292,7 @@ import { event_types, eventSource } from './scripts/events.js';
 import { initAccessibility } from './scripts/a11y.js';
 import { initQuickContextSizeEnhancer } from './scripts/quick-context-size-enhancer.js';
 import { applyStreamFadeIn } from './scripts/util/stream-fadein.js';
-import { getPositiveTokenCount, updateReasoningTokenAccounting } from './scripts/reasoning-token-accounting.js';
+import { formatTokenCounterText, getPositiveTokenCount, updateReasoningTokenAccounting } from './scripts/reasoning-token-accounting.js';
 import { initDomHandlers } from './scripts/dom-handlers.js';
 import { SimpleMutex } from './scripts/util/SimpleMutex.js';
 import { AudioPlayer } from './scripts/audio-player.js';
@@ -3399,6 +3399,8 @@ function updateMessageMetaBadges(messageElement, message) {
     if ($tokenCounter.length === 0) {
         return;
     }
+
+    $tokenCounter.text(formatTokenCounterText(message?.extra?.token_count));
 
     const messageId = Number($messageElement.attr('mesid'));
     const liveStreamingProcessor = Number.isInteger(messageId) && streamingProcessor && Number(streamingProcessor.messageId) === messageId
@@ -10113,6 +10115,10 @@ async function messageEditDone(div) {
 
     await eventSource.emit(event_types.MESSAGE_EDITED, this_edit_mes_id);
     text = chat[this_edit_mes_id]?.mes ?? text;
+    if (chat[this_edit_mes_id] && !chat[this_edit_mes_id].is_system) {
+        await updateMessageTokenAccounting(chat[this_edit_mes_id]);
+    }
+    updateMessageMetaBadges(div.closest('.mes'), chat[this_edit_mes_id]);
     mesBlock.find('.mes_text').empty();
     mesBlock.find('.mes_edit_buttons').css('display', 'none');
     mesBlock.find('.mes_buttons').css('display', '');

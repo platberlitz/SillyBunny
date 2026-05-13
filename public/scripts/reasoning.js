@@ -1456,6 +1456,11 @@ function setReasoningEventHandlers() {
             return;
         }
         updateReasoningFromValue(message, newReasoning);
+        await updateMessageTokenAccounting(message, {
+            reasoning: message.extra.reasoning,
+            reasoningTokens: 0,
+            countReasoning: power_user.message_token_count_enabled,
+        });
         await saveChatConditional();
         updateMessageBlock(messageId, message);
 
@@ -1518,6 +1523,11 @@ function setReasoningEventHandlers() {
         message.extra.reasoning = '';
         delete message.extra.reasoning_type;
         delete message.extra.reasoning_duration;
+        await updateMessageTokenAccounting(message, {
+            reasoning: '',
+            reasoningTokens: 0,
+            countReasoning: false,
+        });
         await saveChatConditional();
         updateMessageBlock(messageId, message);
         const textarea = messageBlock.find('.reasoning_edit_textarea');
