@@ -33,6 +33,7 @@ import {
     settingsReady,
 } from '../script.js';
 import { isMobile, initMovingUI, favsToHotswap } from './RossAscends-mods.js';
+import { normalizeContextRetentionDepth } from './ooc-blocks.js';
 import {
     groups,
     resetSelectedGroup,
@@ -261,8 +262,8 @@ export const power_user = {
     },
     markdown_escape_strings: '',
     chat_truncation: 100,
-    ooc_context_depth: 0,
-    html_context_depth: 0,
+    ooc_context_depth: -1,
+    html_context_depth: -1,
     streaming_fps: 30,
     smooth_streaming: false,
     smooth_streaming_no_think: false,
@@ -3586,16 +3587,14 @@ jQuery(async () => {
         saveSettingsDebounced();
     });
 
-    const normalizeContextDepthInput = input => Math.max(0, Math.floor(Number(input) || 0));
-
     $('#ooc_context_depth').on('input', function () {
-        power_user.ooc_context_depth = normalizeContextDepthInput($(this).val());
+        power_user.ooc_context_depth = normalizeContextRetentionDepth($(this).val());
         $(this).val(power_user.ooc_context_depth);
         saveSettingsDebounced();
     });
 
     $('#html_context_depth').on('input', function () {
-        power_user.html_context_depth = normalizeContextDepthInput($(this).val());
+        power_user.html_context_depth = normalizeContextRetentionDepth($(this).val());
         $(this).val(power_user.html_context_depth);
         saveSettingsDebounced();
     });

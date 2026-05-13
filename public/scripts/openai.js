@@ -81,7 +81,7 @@ import { ToolManager } from './tool-calling.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { COMETAPI_IGNORE_PATTERNS, IGNORE_SYMBOL, MEDIA_DISPLAY, MEDIA_TYPE } from './constants.js';
 import { syncOpenRouterProvidersForModel, updateOpenRouterProvidersWarning } from './textgen-models.js';
-import { hasTextOrArrayPayload, stripHtmlTagsFromContext, stripOocBlocksFromContext } from './ooc-blocks.js';
+import { hasTextOrArrayPayload, shouldRetainContextAtDepth, stripHtmlTagsFromContext, stripOocBlocksFromContext } from './ooc-blocks.js';
 import { checkPostInterceptChatBudget } from './openai-prompt-budget.js';
 
 export {
@@ -709,11 +709,9 @@ function setOpenAIMessages(chat) {
 
         // remove caret return (waste of tokens)
         const contextDepth = Math.max(0, chat.length - j - 1);
-        const oocContextDepth = Math.max(0, Number(power_user.ooc_context_depth) || 0);
-        const htmlContextDepth = Math.max(0, Number(power_user.html_context_depth) || 0);
         content = stripHtmlTagsFromContext(
-            stripOocBlocksFromContext(content.replace(/\r/gm, ''), contextDepth < oocContextDepth),
-            contextDepth < htmlContextDepth,
+            stripOocBlocksFromContext(content.replace(/\r/gm, ''), shouldRetainContextAtDepth(contextDepth, power_user.ooc_context_depth)),
+            shouldRetainContextAtDepth(contextDepth, power_user.html_context_depth),
         );
 
         const name = chat[j].name;
