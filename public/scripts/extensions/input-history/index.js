@@ -29,6 +29,37 @@ let arrowsWrap;
 let btnHistory;
 /**@type {HTMLElement} */
 let historyMenu;
+/**@type {MutationObserver} */
+let buttonPlacementObserver;
+
+const placeButtonWrap = () => {
+    if (!buttonWrap) return;
+
+    const guidedContainer = document.querySelector('#gg-action-button-container');
+    if (guidedContainer) {
+        if (buttonWrap.parentElement !== guidedContainer || guidedContainer.firstElementChild !== buttonWrap) {
+            guidedContainer.prepend(buttonWrap);
+        }
+        buttonWrap.classList.remove('stih--standalone');
+        return;
+    }
+
+    const sendForm = document.querySelector('#send_form');
+    const nonQrFormItems = document.querySelector('#nonQRFormItems');
+    if (!sendForm || !nonQrFormItems) return;
+
+    if (buttonWrap.parentElement !== sendForm || buttonWrap.nextElementSibling !== nonQrFormItems) {
+        sendForm.insertBefore(buttonWrap, nonQrFormItems);
+    }
+    buttonWrap.classList.add('stih--standalone');
+};
+
+const startButtonPlacementObserver = () => {
+    if (buttonPlacementObserver) return;
+
+    buttonPlacementObserver = new MutationObserver(() => placeButtonWrap());
+    buttonPlacementObserver.observe(document.querySelector('#send_form') ?? document.body, { childList: true, subtree: true });
+};
 
 
 SlashCommandParser.addCommandObject(SlashCommand.fromProps({ name: 'inputhistory-config',
@@ -147,7 +178,7 @@ const showHistoryMenu = async () => {
             renderItem(c);
         }
         await waitForFrame();
-        document.querySelector('#nonQRFormItems').append(historyMenu);
+        buttonWrap.append(historyMenu);
         await waitForFrame();
         historyMenu.classList.add('stih--active');
     }
@@ -165,6 +196,7 @@ const updateButtons = () => {
                 const prev = document.createElement('div'); {
                     prev.classList.add('stih--button');
                     prev.classList.add('menu_button');
+                    prev.classList.add('menu_button_icon');
                     prev.classList.add('fa-solid');
                     prev.classList.add('fa-chevron-up');
                     prev.title = 'Previous input';
@@ -174,6 +206,7 @@ const updateButtons = () => {
                 const next = document.createElement('div'); {
                     next.classList.add('stih--button');
                     next.classList.add('menu_button');
+                    next.classList.add('menu_button_icon');
                     next.classList.add('fa-solid');
                     next.classList.add('fa-chevron-down');
                     next.title = 'Next input';
@@ -186,6 +219,7 @@ const updateButtons = () => {
                 btnHistory = his;
                 his.classList.add('stih--button');
                 his.classList.add('menu_button');
+                his.classList.add('menu_button_icon');
                 his.classList.add('stih--menuTrigger');
                 his.classList.add('fa-solid');
                 his.classList.add('fa-clock-rotate-left');
@@ -193,9 +227,10 @@ const updateButtons = () => {
                 his.addEventListener('click', () => showInputHistory());
                 wrap.append(his);
             }
-            ta.insertAdjacentElement('afterend', wrap);
+            startButtonPlacementObserver();
         }
     }
+    placeButtonWrap();
     buttonWrap.classList[settings.showButtons ? 'remove' : 'add']('stih--hidden');
     arrowsWrap.classList[settings.showArrowButtons ? 'remove' : 'add']('stih--hidden');
     btnHistory.classList[settings.showHistoryButton ? 'remove' : 'add']('stih--hidden');
