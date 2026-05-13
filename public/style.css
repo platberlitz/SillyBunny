@@ -1559,7 +1559,7 @@ body.hideAllSwipeButtons :is(.swipe_left, .swipe_right),
     height: var(--avatar-base-height);
     object-fit: cover;
     object-position: center center;
-    border-radius: var(--avatar-base-border-radius-round);
+    border-radius: inherit;
     border: 1px solid var(--SmartThemeBorderColor);
     /*--black30a*/
     box-shadow: 0 0 5px var(--black50a);
