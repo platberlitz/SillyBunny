@@ -4,11 +4,14 @@ import { extensionName, getPresetsForApiType, getProfileApiType, getProfileList 
 import { guidedImpersonate } from './scripts/guidedImpersonate.js';
 import { guidedResponse } from './scripts/guidedResponse.js';
 import { guidedSwipe } from './scripts/guidedSwipe.js';
+import {
+    markOldExtensionWarningDismissed,
+    shouldWarnOldExtensionDeprecated,
+} from './scripts/legacyForkWarning.js';
 import { simpleSend } from './scripts/simpleSend.js';
 
 const oldExtensionKey = 'GuidedGenerations-Extension';
 const oldExtensionName = 'third-party/GuidedGenerations-Extension';
-const oldExtensionWarningStorageKey = 'guided_generations_legacy_fork_warning_v1';
 
 const defaultSettings = {
     showGuidedResponse: true,
@@ -54,24 +57,22 @@ function loadSettings() {
     extension_settings[extensionName] = settings;
 }
 
-function isOldExtensionInstalled() {
-    return extensionNames.some(name => String(name).toLowerCase() === oldExtensionName.toLowerCase());
-}
-
 function maybeWarnOldExtensionDeprecated() {
-    if (!extension_settings[oldExtensionKey] && !isOldExtensionInstalled()) {
+    if (!shouldWarnOldExtensionDeprecated(extensionNames, oldExtensionName)) {
         return;
     }
 
-    if (sessionStorage.getItem(oldExtensionWarningStorageKey) === 'true') {
-        return;
-    }
-
-    sessionStorage.setItem(oldExtensionWarningStorageKey, 'true');
     toastr.warning(
         'The old Guided Generations fork is deprecated and can conflict with the native Guided Generations port. Uninstall or disable the third-party fork.',
         'Guided Generations fork deprecated',
-        { timeOut: 12000, extendedTimeOut: 20000, preventDuplicates: true },
+        {
+            timeOut: 0,
+            extendedTimeOut: 0,
+            tapToDismiss: false,
+            closeButton: true,
+            preventDuplicates: true,
+            onCloseClick: () => markOldExtensionWarningDismissed(),
+        },
     );
 }
 
@@ -353,4 +354,9 @@ export async function init() {
     startQrIntegration();
 }
 
-export { defaultSettings, loadSettings, updateExtensionButtons, updateSettingsUI };
+export {
+    defaultSettings,
+    loadSettings,
+    updateExtensionButtons,
+    updateSettingsUI,
+};
