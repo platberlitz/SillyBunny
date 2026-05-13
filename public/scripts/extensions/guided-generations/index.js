@@ -1,5 +1,5 @@
 import { saveSettingsDebounced } from '../../../script.js';
-import { extension_settings, renderExtensionTemplateAsync } from '../../extensions.js';
+import { extensionNames, extension_settings, renderExtensionTemplateAsync } from '../../extensions.js';
 import { extensionName, getPresetsForApiType, getProfileApiType, getProfileList } from './scripts/shared.js';
 import { guidedImpersonate } from './scripts/guidedImpersonate.js';
 import { guidedResponse } from './scripts/guidedResponse.js';
@@ -7,6 +7,8 @@ import { guidedSwipe } from './scripts/guidedSwipe.js';
 import { simpleSend } from './scripts/simpleSend.js';
 
 const oldExtensionKey = 'GuidedGenerations-Extension';
+const oldExtensionName = 'third-party/GuidedGenerations-Extension';
+const oldExtensionWarningStorageKey = 'guided_generations_legacy_fork_warning_v1';
 
 const defaultSettings = {
     showGuidedResponse: true,
@@ -50,6 +52,27 @@ function loadSettings() {
 
     delete settings.showRecoverInputButton;
     extension_settings[extensionName] = settings;
+}
+
+function isOldExtensionInstalled() {
+    return extensionNames.some(name => String(name).toLowerCase() === oldExtensionName.toLowerCase());
+}
+
+function maybeWarnOldExtensionDeprecated() {
+    if (!extension_settings[oldExtensionKey] && !isOldExtensionInstalled()) {
+        return;
+    }
+
+    if (sessionStorage.getItem(oldExtensionWarningStorageKey) === 'true') {
+        return;
+    }
+
+    sessionStorage.setItem(oldExtensionWarningStorageKey, 'true');
+    toastr.warning(
+        'The old Guided Generations fork is deprecated and can conflict with the native Guided Generations port. Uninstall or disable the third-party fork.',
+        'Guided Generations fork deprecated',
+        { timeOut: 12000, extendedTimeOut: 20000, preventDuplicates: true },
+    );
 }
 
 function setElementValue(element, value) {
@@ -324,6 +347,7 @@ function startQrIntegration() {
 
 export async function init() {
     loadSettings();
+    maybeWarnOldExtensionDeprecated();
     await loadSettingsPanel();
     updateExtensionButtons();
     startQrIntegration();

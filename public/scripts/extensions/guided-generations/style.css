@@ -63,6 +63,11 @@
 
 @media screen and (max-width: 600px) {
     .gg-action-buttons-container {
+        --gg-mobile-action-size: clamp(28px, calc(var(--bottomFormBlockSize) * 0.5), 34px);
+        --gg-mobile-action-icon-size: clamp(13px, calc(var(--bottomFormIconSize, 20px) * 0.75), 16px);
+    }
+
+    .gg-action-buttons-container {
         padding: 0 6px 5px;
         flex-wrap: wrap;
     }
@@ -76,6 +81,20 @@
         width: 100%;
         justify-content: flex-end;
         order: 1;
+        gap: 4px;
+    }
+
+    .gg-action-button {
+        width: var(--gg-mobile-action-size) !important;
+        min-width: var(--gg-mobile-action-size) !important;
+        max-width: var(--gg-mobile-action-size) !important;
+        height: var(--gg-mobile-action-size) !important;
+        min-height: var(--gg-mobile-action-size) !important;
+        max-height: var(--gg-mobile-action-size) !important;
+        flex: 0 0 var(--gg-mobile-action-size) !important;
+        border-radius: 8px !important;
+        font-size: var(--gg-mobile-action-icon-size) !important;
+        padding: 0 !important;
     }
 
     .gg-profile-row {
