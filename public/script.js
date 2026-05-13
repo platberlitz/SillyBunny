@@ -118,6 +118,7 @@ import {
 import {
     extractOocBlocksForDisplay,
     hasTextOrArrayPayload,
+    shouldRetainContextAtDepth,
     restoreOocBlocksForDisplay,
     stripHtmlTagsFromContext,
     stripOocBlocksFromContext,
@@ -5486,11 +5487,9 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         }
 
         const contextDepth = Math.max(0, coreChat.length - index - 1);
-        const oocContextDepth = Math.max(0, Number(power_user.ooc_context_depth) || 0);
-        const htmlContextDepth = Math.max(0, Number(power_user.html_context_depth) || 0);
         const contextMessage = stripHtmlTagsFromContext(
-            stripOocBlocksFromContext(regexedMessage, contextDepth < oocContextDepth),
-            contextDepth < htmlContextDepth,
+            stripOocBlocksFromContext(regexedMessage, shouldRetainContextAtDepth(contextDepth, power_user.ooc_context_depth)),
+            shouldRetainContextAtDepth(contextDepth, power_user.html_context_depth),
         );
 
         return {

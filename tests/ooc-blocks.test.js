@@ -3,14 +3,16 @@ import { describe, test, expect } from '@jest/globals';
 import {
     extractOocBlocksForDisplay,
     hasTextOrArrayPayload,
+    normalizeContextRetentionDepth,
     renderOocBlock,
     restoreOocBlocksForDisplay,
+    shouldRetainContextAtDepth,
     stripHtmlTagsFromContext,
     stripOocBlocksFromContext,
 } from '../public/scripts/ooc-blocks.js';
 
 describe('OOC block handling', () => {
-    test('removes balanced OOC blocks from prompt context', () => {
+    test('strips OOC when prompt-context retention is disabled', () => {
         expect(stripOocBlocksFromContext('Visible ((do not prompt this)) text')).toBe('Visible text');
     });
 
@@ -62,5 +64,20 @@ describe('OOC block handling', () => {
         expect(hasTextOrArrayPayload('', [[], [{ id: 'tool-call' }]])).toBe(true);
         expect(hasTextOrArrayPayload(stripOocBlocksFromContext('((note only))'), [])).toBe(false);
         expect(hasTextOrArrayPayload('', [[], undefined])).toBe(false);
+    });
+
+    test('normalizes context retention depth with -1 as preserve-all default', () => {
+        expect(normalizeContextRetentionDepth(undefined)).toBe(-1);
+        expect(normalizeContextRetentionDepth('')).toBe(-1);
+        expect(normalizeContextRetentionDepth(-5)).toBe(-1);
+        expect(normalizeContextRetentionDepth(2.9)).toBe(2);
+    });
+
+    test('retains context content according to -1, 0, and last-N depths', () => {
+        expect(shouldRetainContextAtDepth(50, -1)).toBe(true);
+        expect(shouldRetainContextAtDepth(0, 0)).toBe(false);
+        expect(shouldRetainContextAtDepth(0, 2)).toBe(true);
+        expect(shouldRetainContextAtDepth(1, 2)).toBe(true);
+        expect(shouldRetainContextAtDepth(2, 2)).toBe(false);
     });
 });

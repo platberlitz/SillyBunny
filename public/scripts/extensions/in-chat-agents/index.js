@@ -486,7 +486,7 @@ async function confirmDuplicateAgentAddition(agent) {
         POPUP_TYPE.CONFIRM,
         'Duplicate agent',
         {
-            okButton: 'Add Anyway',
+            okButton: 'Add Agent',
             cancelButton: 'Cancel',
         },
     ).show();
