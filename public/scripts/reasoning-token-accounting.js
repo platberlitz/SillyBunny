@@ -3,6 +3,23 @@ export function getPositiveTokenCount(value) {
     return Number.isFinite(tokenCount) && tokenCount > 0 ? tokenCount : 0;
 }
 
+function getActiveSwipeExtra(message) {
+    if (typeof message?.swipe_id !== 'number' || !Array.isArray(message?.swipe_info)) {
+        return null;
+    }
+
+    const swipeInfo = message.swipe_info[message.swipe_id];
+    if (!swipeInfo || typeof swipeInfo !== 'object') {
+        return null;
+    }
+
+    if (!swipeInfo.extra || typeof swipeInfo.extra !== 'object') {
+        swipeInfo.extra = {};
+    }
+
+    return swipeInfo.extra;
+}
+
 /**
  * Stores output and reasoning token counts separately for message metadata.
  * @param {object} message Message to update.
@@ -49,5 +66,12 @@ export async function updateReasoningTokenAccounting(
     }
 
     message.extra.reasoning_tokens = countedReasoningTokens;
+
+    const activeSwipeExtra = getActiveSwipeExtra(message);
+    if (activeSwipeExtra) {
+        activeSwipeExtra.token_count = outputTokens;
+        activeSwipeExtra.reasoning_tokens = countedReasoningTokens;
+    }
+
     return { outputTokens, reasoningTokens: countedReasoningTokens };
 }

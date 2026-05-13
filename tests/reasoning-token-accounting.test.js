@@ -68,4 +68,45 @@ describe('reasoning token accounting', () => {
         expect(message.extra.reasoning_tokens).toBe(0);
         expect(countTokens).not.toHaveBeenCalled();
     });
+
+    test('refreshes active swipe token metadata with edited message text', async () => {
+        const message = {
+            mes: 'Polished text has five words',
+            swipe_id: 1,
+            swipes: ['Original stale text', 'Polished text has five words'],
+            swipe_info: [
+                {
+                    extra: {
+                        token_count: 3,
+                        reasoning_tokens: 2,
+                    },
+                },
+                {
+                    extra: {
+                        token_count: 4,
+                        reasoning_tokens: 7,
+                    },
+                },
+            ],
+            extra: {
+                token_count: 4,
+                reasoning_tokens: 7,
+            },
+        };
+        const countTokens = jest.fn(async text => text.split(/\s+/).filter(Boolean).length);
+
+        const result = await updateReasoningTokenAccounting(message, {
+            countTokens,
+            reasoningTokens: 0,
+            countReasoning: false,
+        });
+
+        expect(result).toEqual({ outputTokens: 5, reasoningTokens: 0 });
+        expect(message.extra.token_count).toBe(5);
+        expect(message.extra.reasoning_tokens).toBe(0);
+        expect(message.swipe_info[1].extra.token_count).toBe(5);
+        expect(message.swipe_info[1].extra.reasoning_tokens).toBe(0);
+        expect(message.swipe_info[0].extra.token_count).toBe(3);
+        expect(message.swipe_info[0].extra.reasoning_tokens).toBe(2);
+    });
 });

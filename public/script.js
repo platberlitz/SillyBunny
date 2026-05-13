@@ -10113,6 +10113,9 @@ async function messageEditDone(div) {
 
     await eventSource.emit(event_types.MESSAGE_EDITED, this_edit_mes_id);
     text = chat[this_edit_mes_id]?.mes ?? text;
+    if (chat[this_edit_mes_id] && !chat[this_edit_mes_id].is_system) {
+        await updateMessageTokenAccounting(chat[this_edit_mes_id]);
+    }
     mesBlock.find('.mes_text').empty();
     mesBlock.find('.mes_edit_buttons').css('display', 'none');
     mesBlock.find('.mes_buttons').css('display', '');
