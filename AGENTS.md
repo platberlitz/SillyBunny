@@ -23,7 +23,7 @@
 - `public/lib.js` is served through `src/middleware/webpack-serve.js` / `webpack.config.js`; Bun runtime intentionally disables Webpack minification for that vendor bundle.
 
 ## Config And Data Gotchas
-- Default config is `default/config.yaml`; startup creates or mutates `config.yaml` by adding missing keys and migrating old keys.
+- Checked-in default config is `default/config.yaml`; startup creates or mutates the generated root runtime config by adding missing keys and migrating old keys.
 - Config env vars use the upstream `SILLYTAVERN_` prefix via `keyToEnv()` (for example `SILLYTAVERN_DATAROOT`), despite this fork being named SillyBunny.
 - Do not commit tracked files under `data/default-user/**`; PR CI has a dedicated blocker for that path.
 - Default local port is `4444`; Docker uses `docker compose -f docker/docker-compose.yml up --build` and mounts config/data/plugins/extensions under `docker/`.
