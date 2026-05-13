@@ -6,6 +6,9 @@ Date: 2026-05-08
 
 This update stabilizes preset and connection profile switching, preserves OpenAI logit bias presets, saves character alternate greetings reliably, adds bottom chat navigation and search polish from recent staging PRs, trims the mobile Persona bar with collapsible actions, makes Bun launcher updates recover from stale lockfiles, and updates SillyBunny release metadata to 1.5.4.
 
+### Character Navigation
+- Centered the desktop Characters drawer section tabs while preserving the mobile horizontal-scroll layout and touch behavior.
+
 ### Presets And Connection Profiles
 - Connection profile changes now serialize in order, abort superseded applications cleanly, and save only after the latest selected profile finishes applying.
 - OpenAI preset changes now expose an awaitable completion path and ignore stale async preset applications, keeping linked provider/model settings from being overwritten by older selections.
@@ -54,6 +57,7 @@ This update stabilizes preset and connection profile switching, preserves OpenAI
 - PR #43 `docs: add server hygiene lesson` added the server hygiene lesson to the docs set.
 
 ### Local Commits
+- `fix(shell): center character nav tabs`
 - `fix(settings): stabilize presets and chat loading`
 - `fix(ui): tighten mobile chat bar and update flow`
 - `fix(mobile): align bottom chat controls`

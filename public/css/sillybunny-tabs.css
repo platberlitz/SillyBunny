@@ -7360,9 +7360,13 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 }
 
 @media screen and (min-width: 1001px) {
+    #right-nav-panel.openDrawer .sb-character-shell-nav-wrapper {
+        width: 100%;
+    }
+
     #right-nav-panel.openDrawer .sb-character-shell-nav {
         justify-content: center !important;
-        padding-inline: var(--sb-shell-panel-padding-inline) !important;
+        padding-inline: max(var(--sb-shell-panel-padding-inline), 60px) !important;
     }
 }
 
