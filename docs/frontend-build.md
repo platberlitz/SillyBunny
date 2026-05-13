@@ -16,7 +16,7 @@ as `script-0123456789ab.js`.
 
 ## Enable
 
-In `config.yaml`:
+In your generated root runtime config:
 
 ```yaml
 performance:
