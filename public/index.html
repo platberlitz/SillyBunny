@@ -5758,6 +5758,18 @@
                                     <input id="encode_tags" type="checkbox" />
                                     <small data-i18n="Show tags in responses">Show &lt;tags&gt; in responses</small>
                                 </label>
+                                <div class="flex-container alignitemscenter gap10">
+                                    <label for="ooc_context_depth" class="flex1" title="Keep OOC ((...)) blocks in the last N context messages. 0 strips all OOC blocks from prompt context." data-i18n="[title]Keep OOC blocks in the last N context messages. 0 strips all OOC blocks from prompt context.">
+                                        <small data-i18n="OOC context depth">OOC context depth</small>
+                                    </label>
+                                    <input id="ooc_context_depth" class="text_pole widthUnset" type="number" min="0" step="1" value="0" />
+                                </div>
+                                <div class="flex-container alignitemscenter gap10">
+                                    <label for="html_context_depth" class="flex1" title="Keep raw HTML tags in the last N context messages. 0 strips HTML tags from prompt context." data-i18n="[title]Keep raw HTML tags in the last N context messages. 0 strips HTML tags from prompt context.">
+                                        <small data-i18n="HTML tag context depth">HTML tag context depth</small>
+                                    </label>
+                                    <input id="html_context_depth" class="text_pole widthUnset" type="number" min="0" step="1" value="0" />
+                                </div>
                                 <label class="checkbox_label" for="experimental_macro_engine" title="Experimental new Macro Engine.&NewLine;&NewLine;Allows nested macros to be resolved correctly and has a dedicated, logical replacement order.&NewLine;The new engine is designed to cleanly replace the old regex-based macro system.">
                                     <input id="experimental_macro_engine" type="checkbox" />
                                     <small data-i18n="Experimental Macro Engine">Experimental Macro Engine</small>

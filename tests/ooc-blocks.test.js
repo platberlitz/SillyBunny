@@ -5,6 +5,7 @@ import {
     hasTextOrArrayPayload,
     renderOocBlock,
     restoreOocBlocksForDisplay,
+    stripHtmlTagsFromContext,
     stripOocBlocksFromContext,
 } from '../public/scripts/ooc-blocks.js';
 
@@ -19,6 +20,15 @@ describe('OOC block handling', () => {
 
     test('keeps unclosed OOC text intact instead of swallowing the rest of the prompt', () => {
         expect(stripOocBlocksFromContext('Visible ((unfinished note')).toBe('Visible ((unfinished note');
+    });
+
+    test('can preserve OOC blocks for recent context messages', () => {
+        expect(stripOocBlocksFromContext('Visible ((keep this)) text', true)).toBe('Visible ((keep this)) text');
+    });
+
+    test('strips or preserves HTML tags for prompt context', () => {
+        expect(stripHtmlTagsFromContext('Visible <strong>tagged</strong> text')).toBe('Visible tagged text');
+        expect(stripHtmlTagsFromContext('Visible <strong>tagged</strong> text', true)).toBe('Visible <strong>tagged</strong> text');
     });
 
     test('extracts and restores OOC display blocks in source order', () => {
