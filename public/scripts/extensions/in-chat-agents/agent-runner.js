@@ -1435,13 +1435,36 @@ function describePromptTransformTarget(profileId = '', runner = '') {
     return 'the main model';
 }
 
+function getPromptTransformProfileLabel(profileId = '') {
+    return profileId ? getConnectionProfileDisplayName(profileId) : 'Main model';
+}
+
+function getPromptTransformModelLabel(agent, profileId = '') {
+    const modelOverride = String(agent?.modelOverride ?? '').trim();
+    if (modelOverride) {
+        return modelOverride;
+    }
+
+    return getPromptTransformProfileLabel(profileId);
+}
+
+function getPromptTransformRunMetadata(agent, profileId = '') {
+    return {
+        order: Number(agent?.injection?.order ?? 0),
+        profileLabel: getPromptTransformProfileLabel(profileId),
+        modelLabel: getPromptTransformModelLabel(agent, profileId),
+    };
+}
+
 function showPromptTransformRunningToast(agent, mode, profileId = '') {
     const agentName = agent?.name || 'In-Chat Agent';
     const modeLabel = describePromptTransformMode(mode);
     const targetLabel = describePromptTransformTarget(profileId, profileId ? 'profile' : 'main');
+    const metadata = getPromptTransformRunMetadata(agent, profileId);
     const cancelButtonClass = 'ica--toast-cancel-agent';
     const messageHtml = `
         <div>${escapeToastHtml(`Running ${modeLabel} via ${targetLabel}...`)}</div>
+        <div>${escapeToastHtml(`Order ${metadata.order} | Model: ${metadata.modelLabel}`)}</div>
         <button type="button" class="menu_button menu_button_icon caution ${cancelButtonClass}">
             <i class="fa-solid fa-stop"></i>
             <span>Cancel Agent</span>
@@ -1522,6 +1545,27 @@ function syncPromptTransformMessageState(message, messageIndex) {
     syncAssistantMessageTextToSwipe(message);
 }
 
+async function syncPromptTransformMessageStateAsync(message, messageIndex) {
+    syncPromptTransformMessageState(message, messageIndex);
+
+    if (!message || message.is_user || message.is_system) {
+        return;
+    }
+
+    const context = getContext();
+    const tokenCount = typeof context?.getTokenCountAsync === 'function'
+        ? await context.getTokenCountAsync(message.mes, 0)
+        : 0;
+
+    message.extra ??= {};
+    message.extra.token_count = tokenCount;
+
+    const swipeInfo = getActiveSwipeInfo(message, { create: true });
+    if (swipeInfo?.extra) {
+        swipeInfo.extra.token_count = tokenCount;
+    }
+}
+
 function syncAssistantMessageStateToSwipe(message, messageIndex) {
     if (!message || message.is_user || message.is_system) {
         return;
@@ -1600,6 +1644,9 @@ function updatePromptTransformHistory(message, run) {
         agentId: run.agentId,
         agentName: run.agentName,
         mode: run.mode,
+        order: run.order,
+        profileLabel: run.profileLabel,
+        modelLabel: run.modelLabel,
         beforeText: normalizeContentText(run.beforeText),
         afterText: normalizeContentText(run.nextMessageText),
         timestamp: run.timestamp,
@@ -2104,6 +2151,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
     const normalizedGenerationType = normalizeGenerationType(generationType);
     const promptTransformMode = getPromptTransformMode(agent);
     const profileId = resolveAgentConnectionProfile(agent);
+    const runMetadata = getPromptTransformRunMetadata(agent, profileId);
     const showNotifications = shouldShowPromptTransformNotifications(agent);
 
     if (!currentMessageText.trim()) {
@@ -2114,6 +2162,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
             status: 'skipped-empty-message',
             mode: promptTransformMode,
             profileId,
+            ...runMetadata,
             runner: 'none',
             timestamp: new Date().toISOString(),
             outputText: '',
@@ -2138,6 +2187,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
             status: 'skipped-empty-prompt',
             mode: promptTransformMode,
             profileId,
+            ...runMetadata,
             runner: 'none',
             timestamp: new Date().toISOString(),
             outputText: '',
@@ -2174,6 +2224,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
                 status: 'empty-response',
                 mode: promptTransformMode,
                 profileId: response.profileId,
+                ...getPromptTransformRunMetadata(agent, response.profileId),
                 runner: response.runner,
                 timestamp: new Date().toISOString(),
                 outputText: '',
@@ -2199,6 +2250,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
                 status: 'cancelled',
                 mode: promptTransformMode,
                 profileId: response.profileId,
+                ...getPromptTransformRunMetadata(agent, response.profileId),
                 runner: response.runner,
                 timestamp: new Date().toISOString(),
                 outputText: '',
@@ -2210,7 +2262,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
         const changed = nextMessageText !== currentMessageText;
         if (changed && applyToMessage) {
             message.mes = nextMessageText;
-            syncPromptTransformMessageState(message, messageIndex);
+            await syncPromptTransformMessageStateAsync(message, messageIndex);
         }
 
         console.info(`[InChatAgents] ${describePromptTransformMode(promptTransformMode)} agent "${agent.name}" ran via ${describePromptTransformTarget(response.profileId, response.runner)}${changed ? ' and changed the message.' : ' with no text change.'}`);
@@ -2222,6 +2274,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
             status: changed ? 'changed' : 'unchanged',
             mode: promptTransformMode,
             profileId: response.profileId,
+            ...getPromptTransformRunMetadata(agent, response.profileId),
             runner: response.runner,
             timestamp: new Date().toISOString(),
             outputText: promptOutputText,
@@ -2244,6 +2297,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
             mode: promptTransformMode,
             error: error instanceof Error ? error.message : String(error),
             profileId,
+            ...runMetadata,
             runner: 'error',
             timestamp: new Date().toISOString(),
             outputText: '',
@@ -2322,7 +2376,7 @@ async function runPromptTransformAppendBatch(agents, message, generationType, me
     const consolidated = consolidateAppendPromptTransformOutputs(currentMessageText, agents, results);
     if (consolidated.changed) {
         message.mes = consolidated.text;
-        syncPromptTransformMessageState(message, messageIndex);
+        await syncPromptTransformMessageStateAsync(message, messageIndex);
     }
 
     return {
@@ -2628,7 +2682,7 @@ async function processReceivedMessage(messageIndex, generationType, activationSn
     let currentPromptTransformText = unwrapAssistantResponseWrapper(message.mes);
     if (currentPromptTransformText !== normalizeContentText(message.mes)) {
         message.mes = currentPromptTransformText;
-        syncPromptTransformMessageState(message, messageIndex);
+        await syncPromptTransformMessageStateAsync(message, messageIndex);
         chatStateChanged = true;
         messageDisplayChanged = true;
     }
@@ -3370,7 +3424,7 @@ function onWorldInfoUpdatedToolSync() {
     syncToolAgentRegistrations();
 }
 
-export function undoPromptTransform(messageIndex) {
+export async function undoPromptTransform(messageIndex) {
     const message = chat[messageIndex];
     if (!message || message.is_user || message.is_system) {
         return false;
@@ -3384,13 +3438,13 @@ export function undoPromptTransform(messageIndex) {
 
     const lastEntry = history[history.length - 1];
     message.mes = lastEntry.beforeText;
-    syncPromptTransformMessageState(message, messageIndex);
+    await syncPromptTransformMessageStateAsync(message, messageIndex);
     saveChatDebounced();
     scheduleMessageRefresh(messageIndex, message);
     return true;
 }
 
-export function redoPromptTransform(messageIndex) {
+export async function redoPromptTransform(messageIndex) {
     const message = chat[messageIndex];
     if (!message || message.is_user || message.is_system) {
         return false;
@@ -3404,7 +3458,7 @@ export function redoPromptTransform(messageIndex) {
 
     const lastEntry = history[history.length - 1];
     message.mes = lastEntry.afterText;
-    syncPromptTransformMessageState(message, messageIndex);
+    await syncPromptTransformMessageStateAsync(message, messageIndex);
     saveChatDebounced();
     scheduleMessageRefresh(messageIndex, message);
     return true;
@@ -3492,7 +3546,7 @@ async function executeManualAgentRun(agentId, messageIndex, cancelRevision = age
 
     if (result.changed) {
         message.mes = result.nextMessageText;
-        syncPromptTransformMessageState(message, messageIndex);
+        await syncPromptTransformMessageStateAsync(message, messageIndex);
     }
 
     if (updatePromptTransformRuns(message, [result])) {
