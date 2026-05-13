@@ -468,6 +468,7 @@ export let characters = [];
  */
 export let this_chid;
 let saveCharactersPage = 0;
+let characterMenuEntityView = 'characters';
 export const default_avatar = 'img/ai4.png';
 const SILLYBUNNY_FRONTEND_ICON_STORAGE_KEY = 'sb-frontend-icon';
 const SILLYBUNNY_FRONTEND_ICON_DEFAULT = 'pixel';
@@ -1152,6 +1153,7 @@ function getCharacterBlock(item, id) {
     }
     template.find('.ch_fav_icon').css('display', 'none');
     template.toggleClass('is_fav', item.fav || item.fav == 'true');
+    template.toggleClass('is-active-entity', !selected_group && String(this_chid) === String(id));
     template.find('.ch_fav').val(item.fav);
 
     const isAssistant = item.avatar === getPermanentAssistantAvatar();
@@ -1214,7 +1216,20 @@ export async function printCharacters(fullRefresh = false) {
     applyTagsOnCharacterSelect();
     applyTagsOnGroupSelect();
 
-    const entities = getEntitiesList({ doFilter: true });
+    const entities = getEntitiesList({ doFilter: true })
+        .filter(entity => entityMatchesCharacterMenuView(entity))
+        .map(entity => {
+            if (entity.type !== 'tag') {
+                return entity;
+            }
+
+            const visibleEntities = entity.entities?.filter(item => entityMatchesCharacterMenuView(item)) ?? [];
+            return {
+                ...entity,
+                entities: visibleEntities,
+                hidden: Math.max(0, (entity.entities?.length ?? 0) - visibleEntities.length),
+            };
+        });
 
     const pageSize = Number(accountStorage.getItem(storageKey)) || per_page_default;
     const sizeChangerOptions = [10, 25, 50, 100, 250, 500, 1000];
@@ -1257,7 +1272,8 @@ export async function printCharacters(fullRefresh = false) {
                 }
             }
 
-            const hidden = (characters.length + groups.length) - displayCount;
+            const sourceCount = characterMenuEntityView === 'groups' ? groups.length : characters.length;
+            const hidden = sourceCount - displayCount;
             if (hidden > 0 && entitiesFilter.hasAnyFilter()) {
                 const hiddenBlock = await getHiddenBlock(hidden);
                 $(listId).append(hiddenBlock);
@@ -1280,6 +1296,18 @@ export async function printCharacters(fullRefresh = false) {
 
     favsToHotswap();
     updatePersonaConnectionsAvatarList();
+}
+
+function entityMatchesCharacterMenuView(entity) {
+    if (characterMenuEntityView === 'groups') {
+        return entity.type === 'group' || entity.type === 'tag';
+    }
+
+    return entity.type === 'character' || entity.type === 'tag';
+}
+
+export function setCharacterMenuEntityView(value) {
+    characterMenuEntityView = value === 'groups' ? 'groups' : 'characters';
 }
 
 /** Checks the state of the current search, and adds/removes the search sorting option accordingly */
@@ -11243,6 +11271,9 @@ export function select_rm_info(type, charId, previousCharId = null) {
         toastr.error(t`Invalid process (no 'type')`);
         return;
     }
+    const rightNavPanel = document.getElementById('right-nav-panel');
+    const keepSillyBunnyImportTab = rightNavPanel?.dataset.menuType === 'import' && ['char_import', 'char_import_no_toast'].includes(type);
+
     if (type !== 'group_create') {
         var displayName = String(charId).replace('.png', '');
     }
@@ -11264,11 +11295,19 @@ export function select_rm_info(type, charId, previousCharId = null) {
         toastr.success(t`Character Imported: ${displayName}`);
     }
 
-    selectRightMenuWithAnimation('rm_characters_block');
+    if (!keepSillyBunnyImportTab) {
+        selectRightMenuWithAnimation('rm_characters_block');
+    } else {
+        document.dispatchEvent(new CustomEvent('sillybunny:character-import-tab-preserve'));
+    }
 
     // Set a timeout so multiple flashes don't overlap
     clearTimeout(importFlashTimeout);
     importFlashTimeout = setTimeout(function () {
+        if (keepSillyBunnyImportTab) {
+            return;
+        }
+
         if (type === 'char_import' || type === 'char_create' || type === 'char_import_no_toast') {
             // Find the page at which the character is located
             const avatarFileName = charId;
@@ -11498,7 +11537,7 @@ function select_rm_create({ switchMenu = true } = {}) {
 }
 
 function select_rm_characters() {
-    const doFullRefresh = menu_type === 'characters';
+    const doFullRefresh = menu_type === characterMenuEntityView;
     setMenuType('characters');
     selectRightMenuWithAnimation('rm_characters_block');
     printCharacters(doFullRefresh);
@@ -13710,10 +13749,23 @@ jQuery(async function () {
         $('#character_search_bar').val('').trigger('input');
         scheduleUiSurfaceFocus(document.getElementById('right-nav-panel'));
     });
+    $('#rm_button_selected_ch h2').on('click', async function (event) {
+        if (menu_type !== 'character_edit' || selected_group) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        await renameCharacter();
+    });
 
     $(document).on('click', '.character_select', async function () {
+        const shouldCloseCharacterMenu = $(this).closest('#rm_print_characters_block').length > 0;
         const id = Number($(this).attr('data-chid'));
         await selectCharacterById(id);
+        if (shouldCloseCharacterMenu) {
+            window.SillyBunnyShell?.closeCharacters?.();
+        }
         scheduleUiSurfaceFocus(document.getElementById('right-nav-panel'));
     });
 

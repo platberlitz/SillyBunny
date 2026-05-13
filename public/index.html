@@ -19,7 +19,7 @@
     </style>
     <link rel="preload" as="style" href="style.css">
     <link rel="modulepreload" href="script.js">
-    <link rel="modulepreload" href="scripts/sillybunny-tabs.js?v=20260507a">
+    <link rel="modulepreload" href="scripts/sillybunny-tabs.js?v=20260513a">
     <link rel="preload" as="font" type="font/woff2" href="webfonts/Figtree/Figtree-Regular.woff2?v=20260422b" crossorigin>
     <link rel="manifest" crossorigin="use-credentials" href="manifest.json">
     <link href="webfonts/Figtree/stylesheet.css?v=20260422b" rel="stylesheet">
@@ -45,8 +45,8 @@
     <link rel="stylesheet" type="text/css" href="css/toggle-dependent.css">
     <link rel="stylesheet" type="text/css" href="css/select2-overrides.css">
     <link rel="stylesheet" type="text/css" href="css/mobile-styles.css?v=20260505a" media="(max-width: 768px)">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260507a">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260508a">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260513a">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260513a">
     <link rel="stylesheet" type="text/css" href="css/sillybunny-mobile-shell.css?v=20260506a" media="(max-width: 1000px)">
     <link rel="stylesheet" type="text/css" href="css/user.css">
     <!-- Scripts are loaded at the end of the body to improve page load speed -->
@@ -6339,8 +6339,41 @@
                 <div id="rightNavDrawerIcon" class="drawer-icon fa-solid fa-address-card fa-fw closedIcon" title="Character Management" data-i18n="[title]Character Management">
                 </div>
             </div>
-            <nav id="right-nav-panel" class="drawer-content closedDrawer fillRight" tabindex="-1">
+            <nav id="right-nav-panel" class="drawer-content closedDrawer fillRight sb-shell-root" tabindex="-1">
                 <div id="right-nav-panelheader" class="fa-solid fa-grip drag-grabber">
+                </div>
+                <div class="sb-shell-nav-wrapper sb-character-shell-nav-wrapper">
+                    <div class="sb-shell-nav sb-character-shell-nav" role="tablist" aria-label="Character sections" aria-orientation="horizontal">
+                        <button id="sb_character_tab_characters" class="sb-shell-tab is-active" type="button" role="tab" aria-selected="true" data-sb-character-tab="characters">
+                            <i class="fa-solid fa-address-book" aria-hidden="true"></i>
+                            <span class="sb-shell-tab-copy"><strong data-i18n="Characters">Characters</strong></span>
+                        </button>
+                        <button id="sb_character_tab_groups" class="sb-shell-tab" type="button" role="tab" aria-selected="false" data-sb-character-tab="groups">
+                            <i class="fa-solid fa-users" aria-hidden="true"></i>
+                            <span class="sb-shell-tab-copy"><strong data-i18n="Groups">Groups</strong></span>
+                        </button>
+                        <button id="sb_character_tab_editor" class="sb-shell-tab" type="button" role="tab" aria-selected="false" data-sb-character-tab="editor">
+                            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                            <span class="sb-shell-tab-copy"><strong data-i18n="Editor">Editor</strong></span>
+                        </button>
+                        <button id="sb_character_tab_persona" class="sb-shell-tab" type="button" role="tab" aria-selected="false" data-sb-character-tab="persona">
+                            <i class="fa-solid fa-face-smile" aria-hidden="true"></i>
+                            <span class="sb-shell-tab-copy"><strong data-i18n="Persona">Persona</strong></span>
+                        </button>
+                        <button id="sb_character_tab_import" class="sb-shell-tab" type="button" role="tab" aria-selected="false" data-sb-character-tab="import">
+                            <i class="fa-solid fa-file-import" aria-hidden="true"></i>
+                            <span class="sb-shell-tab-copy"><strong data-i18n="Import">Import</strong></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="sb-shell-header sb-character-shell-header">
+                    <button id="sb_character_shell_close" class="sb-shell-close" type="button" title="Close Characters" aria-label="Close Characters">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                    <div class="sb-shell-kicker" data-i18n="Characters">Characters</div>
+                    <h2 class="sb-shell-title" tabindex="-1" data-i18n="Character Menu">Character Menu</h2>
+                    <p class="sb-shell-subtitle" data-i18n="Create, organize, and tune the cast for your chats from one place.">Create, organize, and tune the cast for your chats from one place.</p>
+                    <p class="sb-shell-description" data-i18n="This area will get dedicated character workflows. The tabs above are placeholders while the final sections are decided.">This area will get dedicated character workflows. The tabs above are placeholders while the final sections are decided.</p>
                 </div>
                 <div id="CharListButtonAndHotSwaps" class="flex-container flexnowrap">
                     <div class="flexFlowColumn flex-container">
@@ -6354,11 +6387,11 @@
                         <div class="right_menu_button fa-solid fa-list-ul" id="rm_button_characters" title="Select/Create Characters" data-i18n="[title]Select/Create Characters"></div>
                     </div>
                     <div id="HotSwapWrapper" class="alignitemscenter flex-container margin0auto wide100p">
+                        <span class="sb-character-favorites-label" data-i18n="Favorites">Favorites</span>
                         <div class="hotswap avatars_inline scroll-reset-container expander" data-i18n="[no_favs]Favorite characters to add them to HotSwaps" no_favs="Favorite characters to add them to HotSwaps">
                         </div>
                     </div>
                 </div>
-
                 <!-- this div structure must be preserved until group peeking can adjust -->
                 <div id="rm_PinAndTabs">
                     <div id="right-nav-panel-tabs" class="">
@@ -6377,8 +6410,13 @@
                                 </div>
                             </div>
                             <a id="chartokenwarning" class="right_menu_button fa-solid fa-triangle-exclamation" href="https://docs.sillytavern.app/usage/core-concepts/characterdesign/#character-tokens" target="_blank" title="About Token 'Limits'" data-i18n="[title]About Token 'Limits'"></a>
+                            <div id="creators_note_styles_button" class="right_menu_button fa-solid fa-palette fa-fw" title="Allow / Forbid the use of global styles for this character." data-i18n="[title]Allow / Forbid the use of global styles for this character."></div>
+                            <div id="character_open_media_overrides" class="right_menu_button open_media_overrides" title="Click to allow/forbid the use of external media for this character." data-i18n="[title]Click to allow/forbid the use of external media for this character.">
+                                <i id="character_media_allowed_icon" class="fa-solid fa-fw fa-link"></i>
+                                <i id="character_media_forbidden_icon" class="fa-solid fa-fw fa-link-slash"></i>
+                            </div>
                             <i title="Click for stats!" data-i18n="[title]Click for stats!" class="fa-solid fa-ranking-star right_menu_button rm_stats_button"></i>
-                            <i title="Toggle character info panel" data-i18n="[title]Toggle character info panel" id="hideCharPanelAvatarButton" class="fa-solid fa-eye right_menu_button"></i>
+                            <div id="spoiler_free_desc_button" class="right_menu_button fa-solid fa-eye fa-fw" title="Toggle character info" data-i18n="[title]Toggle character info"></div>
                         </div>
                         <button id="sb_character_editor_exit" class="menu_button menu_button_icon" type="button" title="Close Characters" aria-label="Close Characters">
                             <i class="fa-solid fa-xmark" aria-hidden="true"></i>
@@ -6388,6 +6426,41 @@
                 <!-- end group peeking cope structure-->
 
                 <div class="scrollableInner">
+                    <div id="sb_character_editor_empty" class="sb-character-editor-empty" hidden>
+                        <div class="sb-character-editor-empty-icon fa-solid fa-address-card" aria-hidden="true"></div>
+                        <div class="sb-character-editor-empty-copy">
+                            <h3 data-i18n="No character selected. Please select or create a new character.">No character selected. Please select or create a new character.</h3>
+                        </div>
+                        <div class="sb-character-editor-empty-actions">
+                            <button id="sb_character_empty_browse" class="menu_button menu_button_icon" type="button">
+                                <i class="fa-solid fa-address-book" aria-hidden="true"></i>
+                                <span data-i18n="Browse Characters">Browse Characters</span>
+                            </button>
+                            <button id="sb_character_empty_create" class="menu_button menu_button_icon" type="button">
+                                <i class="fa-solid fa-user-plus" aria-hidden="true"></i>
+                                <span data-i18n="Create New Character">Create New Character</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="sb_character_persona_panel" class="sb-character-persona-panel" hidden></div>
+                    <div id="sb_character_import_panel" class="sb-character-import-panel" hidden>
+                        <div class="sb-character-import-actions">
+                            <button id="sb_character_import_file_action" class="sb-character-import-action" type="button">
+                                <i class="fa-solid fa-file-import" aria-hidden="true"></i>
+                                <span>
+                                    <strong data-i18n="Import from file">Import from file</strong>
+                                    <small data-i18n="Upload PNG, JSON, YAML, CHARX, or BYAF character files.">Upload PNG, JSON, YAML, CHARX, or BYAF character files.</small>
+                                </span>
+                            </button>
+                            <button id="sb_character_import_url_action" class="sb-character-import-action" type="button">
+                                <i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i>
+                                <span>
+                                    <strong data-i18n="Import from URL">Import from URL</strong>
+                                    <small data-i18n="Paste one or more links to character cards or supported external content.">Paste one or more links to character cards or supported external content.</small>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
                     <div name="Solo Char Create/Edit Panel" id="rm_ch_create_block" class="right_menu flex-container flexFlowColumn" style="display: none;">
                         <form id="form_create" action="javascript:void(null);" method="post" enctype="multipart/form-data">
                             <div id="avatar-and-name-block">
@@ -6399,32 +6472,37 @@
                                 </div>
                                 <div class="flex-container flexFlowColumn expander flexNoGap">
                                     <div id="avatar_div" class="avatar_div buttons_block alignitemsflexstart justifySpaceBetween flexnowrap">
-                                        <label id="avatar_div_div" class="add_avatar avatar" for="add_avatar_button" title="Click to select a new avatar for this character" data-i18n="[title]Click to select a new avatar for this character">
-                                            <img id="avatar_load_preview" src="img/ai4.png" alt="avatar">
-                                            <input hidden type="file" id="add_avatar_button" name="avatar" accept="image/*">
-                                        </label>
-                                        <div class="flex-container" id="avatar_controls">
+                                        <div class="sb-character-editor-controls-row">
+                                            <label id="avatar_div_div" class="add_avatar avatar" for="add_avatar_button" title="Click to select a new avatar for this character" data-i18n="[title]Click to select a new avatar for this character">
+                                                <img id="avatar_load_preview" src="img/ai4.png" alt="avatar">
+                                                <input hidden type="file" id="add_avatar_button" name="avatar" accept="image/*">
+                                            </label>
+                                            <div class="char-button-group char-button-group-primary char-button-group-utility sb-character-editor-side-actions">
+                                                <div id="favorite_button" class="menu_button fa-solid fa-star" title="Add to Favorites" data-i18n="[title]Add to Favorites" data-label="FAV."></div>
+                                                <input type="hidden" id="fav_checkbox" name="fav" />
+                                                <div id="advanced_div" class="menu_button fa-solid fa-book" title="Advanced Definitions" data-i18n="[title]Advanced Definition" data-label="ADV."></div>
+                                            </div>
+                                            <div class="flex-container" id="avatar_controls">
                                             <div class="form_create_bottom_buttons_block buttons_block">
                                                 <div class="char-button-toolbar">
                                                     <div class="char-button-group char-button-group-secondary char-button-group-icons">
-                                                        <div id="world_button" class="menu_button fa-solid fa-globe" title="Character Lore&#10;&#10;Click to load&#10;Shift/Alt-click or long-press to open 'Link to World Info' popup" data-i18n="[title]world_button_title"></div>
+                                                        <div id="world_button" class="menu_button fa-solid fa-globe" title="Character Lore&#10;&#10;Click to load&#10;Shift/Alt-click or long-press to open 'Link to World Info' popup" data-i18n="[title]world_button_title"><span data-i18n="Character Lore">Character Lore</span></div>
+                                                        <label for="create_button" id="create_button_label" class="menu_button fa-solid fa-user-check" title="Create Character" data-i18n="[title]Create Character">
+                                                            <span data-i18n="Create Character">Create Character</span>
+                                                            <input type="submit" id="create_button" name="create_button">
+                                                        </label>
                                                         <div class="chat_lorebook_button menu_button fa-solid fa-passport" title="Chat Lore&#10;&#10;Click to load&#10;Shift/Alt-click or long-press to open 'Link to Chat Lorebook' popup" data-i18n="[title]chat_lorebook_button_title"></div>
                                                         <div id="char_connections_button" class="menu_button fa-solid fa-face-smile" title="Connected Personas" data-i18n="[title]Connected Personas"></div>
                                                         <div id="export_button" class="menu_button fa-solid fa-file-export" title="Export and Download" data-i18n="[title]Export and Download"></div>
                                                         <div id="dupe_button" class="menu_button fa-solid fa-clone" title="Duplicate Character" data-i18n="[title]Duplicate Character"></div>
-                                                        <label for="create_button" id="create_button_label" class="menu_button fa-solid fa-user-check" title="Create Character" data-i18n="[title]Create Character">
-                                                            <input type="submit" id="create_button" name="create_button">
-                                                        </label>
                                                         <div id="delete_button" class="menu_button fa-solid fa-skull red_button" title="Delete Character" data-i18n="[title]Delete Character"></div>
                                                     </div>
                                                     <div class="char-button-group char-button-group-primary char-button-group-utility">
                                                         <div id="rm_button_back" class="menu_button fa-solid fa-left-long" data-label="Back"></div>
-                                                        <div id="favorite_button" class="menu_button fa-solid fa-star" title="Add to Favorites" data-i18n="[title]Add to Favorites" data-label="FAV."></div>
-                                                        <input type="hidden" id="fav_checkbox" name="fav" />
-                                                        <div id="advanced_div" class="menu_button fa-solid fa-book" title="Advanced Definitions" data-i18n="[title]Advanced Definition" data-label="ADV."></div>
                                                     </div>
                                                 </div>
                                             </div>
+                                            <div class="sb-character-editor-header-spacer" aria-hidden="true"></div>
                                             <label class="flex1 height100p" for="char-management-dropdown">
                                                 <select id="char-management-dropdown" class="text_pole">
                                                     <option value="default" disabled selected data-i18n="More...">More...</option>
@@ -6466,23 +6544,22 @@
                                                         </option>-->
                                                 </select>
                                             </label>
-                                        </div>
-                                    </div>
-                                    <div id="tags_div">
-                                        <div class="tag_controls">
-                                            <input id="tagInput" class="text_pole textarea_compact tag_input wide100p margin0" data-i18n="[placeholder]Search / Create Tags" placeholder="Search / Create tags" />
-                                            <div class="tags_view menu_button fa-solid fa-tags" title="View all tags" data-i18n="[title]View all tags"></div>
+                                            <div id="tags_div">
+                                                <div class="tag_controls">
+                                                    <input id="tagInput" class="text_pole textarea_compact tag_input wide100p margin0" data-i18n="[placeholder]Search / Create Tags" placeholder="Search / Create tags" />
+                                                    <div class="tags_view menu_button fa-solid fa-tags" title="View all tags" data-i18n="[title]View all tags"></div>
+                                                </div>
+                                            </div>
+                                            </div>
                                         </div>
                                         <div id="tagList" class="tags"></div>
                                     </div>
                                 </div>
                             </div>
-                            <div id="spoiler_free_desc" class="inline-drawer flex-container flexFlowColumn flexNoGap">
-                                <div class="inline-drawer-toggle inline-drawer-header padding0 gap5px standoutHeader">
+                            <div id="spoiler_free_desc" class="inline-drawer flex-container flexFlowColumn flexNoGap sb-creator-notes-compact">
+                                <div class="inline-drawer-toggle inline-drawer-header padding0 gap5px">
                                     <div id="creators_notes_div" class="title_restorable flexGap5 wide100p ">
                                         <span class="flex1" data-i18n="Creator's Notes">Creator's Notes</span>
-                                        <div id="creators_note_styles_button" class="margin0 menu_button fa-solid fa-palette fa-fw" title="Allow / Forbid the use of global styles for this character." data-i18n="[title]Allow / Forbid the use of global styles for this character."></div>
-                                        <div id="spoiler_free_desc_button" class="margin0 menu_button fa-solid fa-eye fa-fw" title="Show / Hide Description and First Message" data-i18n="[title]Show / Hide Description and First Message"></div>
                                     </div>
                                     <div class="flex-container widthFitContent">
                                         <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down interactable"></div>
@@ -6504,13 +6581,6 @@
                                         <a href="https://docs.sillytavern.app/usage/core-concepts/characterdesign/#character-description" class="notes-link" target="_blank">
                                             <span class="fa-solid fa-circle-question note-link-span"></span>
                                         </a>
-                                    </div>
-                                    <div id="character_open_media_overrides" class="menu_button menu_button_icon open_media_overrides" title="Click to allow/forbid the use of external media for this character." data-i18n="[title]Click to allow/forbid the use of external media for this character.">
-                                        <i id="character_media_allowed_icon" class="fa-solid fa-fw fa-link"></i>
-                                        <i id="character_media_forbidden_icon" class="fa-solid fa-fw fa-link-slash"></i>
-                                        <span data-i18n="Ext. Media">
-                                            Ext. Media
-                                        </span>
                                     </div>
                                 </div>
                                 <textarea id="description_textarea" class="mdHotkeys" data-macros data-i18n="[placeholder]Describe your character's physical and mental traits here." placeholder="Describe your character's physical and mental traits here." name="description" placeholder=""></textarea>
@@ -6575,6 +6645,57 @@
                         </form>
                     </div>
                     <div name="Group Chat Edit Panel" id="rm_group_chats_block" class="right_menu flex-container flexNoGap">
+                        <section class="sb-group-settings-section">
+                            <div id="group-metadata-controls" class="marginTopBot5">
+                                <div id="rm_group_top_bar" class="flex-container alignitemscenter spaceBetween width100p fontsize80p">
+                                    <div>
+                                        <label class="add_avatar avatar flex-container justifyCenter" for="group_avatar_button" title="Click to select a new avatar for this group" data-i18n="[title]Click to select a new avatar for this group">
+                                            <div id="group_avatar_preview">
+                                                <div class="avatar">
+                                                    <img src="img/ai4.png" alt="avatar">
+                                                </div>
+                                            </div>
+                                            <input hidden type="file" id="group_avatar_button" name="avatar" accept="image/png, image/jpeg, image/jpg, image/gif, image/bmp">
+                                        </label>
+                                    </div>
+                                    <div class="sb-group-editor-primary">
+                                        <div class="sb-group-editor-name-row">
+                                            <input id="rm_group_chat_name" class="text_pole flex1" type="text" name="chat_name" data-i18n="[placeholder]Chat Name (Optional)" placeholder="Chat Name (Optional)" />
+                                            <div class="flex-container sb-group-editor-action-cluster">
+                                                <div class="flex-container sb-group-editor-side-actions">
+                                                    <div id="group_favorite_button" class="heightFitContent margin0 menu_button fa-solid fa-fw fa-star" title="Add to Favorites" data-i18n="[title]Add to Favorites" data-label="FAV."></div>
+                                                    <div id="rm_group_scenario" class="heightFitContent margin0 menu_button fa-solid fa-fw fa-scroll" title="Set group chat character settings overrides" data-i18n="[title]Set group chat character settings overrides" data-label="ADV."></div>
+                                                    <input id="rm_group_fav" type="hidden" />
+                                                </div>
+                                                <div class="flex-container sb-group-editor-utility-actions">
+                                                    <div class="chat_lorebook_button menu_button fa-solid fa-passport" title="Chat Lore&#10;&#10;Click to load&#10;Shift/Alt-click or long-press to open 'Link to Chat Lorebook' popup" data-i18n="[title]chat_lorebook_button_title"></div>
+                                                    <div id="rm_group_submit" class="heightFitContent margin0 menu_button fa-solid fa-fw fa-check" title="Create" data-i18n="[title]Create" data-label="Create Group"></div>
+                                                    <div id="group_open_media_overrides" class="heightFitContent margin0 menu_button menu_button_icon open_media_overrides" title="Click to allow/forbid the use of external media for this group." data-i18n="[title]Click to allow/forbid the use of external media for this group.">
+                                                        <i id="group_media_allowed_icon" class="fa-solid fa-fw fa-link"></i>
+                                                        <i id="group_media_forbidden_icon" class="fa-solid fa-fw fa-link-slash"></i>
+                                                    </div>
+                                                    <div id="rm_group_delete" class="heightFitContent margin0 menu_button fa-solid fa-fw fa-trash-can" title="Delete" data-i18n="[title]Delete"></div>
+                                                </div>
+                                            </div>
+                                            <label class="height100p" for="group-chat-lorebook-dropdown">
+                                                <select id="group-chat-lorebook-dropdown" class="text_pole">
+                                                    <option value="default" disabled selected data-i18n="More...">More...</option>
+                                                    <option id="group_chat_lorebook_link" data-i18n="Link to Chat Lorebook">Link to Chat Lorebook</option>
+                                                    <option id="renameGroupButton" data-i18n="Rename Group">Rename Group</option>
+                                                </select>
+                                            </label>
+                                            <div id="group_tags_div" class="wide100p">
+                                                <div class="tag_controls">
+                                                    <input id="groupTagInput" class="text_pole textarea_compact tag_input flex1 margin0" data-i18n="[placeholder]Search / Create Tags" placeholder="Search / Create tags" />
+                                                    <div class="tags_view menu_button fa-solid fa-tags margin0" title="View all tags" data-i18n="[title]View all tags"></div>
+                                                </div>
+                                            </div>
+                                            <div id="groupTagList" class="tags paddingTopBot5"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
                         <div class="inline-drawer wide100p flexFlowColumn">
                             <div id="groupControlsToggle" class="inline-drawer-toggle inline-drawer-header">
                                 <span>
@@ -6586,36 +6707,7 @@
                                 <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
                             </div>
                             <div class="inline-drawer-content">
-                                <div id="group-metadata-controls" class="marginTopBot5">
-                                    <div class="flex-container wide100p">
-                                        <input id="rm_group_chat_name" class="text_pole flex1" type="text" name="chat_name" data-i18n="[placeholder]Chat Name (Optional)" placeholder="Chat Name (Optional)" />
-                                        <div class="chat_lorebook_button menu_button fa-solid fa-passport" title="Chat Lore&#10;&#10;Click to load&#10;Shift/Alt-click or long-press to open 'Link to Chat Lorebook' popup" data-i18n="[title]chat_lorebook_button_title"></div>
-                                    </div>
-                                    <label class="flex1 height100p" for="group-chat-lorebook-dropdown">
-                                        <select id="group-chat-lorebook-dropdown" class="text_pole">
-                                            <option value="default" disabled selected data-i18n="More...">More...</option>
-                                            <option id="group_chat_lorebook_link" data-i18n="Link to Chat Lorebook">Link to Chat Lorebook</option>
-                                        </select>
-                                    </label>
-                                    <div id="group_tags_div" class="wide100p">
-                                        <div class="tag_controls">
-                                            <input id="groupTagInput" class="text_pole textarea_compact tag_input flex1 margin0" data-i18n="[placeholder]Search / Create Tags" placeholder="Search / Create tags" />
-                                            <div class="tags_view menu_button fa-solid fa-tags margin0" title="View all tags" data-i18n="[title]View all tags"></div>
-                                        </div>
-                                        <div id="groupTagList" class="tags paddingTopBot5"></div>
-                                    </div>
-                                    <div id="rm_group_top_bar" class="flex-container alignitemscenter spaceBetween width100p fontsize80p">
-                                        <div>
-                                            <label class="add_avatar avatar flex-container justifyCenter" for="group_avatar_button" title="Click to select a new avatar for this group" data-i18n="[title]Click to select a new avatar for this group">
-                                                <div id="group_avatar_preview">
-                                                    <div class="avatar">
-                                                        <img src="img/ai4.png" alt="avatar">
-                                                    </div>
-                                                </div>
-                                                <input hidden type="file" id="group_avatar_button" name="avatar" accept="image/png, image/jpeg, image/jpg, image/gif, image/bmp">
-                                            </label>
-                                        </div>
-                                        <div name="GroupStragegyAndOrder" id="rm_group_buttons" class="flex-container paddingLeftRight5 flex2">
+                                <div name="GroupStragegyAndOrder" id="rm_group_buttons" class="flex-container paddingLeftRight5 flex2">
                                             <div class="flex1 flexGap5">
                                                 <label for="rm_group_activation_strategy" class="flexnowrap width100p whitespacenowrap">
                                                     <span data-i18n="Group reply strategy">Group reply strategy</span>
@@ -6636,6 +6728,47 @@
                                                     <option value="1" data-i18n="Join character cards (exclude muted)">Join character cards (exclude muted)</option>
                                                     <option value="2" data-i18n="Join character cards (include muted)">Join character cards (include muted)</option>
                                                 </select>
+                                            </div>
+                                            <div class="flex1 flexGap5" title="Inserted before each part of the joined fields." data-i18n="[title]Inserted before each part of the joined fields.">
+                                                <label for="rm_group_generation_mode_join_prefix" class="flexnowrap width100p whitespacenowrap">
+                                                    <span data-i18n="Join Prefix">Join Prefix</span>
+                                                    <div class="fa-solid fa-circle-info opacity50p" data-i18n="[title]When 'Join character cards' is selected, all respective fields of the characters are being joined together.This means that in the story string for example all character descriptions will be joined to one big text.If you want those fields to be separated, you can define a prefix or suffix here.This value supports normal macros and will also replace {{char}} with the relevant char's name and &lt;FIELDNAME&gt; with the name of the part (e.g.: description, personality, scenario, etc.)" title="When 'Join character cards' is selected, all respective fields of the characters are being joined together.&#13;This means that in the story string for example all character descriptions will be joined to one big text.&#13;If you want those fields to be separated, you can define a prefix or suffix here.&#13;&#13;This value supports normal macros and will also replace {{char}} with the relevant char's name and &lt;FIELDNAME&gt; with the name of the part (e.g.: description, personality, scenario, etc.)">
+                                                    </div>
+                                                </label>
+                                                <textarea id="rm_group_generation_mode_join_prefix" class="text_pole wide100p textarea_compact autoSetHeight" placeholder="&mdash;" rows="1"></textarea>
+                                            </div>
+                                            <div class="flex1 flexGap5" title="Inserted after each part of the joined fields." data-i18n="[title]Inserted after each part of the joined fields.">
+                                                <label for="rm_group_generation_mode_join_suffix" class="flexnowrap width100p whitespacenowrap">
+                                                    <span data-i18n="Join Suffix">Join Suffix</span>
+                                                    <div class="fa-solid fa-circle-info opacity50p" data-i18n="[title]When 'Join character cards' is selected, all respective fields of the characters are being joined together.This means that in the story string for example all character descriptions will be joined to one big text.If you want those fields to be separated, you can define a prefix or suffix here.This value supports normal macros and will also replace {{char}} with the relevant char's name and &lt;FIELDNAME&gt; with the name of the part (e.g.: description, personality, scenario, etc.)" title="When 'Join character cards' is selected, all respective fields of the characters are being joined together.&#13;This means that in the story string for example all character descriptions will be joined to one big text.&#13;If you want those fields to be separated, you can define a prefix or suffix here.&#13;&#13;This value supports normal macros and will also replace {{char}} with the relevant char's name and &lt;FIELDNAME&gt; with the name of the part (e.g.: description, personality, scenario, etc.)">
+                                                    </div>
+                                                </label>
+                                                <textarea id="rm_group_generation_mode_join_suffix" class="text_pole wide100p textarea_compact autoSetHeight" placeholder="&mdash;" rows="1"></textarea>
+                                            </div>
+                                </div>
+                                <div id="GroupFavDelOkBack" class="flex-container flexGap5 spaceEvenly flex1">
+                                            <div id="rm_button_back_from_group" class="heightFitContent margin0 menu_button fa-solid fa-fw fa-left-long"></div>
+                                            <div id="rm_group_restore_avatar" class="heightFitContent margin0 menu_button fa-solid fa-fw fa-images" title="Restore collage avatar" data-i18n="[title]Restore collage avatar"></div>
+                                            <div class="flex1">
+                                                <label id="rm_group_hidemutedsprites_label" class="checkbox_label whitespacenowrap">
+                                                    <input id="rm_group_hidemutedsprites" type="checkbox" />
+                                                    <span data-i18n="Hide Muted Member Sprites">Hide Muted Member Sprites</span>
+                                                </label>
+                                                <label class="checkbox_label whitespacenowrap">
+                                                    <input id="rm_group_allow_self_responses" type="checkbox" />
+                                                    <span data-i18n="Allow self responses">Allow self responses</span>
+                                                </label>
+                                                <label id="rm_group_automode_label" class="checkbox_label whitespacenowrap">
+                                                    <input id="rm_group_automode" type="checkbox" />
+                                                    <span data-i18n="Auto Mode">Auto Mode</span>
+                                                    <input id="rm_group_automode_delay" class="text_pole textarea_compact widthUnset" type="number" min="1" max="999" step="1" value="120" title="Auto Mode delay in seconds" data-i18n="[title]Auto Mode delay in seconds" />
+                                                    <span class="auto_mode_delay_unit" title="Auto Mode delay unit" data-i18n="seconds">seconds</span>
+                                                </label>
+                                                <label id="rm_group_auto_dm_cooldown_label" class="checkbox_label whitespacenowrap" title="Minimum delay between scheduled Auto DMs" data-i18n="[title]Minimum delay between scheduled Auto DMs">
+                                                    <span data-i18n="Auto DM cooldown">Auto DM cooldown</span>
+                                                    <input id="rm_group_auto_dm_cooldown" class="text_pole textarea_compact widthUnset" type="number" min="1" max="9999" step="1" value="300" title="Auto DM cooldown in seconds" data-i18n="[title]Auto DM cooldown in seconds" />
+                                                    <span class="auto_mode_delay_unit" title="Auto DM cooldown unit" data-i18n="seconds">seconds</span>
+                                                </label>
                                             </div>
                                             <div class="wide100p flex-container flexFlowColumn flexGap5 group_schedule_controls">
                                                 <div class="flex-container flexGap5 flexWrap alignitemscenter">
@@ -6658,58 +6791,6 @@
 08:00 Bunny Guide: checks in after breakfast
 23:00 Assistant Nahida: winds down and reflects;[title]Daily auto-message schedule. Format: HH:MM Character: reason"></textarea>
                                             </div>
-                                            <div class="flex1 flexGap5" title="Inserted before each part of the joined fields." data-i18n="[title]Inserted before each part of the joined fields.">
-                                                <label for="rm_group_generation_mode_join_prefix" class="flexnowrap width100p whitespacenowrap">
-                                                    <span data-i18n="Join Prefix">Join Prefix</span>
-                                                    <div class="fa-solid fa-circle-info opacity50p" data-i18n="[title]When 'Join character cards' is selected, all respective fields of the characters are being joined together.This means that in the story string for example all character descriptions will be joined to one big text.If you want those fields to be separated, you can define a prefix or suffix here.This value supports normal macros and will also replace {{char}} with the relevant char's name and &lt;FIELDNAME&gt; with the name of the part (e.g.: description, personality, scenario, etc.)" title="When 'Join character cards' is selected, all respective fields of the characters are being joined together.&#13;This means that in the story string for example all character descriptions will be joined to one big text.&#13;If you want those fields to be separated, you can define a prefix or suffix here.&#13;&#13;This value supports normal macros and will also replace {{char}} with the relevant char's name and &lt;FIELDNAME&gt; with the name of the part (e.g.: description, personality, scenario, etc.)">
-                                                    </div>
-                                                </label>
-                                                <textarea id="rm_group_generation_mode_join_prefix" class="text_pole wide100p textarea_compact autoSetHeight" placeholder="&mdash;" rows="1"></textarea>
-                                            </div>
-                                            <div class="flex1 flexGap5" title="Inserted after each part of the joined fields." data-i18n="[title]Inserted after each part of the joined fields.">
-                                                <label for="rm_group_generation_mode_join_suffix" class="flexnowrap width100p whitespacenowrap">
-                                                    <span data-i18n="Join Suffix">Join Suffix</span>
-                                                    <div class="fa-solid fa-circle-info opacity50p" data-i18n="[title]When 'Join character cards' is selected, all respective fields of the characters are being joined together.This means that in the story string for example all character descriptions will be joined to one big text.If you want those fields to be separated, you can define a prefix or suffix here.This value supports normal macros and will also replace {{char}} with the relevant char's name and &lt;FIELDNAME&gt; with the name of the part (e.g.: description, personality, scenario, etc.)" title="When 'Join character cards' is selected, all respective fields of the characters are being joined together.&#13;This means that in the story string for example all character descriptions will be joined to one big text.&#13;If you want those fields to be separated, you can define a prefix or suffix here.&#13;&#13;This value supports normal macros and will also replace {{char}} with the relevant char's name and &lt;FIELDNAME&gt; with the name of the part (e.g.: description, personality, scenario, etc.)">
-                                                    </div>
-                                                </label>
-                                                <textarea id="rm_group_generation_mode_join_suffix" class="text_pole wide100p textarea_compact autoSetHeight" placeholder="&mdash;" rows="1"></textarea>
-                                            </div>
-                                        </div>
-                                        <div id="GroupFavDelOkBack" class="flex-container flexGap5 spaceEvenly flex1">
-                                            <div id="rm_button_back_from_group" class="heightFitContent margin0 menu_button fa-solid fa-fw fa-left-long"></div>
-                                            <div id="rm_group_scenario" class="heightFitContent margin0 menu_button fa-solid fa-fw fa-scroll" title="Set group chat character settings overrides" data-i18n="[title]Set group chat character settings overrides"></div>
-                                            <div id="group_favorite_button" class="heightFitContent margin0 menu_button fa-solid fa-fw fa-star" title="Add to Favorites" data-i18n="[title]Add to Favorites"></div>
-                                            <input id="rm_group_fav" type="hidden" />
-                                            <div id="group_open_media_overrides" class="heightFitContent margin0 menu_button menu_button_icon open_media_overrides" title="Click to allow/forbid the use of external media for this group." data-i18n="[title]Click to allow/forbid the use of external media for this group.">
-                                                <i id="group_media_allowed_icon" class="fa-solid fa-fw fa-link"></i>
-                                                <i id="group_media_forbidden_icon" class="fa-solid fa-fw fa-link-slash"></i>
-                                            </div>
-                                            <div id="rm_group_submit" class="heightFitContent margin0 menu_button fa-solid fa-fw fa-check" title="Create" data-i18n="[title]Create"></div>
-                                            <div id="rm_group_restore_avatar" class="heightFitContent margin0 menu_button fa-solid fa-fw fa-images" title="Restore collage avatar" data-i18n="[title]Restore collage avatar"></div>
-                                            <div id="rm_group_delete" class="heightFitContent margin0 menu_button fa-solid fa-fw fa-trash-can" title="Delete" data-i18n="[title]Delete"></div>
-                                            <div class="flex1">
-                                                <label class="checkbox_label whitespacenowrap">
-                                                    <input id="rm_group_allow_self_responses" type="checkbox" />
-                                                    <span data-i18n="Allow self responses">Allow self responses</span>
-                                                </label>
-                                                <label id="rm_group_automode_label" class="checkbox_label whitespacenowrap">
-                                                    <input id="rm_group_automode" type="checkbox" />
-                                                    <span data-i18n="Auto Mode">Auto Mode</span>
-                                                    <input id="rm_group_automode_delay" class="text_pole textarea_compact widthUnset" type="number" min="1" max="999" step="1" value="120" title="Auto Mode delay in seconds" data-i18n="[title]Auto Mode delay in seconds" />
-                                                    <span class="auto_mode_delay_unit" title="Auto Mode delay unit" data-i18n="seconds">seconds</span>
-                                                </label>
-                                                <label id="rm_group_auto_dm_cooldown_label" class="checkbox_label whitespacenowrap" title="Minimum delay between scheduled Auto DMs" data-i18n="[title]Minimum delay between scheduled Auto DMs">
-                                                    <span data-i18n="Auto DM cooldown">Auto DM cooldown</span>
-                                                    <input id="rm_group_auto_dm_cooldown" class="text_pole textarea_compact widthUnset" type="number" min="1" max="9999" step="1" value="300" title="Auto DM cooldown in seconds" data-i18n="[title]Auto DM cooldown in seconds" />
-                                                    <span class="auto_mode_delay_unit" title="Auto DM cooldown unit" data-i18n="seconds">seconds</span>
-                                                </label>
-                                                <label id="rm_group_hidemutedsprites_label" class="checkbox_label whitespacenowrap">
-                                                    <input id="rm_group_hidemutedsprites" type="checkbox" />
-                                                    <span data-i18n="Hide Muted Member Sprites">Hide Muted Member Sprites</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -6908,6 +6989,7 @@
                 </div>
                 <button id="character_cross" class="fa-solid fa-circle-xmark" type="button" title="Close Advanced Definitions" aria-label="Close Advanced Definitions"></button>
             </div>
+            <div id="character_popup_body">
             <hr class="margin-bot-10px">
             <div class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
@@ -7070,6 +7152,7 @@
                 <!-- TODO: Example chats handhold-editor concept: https://gist.github.com/Cohee1207/50da02a4001ac1adae9b440f9b8e1079 -->
             </div>
             <div id="character_popup_ok" class="menu_button" data-i18n="Save">Save</div>
+            </div>
         </div>
 
         <div id="shadow_select_chat_popup">
@@ -8706,7 +8789,7 @@
     <script type="module" src="scripts/i18n.js"></script>
     <script type="module" src="scripts/performance-loader.js"></script>
     <script type="module" src="script.js"></script>
-    <script type="module" src="scripts/sillybunny-tabs.js?v=20260507a"></script>
+    <script type="module" src="scripts/sillybunny-tabs.js?v=20260513a"></script>
     <script>
         window.addEventListener('load', (event) => {
             const documentHeight = () => {
