@@ -3,6 +3,11 @@ export function getPositiveTokenCount(value) {
     return Number.isFinite(tokenCount) && tokenCount > 0 ? tokenCount : 0;
 }
 
+export function formatTokenCounterText(value) {
+    const tokenCount = getPositiveTokenCount(value);
+    return tokenCount > 0 ? `${tokenCount}t` : '';
+}
+
 function getActiveSwipeExtra(message) {
     if (typeof message?.swipe_id !== 'number' || !Array.isArray(message?.swipe_info)) {
         return null;

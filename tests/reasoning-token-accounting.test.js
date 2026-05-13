@@ -1,7 +1,15 @@
 import { describe, expect, jest, test } from '@jest/globals';
-import { updateReasoningTokenAccounting } from '../public/scripts/reasoning-token-accounting.js';
+import { formatTokenCounterText, updateReasoningTokenAccounting } from '../public/scripts/reasoning-token-accounting.js';
 
 describe('reasoning token accounting', () => {
+    test('formats visible token counter text only for positive counts', () => {
+        expect(formatTokenCounterText(42)).toBe('42t');
+        expect(formatTokenCounterText('7')).toBe('7t');
+        expect(formatTokenCounterText(0)).toBe('');
+        expect(formatTokenCounterText(undefined)).toBe('');
+        expect(formatTokenCounterText(Number.NaN)).toBe('');
+    });
+
     test('counts output and locally parsed reasoning separately', async () => {
         const message = {
             mes: 'Final answer',
