@@ -181,21 +181,55 @@ export const chat_styles = Object.freeze({
     DEFAULT: 0,
     BUBBLES: 1,
     DOCUMENT: 2,
+    // SillyBunny: native fork-only chat display styles kept compatible with Moonlit Echoes body classes.
+    ECHO: 3,
+    WHISPER: 4,
+    HUSH: 5,
+    RIPPLE: 6,
+    TIDE: 7,
 });
 
 const CHAT_STYLE_BODY_CLASSES = Object.freeze({
     [chat_styles.DEFAULT]: 'flatchat',
     [chat_styles.BUBBLES]: 'bubblechat',
     [chat_styles.DOCUMENT]: 'documentstyle',
+    [chat_styles.ECHO]: 'echostyle',
+    [chat_styles.WHISPER]: 'whisperstyle',
+    [chat_styles.HUSH]: 'hushstyle',
+    [chat_styles.RIPPLE]: 'ripplestyle',
+    [chat_styles.TIDE]: 'tidestyle',
 });
 
-const LEGACY_CHAT_STYLE_BODY_CLASSES = Object.freeze([
-    'echostyle',
-    'whisperstyle',
-    'hushstyle',
-    'ripplestyle',
-    'tidestyle',
+const LEGACY_CHAT_STYLE_BODY_CLASSES = Object.freeze([]);
+const NATIVE_CHAT_STYLE_VALUES = new Set([
+    chat_styles.ECHO,
+    chat_styles.WHISPER,
+    chat_styles.HUSH,
+    chat_styles.RIPPLE,
+    chat_styles.TIDE,
 ]);
+const NATIVE_CHAT_STYLE_STYLESHEET_ID = 'sillybunny-native-chat-styles';
+const NATIVE_CHAT_STYLE_STYLESHEET_HREF = 'css/sillybunny-chat-styles.css?v=20260513b';
+
+function ensureNativeChatStyleStylesheet() {
+    if (document.getElementById(NATIVE_CHAT_STYLE_STYLESHEET_ID)) {
+        return;
+    }
+
+    const link = document.createElement('link');
+    link.id = NATIVE_CHAT_STYLE_STYLESHEET_ID;
+    link.rel = 'stylesheet';
+    link.type = 'text/css';
+    link.href = NATIVE_CHAT_STYLE_STYLESHEET_HREF;
+
+    const themeStylesheet = document.querySelector('link[href^="css/sillybunny-theme.css"]');
+    if (themeStylesheet) {
+        themeStylesheet.after(link);
+        return;
+    }
+
+    document.head.appendChild(link);
+}
 
 function isValidChatDisplayValue(value) {
     return Number.isInteger(value) && Object.hasOwn(CHAT_STYLE_BODY_CLASSES, value);
@@ -1174,6 +1208,10 @@ function applyChatDisplay() {
 
     const nextClass = CHAT_STYLE_BODY_CLASSES[power_user.chat_display] ?? CHAT_STYLE_BODY_CLASSES[chat_styles.DEFAULT];
     const allClasses = [...Object.values(CHAT_STYLE_BODY_CLASSES), ...LEGACY_CHAT_STYLE_BODY_CLASSES].join(' ');
+
+    if (NATIVE_CHAT_STYLE_VALUES.has(power_user.chat_display)) {
+        ensureNativeChatStyleStylesheet();
+    }
 
     console.debug(`applying ${nextClass}`);
     $('body').removeClass(allClasses);
