@@ -249,7 +249,7 @@ This update stabilizes preset and connection profile switching, adds bottom chat
 
 **Character Drawer**
 * Rotated the character-menu service-worker, shell, and static asset cache keys so iOS WebKit clients load the reworked drawer instead of stale cached files.
-* Restored horizontal scrolling in the mobile character tab strip and trimmed the mobile character header spacing.
+* Restored horizontal scrolling in the mobile character tab strip and collapsed mobile character drawer chrome so more of the character list is visible immediately.
 
 **Runtime And Updates**
 * Bun launchers now retry dependency installs without `--frozen-lockfile` if the locked install fails, so users no longer need to delete `bun.lock` after an update.

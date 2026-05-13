@@ -45,6 +45,208 @@
         flex-direction: column !important;
     }
 
+    #right-nav-panel.openDrawer .sb-character-shell-nav {
+        justify-content: flex-start !important;
+        padding: 4px 50px 4px 8px !important;
+        gap: 4px !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-shell-nav .sb-shell-tab {
+        flex-basis: auto !important;
+        min-width: max-content !important;
+        min-height: 40px !important;
+        padding: 5px 9px !important;
+        border-radius: 9px !important;
+    }
+
+    #right-nav-panel.openDrawer > .sb-character-shell-header {
+        min-height: 0 !important;
+        padding: 0 !important;
+    }
+
+    #right-nav-panel.openDrawer > .sb-character-shell-header .sb-shell-title {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        margin: -1px !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        clip: rect(0 0 0 0) !important;
+        clip-path: inset(50%) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+    }
+
+    #right-nav-panel.openDrawer > .sb-character-shell-header .sb-shell-subtitle {
+        display: none !important;
+    }
+
+    #right-nav-panel.openDrawer > .sb-character-shell-header .sb-shell-close {
+        top: -42px !important;
+        right: 8px !important;
+        width: 36px !important;
+        min-width: 36px !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        border-radius: 999px !important;
+    }
+
+    #right-nav-panel.openDrawer > #CharListButtonAndHotSwaps {
+        min-height: 34px !important;
+        max-height: 34px !important;
+        padding: 3px 10px !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-favorites-label {
+        font-size: calc(var(--mainFontSize) * 0.66) !important;
+        letter-spacing: 0.12em !important;
+    }
+
+    #right-nav-panel.openDrawer #HotSwapWrapper .hotswap {
+        max-height: 28px !important;
+    }
+
+    #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > small {
+        font-size: calc(var(--mainFontSize) * 0.72) !important;
+        line-height: 1.1 !important;
+    }
+
+    #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > .avatar,
+    body.big-avatars #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > .avatar,
+    body.charListGrid #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > .avatar,
+    body #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > :is(.avatar, .character_select, .group_select) {
+        flex: 0 0 28px !important;
+    }
+
+    #right-nav-panel.openDrawer #HotSwapWrapper .hotswap .avatar,
+    #right-nav-panel.openDrawer #HotSwapWrapper .hotswap .avatar img,
+    body.big-avatars #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > .avatar,
+    body.charListGrid #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > .avatar,
+    body #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > :is(.avatar, .character_select, .group_select) {
+        width: 28px !important;
+        min-width: 28px !important;
+        max-width: 28px !important;
+        height: 28px !important;
+        min-height: 28px !important;
+        max-height: 28px !important;
+    }
+
+    #right-nav-panel.openDrawer #charListFixedTop {
+        padding: 0 0 3px !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar {
+        align-items: center !important;
+        gap: 6px !important;
+        margin: 3px 0 5px !important;
+        padding: 4px !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        overscroll-behavior-x: contain !important;
+        scroll-padding-inline: 4px !important;
+        touch-action: pan-x !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        border-radius: 12px !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar > * {
+        flex: 0 0 auto !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_bar {
+        gap: 6px !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar :is(#character_sort_order, #rm_button_create, #rm_button_group_chats),
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_print_characters_pagination .paginationjs-size-changer select,
+    #right-nav-panel.openDrawer #character_search_bar {
+        height: 38px !important;
+        min-height: 38px !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #character_sort_order {
+        min-width: 7.5em !important;
+        max-width: 9em !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar :is(#rm_button_search, #rm_print_characters_pagination .menu_button, #rm_print_characters_pagination .paginationjs-pages ul li a) {
+        width: 38px !important;
+        min-width: 38px !important;
+        max-width: 38px !important;
+        height: 38px !important;
+        min-height: 38px !important;
+        max-height: 38px !important;
+        padding: 0 !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_print_characters_pagination,
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_print_characters_pagination .paginationjs {
+        display: inline-flex !important;
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        min-width: max-content !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_print_characters_pagination .paginationjs-pages ul {
+        flex-wrap: nowrap !important;
+        gap: 4px !important;
+        margin: 0 !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_print_characters_pagination .paginationjs-size-changer select {
+        width: auto !important;
+        min-width: 6.8em !important;
+        margin: 0 !important;
+        font-size: max(16px, calc(var(--mainFontSize) * 0.84)) !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_print_characters_pagination .paginationjs-nav {
+        min-height: 38px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        padding-inline: 4px !important;
+        white-space: nowrap !important;
+    }
+
+    #right-nav-panel.openDrawer #form_character_search_form {
+        margin-top: 4px !important;
+    }
+
+    #right-nav-panel.openDrawer #character_search_bar {
+        padding-block: 0 !important;
+        font-size: max(16px, calc(var(--mainFontSize) * 0.9)) !important;
+    }
+
+    #right-nav-panel.openDrawer .rm_tag_controls {
+        gap: 4px !important;
+        margin-top: 4px !important;
+    }
+
+    #right-nav-panel.openDrawer .rm_tag_controls :is(.tag.actionable, .tags_view, .right_menu_button) {
+        width: 34px !important;
+        min-width: 34px !important;
+        height: 34px !important;
+        min-height: 34px !important;
+        font-size: calc(var(--mainFontSize) * 0.9) !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_create::after {
+        content: 'Create' !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_group_chats::after {
+        content: 'Group' !important;
+    }
+
     #left-nav-panel.openDrawer .sb-shell-frame,
     #user-settings-block.openDrawer .sb-shell-frame,
     .sb-shell-root.openDrawer .sb-shell-frame,

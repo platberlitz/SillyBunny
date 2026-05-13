@@ -31,7 +31,7 @@ This update stabilizes preset and connection profile switching, preserves OpenAI
 
 ### Character Drawer
 - Rotated the character-menu service-worker, shell, and static asset cache keys so iOS WebKit clients load the reworked drawer instead of stale cached files.
-- Restored horizontal scrolling in the mobile character tab strip and trimmed the mobile character header spacing.
+- Restored horizontal scrolling in the mobile character tab strip and collapsed mobile character drawer chrome so more of the character list is visible immediately.
 
 ### Character Editor
 - Character alternate greetings now save from the live editor contents, so edited greetings persist instead of falling back to stale array state.
