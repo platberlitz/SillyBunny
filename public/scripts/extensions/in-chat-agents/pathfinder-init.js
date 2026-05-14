@@ -41,8 +41,12 @@ export function initPathfinder(context) {
     // Initialize pipeline prompt store with defaults
     initializePromptStore(getDefaultPrompts(), getDefaultPipelines());
 
-    if (context?.loadWorldInfo && context?.createWorldInfoEntry && context?.saveWorldInfo) {
+    const entryManagerAPIs = ['loadWorldInfo', 'createWorldInfoEntry', 'saveWorldInfo'];
+    const missingEntryManagerAPIs = entryManagerAPIs.filter(api => !context?.[api]);
+    if (missingEntryManagerAPIs.length === 0) {
         initEntryManagerAPIs(context.loadWorldInfo, context.createWorldInfoEntry, context.saveWorldInfo);
+    } else {
+        console.error(`[Pathfinder] Missing context APIs for lorebook writes: ${missingEntryManagerAPIs.join(', ')}`);
     }
 
     if (context?.eventSource && context?.eventTypes) {
