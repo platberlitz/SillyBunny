@@ -6,7 +6,7 @@ const PROMPT_PLACEHOLDER = getConfigValue('promptPlaceholder', 'Let\'s get start
 const REASONING_EFFORT = {
     // 'auto' kept for backward-compat: backend may receive it from non-migrated external callers
     auto: 'auto',
-    blank: 'blank',
+    none: 'none',
     low: 'low',
     medium: 'medium',
     high: 'high',
@@ -1134,7 +1134,7 @@ export function calculateClaudeBudgetTokens(maxTokens, reasoningEffort, stream, 
     if (isAdaptiveModel) {
         switch (reasoningEffort) {
             case REASONING_EFFORT.auto:
-            case REASONING_EFFORT.blank:
+            case REASONING_EFFORT.none:
                 return null;
             case REASONING_EFFORT.min:
                 return 'low';
@@ -1155,7 +1155,7 @@ export function calculateClaudeBudgetTokens(maxTokens, reasoningEffort, stream, 
 
     switch (reasoningEffort) {
         case REASONING_EFFORT.auto:
-        case REASONING_EFFORT.blank:
+        case REASONING_EFFORT.none:
             return null;
         case REASONING_EFFORT.min:
             budgetTokens = 1024;
@@ -1197,7 +1197,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
 
         switch (reasoningEffort) {
             case REASONING_EFFORT.auto:
-            case REASONING_EFFORT.blank:
+            case REASONING_EFFORT.none:
                 return -1;
             case REASONING_EFFORT.min:
                 return 0;
@@ -1226,7 +1226,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
 
         switch (reasoningEffort) {
             case REASONING_EFFORT.auto:
-            case REASONING_EFFORT.blank:
+            case REASONING_EFFORT.none:
                 return -1;
             case REASONING_EFFORT.min:
                 return 0;
@@ -1255,7 +1255,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
 
         switch (reasoningEffort) {
             case REASONING_EFFORT.auto:
-            case REASONING_EFFORT.blank:
+            case REASONING_EFFORT.none:
                 return -1;
             case REASONING_EFFORT.min:
                 budgetTokens = 128;
@@ -1283,7 +1283,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
     function getGemini3FlashBudget() {
         switch (reasoningEffort) {
             case REASONING_EFFORT.auto:
-            case REASONING_EFFORT.blank:
+            case REASONING_EFFORT.none:
                 return null;
             case REASONING_EFFORT.min:
                 return 'minimal';
@@ -1304,7 +1304,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
     function getGemini3ProBudget() {
         switch (reasoningEffort) {
             case REASONING_EFFORT.auto:
-            case REASONING_EFFORT.blank:
+            case REASONING_EFFORT.none:
                 return null;
             case REASONING_EFFORT.min:
                 return 'low';

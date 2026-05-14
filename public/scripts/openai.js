@@ -283,7 +283,7 @@ const openrouter_middleout_types = {
 };
 
 export const reasoning_effort_types = {
-    blank: 'blank',
+    none: 'none',
     low: 'low',
     medium: 'medium',
     high: 'high',
@@ -575,7 +575,7 @@ const default_settings = {
     show_thoughts: true,
     auto_append_reasoning_tags: false,
     auto_append_reasoning_tag_style: reasoning_tag_styles.think,
-    reasoning_effort: reasoning_effort_types.blank,
+    reasoning_effort: reasoning_effort_types.none,
     verbosity: verbosity_levels.auto,
     custom_reasoning_preset: custom_reasoning_preset_types.OPENAI,
     custom_reasoning_param_name: 'reasoning_effort',
@@ -4287,7 +4287,7 @@ function getReasoningEffort(settings = null, model = null) {
 
     function resolveReasoningEffort() {
         switch (settings.reasoning_effort) {
-            case reasoning_effort_types.blank:
+            case reasoning_effort_types.none:
                 return undefined;
             case reasoning_effort_types.min:
                 if (chat_completion_sources.OPENROUTER === settings.chat_completion_source && !shouldRequestReasoning(settings)) {
@@ -5920,7 +5920,7 @@ function migrateChatCompletionSettings(settings) {
         { oldKey: 'claude_use_sysprompt', oldValue: true, newKey: 'use_sysprompt', newValue: true },
         { oldKey: 'use_makersuite_sysprompt', oldValue: true, newKey: 'use_sysprompt', newValue: true },
         { oldKey: 'mistralai_model', oldValue: /^(mistral-medium|mistral-small)$/, newKey: 'mistralai_model', newValue: (settings.mistralai_model + '-latest') },
-        { oldKey: 'reasoning_effort', oldValue: 'auto', newKey: 'reasoning_effort', newValue: reasoning_effort_types.blank },
+        { oldKey: 'reasoning_effort', oldValue: 'auto', newKey: 'reasoning_effort', newValue: reasoning_effort_types.none },
     ];
 
     for (const migration of migrateMap) {

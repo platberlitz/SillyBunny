@@ -105,8 +105,8 @@ describe('calculateClaudeBudgetTokens', () => {
         test('auto returns null', () => {
             expect(mod.calculateClaudeBudgetTokens(8192, 'auto', true, true)).toBeNull();
         });
-        test('blank returns null', () => {
-            expect(mod.calculateClaudeBudgetTokens(8192, 'blank', true, true)).toBeNull();
+        test('none returns null', () => {
+            expect(mod.calculateClaudeBudgetTokens(8192, 'none', true, true)).toBeNull();
         });
 
         test('min returns "low"', () => expect(mod.calculateClaudeBudgetTokens(8192, 'min', true, true)).toBe('low'));
@@ -121,8 +121,8 @@ describe('calculateClaudeBudgetTokens', () => {
         test('auto returns null', () => {
             expect(mod.calculateClaudeBudgetTokens(8192, 'auto', true, false)).toBeNull();
         });
-        test('blank returns null', () => {
-            expect(mod.calculateClaudeBudgetTokens(8192, 'blank', true, false)).toBeNull();
+        test('none returns null', () => {
+            expect(mod.calculateClaudeBudgetTokens(8192, 'none', true, false)).toBeNull();
         });
 
         test('min returns 1024 regardless of maxTokens', () => {
@@ -170,7 +170,7 @@ describe('calculateGoogleBudgetTokens', () => {
 
     describe('gemini-3 flash', () => {
         test('auto returns null', () => expect(mod.calculateGoogleBudgetTokens(8192, 'auto', 'gemini-3.5-flash')).toBeNull());
-        test('blank returns null', () => expect(mod.calculateGoogleBudgetTokens(8192, 'blank', 'gemini-3.5-flash')).toBeNull());
+        test('none returns null', () => expect(mod.calculateGoogleBudgetTokens(8192, 'none', 'gemini-3.5-flash')).toBeNull());
         test('min returns minimal', () => expect(mod.calculateGoogleBudgetTokens(8192, 'min', 'gemini-3.5-flash')).toBe('minimal'));
         test('low returns low', () => expect(mod.calculateGoogleBudgetTokens(8192, 'low', 'gemini-3.5-flash')).toBe('low'));
         test('medium returns medium', () => expect(mod.calculateGoogleBudgetTokens(8192, 'medium', 'gemini-3.5-flash')).toBe('medium'));
@@ -181,7 +181,7 @@ describe('calculateGoogleBudgetTokens', () => {
 
     describe('gemini-3 pro', () => {
         test('auto returns null', () => expect(mod.calculateGoogleBudgetTokens(8192, 'auto', 'gemini-3.0-pro')).toBeNull());
-        test('blank returns null', () => expect(mod.calculateGoogleBudgetTokens(8192, 'blank', 'gemini-3.0-pro')).toBeNull());
+        test('none returns null', () => expect(mod.calculateGoogleBudgetTokens(8192, 'none', 'gemini-3.0-pro')).toBeNull());
         test('min returns low', () => expect(mod.calculateGoogleBudgetTokens(8192, 'min', 'gemini-3.0-pro')).toBe('low'));
         test('low returns low', () => expect(mod.calculateGoogleBudgetTokens(8192, 'low', 'gemini-3.0-pro')).toBe('low'));
         test('medium returns low', () => expect(mod.calculateGoogleBudgetTokens(8192, 'medium', 'gemini-3.0-pro')).toBe('low'));

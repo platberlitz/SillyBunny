@@ -211,7 +211,7 @@ function shouldEnableCustomReasoning(requestBody) {
         return requestBody.include_reasoning;
     }
 
-    return Boolean(requestBody.reasoning_effort && !['auto', 'blank', 'none'].includes(String(requestBody.reasoning_effort)));
+    return Boolean(requestBody.reasoning_effort && !['auto', 'none'].includes(String(requestBody.reasoning_effort)));
 }
 
 function applyCustomReasoningParameters(bodyParams, requestBody) {
@@ -1236,7 +1236,7 @@ async function sendXaiRequest(request, response) {
             bodyParams['stop'] = request.body.stop;
         }
 
-        if (request.body.reasoning_effort && !['blank', 'auto', 'none'].includes(request.body.reasoning_effort)) {
+        if (request.body.reasoning_effort && !['auto', 'none'].includes(request.body.reasoning_effort)) {
             // grok-4.20-multi-agent supports xhigh; grok-3-mini supports low/high only
             const effort = request.body.reasoning_effort;
             bodyParams['reasoning_effort'] = effort === 'xhigh' ? 'xhigh' : (effort === 'high' ? 'high' : 'low');
