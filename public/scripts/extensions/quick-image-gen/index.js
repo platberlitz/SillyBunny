@@ -13824,8 +13824,8 @@ jQuery(function () {
     // Non-blocking async initialization
     (async () => {
         try {
-            const extensionsModule = await import("../../extensions.js");
-            const scriptModule = await import("../../../script.js");
+            const extensionsModule = await import("../../../extensions.js");
+            const scriptModule = await import("../../../../script.js");
             extension_settings = extensionsModule.extension_settings;
             getContext = extensionsModule.getContext;
             saveSettingsDebounced = scriptModule.saveSettingsDebounced;
@@ -13836,7 +13836,7 @@ jQuery(function () {
             getRequestHeaders = scriptModule.getRequestHeaders;
 
             try {
-                const openAICompatModule = await import("../../openai.js");
+                const openAICompatModule = await import("../../../openai.js");
                 createGenerationParameters = openAICompatModule.createGenerationParameters;
                 getChatCompletionModel = openAICompatModule.getChatCompletionModel;
             } catch (e) {
@@ -13844,7 +13844,7 @@ jQuery(function () {
             }
 
             try {
-                const utilsModule = await import("../../utils.js");
+                const utilsModule = await import("../../../utils.js");
                 saveBase64AsFile = utilsModule.saveBase64AsFile;
                 getSanitizedFilename = utilsModule.getSanitizedFilename;
             } catch (e) {
@@ -13852,14 +13852,14 @@ jQuery(function () {
             }
 
             try {
-                const rossModule = await import("../../RossAscends-mods.js");
+                const rossModule = await import("../../../RossAscends-mods.js");
                 humanizedDateTime = rossModule.humanizedDateTime;
             } catch (e) {
                 console.warn("[ImageGen] Could not import RossAscends-mods:", e.message);
             }
 
             try {
-                const secretsModule = await import("../../secrets.js");
+                const secretsModule = await import("../../../../scripts/secrets.js");
                 secret_state = secretsModule.secret_state;
                 rotateSecret = secretsModule.rotateSecret;
             } catch (e) {

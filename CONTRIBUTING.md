@@ -24,6 +24,10 @@ BEFORE submitting a pull request, keep the following project goals and best prac
 - Keep fork-specific feature additions and upstream synchronization merges in separate pull requests. Mixing upstream code updates with SillyBunny feature logic complicates the review process.
 - Make sure new features work elegantly with parity on both mobile and desktop environments.
 
+#### Bundled Quick Image Gen
+
+The bundled Quick Image Gen files under `public/scripts/extensions/quick-image-gen/` mirror the upstream `main` branch at <https://github.com/platberlitz/sillytavern-image-gen>. Update Quick Image Gen in that repository first, then let the daily sync workflow open a SillyBunny PR or run `bash scripts/sync-quick-image-gen.sh` locally and commit the generated result. Manual edits to `index.js`, `style.css`, or `manifest.json` in the bundled copy will be overwritten by the next sync.
+
 #### Correct target branch
 
 Always create pull requests using the `staging` branch; 99% of contributions should go there. This way, we can ensure stability before a proper release version.
