@@ -432,7 +432,7 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 
 ### Workspace, Sampling, And Presets
 - Added a unified Sampling menu in the Workspace menu for Chat Completions and Text Completions. This also migrates seed and logit bias information from Chat Completions to a more logical place, and includes a Neutralize Samplers button for Chat Completions.
-- Updated Geechan's bundled roleplay preset to `Geechan - Universal Roleplay (Chat Completions) (v5.1)` plus matching Text Completions context and system prompt variants.
+- Updated Geechan's bundled roleplay preset to `Geechan - Universal Roleplay (Chat Completions) (v5.2)` plus matching Text Completions context and system prompt variants.
 - Replaced `Geechan's Chatroom Prompt` with the overhauled `Geechan - Universal Online Chat (Chat Completions) (v1.0)` preset, plus matching Text Completions context and system prompt files.
 - Updated `Pura's Director Preset (SillyBunny)` to version `13.0` and removed the separate SillyTavern variant from bundled content.
 - Added roomier editing tools, including a resizable first-message field, a desktop World Info pop-up editor, expanded context-size presets, Text Completions preset parity, and better advanced definitions editing.
