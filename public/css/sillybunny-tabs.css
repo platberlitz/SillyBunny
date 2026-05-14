@@ -57,6 +57,7 @@
     --sb-mobile-tools-header-gap-base: 8px;
     --sb-mobile-tools-actions-gap-base: 6px;
     --sb-mobile-tools-button-size-base: 30px;
+    --sb-mobile-tools-min-size: 44px;
     --sb-mobile-tools-button-radius-base: 9px;
     --sb-mobile-tools-field-height-base: 30px;
     --sb-mobile-tools-field-padding-x-base: 9px;
@@ -113,9 +114,9 @@
     --sb-mobile-tools-gap: calc(var(--sb-mobile-tools-gap-base) * var(--sb-topbar-scale-active));
     --sb-mobile-tools-header-gap: calc(var(--sb-mobile-tools-header-gap-base) * var(--sb-topbar-scale-active));
     --sb-mobile-tools-actions-gap: calc(var(--sb-mobile-tools-actions-gap-base) * var(--sb-topbar-scale-active));
-    --sb-mobile-tools-button-size: clamp(34px, calc(44px * var(--sb-topbar-scale-active) * var(--sb-mobile-button-scale)), 56px);
+    --sb-mobile-tools-button-size: clamp(var(--sb-mobile-tools-min-size), calc(var(--sb-mobile-tools-button-size-base) * var(--sb-topbar-scale-active) * var(--sb-mobile-button-scale)), 56px);
     --sb-mobile-tools-button-radius: calc(var(--sb-mobile-tools-button-radius-base) * var(--sb-topbar-scale-active) * var(--sb-mobile-button-scale));
-    --sb-mobile-tools-field-height: max(44px, calc(var(--sb-mobile-tools-field-height-base) * var(--sb-topbar-scale-active)));
+    --sb-mobile-tools-field-height: clamp(var(--sb-mobile-tools-min-size), calc(var(--sb-mobile-tools-field-height-base) * var(--sb-topbar-scale-active)), 56px);
     --sb-mobile-tools-field-padding-x: calc(var(--sb-mobile-tools-field-padding-x-base) * var(--sb-topbar-scale-active));
     --sb-mobile-tools-field-icon-size: calc(var(--mainFontSize) * var(--sb-mobile-tools-field-icon-scale-base) * var(--sb-topbar-scale-active));
     --sb-mobile-tools-input-height: calc(var(--sb-mobile-tools-input-height-base) * var(--sb-topbar-scale-active));
@@ -146,6 +147,7 @@
 
 :root[data-sb-compact-mode='true'] {
     --sb-density-scale: 0.88;
+    --sb-topbar-primary-height-base: 34px;
     --sb-topbar-padding-x-base: 7px;
     --sb-topbar-stack-gap-base: 3px;
     --sb-topbar-inline-gap-base: 7px;
@@ -155,22 +157,23 @@
     --sb-chatbar-gap-base: 4px;
     --sb-chatbar-padding-y-base: 3px;
     --sb-chatbar-padding-x-base: 5px;
-    --sb-chatbar-button-size-base: 30px;
-    --sb-chatbar-field-height-base: 30px;
+    --sb-chatbar-button-size-base: 26px;
+    --sb-chatbar-field-height-base: 26px;
     --sb-chatbar-field-padding-x-base: 7px;
     --sb-chatbar-input-font-scale-base: 0.66;
     --sb-proxy-button-padding-x-base: 11px;
-    --sb-proxy-button-height-base: 40px;
+    --sb-proxy-button-height-base: 34px;
     --sb-proxy-button-min-width-base: 88px;
     --sb-proxy-button-gap-base: 6px;
-    --sb-mobile-toggle-size-base: 44px;
+    --sb-mobile-toggle-size-base: 34px;
     --sb-home-toggle-min-width-base: 78px;
     --sb-mobile-tools-padding-top-base: 7px;
     --sb-mobile-tools-padding-x-base: 7px;
     --sb-mobile-tools-padding-bottom-base: 8px;
     --sb-mobile-tools-gap-base: 6px;
-    --sb-mobile-tools-button-size-base: 30px;
-    --sb-mobile-tools-field-height-base: 30px;
+    --sb-mobile-tools-button-size-base: 26px;
+    --sb-mobile-tools-min-size: 34px;
+    --sb-mobile-tools-field-height-base: 26px;
     --sb-shell-panel-bottom-padding: clamp(30px, 4vh, 52px);
     --sb-shell-section-gap: var(--sb-shell-space-md);
     --sb-shell-card-gap: var(--sb-shell-space-sm);
@@ -4405,20 +4408,19 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 }
 
 #right-nav-panel .sb-character-editor-controls-row > #avatar_div_div {
-    flex: 0 1 auto;
-    width: min(100%, 50vh, 373px) !important;
-    height: auto !important;
-    aspect-ratio: 2 / 3;
-    margin: 10px auto 4px !important;
-    border-radius: var(--sb-radius-md, 16px) !important;
-    overflow: hidden;
+    flex: 0 0 var(--avatar-base-width);
+    width: var(--avatar-base-width) !important;
+    min-width: var(--avatar-base-width) !important;
+    max-width: var(--avatar-base-width) !important;
+    height: var(--avatar-base-height) !important;
+    min-height: var(--avatar-base-height) !important;
+    max-height: var(--avatar-base-height) !important;
+    margin: 10px 8px 0 10px !important;
 }
 
 #right-nav-panel .sb-character-editor-controls-row > #avatar_div_div img {
     width: 100% !important;
     height: 100% !important;
-    border-radius: inherit !important;
-    object-fit: contain;
 }
 
 #right-nav-panel #avatar_controls > #tags_div .tag_controls {
@@ -5811,6 +5813,21 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         --sb-home-toggle-min-width-base: 44px;
         --sb-proxy-underline-inset-base: 8px;
         --sb-proxy-underline-bottom-base: 4px;
+    }
+
+    :root[data-sb-compact-mode='true'] {
+        --sb-topbar-primary-height-base: 34px;
+        --sb-topbar-padding-x-base: 6px;
+        --sb-topbar-inline-gap-base: 5px;
+        --sb-topbar-search-row-height-base: 32px;
+        --sb-topbar-group-gap-base: 3px;
+        --sb-chatbar-height-base: 34px;
+        --sb-chatbar-button-size-base: 24px;
+        --sb-chatbar-field-height-base: 24px;
+        --sb-chatbar-field-padding-x-base: 7px;
+        --sb-mobile-toggle-size-base: 34px;
+        --sb-home-toggle-min-width-base: 34px;
+        --sb-mobile-tools-min-size: 34px;
     }
 
     .sb-mobile-only-setting {
