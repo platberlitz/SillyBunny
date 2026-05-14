@@ -249,6 +249,46 @@ function applyCustomReasoningParameters(bodyParams, requestBody) {
     }
 }
 
+function isLikelyLocalServerUrl(serverUrl) {
+    if (typeof serverUrl !== 'string' || !serverUrl.trim()) {
+        return false;
+    }
+
+    try {
+        const url = new URL(serverUrl);
+        const host = String(url.hostname ?? '').toLowerCase();
+        return [
+            'localhost',
+            '127.0.0.1',
+            '::1',
+        ].includes(host) || host.endsWith('.local') || /^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
+    } catch {
+        return /(^|[^\w])localhost([^\w]|$)/i.test(serverUrl) || /127\.0\.0\.1|\b10\.\d+\.\d+\.\d+\b|\b192\.168\.\d+\.\d+\b|\b172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+\b/.test(serverUrl);
+    }
+}
+
+function getOpenAiCompatibleServerUrl(requestBody) {
+    return requestBody.chat_completion_source === CHAT_COMPLETION_SOURCES.CUSTOM ? requestBody.custom_url : '';
+}
+
+function applyLocalPromptCacheScope(bodyParams, requestBody) {
+    if (requestBody.chat_completion_source !== CHAT_COMPLETION_SOURCES.CUSTOM) {
+        return;
+    }
+
+    const serverUrl = getOpenAiCompatibleServerUrl(requestBody);
+    if (!isLikelyLocalServerUrl(serverUrl)) {
+        return;
+    }
+
+    // SillyBunny: isolate helper generations so local prompt caches keep the main chat lane hot.
+    if (String(requestBody.cacheScope ?? 'auxiliary') === 'main') {
+        bodyParams.cache_prompt = true;
+    } else {
+        delete bodyParams.cache_prompt;
+    }
+}
+
 /**
  * Hacky way to use JSON schema only if json_object format is supported.
  * @param {object} bodyParams Additional body parameters
@@ -2957,6 +2997,8 @@ router.post('/generate', async function (request, response) {
                 bodyParams['verbosity'] = request.body.verbosity;
             }
         }
+
+        applyLocalPromptCacheScope(bodyParams, request.body);
 
         if (!apiKey && !request.body.reverse_proxy && request.body.chat_completion_source !== CHAT_COMPLETION_SOURCES.CUSTOM) {
             console.warn('OpenAI API key is missing.');

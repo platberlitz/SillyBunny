@@ -4350,7 +4350,7 @@ function getVerbosity(settings = null) {
  * @param {import('../script.js').AdditionalRequestOptions} options Additional request options
  * @returns {Promise<object>} Final generation parameters object appropriate for the chat completion source
  */
-export async function createGenerationParameters(settings, model, type, messages, { jsonSchema = null } = {}) {
+export async function createGenerationParameters(settings, model, type, messages, { jsonSchema = null, cacheScope = null } = {}) {
     // HACK: Filter out null and non-object messages
     if (!Array.isArray(messages)) {
         throw new Error('messages must be an array');
@@ -4476,6 +4476,7 @@ export async function createGenerationParameters(settings, model, type, messages
         'request_image_aspect_ratio': String(settings.request_image_aspect_ratio),
         'custom_prompt_post_processing': settings.custom_prompt_post_processing,
         'verbosity': getVerbosity(settings),
+        'cacheScope': cacheScope ?? (type === 'quiet' ? 'auxiliary' : 'main'),
     };
 
     if (settings.chat_completion_source === chat_completion_sources.AZURE_OPENAI) {
@@ -4760,14 +4761,14 @@ export async function createGenerationParameters(settings, model, type, messages
  * @returns {Promise<unknown>}
  * @throws {Error}
  */
-async function sendOpenAIRequest(type, messages, signal, { jsonSchema = null } = {}) {
+async function sendOpenAIRequest(type, messages, signal, { jsonSchema = null, cacheScope = null } = {}) {
     // Provide default abort signal
     if (!signal) {
         signal = new AbortController().signal;
     }
 
     const model = getChatCompletionModel(oai_settings);
-    const { generate_data, stream, canMultiSwipe } = await createGenerationParameters(oai_settings, model, type, messages, { jsonSchema });
+    const { generate_data, stream, canMultiSwipe } = await createGenerationParameters(oai_settings, model, type, messages, { jsonSchema, cacheScope });
     await eventSource.emit(event_types.CHAT_COMPLETION_SETTINGS_READY, generate_data);
 
     const generate_url = '/api/backends/chat-completions/generate';
