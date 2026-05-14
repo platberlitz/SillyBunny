@@ -123,6 +123,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #88 (2026-05-14) `fix: keep tablet shell edge-to-edge`
 - PR #89 (2026-05-14) `fix: tighten mobile composer top gap and shrink message box`
 - PR #90 (2026-05-14) `fix: skip post-generation agents on greetings`
+- PR #91 (2026-05-14) `fix(mobile): keep controls within mobile bounds`
 
 ### Direct Staging Commits
 - `fix(chat): restore scroll anchoring so scrolling up no longer skips messages`
