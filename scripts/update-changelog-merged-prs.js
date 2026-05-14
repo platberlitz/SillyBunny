@@ -15,12 +15,13 @@ const mergedPrHeading = '### Merged Staging PRs';
 const stagingBranch = 'staging';
 
 function printHelp() {
-    console.log(`Usage: node scripts/update-changelog-merged-prs.js --pr <number> [--pr <number>] [--version <version>] [--dry-run]
+    console.log(`Usage: node scripts/update-changelog-merged-prs.js [--pr <number>] [--pr <number>] [--version <version>] [--dry-run]
 
 Adds merged staging pull requests to the current changelog version section.
 
 Options:
   --pr <number>       Pull request number to record. Can be repeated or comma-separated.
+                      Defaults to merged PRs found in the GitHub event payload.
   --version <version> Changelog version heading to update. Defaults to package.json version.
   --dry-run           Report whether changelog.md would change without writing it.
   --help              Show this help text.
@@ -62,9 +63,9 @@ function parseArgs(argv) {
         throw new Error(`Unknown argument: ${arg}`);
     }
 
-    const eventPrNumber = readEventPrNumber();
-    if (!options.prNumbers.length && eventPrNumber) {
-        options.prNumbers.push(eventPrNumber);
+    const eventPrNumbers = readEventPrNumbers();
+    if (!options.prNumbers.length && eventPrNumbers.length) {
+        options.prNumbers.push(...eventPrNumbers);
     }
 
     return options;
@@ -79,17 +80,44 @@ function readArgValue(argv, index, flag) {
     return value;
 }
 
-function readEventPrNumber() {
+function readEventPrNumbers() {
+    const prNumbers = [];
+
     if (process.env.CHANGELOG_PR_NUMBER) {
-        return process.env.CHANGELOG_PR_NUMBER;
+        prNumbers.push(...process.env.CHANGELOG_PR_NUMBER.split(','));
     }
 
     if (!process.env.GITHUB_EVENT_PATH || !fs.existsSync(process.env.GITHUB_EVENT_PATH)) {
-        return undefined;
+        return prNumbers;
     }
 
     const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
-    return event.pull_request?.number ? String(event.pull_request.number) : undefined;
+
+    if (event.pull_request?.number) {
+        prNumbers.push(String(event.pull_request.number));
+    }
+
+    const commits = [...(event.commits || [])];
+    if (event.head_commit) {
+        commits.push(event.head_commit);
+    }
+
+    for (const commit of commits) {
+        prNumbers.push(...extractMergedPrNumbers(commit.message));
+    }
+
+    return prNumbers;
+}
+
+function extractMergedPrNumbers(message) {
+    const numbers = [];
+    const pattern = /^Merge pull request #(\d+)\b/gm;
+
+    for (const match of String(message || '').matchAll(pattern)) {
+        numbers.push(match[1]);
+    }
+
+    return numbers;
 }
 
 function normalizePrNumbers(values) {
@@ -249,6 +277,11 @@ function main() {
         }
 
         const prNumbers = normalizePrNumbers(options.prNumbers);
+        if (!prNumbers.length && process.env.GITHUB_EVENT_NAME === 'push') {
+            console.log('No merged staging pull requests found in this push.');
+            return;
+        }
+
         if (!prNumbers.length) {
             throw new Error('At least one --pr <number> is required.');
         }

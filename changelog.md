@@ -92,18 +92,36 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #53 (2026-05-11) `fix: preserve chat completion tab scroll`
 - PR #54 (2026-05-11) `fix: honor profile secret ids for custom chat completions`
 - PR #55 (2026-05-11) `fix: let chat completion tab switcher scroll`
+- PR #56 (2026-05-13) `feat: bake workflow extensions into core`
 - PR #57 (2026-05-12) `fix: confirm preset overwrites and unsaved text edits`
 - PR #59 (2026-05-12) `fix: restore mobile composer auto-grow`
 - PR #60 (2026-05-12) `feat: add pre-generation agent interceptors`
 - PR #62 (2026-05-12) `fix: reduce iOS streaming pressure`
 - PR #63 (2026-05-12) `fix: align iOS smooth streaming checks`
+- PR #64 (2026-05-13) `fix: restore avatar preview and shape styling`
 - PR #65 (2026-05-12) `fix: stabilize mobile shell interactions`
+- PR #66 (2026-05-13) `feat: expand connection profile summaries`
 - PR #67 (2026-05-13) `feat: add OOC and HTML context depth controls`
 - PR #68 (2026-05-13) `fix: polish in-chat agent rewrite metadata`
 - PR #69 (2026-05-12) `fix: hide Claude sampler omission toggles`
 - PR #70 (2026-05-12) `fix: hide disabled extension message actions`
 - PR #71 (2026-05-12) `fix: refresh memory sharding quick reply`
 - PR #73 (2026-05-13) `feat: rework character menu`
+- PR #74 (2026-05-13) `chore(presets): refresh Pura director preset`
+- PR #75 (2026-05-13) `docs: clarify generated runtime config`
+- PR #76 (2026-05-13) `fix: compact guided generations mobile buttons`
+- PR #77 (2026-05-13) `fix: apply geechan review follow-ups`
+- PR #78 (2026-05-13) `fix: persist guided generations fork warning`
+- PR #79 (2026-05-13) `fix: tighten mobile character editor layout`
+- PR #80 (2026-05-13) `feat: bundle Echo, Whisper, Hush, Ripple, Tide chat styles natively`
+- PR #81 (2026-05-13) `fix: refresh message token counts after edits`
+- PR #82 (2026-05-13) `Fix input history controls in chat composer`
+- PR #84 (2026-05-14) `fix: improve mobile character drawer layout`
+- PR #86 (2026-05-14) `fix(mobile): enlarge composer textarea and balance spacing`
+- PR #87 (2026-05-14) `fix: refresh in-chat-agent token badges`
+- PR #88 (2026-05-14) `fix: keep tablet shell edge-to-edge`
+- PR #89 (2026-05-14) `fix: tighten mobile composer top gap and shrink message box`
+- PR #90 (2026-05-14) `fix: skip post-generation agents on greetings`
 
 ### Direct Staging Commits
 - `fix(chat): restore scroll anchoring so scrolling up no longer skips messages`
