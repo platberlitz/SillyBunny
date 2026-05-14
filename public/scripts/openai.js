@@ -283,12 +283,13 @@ const openrouter_middleout_types = {
 };
 
 export const reasoning_effort_types = {
-    auto: 'auto',
+    none: 'none',
     low: 'low',
     medium: 'medium',
     high: 'high',
     min: 'min',
     max: 'max',
+    xhigh: 'xhigh',
 };
 
 export const reasoning_tag_styles = {
@@ -574,7 +575,7 @@ const default_settings = {
     show_thoughts: true,
     auto_append_reasoning_tags: false,
     auto_append_reasoning_tag_style: reasoning_tag_styles.think,
-    reasoning_effort: reasoning_effort_types.auto,
+    reasoning_effort: reasoning_effort_types.none,
     verbosity: verbosity_levels.auto,
     custom_reasoning_preset: custom_reasoning_preset_types.OPENAI,
     custom_reasoning_param_name: 'reasoning_effort',
@@ -4284,7 +4285,7 @@ function getReasoningEffort(settings = null, model = null) {
 
     function resolveReasoningEffort() {
         switch (settings.reasoning_effort) {
-            case reasoning_effort_types.auto:
+            case reasoning_effort_types.none:
                 return undefined;
             case reasoning_effort_types.min:
                 if (chat_completion_sources.OPENROUTER === settings.chat_completion_source && !shouldRequestReasoning(settings)) {
@@ -4294,8 +4295,14 @@ function getReasoningEffort(settings = null, model = null) {
                 return [chat_completion_sources.OPENAI, chat_completion_sources.OPENAI_RESPONSES, chat_completion_sources.AZURE_OPENAI].includes(settings.chat_completion_source) && /^gpt-5/.test(model)
                     ? reasoning_effort_types.min
                     : reasoning_effort_types.low;
-            case reasoning_effort_types.max:
-                return reasoning_effort_types.high;
+            case reasoning_effort_types.max: {
+                // xhigh is supported on OpenAI models after gpt-5.1-codex-max and on xAI grok-4.20-multi-agent
+                const xhighOpenAI = [chat_completion_sources.OPENAI, chat_completion_sources.OPENAI_RESPONSES, chat_completion_sources.AZURE_OPENAI].includes(settings.chat_completion_source)
+                    && /^gpt-5\.([2-9]|\d{2,})/.test(model);
+                const xhighXAI = settings.chat_completion_source === chat_completion_sources.XAI
+                    && model.includes('grok-4.20-multi-agent');
+                return (xhighOpenAI || xhighXAI) ? reasoning_effort_types.xhigh : reasoning_effort_types.high;
+            }
             default:
                 return settings.reasoning_effort;
         }
@@ -4602,13 +4609,15 @@ export async function createGenerationParameters(settings, model, type, messages
     }
 
     if (settings.chat_completion_source === chat_completion_sources.XAI) {
+        const xaiReasoningModels = ['grok-3-mini', 'grok-4.20-multi-agent'];
+        if (!xaiReasoningModels.some(m => model.includes(m))) {
+            delete generate_data.reasoning_effort;
+        }
+
         if (model.includes('grok-3-mini')) {
             delete generate_data.presence_penalty;
             delete generate_data.frequency_penalty;
             delete generate_data.stop;
-        } else {
-            // As of 2025/09/21, only grok-3-mini accepts reasoning_effort
-            delete generate_data.reasoning_effort;
         }
 
         if (model.includes('grok-4') || model.includes('grok-code')) {
@@ -5909,6 +5918,7 @@ function migrateChatCompletionSettings(settings) {
         { oldKey: 'claude_use_sysprompt', oldValue: true, newKey: 'use_sysprompt', newValue: true },
         { oldKey: 'use_makersuite_sysprompt', oldValue: true, newKey: 'use_sysprompt', newValue: true },
         { oldKey: 'mistralai_model', oldValue: /^(mistral-medium|mistral-small)$/, newKey: 'mistralai_model', newValue: (settings.mistralai_model + '-latest') },
+        { oldKey: 'reasoning_effort', oldValue: 'auto', newKey: 'reasoning_effort', newValue: reasoning_effort_types.none },
     ];
 
     for (const migration of migrateMap) {

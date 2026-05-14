@@ -1236,8 +1236,10 @@ async function sendXaiRequest(request, response) {
             bodyParams['stop'] = request.body.stop;
         }
 
-        if (request.body.reasoning_effort) {
-            bodyParams['reasoning_effort'] = request.body.reasoning_effort === 'high' ? 'high' : 'low';
+        if (request.body.reasoning_effort && !['auto', 'none'].includes(request.body.reasoning_effort)) {
+            // grok-4.20-multi-agent supports xhigh; grok-3-mini supports low/high only
+            const effort = request.body.reasoning_effort;
+            bodyParams['reasoning_effort'] = effort === 'xhigh' ? 'xhigh' : (effort === 'high' ? 'high' : 'low');
         }
 
         if (request.body.json_schema) {
