@@ -39,6 +39,7 @@ describe('in-chat agent post-processing runner', () => {
     let updateMessageMetaBadges;
     let connectionManagerRequestService;
     let globalSettings;
+    let currentChatId;
     let documentListeners;
     let windowListeners;
 
@@ -103,6 +104,7 @@ describe('in-chat agent post-processing runner', () => {
             promptTransformShowNotifications: false,
             appendAgentsExecutionMode: 'parallel',
         };
+        currentChatId = 'chat-a';
         documentListeners = new Map();
         windowListeners = new Map();
 
@@ -168,6 +170,7 @@ describe('in-chat agent post-processing runner', () => {
             }),
             substituteParams: jest.fn(value => String(value ?? '')),
             generateQuietPrompt,
+            getCurrentChatId: jest.fn(() => currentChatId),
             normalizeContentText: jest.fn(value => String(value ?? '')),
             saveChatDebounced,
             stopGeneration: jest.fn(() => false),
@@ -951,6 +954,29 @@ describe('in-chat agent post-processing runner', () => {
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
     });
 
+    test('does not run post-processing agents for greeting messages', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Hello there',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'first_message');
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'first_message');
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Hello there');
+        expect(chat[0].extra.inChatAgentPostRuns).toBeUndefined();
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+    });
+
     test('snapshots regex-only agents as soon as the assistant message is received', async () => {
         useRegexOnlyAgent();
 
@@ -1587,6 +1613,34 @@ describe('in-chat agent post-processing runner', () => {
 
         expect(chat[0].mes).toBe('Late mobile reply\n[post processed]');
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not flush stale mobile post-processing after switching chats', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        currentChatId = 'chat-a';
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+
+        currentChatId = 'chat-b';
+        chat.splice(0, chat.length, {
+            name: 'Assistant',
+            mes: 'Existing greeting',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        delete document.body.dataset.generating;
+        await eventSource.emit(eventTypes.CHAT_CHANGED, currentChatId);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Existing greeting');
+        expect(saveChatDebounced).not.toHaveBeenCalled();
     });
 
     test('polls missed mobile render events using the generation-start snapshot', async () => {
