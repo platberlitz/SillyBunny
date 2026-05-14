@@ -2811,8 +2811,10 @@ async function mountPathfinderSettingsInExtensions() {
         return host;
     }
 
-    settingsPanel.addClass('pf--settings-embedded');
-    body.append(settingsPanel[0]);
+    settingsPanel.filter('#pf--settings').addClass('pf--settings-embedded');
+    for (const node of settingsPanel.toArray()) {
+        body.append(node);
+    }
     return host;
 }
 
