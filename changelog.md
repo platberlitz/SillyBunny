@@ -126,6 +126,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #91 (2026-05-14) `fix(mobile): keep controls within mobile bounds`
 - PR #95 (2026-05-14) `fix(ui): restore chat and compact layout`
 - PR #96 (2026-05-14) `fix(presets): add connection field guardrails`
+- PR #98 (2026-05-14) `chore(presets): update Geechan roleplay prompts to v5.2`
 
 ### Direct Staging Commits
 - `fix(chat): restore scroll anchoring so scrolling up no longer skips messages`
