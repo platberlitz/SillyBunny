@@ -125,6 +125,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #90 (2026-05-14) `fix: skip post-generation agents on greetings`
 - PR #91 (2026-05-14) `fix(mobile): keep controls within mobile bounds`
 - PR #95 (2026-05-14) `fix(ui): restore chat and compact layout`
+- PR #96 (2026-05-14) `fix(presets): add connection field guardrails`
 
 ### Direct Staging Commits
 - `fix(chat): restore scroll anchoring so scrolling up no longer skips messages`
