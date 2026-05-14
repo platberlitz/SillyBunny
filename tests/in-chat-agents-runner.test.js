@@ -213,6 +213,7 @@ describe('in-chat agent post-processing runner', () => {
             getEnabledToolAgents: jest.fn(() => []),
             getGlobalSettings: jest.fn(() => globalSettings),
             getPromptTransformMode: jest.fn(agent => agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite'),
+            saveAgent: jest.fn(async () => {}),
             isToolAgent: jest.fn(() => false),
             normalizePreProcessMaxTokens: jest.fn(value => Number.isFinite(Number(value)) ? Math.max(16, Math.min(16000, Number(value))) : 8192),
             normalizePromptTransformMaxTokens: jest.fn(value => Number.isFinite(Number(value)) ? Math.max(16, Math.min(16000, Number(value))) : 8192),
@@ -225,10 +226,19 @@ describe('in-chat agent post-processing runner', () => {
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/tree-store.js', () => ({
-            getAllEntryUids: jest.fn(() => []),
             getSettings: jest.fn(() => ({ pipelinePrompts: {}, pipelines: [] })),
-            getTree: jest.fn(() => null),
             setSettings: jest.fn(),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/tool-definitions.js', () => ({
+            getPathfinderToolDefinitions: jest.fn(() => [
+                { name: 'Pathfinder_Search', displayName: 'Search', description: 'Search', parameters: {}, actionKey: 'pathfinder.search' },
+                { name: 'Pathfinder_Summarize', displayName: 'Summarize', description: 'Summarize', parameters: {}, actionKey: 'pathfinder.summarize' },
+            ]),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/pathfinder-tool-bridge.js', () => ({
+            getContextualLorebooks: jest.fn(() => []),
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/sidecar-retrieval.js', () => ({

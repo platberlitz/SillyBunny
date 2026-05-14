@@ -27,6 +27,9 @@ export const SETTING_DEFAULTS = {
     enabledLorebooks: [],
     includeContextualLorebooks: true,
     autoUseAttachedLorebook: false,
+    autoSyncLorebooksOnChatChange: true,
+    dedupeNaturalActivation: true,
+    toolStates: {},
     bookPermissions: {},
     confirmTools: {},
     // Pipeline settings
@@ -57,7 +60,7 @@ export function getSettings() {
 
 export function setSettings(newSettings) {
     const nextSettings = { ...SETTING_DEFAULTS, ...settings, ...(newSettings || {}) };
-    for (const key of ['bookPermissions', 'confirmTools', 'pipelinePrompts', 'pipelines']) {
+    for (const key of ['toolStates', 'bookPermissions', 'confirmTools', 'pipelinePrompts', 'pipelines']) {
         nextSettings[key] = {
             ...(SETTING_DEFAULTS[key] || {}),
             ...(settings?.[key] || {}),
@@ -225,6 +228,28 @@ export function setLorebookEnabled(bookName, enabled) {
     }
 }
 
+export function getToolStates() {
+    const s = getSettings();
+    if (!s.toolStates || typeof s.toolStates !== 'object') {
+        s.toolStates = {};
+    }
+    return s.toolStates;
+}
+
+export function isPathfinderToolEnabled(toolName, fallback = true) {
+    const states = getToolStates();
+    if (!Object.prototype.hasOwnProperty.call(states, toolName)) {
+        return fallback;
+    }
+
+    return states[toolName] !== false;
+}
+
+export function setPathfinderToolEnabled(toolName, enabled) {
+    const states = getToolStates();
+    states[toolName] = Boolean(enabled);
+}
+
 export function getBookDescription(bookName) {
     const tree = getTree(bookName);
     return tree?.description ?? '';
@@ -265,12 +290,34 @@ export function setBookPermission(bookName, permission, value) {
     s.bookPermissions[bookName][permission] = value;
 }
 
+function isPermissionAllowed(value) {
+    if (value === undefined || value === null) {
+        return true;
+    }
+
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'number') {
+        return value !== 0;
+    }
+
+    const normalized = String(value).trim().toLowerCase();
+    return !['none', 'false', 'off', 'deny', 'denied', 'no', '0', 'disabled'].includes(normalized);
+}
+
 export function canReadBook(bookName) {
     const perm = getBookPermission(bookName, 'read');
-    return perm !== 'none';
+    return isPermissionAllowed(perm);
 }
 
 export function canWriteBook(bookName) {
     const perm = getBookPermission(bookName, 'write');
-    return perm === 'readwrite';
+    return isPermissionAllowed(perm);
+}
+
+export function canDeleteBook(bookName) {
+    const perm = getBookPermission(bookName, 'delete');
+    return isPermissionAllowed(perm);
 }

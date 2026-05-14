@@ -1,6 +1,6 @@
 import { getTree, createTreeNode, saveTree } from '../tree-store.js';
 import { createEntry } from '../entry-manager.js';
-import { getActiveTunnelVisionBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
+import { getWritableBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
 import { registerToolAction, registerToolFormatter } from '../../tool-action-registry.js';
 import { logToolCallStarted, logToolCallCompleted, logToolCallError } from '../activity-feed.js';
 import { setSummaryMemoryCreated } from '../summary-memory-store.js';
@@ -21,7 +21,7 @@ export async function createSummaryMemoryEntry(args = {}) {
         throw new Error('"title" and "content" are required.');
     }
 
-    const writableBooks = getActiveTunnelVisionBooks();
+    const writableBooks = getWritableBooks();
     const targetBook = resolveTargetBook(bookName, writableBooks);
     if (!targetBook) {
         logToolCallError(TOOL_NAMES.SUMMARIZE, 'No writable lorebooks');

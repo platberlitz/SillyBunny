@@ -26,6 +26,7 @@ import {
     getEnabledToolAgents,
     getGlobalSettings,
     getPromptTransformMode,
+    saveAgent,
     isToolAgent,
     normalizePreProcessMaxTokens,
     normalizePromptTransformMaxTokens,
@@ -38,11 +39,11 @@ import {
     getToolFormatter,
 } from './tool-action-registry.js';
 import {
-    getAllEntryUids as pfGetAllEntryUids,
     getSettings as getPathfinderRuntimeSettings,
-    getTree as pfGetTree,
     setSettings as setPathfinderRuntimeSettings,
 } from './pathfinder/tree-store.js';
+import { getPathfinderToolDefinitions } from './pathfinder/tool-definitions.js';
+import { getContextualLorebooks } from './pathfinder/pathfinder-tool-bridge.js';
 import { PATHFINDER_RETRIEVAL_PROMPT_KEYS, runSidecarRetrieval } from './pathfinder/sidecar-retrieval.js';
 import { markAutoSummaryComplete, shouldAutoSummarize } from './pathfinder/auto-summary.js';
 
@@ -69,6 +70,7 @@ const BODY_GENERATING_FLAG_GRACE_MS = 1500;
 const DEFERRED_POST_PROCESSING_RETRY_MS = 50;
 const LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS = 30000;
 const MISSED_GENERATION_END_RECOVERY_MS = 200;
+const PATHFINDER_SUMMARIZE_TOOL_NAME = 'Pathfinder_Summarize';
 
 /** @type {{ generationType: string, activeAgentIds: string[] } | null} */
 let pendingGenerationSnapshot = null;
@@ -325,11 +327,34 @@ export function getPathfinderRuntimeAgent(agents = getEnabledToolAgents()) {
     return agents.find(isPathfinderToolAgent) ?? null;
 }
 
+function getAgentToolByName(agent, toolName) {
+    return Array.isArray(agent?.tools)
+        ? agent.tools.find(tool => tool?.name === toolName)
+        : null;
+}
+
+function isPathfinderToolEnabledForAgent(agent, toolName) {
+    const states = agent?.settings?.toolStates;
+    if (states && typeof states === 'object' && Object.prototype.hasOwnProperty.call(states, toolName)) {
+        return states[toolName] !== false;
+    }
+
+    const savedTool = getAgentToolByName(agent, toolName);
+    return savedTool?.enabled !== false;
+}
+
+function getPathfinderToolStateMap(agent) {
+    return Object.fromEntries(
+        getPathfinderToolDefinitions().map(tool => [tool.name, isPathfinderToolEnabledForAgent(agent, tool.name)]),
+    );
+}
+
 function syncPathfinderRuntimeSettings(agent = getPathfinderRuntimeAgent()) {
     const currentRuntimeSettings = getPathfinderRuntimeSettings();
     const nextRuntimeSettings = agent?.settings
         ? {
             ...agent.settings,
+            toolStates: getPathfinderToolStateMap(agent),
             pipelinePrompts: currentRuntimeSettings.pipelinePrompts,
             pipelines: currentRuntimeSettings.pipelines,
         }
@@ -342,21 +367,73 @@ function syncPathfinderRuntimeSettings(agent = getPathfinderRuntimeAgent()) {
 }
 
 function getRegisterableAgentTools(agent) {
-    const enabledTools = (agent.tools ?? []).filter(tool => tool.enabled !== false);
+    if (isPathfinderToolAgent(agent)) {
+        const enabledTools = getPathfinderToolDefinitions()
+            .filter(tool => isPathfinderToolEnabledForAgent(agent, tool.name));
 
-    if (!isPathfinderToolAgent(agent) || agent?.settings?.sidecarEnabled) {
-        return enabledTools;
+        if (agent?.settings?.sidecarEnabled) {
+            return enabledTools;
+        }
+
+        return enabledTools.filter(tool => tool.name === PATHFINDER_SUMMARIZE_TOOL_NAME);
     }
 
-    return enabledTools.filter(tool => tool.name === 'Pathfinder_Summarize');
+    return (agent.tools ?? []).filter(tool => tool.enabled !== false);
 }
 
 function isPathfinderSummarizeToolEnabled(agent) {
-    const summarizeTool = Array.isArray(agent?.tools)
-        ? agent.tools.find(tool => tool?.name === 'Pathfinder_Summarize')
-        : null;
+    return isPathfinderToolEnabledForAgent(agent, PATHFINDER_SUMMARIZE_TOOL_NAME);
+}
 
-    return summarizeTool?.enabled !== false;
+export function getToolRecursionState() {
+    return {
+        depth: toolRecursionDepth,
+        limit: ToolManager.RECURSE_LIMIT ?? 5,
+        registeredToolNames: [...agentRegisteredToolNames],
+    };
+}
+
+export async function syncPathfinderAgentLorebooksForCurrentChat(agent = getPathfinderRuntimeAgent(), { persist = false } = {}) {
+    if (!agent || !isPathfinderToolAgent(agent)) {
+        return false;
+    }
+
+    const existingSettings = {
+        ...getPathfinderRuntimeSettings(),
+        ...(agent.settings || {}),
+    };
+    if (existingSettings.autoSyncLorebooksOnChatChange === false) {
+        return false;
+    }
+
+    const contextualBooks = Array.from(new Set(getContextualLorebooks().filter(Boolean)));
+    const currentBooks = Array.isArray(existingSettings.enabledLorebooks) ? existingSettings.enabledLorebooks : [];
+    const sameBooks = currentBooks.length === contextualBooks.length && currentBooks.every((book, index) => book === contextualBooks[index]);
+    const selectedLorebook = contextualBooks[0] ?? '';
+
+    if (sameBooks && (existingSettings.selectedLorebook ?? '') === selectedLorebook) {
+        return false;
+    }
+
+    const nextSettings = {
+        ...existingSettings,
+        enabledLorebooks: contextualBooks,
+        selectedLorebook,
+    };
+    agent.settings = {
+        ...(agent.settings || {}),
+        ...nextSettings,
+    };
+    setPathfinderRuntimeSettings(nextSettings);
+
+    if (persist) {
+        await saveAgent(agent);
+    }
+
+    console.info('[Pathfinder] Synced enabled lorebooks to the current chat context.', {
+        lorebooks: contextualBooks,
+    });
+    return true;
 }
 
 /**
@@ -3343,43 +3420,12 @@ function onChatCompletionSettingsReady(data) {
 
 /**
  * Handles WORLDINFO_ENTRIES_LOADED for tool-category agents.
- * Suppresses keyword-based scanning for lorebooks managed by tool agents
- * (e.g., Pathfinder) to prevent double-injection.
+ * Pathfinder now leaves native World Info activation intact and de-dupes its
+ * own injected retrieval context against naturally activated entries instead.
  * @param {object} data World info data with globalLore, characterLore, etc.
  */
 function onWorldInfoEntriesLoaded(data) {
-    if (!areAgentsGloballyEnabled()) {
-        return;
-    }
-
-    const enabledToolAgents = getEnabledToolAgents();
-    if (enabledToolAgents.length === 0) return;
-
-    const managedUids = getPfManagedEntryUids(enabledToolAgents);
-    if (managedUids.size === 0) return;
-
-    const loreArrayKeys = ['globalLore', 'characterLore', 'chatLore', 'personaLore'];
-    for (const key of loreArrayKeys) {
-        if (!Array.isArray(data[key])) continue;
-        data[key] = data[key].filter(entry => {
-            if (!entry) return true;
-            return !managedUids.has(entry.uid);
-        });
-    }
-}
-
-function getPfManagedEntryUids(toolAgents) {
-    const uids = new Set();
-    for (const agent of toolAgents) {
-        const books = agent.settings?.enabledLorebooks ?? [];
-        for (const bookName of books) {
-            const tree = pfGetTree(bookName);
-            if (tree) {
-                for (const uid of pfGetAllEntryUids(tree)) uids.add(uid);
-            }
-        }
-    }
-    return uids;
+    void data;
 }
 
 let _onChatChangedToolSync = false;
@@ -3398,7 +3444,13 @@ function onChatChangedToolSync() {
     requestAnimationFrame(() => {
         _onChatChangedToolSync = false;
         toolRecursionDepth = 0;
-        syncToolAgentRegistrations();
+        void (async () => {
+            const pathfinderAgent = getPathfinderRuntimeAgent();
+            if (pathfinderAgent) {
+                await syncPathfinderAgentLorebooksForCurrentChat(pathfinderAgent, { persist: true });
+            }
+            syncToolAgentRegistrations();
+        })();
     });
 }
 

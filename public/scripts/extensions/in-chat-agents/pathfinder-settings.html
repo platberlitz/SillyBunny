@@ -63,6 +63,13 @@
             </label>
             <div class="pf--setting-help">When enabled, Pathfinder auto-selects lorebooks attached to the active character card or chat.</div>
         </div>
+        <div class="pf--setting-group pf--lorebook-toggle">
+            <label class="checkbox_label">
+                <input type="checkbox" id="pf--auto-sync-lorebooks" />
+                <span>Reset selections to the current chat/character lorebooks on chat change</span>
+            </label>
+            <div class="pf--setting-help">Prevents a previous chat's lorebook from staying selected when the new chat has no attached lorebook.</div>
+        </div>
     </div>
 
     <!-- Step 2: Choose Mode -->
@@ -172,6 +179,14 @@
                     <option value="">Use main model</option>
                 </select>
                 <div class="pf--setting-help">Use a faster/cheaper model for the pipeline (e.g., Haiku, GPT-4o-mini)</div>
+            </div>
+
+            <div class="pf--setting-group">
+                <label class="checkbox_label">
+                    <input type="checkbox" id="pf--dedupe-natural-activation" />
+                    <span>Skip entries already activated by World Info</span>
+                </label>
+                <div class="pf--setting-help">Keeps keyword/constant lore active naturally, then removes those entries from Pathfinder's injected context.</div>
             </div>
         </div>
     </div>
@@ -285,12 +300,14 @@
             <div class="pf--setting-group">
                 <label class="pf--setting-label">Enabled Tools</label>
                 <div class="pf--tool-list">
-                    <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Search" checked /><span>Search - Browse waypoint map</span></label>
-                    <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Remember" checked /><span>Remember - Create new entries</span></label>
-                    <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Update" checked /><span>Update - Edit existing entries</span></label>
-                    <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Forget" checked /><span>Forget - Disable/delete entries</span></label>
-                    <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Notebook" checked /><span>Notebook - Private AI scratchpad</span></label>
+                    <div class="pf--empty-state pf--tool-loading"><i class="fa-solid fa-wrench"></i><span>Loading tool toggles...</span></div>
                 </div>
+            </div>
+
+            <div class="pf--setting-group">
+                <label class="pf--setting-label">Lorebook Permissions</label>
+                <div class="pf--setting-help">Limit what Tool Mode can read, edit, or delete per selected lorebook. Write permission allows creating, updating, disabling, and reorganizing entries. Delete permission is only needed for hard deletes.</div>
+                <div id="pf--permission-matrix" class="pf--permission-matrix"></div>
             </div>
 
             <div class="pf--setting-group">
@@ -313,10 +330,16 @@
             <div id="pf--diagnostics-output" class="pf--diagnostics-output">
                 Click "Run Diagnostics" to check your Pathfinder configuration.
             </div>
-            <button type="button" id="pf--run-diagnostics" class="menu_button">
-                <i class="fa-solid fa-stethoscope"></i>
-                <span>Run Diagnostics</span>
-            </button>
+            <div class="pf--diagnostics-actions">
+                <button type="button" id="pf--run-diagnostics" class="menu_button menu_button_icon">
+                    <i class="fa-solid fa-stethoscope"></i>
+                    <span>Run Diagnostics</span>
+                </button>
+                <button type="button" id="pf--copy-diagnostics" class="menu_button menu_button_icon">
+                    <i class="fa-solid fa-copy"></i>
+                    <span>Copy Diagnostics</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -367,8 +390,32 @@
     text-align: left;
 }
 
+.pf--settings.pf--settings-embedded {
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+}
+
 .pf--settings * {
     text-align: left;
+}
+
+.pf--extensions-host .inline-drawer-header b {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pf--extensions-body {
+    padding: 10px 0;
+}
+
+.pf--extensions-empty {
+    padding: 12px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.1));
+    border-radius: 8px;
+    background: var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.2));
+    font-size: 12px;
 }
 
 /* Status Banner */
@@ -902,6 +949,49 @@
     border-radius: 4px;
 }
 
+.pf--permission-matrix {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.pf--permission-row {
+    display: grid;
+    grid-template-columns: minmax(150px, 1fr) repeat(3, minmax(78px, max-content));
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+}
+
+.pf--permission-book {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.pf--permission-book strong,
+.pf--permission-book span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pf--permission-book span {
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+.pf--permission-row .checkbox_label {
+    margin: 0;
+    padding: 0;
+    min-height: 0;
+}
+
 /* Prompt Editor */
 .pf--prompt-actions {
     display: flex;
@@ -949,7 +1039,14 @@
     text-align: left !important;
 }
 
-#pf--run-diagnostics {
+.pf--diagnostics-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+#pf--run-diagnostics,
+#pf--copy-diagnostics {
     display: inline-flex;
     align-self: flex-start;
     width: fit-content;
@@ -961,7 +1058,8 @@
     margin-right: auto;
 }
 
-#pf--run-diagnostics span {
+#pf--run-diagnostics span,
+#pf--copy-diagnostics span {
     min-width: 0;
     overflow-wrap: anywhere;
     text-align: center;
@@ -1006,6 +1104,11 @@
     .pf--prompt-status {
         flex: 1 1 100%;
         margin-left: 0;
+    }
+
+    .pf--permission-row {
+        grid-template-columns: 1fr;
+        align-items: flex-start;
     }
 }
 </style>

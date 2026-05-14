@@ -1,5 +1,5 @@
 import { updateEntry } from '../entry-manager.js';
-import { getActiveTunnelVisionBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
+import { getWritableBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
 import { registerToolAction, registerToolFormatter } from '../../tool-action-registry.js';
 import { logToolCallStarted, logToolCallCompleted, logToolCallError } from '../activity-feed.js';
 
@@ -23,7 +23,7 @@ async function updateAction(args) {
         return 'Error: Provide at least "content" or "title" to update.';
     }
 
-    const targetBook = resolveTargetBook(bookName, getActiveTunnelVisionBooks());
+    const targetBook = resolveTargetBook(bookName, getWritableBooks());
     if (!targetBook) {
         logToolCallError(TOOL_NAMES.UPDATE, 'No writable lorebooks');
         return 'No Pathfinder-enabled lorebooks available for writing.';

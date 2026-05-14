@@ -3,15 +3,16 @@ import { initEntryManagerAPIs } from './pathfinder/entry-manager.js';
 import { initActivityFeed } from './pathfinder/activity-feed.js';
 import { initAutoSummary } from './pathfinder/auto-summary.js';
 import { initCommands } from './pathfinder/commands.js';
+import { getPathfinderToolDefinitions } from './pathfinder/tool-definitions.js';
 
-import { getDefinition as getSearchDef, registerActions as registerSearchActions } from './pathfinder/tools/search.js';
-import { getDefinition as getRememberDef, registerActions as registerRememberActions } from './pathfinder/tools/remember.js';
-import { getDefinition as getUpdateDef, registerActions as registerUpdateActions } from './pathfinder/tools/update.js';
-import { getDefinition as getForgetDef, registerActions as registerForgetActions } from './pathfinder/tools/forget.js';
-import { getDefinition as getSummarizeDef, registerActions as registerSummarizeActions } from './pathfinder/tools/summarize.js';
-import { getDefinition as getReorganizeDef, registerActions as registerReorganizeActions } from './pathfinder/tools/reorganize.js';
-import { getDefinition as getMergeSplitDef, registerActions as registerMergeSplitActions } from './pathfinder/tools/merge-split.js';
-import { getDefinition as getNotebookDef, registerActions as registerNotebookActions } from './pathfinder/tools/notebook.js';
+import { registerActions as registerSearchActions } from './pathfinder/tools/search.js';
+import { registerActions as registerRememberActions } from './pathfinder/tools/remember.js';
+import { registerActions as registerUpdateActions } from './pathfinder/tools/update.js';
+import { registerActions as registerForgetActions } from './pathfinder/tools/forget.js';
+import { registerActions as registerSummarizeActions } from './pathfinder/tools/summarize.js';
+import { registerActions as registerReorganizeActions } from './pathfinder/tools/reorganize.js';
+import { registerActions as registerMergeSplitActions } from './pathfinder/tools/merge-split.js';
+import { registerActions as registerNotebookActions } from './pathfinder/tools/notebook.js';
 
 import { buildTreeFromMetadata, buildTreeWithLLM } from './pathfinder/tree-builder.js';
 import { runDiagnostics } from './pathfinder/diagnostics.js';
@@ -21,19 +22,6 @@ import { initializePromptStore } from './pathfinder/prompts/prompt-store.js';
 import { getDefaultPrompts, getDefaultPipelines } from './pathfinder/prompts/default-prompts.js';
 
 let initialized = false;
-
-export function getPathfinderToolDefinitions() {
-    return [
-        getSearchDef(),
-        getRememberDef(),
-        getUpdateDef(),
-        getForgetDef(),
-        getSummarizeDef(),
-        getReorganizeDef(),
-        getMergeSplitDef(),
-        getNotebookDef(),
-    ];
-}
 
 export function initPathfinder(context) {
     if (initialized) return;
@@ -78,6 +66,7 @@ export async function buildPathfinderTree(bookName, bookData, useLLM = false, ll
 export { runDiagnostics };
 export { getSettings as getPathfinderSettings, setSettings as setPathfinderSettings };
 export { isLorebookEnabled, setLorebookEnabled };
+export { getPathfinderToolDefinitions };
 
 // Export pipeline-related functions for external use
 export { initPromptEditorUI, refreshPromptEditorUI } from './pathfinder/prompts/prompt-editor-ui.js';

@@ -1,8 +1,8 @@
-import { getSettings, getTree, getAllEntryUids } from './tree-store.js';
+import { canDeleteBook, canReadBook, canWriteBook, getSettings, getTree, getAllEntryUids } from './tree-store.js';
 import { ALL_TOOL_NAMES, getActiveTunnelVisionBooks, getContextualLorebooks } from './pathfinder-tool-bridge.js';
 import { getFeedItems } from './activity-feed.js';
 import { getEnabledToolAgents } from '../agent-store.js';
-import { getPathfinderRuntimeAgent, syncToolAgentRegistrations } from '../agent-runner.js';
+import { getPathfinderRuntimeAgent, getToolRecursionState, syncToolAgentRegistrations } from '../agent-runner.js';
 
 function getRegisteredPathfinderTools(ToolManager) {
     const tools = ToolManager?.tools instanceof Map
@@ -16,9 +16,21 @@ function getRegisteredPathfinderTools(ToolManager) {
     );
 }
 
-function getEnabledPathfinderTools(pathfinderAgent, registeredTools = []) {
+function formatNameList(names, fallback = 'none') {
+    return names.length > 0 ? names.join(', ') : fallback;
+}
+
+function getEnabledPathfinderTools(pathfinderAgent, registeredTools = [], settings = getSettings()) {
     if (!pathfinderAgent) {
         return [];
+    }
+
+    const toolStates = settings?.toolStates;
+    if (toolStates && typeof toolStates === 'object') {
+        const configuredNames = ALL_TOOL_NAMES.filter(name => Object.prototype.hasOwnProperty.call(toolStates, name));
+        if (configuredNames.length > 0) {
+            return configuredNames.filter(name => toolStates[name] !== false);
+        }
     }
 
     const agentTools = Array.isArray(pathfinderAgent?.tools) ? pathfinderAgent.tools : [];
@@ -77,6 +89,19 @@ function getLastPipelineRunMessage(settings) {
     }
 
     return `Enabled (${pipelineId} pipeline). Last run injected ${selectedCount} entr${selectedCount === 1 ? 'y' : 'ies'}${candidateCount > 0 ? ` from ${candidateCount} candidate(s)` : ''}.`;
+}
+
+function getToolRegistrationDetail(enabledTools, registeredTools) {
+    const missingTools = enabledTools.filter(name => !registeredTools.includes(name));
+    const recursion = getToolRecursionState();
+    const recursionLimit = Number(recursion?.limit ?? 0) || 0;
+    const recursionText = recursionLimit > 0 ? ` Recursion: ${recursion.depth}/${recursionLimit}.` : '';
+
+    return {
+        missingTools,
+        recursionText,
+        registeredText: `Registered: ${formatNameList(registeredTools)}. Enabled: ${formatNameList(enabledTools)}.`,
+    };
 }
 
 function getPipelineStageSummary(stageResults = []) {
@@ -152,18 +177,19 @@ export async function runDiagnostics() {
         const enabledAgents = getEnabledToolAgents();
         const pathfinderAgent = getPathfinderRuntimeAgent(enabledAgents);
         const registeredTools = getRegisteredPathfinderTools(ToolManager);
-        const enabledPathfinderToolNames = getEnabledPathfinderTools(pathfinderAgent, registeredTools);
+        const enabledPathfinderToolNames = getEnabledPathfinderTools(pathfinderAgent, registeredTools, s);
+        const registrationDetail = getToolRegistrationDetail(enabledPathfinderToolNames, registeredTools);
 
         if (enabledPathfinderToolNames.length > 0 && enabledPathfinderToolNames.every(name => registeredTools.includes(name))) {
             if (isToolCallingSupported) {
                 results['Tool Registration'] = {
                     ok: true,
-                    message: `All ${enabledPathfinderToolNames.length} enabled Pathfinder tool(s) registered and active`,
+                    message: `All ${enabledPathfinderToolNames.length} enabled Pathfinder tool(s) registered and active. ${registrationDetail.registeredText}${registrationDetail.recursionText}`,
                 };
             } else {
                 results['Tool Registration'] = {
                     ok: false,
-                    message: `${registeredTools.length} Pathfinder tool(s) registered, but tool calling is not supported for the current API/settings. Enable "Function Calling" in OpenAI settings and ensure the current model supports tools.`,
+                    message: `${registeredTools.length} Pathfinder tool(s) registered, but tool calling is not supported for the current API/settings. ${registrationDetail.registeredText} Enable "Function Calling" in OpenAI settings and ensure the current model supports tools.`,
                 };
             }
         } else if (!pathfinderAgent) {
@@ -191,7 +217,7 @@ export async function runDiagnostics() {
         } else {
             results['Tool Registration'] = {
                 ok: false,
-                message: `Partial: ${registeredTools.length}/${enabledPathfinderToolNames.length} enabled Pathfinder tools registered. Some Pathfinder tool toggles may be disabled or not yet refreshed.`,
+                message: `Partial: ${registeredTools.length}/${enabledPathfinderToolNames.length} enabled Pathfinder tools registered. Missing: ${formatNameList(registrationDetail.missingTools)}. ${registrationDetail.registeredText}${registrationDetail.recursionText}`,
             };
         }
     } else {
@@ -210,6 +236,32 @@ export async function runDiagnostics() {
                 : 'Tool calling is NOT supported. Enable "Function Calling" in OpenAI settings and ensure the current model supports tools.',
         };
     }
+
+    const readableBooks = activeBooks.filter(canReadBook);
+    const writableBooks = activeBooks.filter(canWriteBook);
+    const deletableBooks = activeBooks.filter(canDeleteBook);
+    results['Tool Permissions'] = {
+        ok: activeBooks.length === 0 || readableBooks.length > 0,
+        message: activeBooks.length === 0
+            ? 'No active lorebooks, permissions will apply after selecting a book.'
+            : `Read: ${formatNameList(readableBooks)}. Write: ${formatNameList(writableBooks)}. Delete: ${formatNameList(deletableBooks)}.`,
+    };
+
+    results['Lorebook Auto-Sync'] = {
+        ok: true,
+        message: s.autoSyncLorebooksOnChatChange === false
+            ? `Disabled. Contextual lorebooks detected: ${formatNameList(contextualBooks)}.`
+            : `Enabled. Pathfinder will reset selected lorebooks to current chat context (${formatNameList(contextualBooks)}).`,
+    };
+
+    const lastPipelineDetail = getFeedItems().find(item => item?.type === 'pathfinder_retrieval_detail' && item.mode === 'pipeline');
+    const skippedNaturalCount = Number(lastPipelineDetail?.metadata?.skippedNaturalActivationCount ?? 0) || 0;
+    results['World Info Dedupe'] = {
+        ok: true,
+        message: s.dedupeNaturalActivation === false
+            ? 'Disabled. Pathfinder may inject entries that World Info also activates naturally.'
+            : `Enabled. Last pipeline skipped ${skippedNaturalCount} naturally activated entr${skippedNaturalCount === 1 ? 'y' : 'ies'}.`,
+    };
 
     // Check connection profile
     results['Connection Profile'] = {
