@@ -116,6 +116,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #80 (2026-05-13) `feat: bundle Echo, Whisper, Hush, Ripple, Tide chat styles natively`
 - PR #81 (2026-05-13) `fix: refresh message token counts after edits`
 - PR #82 (2026-05-13) `Fix input history controls in chat composer`
+- PR #83 (2026-05-14) `feat(reasoning): add xhigh effort, rename auto to blank`
 - PR #84 (2026-05-14) `fix: improve mobile character drawer layout`
 - PR #86 (2026-05-14) `fix(mobile): enlarge composer textarea and balance spacing`
 - PR #87 (2026-05-14) `fix: refresh in-chat-agent token badges`
