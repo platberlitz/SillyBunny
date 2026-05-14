@@ -4270,7 +4270,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     min-width: 0;
 }
 
@@ -4406,19 +4406,20 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 }
 
 #right-nav-panel .sb-character-editor-controls-row > #avatar_div_div {
-    flex: 0 0 var(--avatar-base-width);
-    width: var(--avatar-base-width) !important;
-    min-width: var(--avatar-base-width) !important;
-    max-width: var(--avatar-base-width) !important;
-    height: var(--avatar-base-height) !important;
-    min-height: var(--avatar-base-height) !important;
-    max-height: var(--avatar-base-height) !important;
-    margin: 10px 8px 0 10px !important;
+    flex: 0 1 auto;
+    width: min(100%, 50vh, 373px) !important;
+    height: auto !important;
+    aspect-ratio: 2 / 3;
+    margin: 10px auto 4px !important;
+    border-radius: var(--sb-radius-md, 16px) !important;
+    overflow: hidden;
 }
 
 #right-nav-panel .sb-character-editor-controls-row > #avatar_div_div img {
     width: 100% !important;
     height: 100% !important;
+    border-radius: inherit !important;
+    object-fit: contain;
 }
 
 #right-nav-panel #avatar_controls > #tags_div .tag_controls {
@@ -4452,8 +4453,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 
 #right-nav-panel #avatar_div > #tagList {
     flex: 0 0 auto;
-    width: 100%;
-    margin: 2px 10px 0;
+    margin: 8px 0 0;
     padding: 6px 8px;
     min-height: 34px;
     align-items: center;
@@ -7010,7 +7010,11 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls {
         flex-basis: 100%;
-        padding-block: 0;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls > #tags_div {
+        flex: 1 1 100%;
+        max-width: 100%;
     }
 
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls .char-button-group-icons {
@@ -7206,7 +7210,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         width: 100%;
-        max-width: 150px;
+        max-width: 12rem;
         gap: 4px;
     }
 
@@ -7217,7 +7221,11 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         padding-inline: 6px !important;
         gap: 4px;
         font-size: calc(var(--mainFontSize) * 0.82);
-        overflow: visible;
+        overflow: hidden;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-editor-side-actions :is(#favorite_button, #advanced_div) {
+        min-width: 0 !important;
     }
 
     #right-nav-panel.openDrawer .char-button-group-primary .menu_button[data-label]::after {
