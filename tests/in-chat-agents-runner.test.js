@@ -36,6 +36,8 @@ describe('in-chat agent post-processing runner', () => {
     let runSidecarRetrieval;
     let streamingProcessor;
     let updateMessageTokenAccounting;
+    let updateMessageMetaBadges;
+    let connectionManagerRequestService;
     let globalSettings;
     let documentListeners;
     let windowListeners;
@@ -94,6 +96,8 @@ describe('in-chat agent post-processing runner', () => {
 
             return { outputTokens: tokenCount, reasoningTokens: 0 };
         });
+        updateMessageMetaBadges = jest.fn();
+        connectionManagerRequestService = null;
         globalSettings = {
             enabled: true,
             promptTransformShowNotifications: false,
@@ -185,7 +189,11 @@ describe('in-chat agent post-processing runner', () => {
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions.js', () => ({
-            getContext: jest.fn(() => ({ saveChat })),
+            getContext: jest.fn(() => ({
+                saveChat,
+                updateMessageMetaBadges,
+                ConnectionManagerRequestService: connectionManagerRequestService,
+            })),
         }));
 
         await jest.unstable_mockModule('../public/scripts/events.js', () => ({
@@ -1132,6 +1140,8 @@ describe('in-chat agent post-processing runner', () => {
     test('persists prompt-transform history into current swipe metadata', async () => {
         usePromptTransformPostAgent();
         generateQuietPrompt.mockResolvedValue('Swipe-safe rewrite');
+        const messageElement = { id: 'message-0' };
+        document.querySelector = jest.fn(selector => selector === '.mes[mesid="0"]' ? messageElement : null);
 
         const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
         initAgentRunner();
@@ -1159,9 +1169,48 @@ describe('in-chat agent post-processing runner', () => {
         expect(updateMessageTokenAccounting).toHaveBeenCalledWith(chat[0]);
         expect(chat[0].extra.token_count).toBe(2);
         expect(chat[0].swipe_info[0].extra.token_count).toBe(2);
+        expect(updateMessageMetaBadges).toHaveBeenCalledWith(messageElement, chat[0]);
         expect(chat[0].extra.inChatAgentTransformHistory).toHaveLength(1);
         expect(chat[0].swipe_info[0].extra.inChatAgentTransformHistory).toEqual(chat[0].extra.inChatAgentTransformHistory);
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('shows the resolved profile model in prompt-transform running toasts', async () => {
+        usePromptTransformPostAgent();
+        enabledAgents[0].connectionProfile = 'profile-cc';
+        enabledAgents[0].postProcess.promptTransformShowNotifications = true;
+        globalSettings.promptTransformShowNotifications = true;
+        connectionManagerRequestService = {
+            getProfile: jest.fn(profileId => profileId === 'profile-cc'
+                ? { name: 'Geechan CC', model: 'claude-3.5-sonnet' }
+                : null),
+            sendRequest: jest.fn(async () => ({ content: 'Profile rewrite' })),
+        };
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Needs rewrite',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(globalThis.toastr.info).toHaveBeenCalled();
+        const [messageHtml, title] = globalThis.toastr.info.mock.calls[0];
+        expect(title).toBe('Post Transform');
+        expect(messageHtml).toContain('Model: claude-3.5-sonnet (Geechan CC)');
+        expect(messageHtml).not.toContain('Model: Geechan CC');
+        expect(connectionManagerRequestService.sendRequest).toHaveBeenCalledWith(
+            'profile-cc',
+            expect.any(Array),
+            8192,
+            expect.objectContaining({ extractData: true, stream: false }),
+        );
     });
 
     test('keeps prompt-transform storage separate for each swipe', async () => {

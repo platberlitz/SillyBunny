@@ -32,7 +32,7 @@ import {
     resolveConnectionProfile,
 } from './agent-store.js';
 import { buildFallbackPromptText, extractProfileResponseText } from './llm-utils.js';
-import { getConnectionProfileDisplayName } from './profile-utils.js';
+import { getConnectionProfileDisplayName, getConnectionProfileModelName } from './profile-utils.js';
 import {
     getToolAction,
     getToolFormatter,
@@ -1446,7 +1446,17 @@ function getPromptTransformModelLabel(agent, profileId = '') {
         return modelOverride;
     }
 
-    return getPromptTransformProfileLabel(profileId);
+    if (!profileId) {
+        return getPromptTransformProfileLabel(profileId);
+    }
+
+    const modelName = getConnectionProfileModelName(profileId);
+    const profileLabel = getConnectionProfileDisplayName(profileId);
+    if (modelName && profileLabel) {
+        return `${modelName} (${profileLabel})`;
+    }
+
+    return modelName || profileLabel || getPromptTransformProfileLabel(profileId);
 }
 
 function getPromptTransformRunMetadata(agent, profileId = '') {
@@ -1554,6 +1564,21 @@ async function syncPromptTransformMessageStateAsync(message, messageIndex) {
     }
 
     await updateMessageTokenAccounting(message);
+
+    if (messageIndex === null || messageIndex === undefined || messageIndex === '') {
+        return;
+    }
+
+    const numericMessageIndex = Number(messageIndex);
+    if (!Number.isInteger(numericMessageIndex)) {
+        return;
+    }
+
+    const messageElement = document.querySelector(`.mes[mesid="${numericMessageIndex}"]`);
+    const context = getContext();
+    if (messageElement && typeof context?.updateMessageMetaBadges === 'function') {
+        context.updateMessageMetaBadges(messageElement, message);
+    }
 }
 
 function syncAssistantMessageStateToSwipe(message, messageIndex) {

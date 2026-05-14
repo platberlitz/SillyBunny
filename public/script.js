@@ -3390,7 +3390,7 @@ export function updateMessageElement(mes, { messageId = chat.length - 1, message
     return messageElement;
 }
 
-function updateMessageMetaBadges(messageElement, message) {
+export function updateMessageMetaBadges(messageElement, message) {
     const $messageElement = messageElement?.jquery ? messageElement : $(messageElement);
     if ($messageElement.length === 0) {
         return;
