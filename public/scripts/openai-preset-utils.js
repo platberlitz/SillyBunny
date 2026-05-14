@@ -33,3 +33,13 @@ export function getChatCompletionConnectionPresetKeys(settingsMap) {
         .filter(([, [, , , isConnection]]) => isConnection)
         .map(([presetKey]) => presetKey);
 }
+
+/**
+ * Returns whether OpenAI preset saves should include provider/model/API fields.
+ *
+ * @param {Record<string, any>} settings Live OpenAI settings
+ * @returns {boolean} True when linked preset mode is enabled
+ */
+export function shouldIncludeConnectionFieldsInPreset(settings) {
+    return Boolean(settings?.bind_preset_to_connection);
+}

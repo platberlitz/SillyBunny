@@ -83,7 +83,7 @@ import { COMETAPI_IGNORE_PATTERNS, IGNORE_SYMBOL, MEDIA_DISPLAY, MEDIA_TYPE } fr
 import { syncOpenRouterProvidersForModel, updateOpenRouterProvidersWarning } from './textgen-models.js';
 import { hasTextOrArrayPayload, shouldRetainContextAtDepth, stripHtmlTagsFromContext, stripOocBlocksFromContext } from './ooc-blocks.js';
 import { checkPostInterceptChatBudget } from './openai-prompt-budget.js';
-import { buildChatCompletionPreset } from './openai-preset-utils.js';
+import { buildChatCompletionPreset, shouldIncludeConnectionFieldsInPreset } from './openai-preset-utils.js';
 
 export {
     openai_messages_count,
@@ -6324,7 +6324,9 @@ function refreshLogitBiasPresetOptions() {
  * @returns {Promise<void>}
  */
 async function saveOpenAIPreset(name, settings, triggerUi = true) {
-    const presetBody = getChatCompletionPreset(settings);
+    const presetBody = buildChatCompletionPreset(settings, settingsToUpdate, {
+        includeConnection: shouldIncludeConnectionFieldsInPreset(settings),
+    });
     const savePresetSettings = await fetch('/api/presets/save', {
         method: 'POST',
         headers: getRequestHeaders(),

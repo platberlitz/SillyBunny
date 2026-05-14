@@ -1,5 +1,9 @@
 import { describe, expect, test } from '@jest/globals';
-import { buildChatCompletionPreset, getChatCompletionConnectionPresetKeys } from '../public/scripts/openai-preset-utils.js';
+import {
+    buildChatCompletionPreset,
+    getChatCompletionConnectionPresetKeys,
+    shouldIncludeConnectionFieldsInPreset,
+} from '../public/scripts/openai-preset-utils.js';
 
 const settingsMap = {
     chat_completion_source: ['#chat_completion_source', 'chat_completion_source', false, true],
@@ -52,5 +56,34 @@ describe('Chat Completion preset utilities', () => {
             'openai_model',
             'custom_url',
         ]);
+    });
+
+    test('excludes connection fields for normal preset saves', () => {
+        const includeConnection = shouldIncludeConnectionFieldsInPreset({
+            ...settings,
+            bind_preset_to_connection: false,
+        });
+
+        expect(buildChatCompletionPreset(settings, settingsMap, { includeConnection })).toEqual({
+            temperature: 0.72,
+            assistant_prefill: '',
+            prompts: [{ identifier: 'main', content: 'Prompt after edit' }],
+        });
+    });
+
+    test('includes connection fields for explicitly linked preset saves', () => {
+        const includeConnection = shouldIncludeConnectionFieldsInPreset({
+            ...settings,
+            bind_preset_to_connection: true,
+        });
+
+        expect(buildChatCompletionPreset(settings, settingsMap, { includeConnection })).toEqual({
+            chat_completion_source: 'custom',
+            temperature: 0.72,
+            openai_model: 'mimo-model',
+            assistant_prefill: '',
+            custom_url: 'http://127.0.0.1:8080/v1',
+            prompts: [{ identifier: 'main', content: 'Prompt after edit' }],
+        });
     });
 });
