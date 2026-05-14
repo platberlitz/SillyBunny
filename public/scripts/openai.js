@@ -83,6 +83,7 @@ import { COMETAPI_IGNORE_PATTERNS, IGNORE_SYMBOL, MEDIA_DISPLAY, MEDIA_TYPE } fr
 import { syncOpenRouterProvidersForModel, updateOpenRouterProvidersWarning } from './textgen-models.js';
 import { hasTextOrArrayPayload, shouldRetainContextAtDepth, stripHtmlTagsFromContext, stripOocBlocksFromContext } from './ooc-blocks.js';
 import { checkPostInterceptChatBudget } from './openai-prompt-budget.js';
+import { buildChatCompletionPreset } from './openai-preset-utils.js';
 
 export {
     openai_messages_count,
@@ -6235,11 +6236,7 @@ async function getStatusOpen() {
  * @returns {Object} The preset body object
  */
 export function getChatCompletionPreset(settings = oai_settings) {
-    const presetBody = {};
-    for (const [presetKey, [, settingsKey]] of Object.entries(settingsToUpdate)) {
-        presetBody[presetKey] = settings[settingsKey];
-    }
-    return structuredClone(presetBody);
+    return buildChatCompletionPreset(settings, settingsToUpdate);
 }
 
 function normalizeLogitBiasEntry(entry) {
