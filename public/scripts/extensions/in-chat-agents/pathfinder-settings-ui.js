@@ -31,7 +31,7 @@ import { getDefaultPrompts } from './pathfinder/prompts/default-prompts.js';
 import { clearFeed, getFeedItems } from './pathfinder/activity-feed.js';
 import { getSummaryMemoryState, onSummaryMemoryChanged, saveSummaryMemoryContent } from './pathfinder/summary-memory-store.js';
 import { sidecarGenerate } from './pathfinder/llm-sidecar.js';
-import { createSummaryMemoryEntry } from './pathfinder/tools/summarize.js';
+import { createSeparateSummaryMemoryEntry, createSummaryMemoryEntry, deriveSummaryLorebookTitle } from './pathfinder/tools/summarize.js';
 
 const MODULE_NAME = 'in-chat-agents';
 const PATHFINDER_LOG_PREFIX = '[Pathfinder]';
@@ -608,6 +608,7 @@ function renderSummaryMemoryEditor() {
     const indicator = settingsEl.find('#pf--summary-injection-indicator');
     const meta = settingsEl.find('#pf--summary-meta');
     const hasSummary = Boolean(summary.content || summary.uid);
+    const currentContent = String(textarea.val() || summary.content || '').trim();
 
     if (document.activeElement !== textarea[0]) {
         textarea.val(summary.content || '');
@@ -615,6 +616,7 @@ function renderSummaryMemoryEditor() {
 
     textarea.prop('disabled', !hasSummary);
     settingsEl.find('#pf--summary-save').prop('disabled', !hasSummary);
+    settingsEl.find('#pf--summary-save-entry').prop('disabled', !currentContent);
     settingsEl.find('#pf--summary-create').toggle(!hasSummary).prop('disabled', hasSummary);
 
     indicator.removeClass('pf--summary-indicator-missing pf--summary-indicator-not-injected pf--summary-indicator-injected');
@@ -636,6 +638,22 @@ function renderSummaryMemoryEditor() {
     const updated = summary.updatedAt ? `Updated ${formatSummaryTimestamp(summary.updatedAt)}` : 'Not saved yet';
     const injected = summary.injectedAt ? `Last injected ${formatSummaryTimestamp(summary.injectedAt)}${summary.injectedMode ? ` via ${summary.injectedMode}` : ''}` : 'Not injected by retrieval yet';
     meta.text(`${title} — ${location}. ${updated}. ${injected}.`);
+}
+
+function getSummaryEditorDraft() {
+    const summary = getSummaryMemoryState();
+    const content = String(settingsEl.find('#pf--summary-content').val() || summary.content || '').trim();
+    return {
+        title: deriveSummaryLorebookTitle({
+            title: summary.title,
+            content,
+            arc: summary.arc,
+        }),
+        content,
+        significance: summary.significance || 'medium',
+        arc: summary.arc || '',
+        book: summary.bookName || getPathfinderSettings().selectedLorebook || '',
+    };
 }
 
 function getRecentChatForSummary(maxMessages = 24) {
@@ -890,10 +908,40 @@ function bindEvents() {
         const status = settingsEl.find('#pf--summary-save-status');
         try {
             await saveSummaryMemoryContent(settingsEl.find('#pf--summary-content').val());
+            renderSummaryMemoryEditor();
             status.text('Saved!').removeClass('error').addClass('success');
             setTimeout(() => status.text(''), 3000);
         } catch (err) {
             status.text(`Save failed: ${err.message}`).removeClass('success').addClass('error');
+        }
+    });
+
+    settingsEl.find('#pf--summary-content').on('input', renderSummaryMemoryEditor);
+
+    settingsEl.find('#pf--summary-save-entry').on('click', async () => {
+        const status = settingsEl.find('#pf--summary-save-status');
+        const button = settingsEl.find('#pf--summary-save-entry');
+        const draft = getSummaryEditorDraft();
+        if (!draft.content) {
+            status.text('Write or create a summary first.').removeClass('success').addClass('error');
+            return;
+        }
+
+        button.prop('disabled', true);
+        status.text('Saving entry...').removeClass('success error');
+
+        try {
+            const result = await createSeparateSummaryMemoryEntry(draft);
+            setPathfinderToolEnabled('Pathfinder_Summarize', true);
+            settingsEl.find('#pf--enable-summarize-tool').prop('checked', true);
+            await updateAgentSettings();
+            syncToolAgentRegistrations();
+            status.text(`Saved "${result.summaryTitle}"`).removeClass('error').addClass('success');
+            setTimeout(() => status.text(''), 4000);
+        } catch (err) {
+            status.text(`Entry save failed: ${err.message}`).removeClass('success').addClass('error');
+        } finally {
+            renderSummaryMemoryEditor();
         }
     });
 
