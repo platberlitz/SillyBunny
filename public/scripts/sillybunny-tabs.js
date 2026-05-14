@@ -984,6 +984,7 @@ function setCompactMode(enabled, { persist = true } = {}) {
     sbState.compactMode = nextEnabled;
     document.documentElement.dataset.sbCompactMode = String(nextEnabled);
     document.body?.classList.toggle('sb-compact-mode', nextEnabled);
+    syncTopbarLayoutState();
 
     if (persist) {
         safeSetItem(SB_STORAGE_KEYS.compactMode, String(nextEnabled));
