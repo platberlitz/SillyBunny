@@ -9,7 +9,7 @@
   order: 0;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 8px 6px;
+  padding: 0 8px 0;
 }
 .stih--buttons .stih--button {
   flex: 0 0 var(--bottomFormBlockSize);
@@ -123,7 +123,7 @@ html > body .stih--history .stih--hidden {
   }
 
   .stih--buttons.stih--standalone {
-    padding: 0 6px 5px;
+    padding: 0 6px 0;
   }
 
   .stih--buttons .stih--arrows {
