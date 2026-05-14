@@ -1558,13 +1558,13 @@
     :root {
         --bottomFormBlockSize: clamp(34px, calc(var(--sb-mobile-touch-target, 44px) * var(--sb-bottom-bar-scale, 1)), 58px);
         --bottomFormIconSize: clamp(16px, calc(20px * var(--sb-bottom-bar-scale, 1)), 25px);
-        --sb-mobile-composer-input-height: 84px;
+        --sb-mobile-composer-input-height: 68px;
     }
 
     :root[data-sb-compact-mode='true'] {
         --bottomFormBlockSize: clamp(32px, calc(var(--sb-mobile-touch-target, 44px) * var(--sb-bottom-bar-scale, 1)), 54px);
         --bottomFormIconSize: clamp(15px, calc(18px * var(--sb-bottom-bar-scale, 1)), 23px);
-        --sb-mobile-composer-input-height: 72px;
+        --sb-mobile-composer-input-height: 60px;
     }
 
     #send_form {
@@ -1582,7 +1582,7 @@
         column-gap: 6px !important;
         row-gap: 6px !important;
         min-height: calc(var(--sb-mobile-composer-input-height) + var(--bottomFormBlockSize) + 18px) !important;
-        padding: 6px 6px !important;
+        padding: 4px 6px 6px !important;
         box-sizing: border-box !important;
     }
 
@@ -1590,7 +1590,7 @@
         column-gap: 5px !important;
         row-gap: 5px !important;
         min-height: calc(var(--sb-mobile-composer-input-height) + var(--bottomFormBlockSize) + 15px) !important;
-        padding: 5px 6px !important;
+        padding: 3px 6px 5px !important;
     }
 
     #leftSendForm,
