@@ -521,7 +521,7 @@
 
 .pf--settings .checkbox_label {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 8px;
     min-height: var(--sb-control-min-height, 30px);
     line-height: 1.35;
@@ -529,7 +529,8 @@
 
 .pf--settings .checkbox_label input[type="checkbox"] {
     flex: 0 0 auto;
-    margin-top: 2px;
+    align-self: center;
+    margin: 0;
 }
 
 .pf--settings .checkbox_label span {
@@ -1012,10 +1013,14 @@
 }
 
 .pf--tool-list .checkbox_label {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
     padding: 7px 10px;
     background: var(--pf-control-bg);
     border: 1px solid color-mix(in srgb, var(--pf-border) 76%, transparent);
     border-radius: var(--pf-radius-sm);
+    column-gap: 10px;
 }
 
 .pf--permission-matrix {

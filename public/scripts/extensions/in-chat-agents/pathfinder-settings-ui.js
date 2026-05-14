@@ -25,14 +25,13 @@ import {
 } from './pathfinder/tree-store.js';
 import { buildTreeFromMetadata } from './pathfinder/tree-builder.js';
 import { syncToolAgentRegistrations } from './agent-runner.js';
-import { ALL_TOOL_NAMES } from './pathfinder/pathfinder-tool-bridge.js';
+import { ALL_TOOL_NAMES, getContextualLorebookDetails } from './pathfinder/pathfinder-tool-bridge.js';
 import { getPrompt, savePrompt } from './pathfinder/prompts/prompt-store.js';
 import { getDefaultPrompts } from './pathfinder/prompts/default-prompts.js';
 import { clearFeed, getFeedItems } from './pathfinder/activity-feed.js';
 import { getSummaryMemoryState, onSummaryMemoryChanged, saveSummaryMemoryContent } from './pathfinder/summary-memory-store.js';
 import { sidecarGenerate } from './pathfinder/llm-sidecar.js';
 import { createSummaryMemoryEntry } from './pathfinder/tools/summarize.js';
-import { getContextualLorebookDetails } from './pathfinder/pathfinder-tool-bridge.js';
 
 const MODULE_NAME = 'in-chat-agents';
 const PATHFINDER_LOG_PREFIX = '[Pathfinder]';
@@ -54,6 +53,57 @@ function ensureEnabledLorebooks(settings) {
     }
 
     return settings.enabledLorebooks;
+}
+
+function addUniqueLorebookName(names, name) {
+    const bookName = String(name ?? '').trim();
+    if (bookName && !names.includes(bookName)) {
+        names.push(bookName);
+    }
+}
+
+function getActiveLorebookNames(settings, lorebooks = []) {
+    const names = [...ensureEnabledLorebooks(settings)];
+
+    if (settings.autoUseAttachedLorebook || settings.autoSyncLorebooksOnChatChange !== false) {
+        for (const book of lorebooks) {
+            if (book.attached) {
+                addUniqueLorebookName(names, book.name);
+            }
+        }
+    }
+
+    if (settings.includeContextualLorebooks !== false) {
+        for (const source of getContextualLorebookDetails()) {
+            addUniqueLorebookName(names, source.name);
+        }
+    }
+
+    return names;
+}
+
+function getEffectiveLorebooks(lorebooks, settings) {
+    const allBooks = Array.isArray(lorebooks) ? lorebooks : [];
+    const booksByName = new Map(allBooks.map(book => [book.name, book]));
+
+    for (const source of getContextualLorebookDetails()) {
+        if (!source.name || booksByName.has(source.name)) {
+            continue;
+        }
+
+        const sourceTypes = Array.isArray(source.types) ? new Set(source.types) : new Set([source.type || 'attached']);
+        booksByName.set(source.name, {
+            name: source.name,
+            entries: '?',
+            attached: true,
+            sourceTypes,
+            type: formatLorebookSourceLabel(sourceTypes),
+        });
+    }
+
+    return getActiveLorebookNames(settings, allBooks)
+        .map(name => booksByName.get(name) ?? { name, entries: '?', attached: false, type: 'lorebook' })
+        .filter(book => book?.name);
 }
 
 export function normalizeSummaryIntervalInput(value) {
@@ -120,10 +170,14 @@ async function syncAutoAttachedLorebooks(lorebooks, settings) {
     const enabledLorebooks = [...ensureEnabledLorebooks(settings)];
     const attachedLorebooks = lorebooks.filter(book => book.attached).map(book => book.name);
     const syncedLorebooks = Array.from(new Set(attachedLorebooks));
+    const selectedLorebook = syncedLorebooks[0] ?? '';
     const autoSyncChanged = settings.autoSyncLorebooksOnChatChange
-        && (enabledLorebooks.length !== syncedLorebooks.length || enabledLorebooks.some((name, index) => name !== syncedLorebooks[index]));
+        && (enabledLorebooks.length !== syncedLorebooks.length
+            || enabledLorebooks.some((name, index) => name !== syncedLorebooks[index])
+            || (settings.selectedLorebook ?? '') !== selectedLorebook);
     if (settings.autoSyncLorebooksOnChatChange) {
         settings.enabledLorebooks = syncedLorebooks;
+        settings.selectedLorebook = selectedLorebook;
         setPathfinderSettings(settings);
     }
 
@@ -140,6 +194,9 @@ async function syncAutoAttachedLorebooks(lorebooks, settings) {
 
     if (!settings.autoSyncLorebooksOnChatChange) {
         settings.enabledLorebooks = Array.from(new Set([...enabledLorebooks, ...attachedLorebooks]));
+        if (!settings.selectedLorebook || !settings.enabledLorebooks.includes(settings.selectedLorebook)) {
+            settings.selectedLorebook = settings.enabledLorebooks[0] ?? '';
+        }
     }
     attachedLorebooks.forEach(bookName => setLorebookEnabled(bookName, true));
     setPathfinderSettings(settings);
@@ -207,7 +264,7 @@ export async function openPathfinderSettings(agent) {
  */
 async function getAvailableLorebooks() {
     const ctx = getContext();
-    if (!ctx) {
+    if (!ctx && !globalThis.window?.SillyTavern?.getContext?.() && (!Array.isArray(world_names) || world_names.length === 0)) {
         console.warn(`${PATHFINDER_LOG_PREFIX} Could not resolve the current context while gathering lorebooks.`);
         return [];
     }
@@ -285,10 +342,10 @@ async function refreshLorebookList() {
     settingsEl.find('#pf--auto-use-attached').prop('checked', Boolean(settings.autoUseAttachedLorebook));
     const autoEnabledLorebooks = await syncAutoAttachedLorebooks(lorebooks, settings);
     if (autoEnabledLorebooks.length > 0) {
-        updateAgentSettings();
+        await updateAgentSettings();
         updateStatusBanner();
     }
-    const enabledBooks = ensureEnabledLorebooks(getPathfinderSettings());
+    const enabledBooks = getActiveLorebookNames(getPathfinderSettings(), lorebooks);
 
     if (lorebooks.length === 0) {
         logPathfinder('No lorebooks were available for the current character/chat context.');
@@ -332,6 +389,7 @@ async function refreshLorebookList() {
 
             if (checked && !s.enabledLorebooks.includes(bookName)) {
                 s.enabledLorebooks.push(bookName);
+                s.selectedLorebook = s.selectedLorebook || bookName;
                 setLorebookEnabled(bookName, true);
                 logPathfinder(`Lorebook "${bookName}" enabled.`, {
                     source: book.type,
@@ -340,6 +398,9 @@ async function refreshLorebookList() {
                 await ensureLorebookTree(bookName);
             } else if (!checked) {
                 s.enabledLorebooks = s.enabledLorebooks.filter(b => b !== bookName);
+                if (s.selectedLorebook === bookName) {
+                    s.selectedLorebook = s.enabledLorebooks[0] ?? '';
+                }
                 setLorebookEnabled(bookName, false);
                 logPathfinder(`Lorebook "${bookName}" disabled.`, {
                     source: book.type,
@@ -439,12 +500,10 @@ function renderPermissionMatrix(lorebooks = null) {
         return;
     }
 
-    const allBooks = Array.isArray(lorebooks) ? lorebooks : [];
-    const enabledBooks = ensureEnabledLorebooks(getPathfinderSettings());
-    const books = allBooks.filter(book => enabledBooks.includes(book.name));
+    const books = getEffectiveLorebooks(lorebooks, getPathfinderSettings());
 
     if (books.length === 0) {
-        matrix.html('<div class="pf--empty-state pf--permission-empty"><i class="fa-solid fa-lock-open"></i><span>Select a lorebook to set read, write, and delete permissions.</span></div>');
+        matrix.html('<div class="pf--empty-state pf--permission-empty"><i class="fa-solid fa-lock-open"></i><span>Select a lorebook above, or attach one to the current character/chat with auto-select enabled.</span></div>');
         return;
     }
 
@@ -984,7 +1043,8 @@ function bindEvents() {
 function updateStatusBanner() {
     const banner = settingsEl.find('#pf--status-banner');
     const s = getPathfinderSettings();
-    const hasBooks = (s.enabledLorebooks || []).length > 0;
+    const activeBooks = getActiveLorebookNames(s);
+    const hasBooks = activeBooks.length > 0;
     const hasMode = s.sidecarEnabled || s.pipelineEnabled;
     const masterEnabled = currentAgent ? isAgentEnabledForCurrentScope(currentAgent) : false;
 
@@ -997,7 +1057,7 @@ function updateStatusBanner() {
         banner.removeClass('pf--status-disabled').addClass('pf--status-ready');
         banner.find('.pf--status-icon i').removeClass('fa-circle-xmark').addClass('fa-circle-check');
         banner.find('.pf--status-text strong').text('Pathfinder is ready');
-        banner.find('.pf--status-text span').text(`${s.enabledLorebooks.length} lorebook(s) enabled`);
+        banner.find('.pf--status-text span').text(`${activeBooks.length} lorebook(s) available`);
     } else if (hasBooks) {
         banner.removeClass('pf--status-disabled').addClass('pf--status-ready');
         banner.find('.pf--status-icon i').removeClass('fa-circle-xmark').addClass('fa-circle-check');
