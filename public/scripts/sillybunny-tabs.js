@@ -19,6 +19,7 @@ const SB_STORAGE_KEYS = Object.freeze({
     bottomBarScale: 'sb-bottom-bar-scale',
     bottomChatSecondaryOpen: 'sb-bottom-chat-secondary-open',
     mobileButtonScale: 'sb-mobile-button-scale',
+    mobileQuickActions: 'sb-mobile-quick-actions',
     settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
     compactMode: 'sb-compact-mode',
     frontendIcon: 'sb-frontend-icon',
@@ -530,6 +531,16 @@ const SB_UNIVERSAL_SEARCH_IDLE_TITLE = 'Search all settings';
 const SB_UNIVERSAL_SEARCH_IDLE_HINT = 'Jump to any workspace or customization control from one place.';
 const SB_UNIVERSAL_SEARCH_EMPTY_HINT = 'Could not find query. Try a broader term or a different setting name.';
 const SB_UNIVERSAL_SEARCH_RESULT_LIMIT = 10;
+const SB_MOBILE_QUICK_ACTION_LIMIT = 12;
+const SB_MOBILE_QUICK_ACTION_LABEL_MAX_LENGTH = 36;
+const SB_MOBILE_DEFAULT_QUICK_ACTIONS = Object.freeze([
+    { shell: 'left', tab: 'presets', icon: 'fa-sliders', label: 'Presets' },
+    { shell: 'left', tab: 'api', icon: 'fa-plug', label: 'API' },
+    { shell: 'left', tab: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
+    { shell: 'left', tab: 'advanced-formatting', icon: 'fa-text-height', label: 'Formatting' },
+    { shell: 'left', tab: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
+    { shell: 'left', tab: 'agents', icon: 'fa-robot', label: 'Agents' },
+]);
 
 const sbState = {
     initialized: false,
@@ -594,7 +605,9 @@ const sbState = {
     },
     mobileNav: {
         lastOpenedAt: 0,
+        quickActionContainer: null,
     },
+    mobileQuickActions: [],
     chatbar: {
         desktop: null,
         sidebar: null,
@@ -828,6 +841,140 @@ function normalizeTopbarOffset(value) {
     };
 }
 
+function normalizeMobileQuickAction(value) {
+    if (!value || typeof value !== 'object') {
+        return null;
+    }
+
+    const shellKey = normalizeText(value.shellKey);
+    const tabId = normalizeText(value.tabId);
+    const shellConfig = getShellConfig(shellKey);
+
+    if (!shellConfig || !tabId) {
+        return null;
+    }
+
+    const displayText = clampText(value.displayText, 80);
+    const sectionLabel = clampText(value.sectionLabel, 80);
+    const label = clampText(value.label || displayText || sectionLabel, SB_MOBILE_QUICK_ACTION_LABEL_MAX_LENGTH);
+    const dedupeKey = clampText(value.dedupeKey, 160);
+
+    if (!label || !dedupeKey) {
+        return null;
+    }
+
+    return {
+        shellKey,
+        tabId,
+        sectionLabel,
+        displayText,
+        dedupeKey,
+        label,
+    };
+}
+
+function loadMobileQuickActions() {
+    const storedValue = safeGetItem(SB_STORAGE_KEYS.mobileQuickActions);
+    if (!storedValue) {
+        return [];
+    }
+
+    try {
+        const parsedValue = JSON.parse(storedValue);
+        if (!Array.isArray(parsedValue)) {
+            return [];
+        }
+
+        return parsedValue
+            .map(normalizeMobileQuickAction)
+            .filter(Boolean)
+            .slice(0, SB_MOBILE_QUICK_ACTION_LIMIT);
+    } catch {
+        return [];
+    }
+}
+
+function saveMobileQuickActions() {
+    safeSetItem(SB_STORAGE_KEYS.mobileQuickActions, JSON.stringify(sbState.mobileQuickActions));
+}
+
+function getMobileQuickActionKey(action) {
+    return [
+        action.shellKey,
+        action.tabId,
+        action.dedupeKey,
+    ].filter(Boolean).join('::');
+}
+
+function createMobileQuickActionFromMatch(match) {
+    const normalizedMatch = normalizeMobileQuickAction({
+        shellKey: match?.shellKey,
+        tabId: match?.tabId,
+        sectionLabel: match?.sectionLabel,
+        displayText: match?.displayText,
+        dedupeKey: match?.dedupeKey,
+        label: match?.displayText || match?.sectionLabel,
+    });
+
+    return normalizedMatch;
+}
+
+function setMobileQuickActions(actions, { persist = true } = {}) {
+    const seen = new Set();
+    const nextActions = [];
+
+    for (const action of actions) {
+        const normalizedAction = normalizeMobileQuickAction(action);
+        if (!normalizedAction) {
+            continue;
+        }
+
+        const key = getMobileQuickActionKey(normalizedAction);
+        if (seen.has(key)) {
+            continue;
+        }
+
+        seen.add(key);
+        nextActions.push(normalizedAction);
+
+        if (nextActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT) {
+            break;
+        }
+    }
+
+    sbState.mobileQuickActions = nextActions;
+
+    if (persist) {
+        saveMobileQuickActions();
+    }
+
+    renderMobileQuickActionSettingsList();
+    refreshMobileNavQuickActions();
+}
+
+function addMobileQuickActionFromMatch(match) {
+    const action = createMobileQuickActionFromMatch(match);
+    if (!action) {
+        return false;
+    }
+
+    if (sbState.mobileQuickActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT) {
+        return false;
+    }
+
+    const actionKey = getMobileQuickActionKey(action);
+    if (sbState.mobileQuickActions.some(existingAction => getMobileQuickActionKey(existingAction) === actionKey)) {
+        return false;
+    }
+
+    setMobileQuickActions([...sbState.mobileQuickActions, action]);
+    return true;
+}
+
+function removeMobileQuickAction(actionKey) {
+    setMobileQuickActions(sbState.mobileQuickActions.filter(action => getMobileQuickActionKey(action) !== actionKey));
+}
+
 function normalizeTopbarScale(value) {
     const numericValue = Number(value);
 
@@ -877,6 +1024,7 @@ function restorePersistedTopbarState() {
     sbState.chatbar.visible = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.chatbarVisible), sbState.chatbar.visible);
     sbState.chatbar.topbarOffset = normalizeTopbarOffset(safeGetItem(SB_STORAGE_KEYS.topbarOffset));
     sbState.compactMode = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), sbState.compactMode);
+    sbState.mobileQuickActions = loadMobileQuickActions();
     sbState.characterDrawer.rightLocked = normalizeStoredBoolean(
         getPersistentStorageItem(SB_STORAGE_KEYS.characterDrawerRightLocked),
         sbState.characterDrawer.rightLocked,
@@ -9116,6 +9264,156 @@ function createShortcutSettingsGroup() {
     return group;
 }
 
+function getMobileQuickActionContextLabel(action) {
+    const shellLabel = getShellConfig(action.shellKey)?.title || action.shellKey;
+    const tabLabel = getShellState(action.shellKey)?.tabs.get(action.tabId)?.label || action.tabId;
+    return `${shellLabel} · ${tabLabel}`;
+}
+
+function renderMobileQuickActionResults(query, resultsElement) {
+    if (!(resultsElement instanceof HTMLElement)) {
+        return;
+    }
+
+    resultsElement.replaceChildren();
+
+    const trimmedQuery = String(query ?? '').trim();
+    if (trimmedQuery.length < 2) {
+        resultsElement.appendChild(createElement('div', {
+            className: 'sb-mobile-quick-action-empty',
+            text: 'Type at least 2 characters to find settings and extensions.',
+        }));
+        return;
+    }
+
+    const matches = getMobileQuickActionSearchMatches(trimmedQuery);
+    if (!matches.length) {
+        resultsElement.appendChild(createElement('div', {
+            className: 'sb-mobile-quick-action-empty',
+            text: `No matches for "${trimmedQuery}" yet.`,
+        }));
+        return;
+    }
+
+    const currentKeys = new Set(sbState.mobileQuickActions.map(getMobileQuickActionKey));
+    for (const match of matches) {
+        const action = createMobileQuickActionFromMatch(match);
+        if (!action) {
+            continue;
+        }
+
+        const actionKey = getMobileQuickActionKey(action);
+        const isAdded = currentKeys.has(actionKey);
+        const isFull = sbState.mobileQuickActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT;
+        const row = createElement('div', { className: 'sb-mobile-quick-action-result' });
+        const copy = createElement('span', { className: 'sb-mobile-quick-action-copy' });
+        const title = createElement('strong', { text: action.label });
+        const detail = createElement('small', {
+            text: `${match.shellLabel} · ${match.tabLabel}${action.sectionLabel ? ` · ${action.sectionLabel}` : ''}`,
+        });
+        const button = createElement('button', {
+            className: 'menu_button sb-mobile-quick-action-add',
+            text: isAdded ? 'Added' : 'Add',
+            attrs: {
+                type: 'button',
+                'aria-label': `Add ${action.label} to mobile Quick Actions`,
+            },
+        });
+
+        button.disabled = isAdded || isFull;
+        button.addEventListener('click', () => {
+            if (addMobileQuickActionFromMatch(match)) {
+                renderMobileQuickActionResults(trimmedQuery, resultsElement);
+            }
+        });
+
+        copy.append(title, detail);
+        row.append(copy, button);
+        resultsElement.appendChild(row);
+    }
+}
+
+function renderMobileQuickActionSettingsList() {
+    const list = document.getElementById('sb-mobile-quick-action-list');
+    if (!(list instanceof HTMLElement)) {
+        return;
+    }
+
+    list.replaceChildren();
+
+    if (!sbState.mobileQuickActions.length) {
+        list.appendChild(createElement('div', {
+            className: 'sb-mobile-quick-action-empty',
+            text: 'No custom mobile Quick Actions yet.',
+        }));
+        return;
+    }
+
+    for (const action of sbState.mobileQuickActions) {
+        const actionKey = getMobileQuickActionKey(action);
+        const row = createElement('div', { className: 'sb-mobile-quick-action-current' });
+        const copy = createElement('span', { className: 'sb-mobile-quick-action-copy' });
+        const title = createElement('strong', { text: action.label });
+        const detail = createElement('small', { text: getMobileQuickActionContextLabel(action) });
+        const removeButton = createElement('button', {
+            className: 'menu_button sb-mobile-quick-action-remove',
+            text: 'Remove',
+            attrs: {
+                type: 'button',
+                'aria-label': `Remove ${action.label} from mobile Quick Actions`,
+            },
+        });
+
+        removeButton.addEventListener('click', () => removeMobileQuickAction(actionKey));
+
+        copy.append(title, detail);
+        row.append(copy, removeButton);
+        list.appendChild(row);
+    }
+}
+
+function createMobileQuickActionSettingsGroup() {
+    const group = createElement('section', {
+        className: 'sb-theme-slider-group sb-mobile-quick-actions-group',
+    });
+    const heading = createElement('div', { className: 'sb-theme-slider-label' });
+    heading.innerHTML = '<strong>Mobile Quick Actions</strong><br><small>Add shortcuts to any searchable setting or extension in the mobile Workspace panel.</small>';
+
+    const searchInput = createElement('input', {
+        id: 'sb-mobile-quick-action-search',
+        className: 'text_pole sb-mobile-quick-action-search',
+        attrs: {
+            type: 'search',
+            placeholder: 'Search settings or extensions...',
+            autocomplete: 'off',
+            'aria-label': 'Search settings and extensions to add as mobile Quick Actions',
+        },
+    });
+    const results = createElement('div', {
+        id: 'sb-mobile-quick-action-results',
+        className: 'sb-mobile-quick-action-results',
+    });
+    const list = createElement('div', {
+        id: 'sb-mobile-quick-action-list',
+        className: 'sb-mobile-quick-action-list',
+    });
+    const status = createElement('p', {
+        className: 'sb-theme-slider-caption',
+        text: `Custom actions appear after the default Quick Actions. Limit ${SB_MOBILE_QUICK_ACTION_LIMIT}.`,
+    });
+
+    searchInput.addEventListener('input', event => {
+        const input = event.currentTarget;
+        renderMobileQuickActionResults(input instanceof HTMLInputElement ? input.value : '', results);
+    });
+
+    group.append(heading, searchInput, results, list, status);
+    renderMobileQuickActionResults('', results);
+
+    window.requestAnimationFrame(renderMobileQuickActionSettingsList);
+    return group;
+}
+
 function createCompactModeSettingsGroup() {
     const group = createElement('section', {
         className: 'sb-theme-slider-group sb-compact-mode-group',
@@ -9352,6 +9650,7 @@ function injectThemePicker() {
     const compactModeSettingsGroup = createCompactModeSettingsGroup();
     const frontendIconSettingsGroup = createFrontendIconSettingsGroup();
     const shortcutSettingsGroup = createShortcutSettingsGroup();
+    const mobileQuickActionSettingsGroup = createMobileQuickActionSettingsGroup();
     header.append(title, description);
 
     for (const theme of SB_THEMES) {
@@ -9375,7 +9674,7 @@ function injectThemePicker() {
     getMessageStyleSelect()?.addEventListener('change', updateThemePickerUi);
     document.addEventListener('sb:chat-style-updated', updateThemePickerUi);
 
-    card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
+    card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup, mobileQuickActionSettingsGroup);
     themeBlock.prepend(card);
     updateThemePickerUi();
 }
@@ -9472,7 +9771,7 @@ function updateThemePickerUi() {
     }
 }
 
-function createSearchIndex(tabState) {
+function createSearchIndex(tabState, { includeThemeCard = false } = {}) {
     const searchRoot = tabState.searchRoot;
     if (!(searchRoot instanceof HTMLElement)) {
         return [];
@@ -9480,13 +9779,16 @@ function createSearchIndex(tabState) {
 
     const entries = [];
     const seen = new Set();
+    const excludedSelector = includeThemeCard
+        ? '.sb-search-result, .sb-legacy-search-hidden, .sb-mobile-quick-actions-group'
+        : '.sb-search-result, .sb-theme-card, .sb-legacy-search-hidden';
 
     for (const element of searchRoot.querySelectorAll(SB_SEARCH_TARGET_SELECTOR)) {
         if (!(element instanceof HTMLElement)) {
             continue;
         }
 
-        if (element.closest('.sb-search-result, .sb-theme-card, .sb-legacy-search-hidden')) {
+        if (element.closest(excludedSelector)) {
             continue;
         }
 
@@ -9656,6 +9958,102 @@ function collectGlobalSearchMatches(query) {
     return Array.from(matches.values())
         .sort((left, right) => right.score - left.score)
         .slice(0, SB_UNIVERSAL_SEARCH_RESULT_LIMIT);
+}
+
+function getTabSearchEntries(tabState, { includeThemeCard = false } = {}) {
+    const searchIndex = includeThemeCard ? createSearchIndex(tabState, { includeThemeCard }) : tabState.searchIndex;
+
+    if (!searchIndex) {
+        tabState.searchIndex = createSearchIndex(tabState);
+    }
+
+    return [
+        ...(searchIndex || tabState.searchIndex),
+        ...(tabState.id === 'persona' ? getPersonaSearchEntries(tabState) : []),
+    ];
+}
+
+function getMobileQuickActionSearchMatches(query) {
+    const normalizedQuery = normalizeText(query);
+
+    if (normalizedQuery.length < 2) {
+        return [];
+    }
+
+    const searchTerms = normalizedQuery.split(' ').filter(Boolean);
+    const matches = new Map();
+
+    for (const [shellKey, shellState] of Object.entries(sbState.shells)) {
+        const shellLabel = getShellConfig(shellKey)?.title || shellKey;
+
+        for (const tabState of shellState.tabs.values()) {
+            for (const entry of getTabSearchEntries(tabState, { includeThemeCard: true })) {
+                if (!searchTerms.every(term => entry.searchText.includes(term))) {
+                    continue;
+                }
+
+                const match = {
+                    ...entry,
+                    shellKey,
+                    shellLabel,
+                    score: Number(entry.searchText.startsWith(normalizedQuery)) * 10 - entry.displayText.length / 1000,
+                };
+                const matchKey = [
+                    shellKey,
+                    entry.dedupeKey,
+                ].filter(Boolean).join('::');
+                const existingMatch = matches.get(matchKey);
+
+                if (!existingMatch || match.score > existingMatch.score) {
+                    matches.set(matchKey, match);
+                }
+            }
+        }
+    }
+
+    return Array.from(matches.values())
+        .sort((left, right) => right.score - left.score)
+        .slice(0, SB_UNIVERSAL_SEARCH_RESULT_LIMIT);
+}
+
+function findMobileQuickActionMatch(action) {
+    const normalizedAction = normalizeMobileQuickAction(action);
+    if (!normalizedAction) {
+        return null;
+    }
+
+    const shellState = getShellState(normalizedAction.shellKey);
+    const tabState = shellState?.tabs.get(normalizedAction.tabId);
+    if (!tabState) {
+        return null;
+    }
+
+    const entries = getTabSearchEntries(tabState, { includeThemeCard: true });
+    const exactMatch = entries.find(entry => entry.dedupeKey === normalizedAction.dedupeKey);
+    const fallbackMatch = exactMatch || entries.find(entry => (
+        normalizeText(entry.sectionLabel) === normalizeText(normalizedAction.sectionLabel)
+        && normalizeText(entry.displayText) === normalizeText(normalizedAction.displayText)
+    ));
+
+    if (!fallbackMatch) {
+        return null;
+    }
+
+    return {
+        ...fallbackMatch,
+        shellKey: normalizedAction.shellKey,
+        shellLabel: getShellConfig(normalizedAction.shellKey)?.title || normalizedAction.shellKey,
+    };
+}
+
+function activateMobileQuickAction(action) {
+    const match = findMobileQuickActionMatch(action);
+    if (!match) {
+        openShell(action.shellKey, action.tabId);
+        return;
+    }
+
+    revealSearchMatch(action.shellKey, match);
 }
 
 function renderUniversalSearchResults(query) {
@@ -10471,6 +10869,64 @@ function bindWorldInfoRoute() {
     });
 }
 
+function createMobileQuickActionButton(item) {
+    const button = createElement('button', {
+        className: 'sb-nav-item',
+        attrs: {
+            type: 'button',
+        },
+    });
+    const icon = createElement('i', {
+        className: `fa-solid ${item.icon || 'fa-bolt'}`,
+        attrs: {
+            'aria-hidden': 'true',
+        },
+    });
+    const label = createElement('span', { text: item.label });
+
+    button.append(icon, label);
+    button.addEventListener('click', () => {
+        closeMobileNav();
+
+        if (item.action === 'custom') {
+            activateMobileQuickAction(item);
+        } else if (item.action === 'home') {
+            void returnToLandingPage();
+        } else if (item.action === 'chat-tools') {
+            openMobileChatTools();
+        } else if (item.action === 'characters') {
+            toggleCharacterPanel();
+        } else {
+            toggleShellPanel(item.shell, item.tab);
+        }
+    });
+
+    return button;
+}
+
+function refreshMobileNavQuickActions() {
+    const list = sbState.mobileNav.quickActionContainer
+        ?? document.querySelector('#sb-mobile-nav .sb-mobile-section-list');
+    if (!(list instanceof HTMLElement)) {
+        return;
+    }
+
+    sbState.mobileNav.quickActionContainer = list;
+    list.replaceChildren();
+
+    for (const item of SB_MOBILE_DEFAULT_QUICK_ACTIONS) {
+        list.appendChild(createMobileQuickActionButton(item));
+    }
+
+    for (const action of sbState.mobileQuickActions) {
+        list.appendChild(createMobileQuickActionButton({
+            ...action,
+            action: 'custom',
+            icon: 'fa-bolt',
+        }));
+    }
+}
+
 function buildMobileNav() {
     if (document.getElementById('sb-mobile-nav')) {
         return;
@@ -10492,55 +10948,12 @@ function buildMobileNav() {
         overlay.inert = true;
     }
 
-    const sections = [
-        {
-            label: 'Quick Actions',
-            items: [
-                { shell: 'left', tab: 'presets', icon: 'fa-sliders', label: 'Presets' },
-                { shell: 'left', tab: 'api', icon: 'fa-plug', label: 'API' },
-                { shell: 'left', tab: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
-                { shell: 'left', tab: 'advanced-formatting', icon: 'fa-text-height', label: 'Formatting' },
-                { shell: 'left', tab: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
-                { shell: 'left', tab: 'agents', icon: 'fa-robot', label: 'Agents' },
-            ],
-        },
-    ];
-
-    for (const section of sections) {
-        const sectionBlock = createElement('section', { className: 'sb-mobile-section' });
-        const heading = createElement('strong', { className: 'sb-mobile-section-title', text: section.label });
-        const list = createElement('div', { className: 'sb-mobile-section-list' });
-
-        for (const item of section.items) {
-            const button = createElement('button', {
-                className: 'sb-nav-item',
-                attrs: {
-                    type: 'button',
-                },
-            });
-
-            button.innerHTML = `<i class="fa-solid ${item.icon}" aria-hidden="true"></i><span>${item.label}</span>`;
-
-            button.addEventListener('click', () => {
-                closeMobileNav();
-
-                if (item.action === 'home') {
-                    void returnToLandingPage();
-                } else if (item.action === 'chat-tools') {
-                    openMobileChatTools();
-                } else if (item.action === 'characters') {
-                    toggleCharacterPanel();
-                } else {
-                    toggleShellPanel(item.shell, item.tab);
-                }
-            });
-
-            list.appendChild(button);
-        }
-
-        sectionBlock.append(heading, list);
-        content.appendChild(sectionBlock);
-    }
+    const sectionBlock = createElement('section', { className: 'sb-mobile-section' });
+    const list = createElement('div', { className: 'sb-mobile-section-list' });
+    sectionBlock.appendChild(list);
+    content.appendChild(sectionBlock);
+    sbState.mobileNav.quickActionContainer = list;
+    refreshMobileNavQuickActions();
 
     const header = createElement('div', { className: 'sb-mobile-panel-header' });
     const closeButton = createElement('button', {
@@ -10664,6 +11077,7 @@ function setMobileNavOpenState(isOpen) {
     queueMobileModalStateSync();
 
     if (shouldOpen) {
+        refreshMobileNavQuickActions();
         window.requestAnimationFrame(() => {
             overlay.querySelector('#sb-mobile-nav-title')?.focus?.({ preventScroll: true });
         });

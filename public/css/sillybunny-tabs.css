@@ -3770,7 +3770,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         align-items: center;
         justify-content: stretch;
         gap: var(--sb-bottom-chat-mobile-gap);
-        margin: 0 auto 6px;
+        margin: 0 auto;
         padding: var(--sb-bottom-chat-mobile-padding-block) var(--sb-bottom-chat-mobile-padding-inline);
         min-height: calc(var(--sb-bottom-chat-mobile-persona-size) + var(--sb-bottom-chat-mobile-padding-block) + var(--sb-bottom-chat-mobile-padding-block));
         border-radius: var(--sb-bottom-chat-mobile-radius);
