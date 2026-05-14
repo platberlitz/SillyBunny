@@ -2840,8 +2840,8 @@ input[type='range']::-moz-range-thumb {
     grid-column: 2;
     justify-self: end;
     width: 100% !important;
-    min-width: 0;
-    max-width: none;
+    min-width: 0 !important;
+    max-width: 100%;
 }
 
 #openai_settings .oneline-dropdown > :is(.toggle-description, strong.toggle-description) {
@@ -2936,7 +2936,7 @@ input[type='range']::-moz-range-thumb {
     #openai_api .oneline-dropdown,
     #openai_settings .oneline-dropdown,
     #range_block_openai .oneline-dropdown {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
         align-items: stretch;
         gap: 8px;
     }
