@@ -52,7 +52,7 @@ const STARTER_PACK_PRESET_NAME_SILLYBUNNY = 'Pura\'s Director Preset (SillyBunny
 const STARTER_PACK_PRESET_TITLE = 'Pura\'s Director Preset';
 const STARTER_PACK_CREATOR_NAME = 'purachina';
 const STARTER_PACK_SITE_URL = 'https://platberlitz.github.io/';
-const GEECHAN_PRESET_NAME = 'Geechan - Universal Roleplay (Chat Completions) (v5.1)';
+const GEECHAN_PRESET_NAME = 'Geechan - Universal Roleplay (Chat Completions) (v5.2)';
 const GEECHAN_SITE_URL = 'https://rentry.org/geechan';
 const TLD_CHUB_URL = 'https://chub.ai/users/thelonelydevil';
 const TLD_DISCORD_PALS_URL = 'https://github.com/TheLonelyDevil9/discord-pals/';
@@ -817,7 +817,7 @@ function buildGeechanStarterPackItem() {
     const presetManager = getPresetManager('openai');
     const isOpenAiStyleApi = main_api === 'openai';
     const isSelected = isOpenAiStyleApi && presetManager?.getSelectedPresetName() === GEECHAN_PRESET_NAME;
-    const body = 'Geechan\'s Rentry highlights his well-written character cards and guides alongside his prompts and presets. SillyBunny includes his Universal Roleplay v5.1 preset across Chat Completions, plus the matching Text Completions variant for context, system prompt, and instruct pieces. He also made our bundled Assistant Nahida card and Prose Polisher agent.';
+    const body = 'Geechan\'s Rentry highlights his well-written character cards and guides alongside his prompts and presets. SillyBunny includes his Universal Roleplay v5.2 preset across Chat Completions, plus the matching Text Completions variant for context, system prompt, and instruct pieces. He also made our bundled Assistant Nahida card and Prose Polisher agent.';
 
     return {
         title: 'Geechan',
