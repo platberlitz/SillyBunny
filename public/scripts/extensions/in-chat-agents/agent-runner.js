@@ -8,6 +8,7 @@ import {
     setExtensionPrompt,
     substituteParams,
     generateQuietPrompt,
+    getCurrentChatId,
     normalizeContentText,
     saveChatDebounced,
     stopGeneration,
@@ -70,7 +71,7 @@ const DEFERRED_POST_PROCESSING_RETRY_MS = 50;
 const LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS = 30000;
 const MISSED_GENERATION_END_RECOVERY_MS = 200;
 
-/** @type {{ generationType: string, activeAgentIds: string[] } | null} */
+/** @type {{ generationType: string, activeAgentIds: string[], chatId: string } | null} */
 let pendingGenerationSnapshot = null;
 let internalPromptTransformDepth = 0;
 let isGenerationInProgress = false;
@@ -93,6 +94,8 @@ let parallelManualRunCount = 0;
 let agentGenerationCancelRevision = 0;
 const promptTransformIdleResolvers = new Set();
 let pendingPreGenerationInterceptRuns = [];
+let generationStartChatId = '';
+let postProcessingInvalidatedByChatChange = false;
 let generationStartChatLength = 0;
 let generationStartLastAssistantIndex = -1;
 let generationStartLastAssistantMessage = null;
@@ -426,6 +429,7 @@ export function unregisterAllAgentTools() {
 function normalizeGenerationType(generationType) {
     switch (String(generationType ?? '').trim().toLowerCase()) {
         case 'continue':
+        case GREETING_GENERATION_TYPE:
         case 'impersonate':
         case 'quiet':
             return String(generationType).trim().toLowerCase();
@@ -560,14 +564,68 @@ function clearMissedGenerationEndRecoveryCheck() {
     missedGenerationEndRecoveryTimeout = null;
 }
 
+function normalizeSnapshotChatId(chatId) {
+    return chatId === null || chatId === undefined ? '' : String(chatId);
+}
+
+function getCurrentSnapshotChatId() {
+    try {
+        return normalizeSnapshotChatId(getCurrentChatId());
+    } catch {
+        return '';
+    }
+}
+
+function isActivationSnapshotForCurrentChat(snapshot) {
+    if (!snapshot) {
+        return false;
+    }
+
+    return normalizeSnapshotChatId(snapshot.chatId) === getCurrentSnapshotChatId();
+}
+
+function isCurrentGenerationChatStale() {
+    return generationStartChatId && generationStartChatId !== getCurrentSnapshotChatId();
+}
+
+function clearPendingPostProcessingForChatChange() {
+    if (isGenerationInProgress || pendingGenerationSnapshot || deferredPostProcessingQueue.size > 0) {
+        postProcessingInvalidatedByChatChange = true;
+    }
+
+    isGenerationInProgress = false;
+    toolSyncDuringGeneration = false;
+    generationStopRequested = false;
+    generationStartChatId = getCurrentSnapshotChatId();
+    pendingGenerationSnapshot = null;
+    processedPostProcessingRunsByIndex.clear();
+    clearDeferredPostProcessing();
+    clearLatestAssistantPostProcessingFallback();
+    clearPostGenerationRecoveryCheck();
+    clearMissedGenerationEndRecoveryCheck();
+}
+
+function clearStalePendingGenerationSnapshot() {
+    if (!pendingGenerationSnapshot || isActivationSnapshotForCurrentChat(pendingGenerationSnapshot)) {
+        return false;
+    }
+
+    clearPendingPostProcessingForChatChange();
+    return true;
+}
+
 function cloneActivationSnapshot(snapshot, generationType) {
     const normalizedGenerationType = normalizeGenerationType(snapshot?.generationType ?? generationType);
+    const snapshotChatId = snapshot && Object.hasOwn(snapshot, 'chatId')
+        ? snapshot.chatId
+        : getCurrentSnapshotChatId();
 
     return {
         generationType: normalizedGenerationType,
         activeAgentIds: Array.isArray(snapshot?.activeAgentIds)
             ? [...snapshot.activeAgentIds]
             : [],
+        chatId: normalizeSnapshotChatId(snapshotChatId),
     };
 }
 
@@ -781,7 +839,7 @@ function getDeferredActivationSnapshot(generationType) {
 }
 
 function isAssistantPostProcessingGenerationType(generationType) {
-    return !isImpersonateGenerationType(generationType);
+    return !isGreetingGenerationType(generationType) && !isImpersonateGenerationType(generationType);
 }
 
 function deferPostProcessing(messageIndex, generationType, activationSnapshot = null) {
@@ -810,6 +868,10 @@ function deferPostProcessing(messageIndex, generationType, activationSnapshot = 
 }
 
 function isDeferredPostProcessingMessageCurrent(pendingMessage) {
+    if (!isActivationSnapshotForCurrentChat(pendingMessage.activationSnapshot)) {
+        return false;
+    }
+
     const message = chat[pendingMessage.messageIndex];
 
     if (!message || message.is_user || message.is_system) {
@@ -912,6 +974,11 @@ function clearLatestAssistantPostProcessingFallbackTimer() {
 function scheduleLatestAssistantPostProcessingFallback(delayMs = DEFERRED_POST_PROCESSING_RETRY_MS) {
     clearLatestAssistantPostProcessingFallbackTimer();
 
+    if (clearStalePendingGenerationSnapshot()) {
+        latestAssistantPostProcessingFallbackDeadline = 0;
+        return;
+    }
+
     if (!latestAssistantPostProcessingFallbackDeadline) {
         latestAssistantPostProcessingFallbackDeadline = Date.now() + LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS;
     }
@@ -945,6 +1012,15 @@ function scheduleLatestAssistantPostProcessingFallback(delayMs = DEFERRED_POST_P
 }
 
 function hasPostGenerationRecoveryWork() {
+    if (postProcessingInvalidatedByChatChange || isCurrentGenerationChatStale()) {
+        clearPendingPostProcessingForChatChange();
+        return false;
+    }
+
+    if (clearStalePendingGenerationSnapshot()) {
+        return false;
+    }
+
     return Boolean(
         !generationStopRequested &&
         (
@@ -980,7 +1056,12 @@ function schedulePostGenerationRecoveryCheck(delayMs = 0) {
 }
 
 function hasRecoverableAssistantPostProcessingCandidate() {
-    if (!pendingGenerationSnapshot || generationStopRequested || internalPromptTransformDepth > 0) {
+    if (postProcessingInvalidatedByChatChange || isCurrentGenerationChatStale()) {
+        clearPendingPostProcessingForChatChange();
+        return false;
+    }
+
+    if (clearStalePendingGenerationSnapshot() || !pendingGenerationSnapshot || generationStopRequested || internalPromptTransformDepth > 0) {
         return false;
     }
 
@@ -1045,7 +1126,7 @@ function canRecoverMissedGenerationEnd() {
 }
 
 function recoverMissedGenerationEnd(reason = 'fallback') {
-    if (!canRecoverMissedGenerationEnd()) {
+    if (clearStalePendingGenerationSnapshot() || !canRecoverMissedGenerationEnd()) {
         return false;
     }
 
@@ -1207,7 +1288,12 @@ function isGenerationAssistantCandidate(messageIndex, message) {
 }
 
 function queueLatestAssistantPostProcessingFromSnapshot() {
-    if (!pendingGenerationSnapshot || generationStopRequested) {
+    if (postProcessingInvalidatedByChatChange || isCurrentGenerationChatStale()) {
+        clearPendingPostProcessingForChatChange();
+        return { queued: false, retry: false };
+    }
+
+    if (clearStalePendingGenerationSnapshot() || !pendingGenerationSnapshot || generationStopRequested) {
         return { queued: false, retry: false };
     }
 
@@ -1243,10 +1329,12 @@ function queueLatestAssistantPostProcessingFromSnapshot() {
 
 function buildActivationSnapshot(generationType) {
     const normalizedGenerationType = normalizeGenerationType(generationType);
+    const chatId = getCurrentSnapshotChatId();
     if (!areAgentsGloballyEnabled()) {
         return {
             generationType: normalizedGenerationType,
             activeAgentIds: [],
+            chatId,
         };
     }
 
@@ -1255,6 +1343,7 @@ function buildActivationSnapshot(generationType) {
     return {
         generationType: normalizedGenerationType,
         activeAgentIds: activeAgents.map(agent => agent.id),
+        chatId,
     };
 }
 
@@ -2480,6 +2569,8 @@ function onGenerationStarted(generationType, _options, dryRun) {
 
     currentMainGenerationType = normalizeGenerationType(generationType);
     isGenerationInProgress = true;
+    generationStartChatId = getCurrentSnapshotChatId();
+    postProcessingInvalidatedByChatChange = false;
     toolSyncDuringGeneration = true;
     generationStopRequested = false;
     generationStartedAt = Date.now();
@@ -2511,6 +2602,14 @@ function onGenerationStarted(generationType, _options, dryRun) {
 
 function onGenerationEnded() {
     if (internalPromptTransformDepth > 0) {
+        return;
+    }
+
+    if (postProcessingInvalidatedByChatChange || isCurrentGenerationChatStale()) {
+        isGenerationInProgress = false;
+        toolSyncDuringGeneration = false;
+        generationStopRequested = false;
+        clearPendingPostProcessingForChatChange();
         return;
     }
 
@@ -2623,7 +2722,7 @@ async function onGenerationAfterCommands(generationType, _options, dryRun) {
  * Runs post-generation utilities on the received message and snapshots active regex scripts.
  * @param {number} messageIndex
  * @param {string} generationType
- * @param {{ generationType: string, activeAgentIds: string[] } | null} activationSnapshot
+ * @param {{ generationType: string, activeAgentIds: string[], chatId: string } | null} activationSnapshot
  */
 async function processReceivedMessage(messageIndex, generationType, activationSnapshot = null) {
     const message = chat[messageIndex];
@@ -2805,6 +2904,17 @@ async function onMessageReceived(messageIndex, generationType) {
         return;
     }
 
+    if (isGreetingGenerationType(generationType)) {
+        swipeNavigationPending = false;
+        clearDeferredPostProcessing(Number(messageIndex));
+        return;
+    }
+
+    if (postProcessingInvalidatedByChatChange || isCurrentGenerationChatStale()) {
+        clearPendingPostProcessingForChatChange();
+        return;
+    }
+
     if (!isAssistantPostProcessingGenerationType(generationType)) {
         return;
     }
@@ -2872,6 +2982,14 @@ function onStreamTokenReceived() {
 async function onCharacterMessageRendered(messageIndex, generationType) {
     const numericMessageIndex = Number(messageIndex);
     const message = chat[numericMessageIndex];
+
+    if (isGreetingGenerationType(generationType)) {
+        swipeNavigationPending = false;
+        if (shouldRefreshTransformHistoryUi(numericMessageIndex, message)) {
+            scheduleMessageRefresh(numericMessageIndex, message);
+        }
+        return;
+    }
 
     if (swipeNavigationPending) {
         swipeNavigationPending = false;
@@ -3385,6 +3503,8 @@ function getPfManagedEntryUids(toolAgents) {
 let _onChatChangedToolSync = false;
 
 function onChatChangedToolSync() {
+    clearPendingPostProcessingForChatChange();
+
     if (!areAgentsGloballyEnabled()) {
         syncToolAgentRegistrations();
         return;
