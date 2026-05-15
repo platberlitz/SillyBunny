@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import express from 'express';
 import fetch from 'node-fetch';
 
-import { forwardFetchResponse, delay, summarizeLlmPayloadForLog } from '../../util.js';
+import { forwardFetchResponse, abortOnResponseClose, delay, summarizeLlmPayloadForLog } from '../../util.js';
 import { getOverrideHeaders, setAdditionalHeaders, setAdditionalHeadersByType } from '../../additional-headers.js';
 import { TEXTGEN_TYPES } from '../../constants.js';
 
@@ -17,8 +17,12 @@ router.post('/generate', async function (request, response_generate) {
 
     const request_prompt = request.body.prompt;
     const controller = new AbortController();
-    request.socket.removeAllListeners('close');
-    request.socket.on('close', async function () {
+    abortOnResponseClose(response_generate, controller);
+    response_generate.on('close', async function () {
+        if (response_generate.writableEnded) {
+            return;
+        }
+
         if (request.body.can_abort && !response_generate.writableEnded) {
             try {
                 console.info('Aborting Kobold generation...');
@@ -34,7 +38,6 @@ router.post('/generate', async function (request, response_generate) {
                 console.error(error);
             }
         }
-        controller.abort();
     });
 
     let this_settings = {
