@@ -133,7 +133,7 @@ describe('in-chat agent post-processing runner', () => {
         globalThis.toastr = {
             clear: jest.fn(),
             error: jest.fn(),
-            info: jest.fn(),
+            info: jest.fn(() => ({ toast: true })),
             success: jest.fn(),
             warning: jest.fn(),
         };
@@ -224,6 +224,7 @@ describe('in-chat agent post-processing runner', () => {
             getEnabledToolAgents: jest.fn(() => []),
             getGlobalSettings: jest.fn(() => globalSettings),
             getPromptTransformMode: jest.fn(agent => agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite'),
+            saveAgent: jest.fn(async () => {}),
             isToolAgent: jest.fn(() => false),
             normalizePreProcessMaxTokens: jest.fn(value => Number.isFinite(Number(value)) ? Math.max(16, Math.min(16000, Number(value))) : 8192),
             normalizePromptTransformMaxTokens: jest.fn(value => Number.isFinite(Number(value)) ? Math.max(16, Math.min(16000, Number(value))) : 8192),
@@ -236,10 +237,19 @@ describe('in-chat agent post-processing runner', () => {
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/tree-store.js', () => ({
-            getAllEntryUids: jest.fn(() => []),
             getSettings: jest.fn(() => ({ pipelinePrompts: {}, pipelines: [] })),
-            getTree: jest.fn(() => null),
             setSettings: jest.fn(),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/tool-definitions.js', () => ({
+            getPathfinderToolDefinitions: jest.fn(() => [
+                { name: 'Pathfinder_Search', displayName: 'Search', description: 'Search', parameters: {}, actionKey: 'pathfinder.search' },
+                { name: 'Pathfinder_Summarize', displayName: 'Summarize', description: 'Summarize', parameters: {}, actionKey: 'pathfinder.summarize' },
+            ]),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/pathfinder-tool-bridge.js', () => ({
+            getContextualLorebooks: jest.fn(() => []),
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/sidecar-retrieval.js', () => ({
@@ -573,6 +583,48 @@ describe('in-chat agent post-processing runner', () => {
 
         expect(extensionPrompts.pathfinder_pipeline_retrieval).toEqual({ value: 'retrieved lore' });
         expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toEqual({ value: 'Use the current scene style.' });
+    });
+
+    test('shows a processing toast while Pathfinder pipeline retrieval is running', async () => {
+        usePrePromptAgent();
+        enabledAgents.unshift({
+            id: 'agent-pathfinder',
+            name: 'Pathfinder',
+            category: 'tool',
+            sourceTemplateId: 'tpl-pathfinder',
+            phase: 'both',
+            prompt: '',
+            injection: { order: 0 },
+            settings: { pipelineEnabled: true, sidecarEnabled: false },
+            tools: [],
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        });
+
+        let resolveRetrieval;
+        const retrievalDone = new Promise(resolve => {
+            resolveRetrieval = resolve;
+        });
+        runSidecarRetrieval.mockImplementation(async () => {
+            await retrievalDone;
+        });
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        const generationPromise = eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        await Promise.resolve();
+
+        expect(globalThis.toastr.info).toHaveBeenCalledWith('Pathfinder is processing lore for this reply...', 'Please wait', { timeOut: 0, extendedTimeOut: 0 });
+        expect(globalThis.toastr.clear).not.toHaveBeenCalled();
+
+        resolveRetrieval();
+        await generationPromise;
+
+        expect(globalThis.toastr.clear).toHaveBeenCalledWith({ toast: true });
     });
 
     test('runs pre-generation intercept agents on text prompts without injecting their prompt', async () => {

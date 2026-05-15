@@ -1,4 +1,4 @@
-import { getSettings, getTree, isLorebookEnabled, canReadBook, canWriteBook } from './tree-store.js';
+import { getSettings, getTree, isLorebookEnabled, canReadBook, canWriteBook, canDeleteBook } from './tree-store.js';
 
 const CHAT_LOREBOOK_METADATA_KEY = 'world_info';
 
@@ -144,6 +144,12 @@ export function getWritableBooks() {
     return books;
 }
 
+export function getDeletableBooks() {
+    const books = getActiveTunnelVisionBooks().filter(b => canDeleteBook(b));
+    logPathfinderToolBridge('Deletable lorebooks resolved for Pathfinder.', { books });
+    return books;
+}
+
 export function resolveTargetBook(requestedBook, writableBooks = null) {
     const books = writableBooks ?? getWritableBooks();
     if (books.length === 0) return null;
@@ -226,9 +232,17 @@ export async function getEntryContent(bookName, uid) {
                 });
                 return {
                     uid: entry.uid,
+                    world: entry.world || bookName,
                     comment: entry.comment || entry.key?.[0] || '',
                     content: entry.content || '',
                     key: entry.key || [],
+                    keysecondary: entry.keysecondary || [],
+                    selective: entry.selective ?? false,
+                    selectiveLogic: entry.selectiveLogic ?? 0,
+                    caseSensitive: entry.caseSensitive,
+                    matchWholeWords: entry.matchWholeWords,
+                    constant: entry.constant ?? false,
+                    decorators: entry.decorators || [],
                     disable: entry.disable ?? false,
                 };
             }
@@ -267,9 +281,17 @@ export async function getAllEntriesWithContent(bookName) {
             .filter(entry => entry && !entry.disable)
             .map(entry => ({
                 uid: entry.uid,
+                world: entry.world || bookName,
                 comment: entry.comment || entry.key?.[0] || '',
                 content: entry.content || '',
                 key: entry.key || [],
+                keysecondary: entry.keysecondary || [],
+                selective: entry.selective ?? false,
+                selectiveLogic: entry.selectiveLogic ?? 0,
+                caseSensitive: entry.caseSensitive,
+                matchWholeWords: entry.matchWholeWords,
+                constant: entry.constant ?? false,
+                decorators: entry.decorators || [],
             }));
         logPathfinderToolBridge(`Fetched lorebook contents for "${bookName}".`, {
             entryCount: entries.length,

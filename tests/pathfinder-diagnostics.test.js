@@ -16,6 +16,9 @@ let mockRuntimeAgent;
 let mockSyncToolAgentRegistrations;
 
 await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/tree-store.js', () => ({
+    canDeleteBook: jest.fn(() => true),
+    canReadBook: jest.fn(() => true),
+    canWriteBook: jest.fn(() => true),
     getSettings: jest.fn(() => mockSettings),
     getTree: jest.fn(bookName => mockTrees[bookName] ?? null),
     getAllEntryUids: jest.fn(tree => tree.uids ?? []),
@@ -33,6 +36,7 @@ await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/agen
 
 await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/agent-runner.js', () => ({
     getPathfinderRuntimeAgent: jest.fn(() => mockRuntimeAgent),
+    getToolRecursionState: jest.fn(() => ({ depth: 0, limit: 5, registeredToolNames: TOOL_NAMES })),
     syncToolAgentRegistrations: jest.fn(() => mockSyncToolAgentRegistrations()),
 }));
 
@@ -45,6 +49,9 @@ describe('Pathfinder diagnostics', () => {
             includeContextualLorebooks: true,
             pipelineEnabled: false,
             sidecarEnabled: true,
+            toolStates: Object.fromEntries(TOOL_NAMES.map(name => [name, true])),
+            autoSyncLorebooksOnChatChange: true,
+            dedupeNaturalActivation: true,
         };
         mockTrees = {
             'Manual Book': { uids: ['uid-1', 'uid-2'] },
@@ -78,7 +85,7 @@ describe('Pathfinder diagnostics', () => {
         expect(mockSyncToolAgentRegistrations).toHaveBeenCalledTimes(1);
         expect(results['Tool Registration']).toEqual({
             ok: true,
-            message: 'All 3 enabled Pathfinder tool(s) registered and active',
+            message: 'All 3 enabled Pathfinder tool(s) registered and active. Registered: Pathfinder_Search, Pathfinder_Summarize, Pathfinder_Remember. Enabled: Pathfinder_Search, Pathfinder_Summarize, Pathfinder_Remember. Recursion: 0/5.',
         });
     });
 
@@ -101,6 +108,7 @@ describe('Pathfinder diagnostics', () => {
                 { name: 'Pathfinder_Remember', enabled: false },
             ],
         };
+        mockSettings.toolStates = {};
         globalThis.window.SillyTavern.getContext = () => ({
             ToolManager: {
                 tools: new Map([
@@ -116,7 +124,25 @@ describe('Pathfinder diagnostics', () => {
 
         expect(results['Tool Registration']).toEqual({
             ok: true,
-            message: 'All 1 enabled Pathfinder tool(s) registered and active',
+            message: 'All 1 enabled Pathfinder tool(s) registered and active. Registered: Pathfinder_Search, Pathfinder_Summarize, Pathfinder_Remember. Enabled: Pathfinder_Summarize. Recursion: 0/5.',
+        });
+    });
+
+    test('prefers canonical toolStates over stale agent tool arrays', async () => {
+        mockRuntimeAgent = {
+            tools: TOOL_NAMES.map(name => ({ name, enabled: true })),
+        };
+        mockSettings.toolStates = {
+            Pathfinder_Search: false,
+            Pathfinder_Summarize: true,
+            Pathfinder_Remember: false,
+        };
+
+        const results = await runDiagnostics();
+
+        expect(results['Tool Registration']).toEqual({
+            ok: true,
+            message: 'All 1 enabled Pathfinder tool(s) registered and active. Registered: Pathfinder_Search, Pathfinder_Summarize, Pathfinder_Remember. Enabled: Pathfinder_Summarize. Recursion: 0/5.',
         });
     });
 });

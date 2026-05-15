@@ -1,6 +1,6 @@
 import { getSettings } from '../tree-store.js';
 import { createEntry } from '../entry-manager.js';
-import { getActiveTunnelVisionBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
+import { getWritableBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
 import { registerToolAction, registerToolFormatter } from '../../tool-action-registry.js';
 import { logToolCallStarted, logToolCallCompleted, logToolCallError } from '../activity-feed.js';
 
@@ -34,7 +34,7 @@ async function rememberAction(args) {
         return 'Error: Both "title" and "content" are required.';
     }
 
-    const writableBooks = getActiveTunnelVisionBooks();
+    const writableBooks = getWritableBooks();
     const targetBook = resolveTargetBook(bookName, writableBooks);
 
     if (!targetBook) {

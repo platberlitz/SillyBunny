@@ -9,6 +9,7 @@ await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/path
     isLorebookEnabled: jest.fn(bookName => mockSettings.enabledLorebooks.includes(bookName)),
     canReadBook: jest.fn(() => true),
     canWriteBook: jest.fn(() => true),
+    canDeleteBook: jest.fn(() => true),
 }));
 
 const {

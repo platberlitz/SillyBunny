@@ -1,5 +1,5 @@
 import { forgetEntry } from '../entry-manager.js';
-import { getActiveTunnelVisionBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
+import { getDeletableBooks, getWritableBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
 import { registerToolAction, registerToolFormatter } from '../../tool-action-registry.js';
 import { logToolCallStarted, logToolCallCompleted, logToolCallError } from '../activity-feed.js';
 
@@ -17,10 +17,13 @@ async function forgetAction(args) {
         return 'Error: "uid" is required.';
     }
 
-    const targetBook = resolveTargetBook(bookName, getActiveTunnelVisionBooks());
+    const allowedBooks = hardDelete ? getDeletableBooks() : getWritableBooks();
+    const targetBook = resolveTargetBook(bookName, allowedBooks);
     if (!targetBook) {
-        logToolCallError(TOOL_NAMES.FORGET, 'No writable lorebooks');
-        return 'No Pathfinder-enabled lorebooks available.';
+        logToolCallError(TOOL_NAMES.FORGET, hardDelete ? 'No deletable lorebooks' : 'No writable lorebooks');
+        return hardDelete
+            ? 'No Pathfinder-enabled lorebooks allow deletion.'
+            : 'No Pathfinder-enabled lorebooks allow disabling entries.';
     }
 
     try {

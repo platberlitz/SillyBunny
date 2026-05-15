@@ -5258,6 +5258,8 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     const isInstruct = power_user.instruct.enabled && main_api !== 'openai';
     const isImpersonate = type == 'impersonate';
     const shouldConsumeUserInput = type !== 'regenerate' && type !== 'swipe' && type !== 'quiet' && !isImpersonate && !dryRun && !depth && !suppressUserMessage;
+    let textareaText = '';
+    let renderedUserMessage = false;
 
     if (!(dryRun || depth || type == 'regenerate' || type == 'swipe' || type == 'quiet')) {
         const interruptedByCommand = await processCommands(String($('#send_textarea').val()));
@@ -5267,6 +5269,62 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             unblockGeneration(type);
             return Promise.resolve();
         }
+    }
+
+    const lastMessage = chat[chat.length - 1];
+
+    if (!selected_group) {
+        if (shouldConsumeUserInput) {
+            is_send_press = true;
+            textareaText = String($('#send_textarea').val());
+            $('#send_textarea').val('')[0].dispatchEvent(new Event('input', { bubbles: true }));
+        } else {
+            textareaText = '';
+            if (chat.length && lastMessage.is_user) {
+                //do nothing? why does this check exist?
+            } else if (type !== 'quiet' && type !== 'swipe' && !isImpersonate && !dryRun && !depth && chat.length) {
+                if (type === 'regenerate') {
+                    requestMobileChatBottomPin();
+                }
+                deleteItemizedPromptForMessage(chat.length - 1);
+                chat.length = chat.length - 1;
+                await removeLastMessage();
+                await eventSource.emit(event_types.MESSAGE_DELETED, chat.length);
+            }
+        }
+
+        if (!dryRun) {
+            deactivateSendButtons();
+        }
+    }
+
+    let { messageBias, promptBias, isUserPromptBias } = getBiasStrings(textareaText, type);
+
+    // These generation types should not attach pending files to the chat
+    const noAttachTypes = [
+        'regenerate',
+        'swipe',
+        'impersonate',
+        'quiet',
+        'continue',
+    ];
+
+    if ((textareaText != '' || (hasPendingFileAttachment() && !noAttachTypes.includes(type))) && !automatic_trigger && type !== 'quiet' && !dryRun && !depth && !selected_group) {
+        // If user message contains no text other than bias - send as a system message
+        if (messageBias && !removeMacros(textareaText)) {
+            sendSystemMessage(system_message_types.GENERIC, ' ', { bias: messageBias });
+        } else {
+            await sendMessageAsUser(textareaText, messageBias);
+        }
+        renderedUserMessage = true;
+    } else if (textareaText == '' && !automatic_trigger && !dryRun && [undefined, 'normal'].includes(type) && main_api == 'openai' && oai_settings.send_if_empty.trim().length > 0 && !depth && !suppressUserMessage && !selected_group) {
+        // Use send_if_empty if set and the user message is empty. Only when sending messages normally
+        await sendMessageAsUser(oai_settings.send_if_empty.trim(), messageBias);
+        renderedUserMessage = true;
+    }
+
+    if (renderedUserMessage && shouldBatchMobileChatRendering()) {
+        await waitForNextFrame();
     }
 
     // Occurs only if the generation is not aborted due to slash commands execution
@@ -5336,28 +5394,6 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         return Promise.resolve();
     }
 
-    const lastMessage = chat[chat.length - 1];
-
-    let textareaText;
-    if (shouldConsumeUserInput) {
-        is_send_press = true;
-        textareaText = String($('#send_textarea').val());
-        $('#send_textarea').val('')[0].dispatchEvent(new Event('input', { bubbles: true }));
-    } else {
-        textareaText = '';
-        if (chat.length && lastMessage.is_user) {
-            //do nothing? why does this check exist?
-        } else if (type !== 'quiet' && type !== 'swipe' && !isImpersonate && !dryRun && !depth && chat.length) {
-            if (type === 'regenerate') {
-                requestMobileChatBottomPin();
-            }
-            deleteItemizedPromptForMessage(chat.length - 1);
-            chat.length = chat.length - 1;
-            await removeLastMessage();
-            await eventSource.emit(event_types.MESSAGE_DELETED, chat.length);
-        }
-    }
-
     const isContinue = type == 'continue';
 
     // Rewrite the generation timer to account for the time passed for all the continuations.
@@ -5372,43 +5408,9 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         }
     }
 
-    if (!dryRun) {
-        deactivateSendButtons();
-    }
-
-    let { messageBias, promptBias, isUserPromptBias } = getBiasStrings(textareaText, type);
-    let renderedUserMessage = false;
-
     //*********************************
     //PRE FORMATING STRING
     //*********************************
-
-    // These generation types should not attach pending files to the chat
-    const noAttachTypes = [
-        'regenerate',
-        'swipe',
-        'impersonate',
-        'quiet',
-        'continue',
-    ];
-    //for normal messages sent from user..
-    if ((textareaText != '' || (hasPendingFileAttachment() && !noAttachTypes.includes(type))) && !automatic_trigger && type !== 'quiet' && !dryRun && !depth) {
-        // If user message contains no text other than bias - send as a system message
-        if (messageBias && !removeMacros(textareaText)) {
-            sendSystemMessage(system_message_types.GENERIC, ' ', { bias: messageBias });
-        } else {
-            await sendMessageAsUser(textareaText, messageBias);
-        }
-        renderedUserMessage = true;
-    } else if (textareaText == '' && !automatic_trigger && !dryRun && [undefined, 'normal'].includes(type) && main_api == 'openai' && oai_settings.send_if_empty.trim().length > 0 && !depth && !suppressUserMessage) {
-        // Use send_if_empty if set and the user message is empty. Only when sending messages normally
-        await sendMessageAsUser(oai_settings.send_if_empty.trim(), messageBias);
-        renderedUserMessage = true;
-    }
-
-    if (renderedUserMessage && shouldBatchMobileChatRendering()) {
-        await waitForNextFrame();
-    }
 
     if (!dryRun) {
         // Ping after rendering the local user message so slow WebKit networking cannot delay the visible send.

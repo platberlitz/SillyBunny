@@ -61,6 +61,7 @@ import {
 } from './regex-scripts.js';
 import { initPathfinder } from './pathfinder-init.js';
 import { openPathfinderSettings, isPathfinderAgent } from './pathfinder-settings-ui.js';
+import { getPathfinderToolDefinitions } from './pathfinder/tool-definitions.js';
 import { buildFallbackPromptText, extractProfileResponseText } from './llm-utils.js';
 import {
     buildConnectionProfileNameMap,
@@ -69,6 +70,7 @@ import {
 } from './profile-utils.js';
 
 const MODULE_NAME = 'in-chat-agents';
+const PATHFINDER_EXTENSIONS_HOST_ID = 'extension_settings_in_chat_agents_pathfinder';
 
 let collapsedCategories = new Set();
 
@@ -87,6 +89,7 @@ let selectModeActive = false;
 /** Set of agent IDs currently selected in select mode. */
 const selectedAgentIds = new Set();
 let suppressCardClickUntil = 0;
+let pathfinderExtensionsMountPromise = null;
 
 const REMOVED_BUNDLED_TEMPLATE_IDS = new Set([
     'tpl-anti-slop-regex',
@@ -495,7 +498,7 @@ async function confirmDuplicateAgentAddition(agent) {
 }
 
 function shouldMigratePathfinderAgentTools(agent, template) {
-    if (!template || shouldSkipBundledTemplateMigrations(agent)) {
+    if (!template) {
         return false;
     }
 
@@ -505,7 +508,24 @@ function shouldMigratePathfinderAgentTools(agent, template) {
 
     const templateTools = Array.isArray(template?.tools) ? template.tools : [];
     const agentTools = Array.isArray(agent?.tools) ? agent.tools : [];
-    return templateTools.length > 0 && agentTools.length === 0;
+    const agentToolNames = new Set(agentTools.map(tool => tool?.name).filter(Boolean));
+    const expectedToolNames = new Set([...templateTools, ...getPathfinderToolDefinitions()].map(tool => tool?.name).filter(Boolean));
+    const toolStates = agent?.settings?.toolStates;
+    const hasAllToolStates = toolStates && typeof toolStates === 'object' && [...expectedToolNames].every(name => Object.hasOwn(toolStates, name));
+
+    return expectedToolNames.size > 0 && ([...expectedToolNames].some(name => !agentToolNames.has(name)) || !hasAllToolStates);
+}
+
+function getDefaultPathfinderTools(template) {
+    const toolsByName = new Map();
+    const templateTools = Array.isArray(template?.tools) ? template.tools : [];
+    for (const tool of [...templateTools, ...getPathfinderToolDefinitions()]) {
+        if (tool?.name && !toolsByName.has(tool.name)) {
+            toolsByName.set(tool.name, tool);
+        }
+    }
+
+    return [...toolsByName.values()];
 }
 
 async function migratePathfinderAgentToolsFromTemplate() {
@@ -517,7 +537,25 @@ async function migratePathfinderAgentToolsFromTemplate() {
             continue;
         }
 
-        agent.tools = structuredClone(template.tools);
+        const existingTools = Array.isArray(agent.tools) ? agent.tools : [];
+        const existingToolNames = new Set(existingTools.map(tool => tool?.name).filter(Boolean));
+        const defaultTools = getDefaultPathfinderTools(template);
+        const missingTools = defaultTools
+            .filter(tool => tool?.name && !existingToolNames.has(tool.name))
+            .map(tool => structuredClone(tool));
+        const toolStates = { ...(agent.settings?.toolStates || {}) };
+        for (const tool of [...existingTools, ...missingTools]) {
+            if (!tool?.name || Object.hasOwn(toolStates, tool.name)) {
+                continue;
+            }
+            toolStates[tool.name] = tool.enabled !== false;
+        }
+
+        agent.tools = [...existingTools, ...missingTools];
+        agent.settings = {
+            ...(agent.settings || {}),
+            toolStates,
+        };
         agent.sourceTemplateId = agent.sourceTemplateId || template.id;
         await saveAgent(agent);
         migratedCount++;
@@ -2717,11 +2755,113 @@ async function openPromptTransformHistoryPopup(messageIndex) {
 
 // ===================== Pathfinder Editor =====================
 
+function getPathfinderSettingsAgent() {
+    return getAgents().find(isPathfinderAgent) ?? null;
+}
+
+function ensurePathfinderExtensionsHost() {
+    const parent = document.getElementById('extensions_settings2') ?? document.getElementById('extensions_settings');
+    if (!parent) {
+        return null;
+    }
+
+    let host = document.getElementById(PATHFINDER_EXTENSIONS_HOST_ID);
+    if (!host) {
+        host = document.createElement('div');
+        host.id = PATHFINDER_EXTENSIONS_HOST_ID;
+        host.className = 'extension_container pf--extensions-host';
+        host.innerHTML = `
+            <div class="inline-drawer">
+                <div class="inline-drawer-toggle inline-drawer-header">
+                    <b><i class="fa-solid fa-route"></i> Pathfinder</b>
+                    <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+                </div>
+                <div class="inline-drawer-content pf--extensions-body" style="display:none"></div>
+            </div>
+        `;
+        parent.append(host);
+    }
+
+    return host;
+}
+
+async function mountPathfinderSettingsInExtensions() {
+    const host = ensurePathfinderExtensionsHost();
+    if (!host) {
+        console.warn('[Pathfinder] Could not mount settings in Extensions drawer because #extensions_settings was not found.');
+        return null;
+    }
+
+    const body = host.querySelector('.pf--extensions-body');
+    if (!body) {
+        return null;
+    }
+
+    const agent = getPathfinderSettingsAgent();
+    body.innerHTML = '';
+
+    if (!agent) {
+        body.innerHTML = '<div class="pf--extensions-empty">Pathfinder agent is not available. Reload In-Chat Agents or restore the bundled Pathfinder template.</div>';
+        return host;
+    }
+
+    const settingsPanel = await openPathfinderSettings(agent);
+    if (!settingsPanel) {
+        body.innerHTML = '<div class="pf--extensions-empty">Could not load Pathfinder settings.</div>';
+        return host;
+    }
+
+    settingsPanel.filter('#pf--settings').addClass('pf--settings-embedded');
+    for (const node of settingsPanel.toArray()) {
+        body.append(node);
+    }
+    return host;
+}
+
+function schedulePathfinderExtensionsMount() {
+    pathfinderExtensionsMountPromise = mountPathfinderSettingsInExtensions()
+        .catch(error => {
+            console.warn('[Pathfinder] Failed to mount settings in Extensions drawer:', error);
+            return null;
+        });
+
+    return pathfinderExtensionsMountPromise;
+}
+
+function openPathfinderExtensionsDrawer(host) {
+    const clickEvent = () => new (globalThis.MouseEvent ?? Event)('click', { bubbles: true });
+    const drawer = document.getElementById('extensions-settings-button');
+    const drawerContent = drawer?.querySelector(':scope > .drawer-content');
+    if (drawer && drawerContent?.classList.contains('closedDrawer')) {
+        drawer.querySelector(':scope > .drawer-toggle')?.dispatchEvent(clickEvent());
+    }
+
+    const inlineDrawer = host?.querySelector('.inline-drawer');
+    const inlineContent = inlineDrawer?.querySelector(':scope > .inline-drawer-content');
+    const inlineIcon = inlineDrawer?.querySelector(':scope > .inline-drawer-header .inline-drawer-icon');
+    if (inlineDrawer && inlineContent && inlineIcon?.classList.contains('down')) {
+        inlineDrawer.querySelector(':scope > .inline-drawer-toggle')?.dispatchEvent(clickEvent());
+    }
+
+    globalThis.setTimeout(() => {
+        host?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        host?.querySelector('input, button, select, textarea')?.focus?.({ preventScroll: true });
+    }, 100);
+}
+
 /**
  * Opens the Pathfinder-specific settings editor
  * @param {Object} agent - The Pathfinder agent
  */
 async function openPathfinderEditor(agent) {
+    const existingHost = document.getElementById(PATHFINDER_EXTENSIONS_HOST_ID);
+    if (existingHost) {
+        const host = await (pathfinderExtensionsMountPromise ?? schedulePathfinderExtensionsMount());
+        openPathfinderExtensionsDrawer(host ?? existingHost);
+        toastr.info('Pathfinder settings are in the Extensions drawer.');
+        return;
+    }
+
     const originalAgentState = JSON.stringify(agent);
     const template = findTemplateForAgent(agent);
     const settingsPanel = await openPathfinderSettings(agent, async (updatedAgent) => {
@@ -3194,6 +3334,7 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
 
     // Render the panel
     renderAgentList();
+    schedulePathfinderExtensionsMount();
 
     // Wire up toolbar
     $('#ica--globalEnabled').on('click', () => {
