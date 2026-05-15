@@ -1567,9 +1567,25 @@
         --sb-mobile-composer-input-height: 36px;
     }
 
+    #form_sheld {
+        padding-block-end: env(safe-area-inset-bottom, 0px) !important;
+    }
+
     #send_form {
         border-radius: 14px 14px 0 0;
         overflow: visible !important;
+        gap: 0 !important;
+        row-gap: 0 !important;
+    }
+
+    #qr--bar {
+        margin-block: 0 !important;
+        padding-block: 0 !important;
+        min-height: 0 !important;
+    }
+
+    #qr--bar + #nonQRFormItems {
+        margin-block-start: 2px !important;
     }
 
     #nonQRFormItems {
