@@ -1558,17 +1558,33 @@
     :root {
         --bottomFormBlockSize: clamp(34px, calc(var(--sb-mobile-touch-target, 44px) * var(--sb-bottom-bar-scale, 1)), 58px);
         --bottomFormIconSize: clamp(16px, calc(20px * var(--sb-bottom-bar-scale, 1)), 25px);
-        --sb-mobile-composer-input-height: 68px;
+        --sb-mobile-composer-input-height: 40px;
     }
 
     :root[data-sb-compact-mode='true'] {
         --bottomFormBlockSize: clamp(32px, calc(var(--sb-mobile-touch-target, 44px) * var(--sb-bottom-bar-scale, 1)), 54px);
         --bottomFormIconSize: clamp(15px, calc(18px * var(--sb-bottom-bar-scale, 1)), 23px);
-        --sb-mobile-composer-input-height: 60px;
+        --sb-mobile-composer-input-height: 36px;
+    }
+
+    #form_sheld {
+        padding-block-end: env(safe-area-inset-bottom, 0px) !important;
     }
 
     #send_form {
         border-radius: 14px 14px 0 0;
+        gap: 0 !important;
+        row-gap: 0 !important;
+    }
+
+    #qr--bar {
+        margin-block: 0 !important;
+        padding-block: 0 !important;
+        min-height: 0 !important;
+    }
+
+    #qr--bar + #nonQRFormItems {
+        margin-block-start: 2px !important;
     }
 
     #nonQRFormItems {
@@ -1580,17 +1596,17 @@
             "tools action" !important;
         align-items: center !important;
         column-gap: 6px !important;
-        row-gap: 6px !important;
-        min-height: calc(var(--sb-mobile-composer-input-height) + var(--bottomFormBlockSize) + 18px) !important;
-        padding: 4px 6px 6px !important;
+        row-gap: 2px !important;
+        min-height: calc(var(--sb-mobile-composer-input-height) + var(--bottomFormBlockSize) + 6px) !important;
+        padding: 0 6px 4px !important;
         box-sizing: border-box !important;
     }
 
     :root[data-sb-compact-mode='true'] #nonQRFormItems {
         column-gap: 5px !important;
-        row-gap: 5px !important;
-        min-height: calc(var(--sb-mobile-composer-input-height) + var(--bottomFormBlockSize) + 15px) !important;
-        padding: 3px 6px 5px !important;
+        row-gap: 1px !important;
+        min-height: calc(var(--sb-mobile-composer-input-height) + var(--bottomFormBlockSize) + 4px) !important;
+        padding: 0 6px 3px !important;
     }
 
     #leftSendForm,
@@ -1675,17 +1691,17 @@
         field-sizing: content !important;
         max-height: 42dvh !important;
         overflow-y: auto !important;
-        padding: 8px 10px !important;
+        padding: 5px 9px !important;
         font-size: 16px !important;
-        line-height: 1.25 !important;
+        line-height: 1.2 !important;
         align-self: stretch !important;
         box-sizing: border-box !important;
     }
 
     :root[data-sb-compact-mode='true'] #send_textarea {
         min-height: var(--sb-mobile-composer-input-height) !important;
-        padding: 7px 9px !important;
-        line-height: 1.22 !important;
+        padding: 4px 8px !important;
+        line-height: 1.18 !important;
     }
 
     #send_but::before,
