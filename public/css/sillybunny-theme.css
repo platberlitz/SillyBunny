@@ -2297,6 +2297,20 @@ input[type='range']::-moz-range-thumb {
     font-size: 0.86rem;
 }
 
+/* Mobile/touch: keep slider thumbs away from card edges and let vertical drags scroll. */
+@media (pointer: coarse) {
+    .sb-sampling-control-card input[type='range'].neo-range-slider {
+        display: block;
+        max-width: min(420px, calc(100% - 48px));
+        margin-inline: auto;
+        touch-action: pan-y;
+    }
+
+    .sb-sampling-grid {
+        row-gap: 14px;
+    }
+}
+
 .sb-presets-advanced-formatting {
     margin-top: 12px;
 }
