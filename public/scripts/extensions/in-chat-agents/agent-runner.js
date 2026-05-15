@@ -105,6 +105,7 @@ let currentMainGenerationType = 'normal';
 let postProcessingGenerationRunId = 0;
 let swipeNavigationPending = false;
 const activePathfinderRetrievalAbortControllers = new Set();
+let activePathfinderRetrievalToast = null;
 
 /** Track which tool names were registered by the agent system so we can cleanly unregister only our own. */
 const agentRegisteredToolNames = new Set();
@@ -200,6 +201,7 @@ export function cancelAgentGeneration() {
     clearDeferredPostProcessing();
     clearMissedGenerationEndRecoveryCheck();
     clearAllPromptTransformRunningToasts();
+    clearPathfinderRetrievalToast();
     abortActivePathfinderRetrieval('Pathfinder retrieval cancelled by user.');
 
     const stopped = internalPromptTransformDepth > 0 || activeManualAgentRun ? stopGeneration() : false;
@@ -222,6 +224,28 @@ function abortActivePathfinderRetrieval(reason = 'Pathfinder retrieval cancelled
     }
 
     activePathfinderRetrievalAbortControllers.clear();
+}
+
+function showPathfinderRetrievalToast() {
+    if (activePathfinderRetrievalToast) {
+        return;
+    }
+
+    activePathfinderRetrievalToast = toastr.info('Pathfinder is processing lore for this reply...', 'Please wait', { timeOut: 0, extendedTimeOut: 0 });
+}
+
+function clearPathfinderRetrievalToast() {
+    if (!activePathfinderRetrievalToast) {
+        return;
+    }
+
+    toastr.clear(activePathfinderRetrievalToast);
+    activePathfinderRetrievalToast = null;
+}
+
+function shouldShowPathfinderRetrievalToast(pathfinderAgent) {
+    const settings = pathfinderAgent?.settings ?? {};
+    return Boolean(settings.pipelineEnabled || settings.sidecarEnabled);
 }
 
 async function processManualAgentRunQueue() {
@@ -2618,6 +2642,7 @@ function onGenerationStopped() {
     clearMissedGenerationEndRecoveryCheck();
     clearDeferredPostProcessing();
     clearAllPromptTransformRunningToasts();
+    clearPathfinderRetrievalToast();
     takePendingPreGenerationInterceptRuns();
     abortActivePathfinderRetrieval('Pathfinder retrieval cancelled because generation stopped.');
 }
@@ -2667,8 +2692,12 @@ async function onGenerationAfterCommands(generationType, _options, dryRun) {
         activePathfinderRetrievalAbortControllers.add(retrievalAbortController);
 
         try {
+            if (shouldShowPathfinderRetrievalToast(pathfinderAgent)) {
+                showPathfinderRetrievalToast();
+            }
             await runSidecarRetrieval(setExtensionPrompt, extension_prompt_types, extension_prompt_roles, retrievalAbortController.signal);
         } finally {
+            clearPathfinderRetrievalToast();
             activePathfinderRetrievalAbortControllers.delete(retrievalAbortController);
         }
 

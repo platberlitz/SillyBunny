@@ -127,7 +127,7 @@ describe('in-chat agent post-processing runner', () => {
         globalThis.toastr = {
             clear: jest.fn(),
             error: jest.fn(),
-            info: jest.fn(),
+            info: jest.fn(() => ({ toast: true })),
             success: jest.fn(),
             warning: jest.fn(),
         };
@@ -572,6 +572,48 @@ describe('in-chat agent post-processing runner', () => {
 
         expect(extensionPrompts.pathfinder_pipeline_retrieval).toEqual({ value: 'retrieved lore' });
         expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toEqual({ value: 'Use the current scene style.' });
+    });
+
+    test('shows a processing toast while Pathfinder pipeline retrieval is running', async () => {
+        usePrePromptAgent();
+        enabledAgents.unshift({
+            id: 'agent-pathfinder',
+            name: 'Pathfinder',
+            category: 'tool',
+            sourceTemplateId: 'tpl-pathfinder',
+            phase: 'both',
+            prompt: '',
+            injection: { order: 0 },
+            settings: { pipelineEnabled: true, sidecarEnabled: false },
+            tools: [],
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        });
+
+        let resolveRetrieval;
+        const retrievalDone = new Promise(resolve => {
+            resolveRetrieval = resolve;
+        });
+        runSidecarRetrieval.mockImplementation(async () => {
+            await retrievalDone;
+        });
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        const generationPromise = eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        await Promise.resolve();
+
+        expect(globalThis.toastr.info).toHaveBeenCalledWith('Pathfinder is processing lore for this reply...', 'Please wait', { timeOut: 0, extendedTimeOut: 0 });
+        expect(globalThis.toastr.clear).not.toHaveBeenCalled();
+
+        resolveRetrieval();
+        await generationPromise;
+
+        expect(globalThis.toastr.clear).toHaveBeenCalledWith({ toast: true });
     });
 
     test('runs pre-generation intercept agents on text prompts without injecting their prompt', async () => {
