@@ -1,7 +1,3 @@
-/* =============================================================================
-   SillyBunny Navigation Shell
-   ============================================================================= */
-
 :root {
     --sb-density-scale: 1;
     --sb-topbar-scale-desktop: 1;
@@ -179,15 +175,10 @@
     --sb-shell-card-gap: var(--sb-shell-space-sm);
 }
 
-/* Pre-hide old ST drawer toggles before shell JS runs. */
 #top-settings-holder > .drawer > .drawer-toggle {
     display: none !important;
 }
 
-/*
- * Keep closed top-bar drawers fully inert from first paint onward.
- * This prevents invisible shells from stealing clicks over the top bar.
- */
 #top-settings-holder > .drawer > .drawer-content.closedDrawer:not(.openDrawer) {
     display: none !important;
     pointer-events: none !important;
@@ -3586,7 +3577,6 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     box-shadow: inset 0 0 0 2px var(--color-primary, var(--sb-accent));
 }
 
-/* Bottom chat management bar */
 #sb-bottom-chat-bar {
     display: flex;
     align-items: center;
@@ -4106,7 +4096,6 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     flex-wrap: wrap;
 }
 
-/* Persona quick-access bubble */
 #sb-persona-bubble {
     width: 44px;
     height: 44px;
@@ -4268,11 +4257,13 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 }
 
 #right-nav-panel .sb-character-editor-controls-row {
+    --sb-avatar-w: 144px;
+    --sb-avatar-h: 216px;
     width: 100%;
-    display: flex;
+    display: grid;
+    grid-template-columns: var(--sb-avatar-w) minmax(0, 1fr);
     align-items: flex-start;
-    gap: 8px;
-    flex-wrap: wrap;
+    gap: 10px 12px;
     min-width: 0;
 }
 
@@ -4286,11 +4277,11 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 }
 
 #right-nav-panel #avatar_controls {
-    flex: 1 1 auto;
+    grid-column: 2;
     min-width: 0;
     align-items: flex-start;
     gap: 8px;
-    padding-block: 10px 0;
+    padding-block: 0;
     justify-content: flex-start;
 }
 
@@ -4357,7 +4348,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     flex-wrap: nowrap;
     align-self: flex-start;
     min-height: 40px;
-    margin-top: 10px;
+    margin-top: 0;
     padding: 4px;
     gap: 4px;
 }
@@ -4400,27 +4391,28 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 }
 
 #right-nav-panel #avatar_controls > #tags_div {
-    flex: 0 1 220px;
-    min-width: min(220px, 100%);
-    max-width: 220px;
+    flex: 1 1 260px;
+    min-width: 0;
+    max-width: 100%;
     align-self: flex-start;
     margin: 0;
 }
 
-#right-nav-panel .sb-character-editor-controls-row > #avatar_div_div {
-    flex: 0 0 var(--avatar-base-width);
-    width: var(--avatar-base-width) !important;
-    min-width: var(--avatar-base-width) !important;
-    max-width: var(--avatar-base-width) !important;
-    height: var(--avatar-base-height) !important;
-    min-height: var(--avatar-base-height) !important;
-    max-height: var(--avatar-base-height) !important;
-    margin: 10px 8px 0 10px !important;
+#right-nav-panel #avatar_div_div.avatar {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: var(--sb-avatar-w) !important;
+    height: var(--sb-avatar-h) !important;
+    margin: 0 !important;
+    overflow: hidden;
+    border-radius: var(--avatar-base-border-radius-rounded) !important;
 }
 
-#right-nav-panel .sb-character-editor-controls-row > #avatar_div_div img {
+#right-nav-panel #avatar_div_div.avatar img {
+    display: block;
     width: 100% !important;
     height: 100% !important;
+    border-radius: inherit !important;
 }
 
 #right-nav-panel #avatar_controls > #tags_div .tag_controls {
@@ -4458,6 +4450,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     padding: 6px 8px;
     min-height: 34px;
     align-items: center;
+    gap: 8px 6px;
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 72%, transparent);
     border-radius: var(--sb-radius-md, 16px);
     background: color-mix(in srgb, var(--sb-shell-surface) 52%, transparent);
@@ -4470,6 +4463,8 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 
 #right-nav-panel #avatar_div > #tagList .tag {
     margin: 0;
+    min-height: calc(var(--mainFontSize) * 1.6);
+    padding: 2px 8px;
 }
 
 #right-nav-panel #result_info #creators_note_styles_button,
@@ -7020,12 +7015,9 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     }
 
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) .sb-character-editor-controls-row {
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-
-    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls {
-        flex-basis: 100%;
+        --sb-avatar-w: 112px;
+        --sb-avatar-h: 168px;
+        gap: 8px 10px;
     }
 
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls > #tags_div {
