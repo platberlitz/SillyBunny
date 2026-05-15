@@ -118,6 +118,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #82 (2026-05-13) `Fix input history controls in chat composer`
 - PR #83 (2026-05-14) `feat(reasoning): add xhigh effort, rename auto to blank`
 - PR #84 (2026-05-14) `fix: improve mobile character drawer layout`
+- PR #85 (2026-05-15) `feat: improve Pathfinder settings and retrieval`
 - PR #86 (2026-05-14) `fix(mobile): enlarge composer textarea and balance spacing`
 - PR #87 (2026-05-14) `fix: refresh in-chat-agent token badges`
 - PR #88 (2026-05-14) `fix: keep tablet shell edge-to-edge`
