@@ -3960,12 +3960,12 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     #sb-bottom-chat-bar {
         --sb-bottom-chat-mobile-gutter: max(14px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
         --sb-bottom-chat-mobile-width: calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2));
-        --sb-bottom-chat-mobile-gap: clamp(1px, calc(3px * var(--sb-bottom-bar-scale)), 5px);
-        --sb-bottom-chat-mobile-padding-block: clamp(2px, calc(3px * var(--sb-bottom-bar-scale)), 5px);
+        --sb-bottom-chat-mobile-gap: clamp(1px, calc(2px * var(--sb-bottom-bar-scale)), 4px);
+        --sb-bottom-chat-mobile-padding-block: clamp(1px, calc(2px * var(--sb-bottom-bar-scale)), 3px);
         --sb-bottom-chat-mobile-padding-inline: clamp(4px, calc(5px * var(--sb-bottom-bar-scale)), 7px);
-        --sb-bottom-chat-mobile-button-size: var(--bottomFormBlockSize, clamp(44px, calc(44px * var(--sb-bottom-bar-scale)), 52px));
-        --sb-bottom-chat-mobile-select-height: clamp(var(--sb-bottom-chat-min-touch), calc(34px * var(--sb-bottom-bar-scale)), 42px);
-        --sb-bottom-chat-mobile-persona-size: clamp(var(--sb-bottom-chat-min-touch), calc(34px * var(--sb-bottom-bar-scale)), 42px);
+        --sb-bottom-chat-mobile-button-size: clamp(28px, calc(30px * var(--sb-bottom-bar-scale)), 34px);
+        --sb-bottom-chat-mobile-select-height: clamp(28px, calc(30px * var(--sb-bottom-bar-scale)), 34px);
+        --sb-bottom-chat-mobile-persona-size: clamp(28px, calc(30px * var(--sb-bottom-bar-scale)), 34px);
         --sb-bottom-chat-mobile-radius: clamp(9px, calc(11px * var(--sb-bottom-bar-scale)), 14px);
         width: min(var(--sb-bottom-chat-mobile-width), calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2)));
         max-width: calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2));
@@ -4105,11 +4105,12 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     #sb-bottom-chat-bar {
         --sb-bottom-chat-mobile-gutter: max(4px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
         --sb-bottom-chat-mobile-width: calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2));
-        --sb-bottom-chat-mobile-gap: clamp(1px, calc(2px * var(--sb-bottom-bar-scale)), 3px);
-        --sb-bottom-chat-mobile-padding-block: clamp(2px, calc(2px * var(--sb-bottom-bar-scale)), 4px);
+        --sb-bottom-chat-mobile-gap: clamp(1px, calc(1.5px * var(--sb-bottom-bar-scale)), 3px);
+        --sb-bottom-chat-mobile-padding-block: clamp(1px, calc(1.5px * var(--sb-bottom-bar-scale)), 2px);
         --sb-bottom-chat-mobile-padding-inline: clamp(3px, calc(4px * var(--sb-bottom-bar-scale)), 6px);
-        --sb-bottom-chat-mobile-select-height: clamp(var(--sb-bottom-chat-min-touch), calc(32px * var(--sb-bottom-bar-scale)), 40px);
-        --sb-bottom-chat-mobile-persona-size: clamp(var(--sb-bottom-chat-min-touch), calc(32px * var(--sb-bottom-bar-scale)), 40px);
+        --sb-bottom-chat-mobile-button-size: clamp(26px, calc(28px * var(--sb-bottom-bar-scale)), 32px);
+        --sb-bottom-chat-mobile-select-height: clamp(26px, calc(28px * var(--sb-bottom-bar-scale)), 32px);
+        --sb-bottom-chat-mobile-persona-size: clamp(26px, calc(28px * var(--sb-bottom-bar-scale)), 32px);
         --sb-bottom-chat-mobile-radius: clamp(8px, calc(10px * var(--sb-bottom-bar-scale)), 13px);
     }
 

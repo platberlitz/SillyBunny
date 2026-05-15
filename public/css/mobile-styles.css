@@ -1591,9 +1591,9 @@
     #nonQRFormItems {
         display: grid !important;
         grid-template-columns:
-            minmax(var(--sb-composer-action-size), min(34vw, calc(var(--sb-composer-action-size) * 4 + 9px)))
+            minmax(calc(var(--sb-composer-action-size) * 2 + 3px), min(30vw, calc(var(--sb-composer-action-size) * 2 + 3px)))
             minmax(0, 1fr)
-            var(--sb-composer-action-size) !important;
+            minmax(calc(var(--sb-composer-action-size) * 2 + 3px), calc(var(--sb-composer-action-size) + var(--sb-composer-send-width, calc(var(--sb-composer-action-size) * 1.45)) + 3px)) !important;
         grid-template-rows: minmax(var(--sb-mobile-composer-input-height), auto) !important;
         grid-template-areas:
             "tools input action" !important;
@@ -1646,19 +1646,19 @@
 
     #rightSendForm {
         grid-area: action !important;
-        width: var(--sb-composer-action-size) !important;
-        min-width: var(--sb-composer-action-size) !important;
-        max-width: var(--sb-composer-action-size) !important;
+        width: 100% !important;
+        min-width: calc(var(--sb-composer-action-size) * 2 + 3px) !important;
+        max-width: 100% !important;
         height: var(--sb-composer-action-size) !important;
         min-height: var(--sb-composer-action-size) !important;
         align-items: center !important;
-        justify-content: center !important;
+        justify-content: flex-end !important;
         align-self: center !important;
-        gap: 0 !important;
+        gap: 3px !important;
         overflow: visible !important;
     }
 
-    #rightSendForm > div:not(#send_but):not(#mes_stop):not(.stscript_btn) {
+    #rightSendForm > div:not(#send_but):not(#mes_stop):not(#extensionsMenuButton):not(.stscript_btn) {
         display: none !important;
     }
 
