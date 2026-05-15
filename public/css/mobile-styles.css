@@ -1573,6 +1573,18 @@
 
     #send_form {
         border-radius: 14px 14px 0 0;
+        gap: 0 !important;
+        row-gap: 0 !important;
+    }
+
+    #qr--bar {
+        margin-block: 0 !important;
+        padding-block: 0 !important;
+        min-height: 0 !important;
+    }
+
+    #qr--bar + #nonQRFormItems {
+        margin-block-start: 2px !important;
     }
 
     #nonQRFormItems {
@@ -1585,16 +1597,16 @@
         align-items: center !important;
         column-gap: 6px !important;
         row-gap: 2px !important;
-        min-height: calc(var(--sb-mobile-composer-input-height) + var(--bottomFormBlockSize) + 8px) !important;
-        padding: 3px 6px 4px !important;
+        min-height: calc(var(--sb-mobile-composer-input-height) + var(--bottomFormBlockSize) + 6px) !important;
+        padding: 0 6px 4px !important;
         box-sizing: border-box !important;
     }
 
     :root[data-sb-compact-mode='true'] #nonQRFormItems {
         column-gap: 5px !important;
         row-gap: 1px !important;
-        min-height: calc(var(--sb-mobile-composer-input-height) + var(--bottomFormBlockSize) + 6px) !important;
-        padding: 2px 6px 3px !important;
+        min-height: calc(var(--sb-mobile-composer-input-height) + var(--bottomFormBlockSize) + 4px) !important;
+        padding: 0 6px 3px !important;
     }
 
     #leftSendForm,
