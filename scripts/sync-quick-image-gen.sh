@@ -116,6 +116,55 @@ mkdir -p "$WORK_DIR"
 cp "$SOURCE_DIR/index.js" "$WORK_DIR/index.js"
 cp "$SOURCE_DIR/style.css" "$WORK_DIR/style.css"
 
+node - "$WORK_DIR/index.js" "$TARGET_DIR" <<'NODE'
+const fs = require('fs');
+const path = require('path');
+
+const indexPath = process.argv[2];
+const bundledExtensionDir = process.argv[3];
+let source = fs.readFileSync(indexPath, 'utf8');
+
+const importRewrites = new Map([
+    ['await import("../../../extensions.js")', 'await import("../../extensions.js")'],
+    ['await import("../../../../script.js")', 'await import("../../../script.js")'],
+    ['await import("../../../openai.js")', 'await import("../../openai.js")'],
+    ['await import("../../../utils.js")', 'await import("../../utils.js")'],
+    ['await import("../../../RossAscends-mods.js")', 'await import("../../RossAscends-mods.js")'],
+    ['await import("../../../../scripts/secrets.js")', 'await import("../../secrets.js")'],
+]);
+
+for (const [upstreamImport, bundledImport] of importRewrites) {
+    if (!source.includes(upstreamImport)) {
+        console.error(`Upstream Quick Image Gen index.js is missing expected import: ${upstreamImport}`);
+        process.exit(1);
+    }
+
+    source = source.replaceAll(upstreamImport, bundledImport);
+}
+
+const remainingUpstreamImports = [...importRewrites.keys()].filter(importPath => source.includes(importPath));
+if (remainingUpstreamImports.length) {
+    console.error('Quick Image Gen index.js still contains upstream-depth imports after rewriting:');
+    for (const importPath of remainingUpstreamImports) {
+        console.error(`- ${importPath}`);
+    }
+    process.exit(1);
+}
+
+const dynamicImportPattern = /await\s+import\("([^"]+)"\)/g;
+for (const [, specifier] of source.matchAll(dynamicImportPattern)) {
+    if (!specifier.startsWith('.')) continue;
+
+    const resolvedPath = path.resolve(bundledExtensionDir, specifier);
+    if (!fs.existsSync(resolvedPath)) {
+        console.error(`Quick Image Gen dynamic import does not resolve in the bundled location: ${specifier}`);
+        process.exit(1);
+    }
+}
+
+fs.writeFileSync(indexPath, source);
+NODE
+
 node - "$SOURCE_DIR/manifest.json" "$WORK_DIR/manifest.json" <<'NODE'
 const fs = require('fs');
 
