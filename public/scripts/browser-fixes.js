@@ -2,6 +2,14 @@ import { getParsedUA, isMobile } from './RossAscends-mods.js';
 
 const isFirefox = () => /firefox/i.test(navigator.userAgent);
 
+function addMacOSPatch() {
+    const userAgent = getParsedUA();
+
+    if (userAgent?.os?.name === 'macOS') {
+        document.body.classList.add('is-macos');
+    }
+}
+
 function sanitizeInlineQuotationOnCopy() {
     // STRG+C, STRG+V on firefox leads to duplicate double quotes when inline quotation elements are copied.
     // To work around this, take the selection and transform <q> to <span> before calling toString().
@@ -237,6 +245,7 @@ function applyBrowserFixes() {
         window.addEventListener('sb-mobile-viewport-reset', scheduleViewportReset);
     }
 
+    addMacOSPatch();
     addSafariPatch();
     addFirefoxPatch();
     addChromePatch();

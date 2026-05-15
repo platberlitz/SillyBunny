@@ -935,6 +935,11 @@ body .panelControlBar {
     flex-grow: 1;
 }
 
+/* macOS browser scroll anchoring fights chat scroll preservation during message loads. */
+body.is-macos #chat {
+    overflow-anchor: none;
+}
+
 #form_sheld {
     white-space: nowrap;
     width: 100%;
