@@ -124,6 +124,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #89 (2026-05-14) `fix: tighten mobile composer top gap and shrink message box`
 - PR #90 (2026-05-14) `fix: skip post-generation agents on greetings`
 - PR #91 (2026-05-14) `fix(mobile): keep controls within mobile bounds`
+- PR #92 (2026-05-15) `chore: auto-sync Quick Image Gen updates`
 - PR #95 (2026-05-14) `fix(ui): restore chat and compact layout`
 - PR #96 (2026-05-14) `fix(presets): add connection field guardrails`
 - PR #98 (2026-05-14) `chore(presets): update Geechan roleplay prompts to v5.2`
