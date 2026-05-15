@@ -5254,7 +5254,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     grid-column: 2;
     grid-row: 1;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr));
     gap: 6px;
 }
 
@@ -5295,9 +5295,12 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     display: grid;
     grid-template-columns: max-content max-content minmax(max-content, 1fr);
     align-items: center;
+    align-self: flex-end;
     justify-content: stretch;
     column-gap: var(--sb-shell-space-sm);
     row-gap: 6px;
+    width: min(34rem, 100%);
+    margin-left: auto;
 }
 
 #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack > .group_schedule_controls > .flex-container:first-child > .checkbox_label {
@@ -5334,6 +5337,30 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     white-space: nowrap;
 }
 
+#right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack #rm_group_ai_schedule {
+    width: min(34rem, 100%);
+    height: clamp(12rem, 18vh, 16rem);
+    min-height: clamp(12rem, 18vh, 16rem);
+    align-self: flex-end;
+    margin-left: auto;
+}
+
+@media screen and (max-width: 1420px) {
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack > .group_schedule_controls {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack #rm_group_ai_schedule {
+        height: clamp(14rem, 26vh, 20rem);
+        min-height: clamp(14rem, 26vh, 20rem);
+    }
+}
+
 @media screen and (max-width: 1180px) {
     #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack {
         grid-template-columns: minmax(0, 1fr);
@@ -5346,6 +5373,18 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         grid-row: auto;
         margin-left: 0;
         transform: none;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack #rm_group_ai_schedule {
+        width: 100%;
+        align-self: stretch;
+        margin-left: 0;
+    }
+
+    #right-nav-panel:is([data-menu-type="group_create"], [data-menu-type="group_edit"]) #GroupFavDelOkBack > .group_schedule_controls > .flex-container:first-child {
+        width: 100%;
+        align-self: stretch;
+        margin-left: 0;
     }
 }
 
