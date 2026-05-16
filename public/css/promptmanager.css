@@ -168,7 +168,8 @@
 #completion_prompt_manager_popup #completion_prompt_manager_popup_edit,
 #completion_prompt_manager_popup #completion_prompt_manager_popup_chathistory_edit,
 #completion_prompt_manager_popup #completion_prompt_manager_popup_dialogueexamples_edit,
-#completion_prompt_manager_popup #completion_prompt_manager_popup_inspect {
+#completion_prompt_manager_popup #completion_prompt_manager_popup_inspect,
+#completion_prompt_manager_popup #completion_prompt_manager_popup_preview {
     display: none;
     padding: 0.5em;
     height: 100%;
@@ -822,7 +823,8 @@
     }
 
     #completion_prompt_manager .completion_prompt_manager_editor_host #completion_prompt_manager_popup_edit,
-    #completion_prompt_manager .completion_prompt_manager_editor_host #completion_prompt_manager_popup_inspect {
+    #completion_prompt_manager .completion_prompt_manager_editor_host #completion_prompt_manager_popup_inspect,
+    #completion_prompt_manager .completion_prompt_manager_editor_host #completion_prompt_manager_popup_preview {
         display: flex;
         flex-direction: column;
         justify-content: flex-start;

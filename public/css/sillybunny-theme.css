@@ -1603,7 +1603,8 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     }
 
     #completion_prompt_manager_popup #completion_prompt_manager_popup_edit,
-    #completion_prompt_manager_popup #completion_prompt_manager_popup_inspect {
+    #completion_prompt_manager_popup #completion_prompt_manager_popup_inspect,
+    #completion_prompt_manager_popup #completion_prompt_manager_popup_preview {
         gap: 10px;
         padding: 0;
         min-width: 0;
