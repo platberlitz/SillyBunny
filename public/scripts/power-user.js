@@ -473,6 +473,7 @@ export const power_user = {
     auto_connect: false,
     auto_load_chat: false,
     forbid_external_media: true,
+    allow_card_scripts: false,
     external_media_allowed_overrides: [],
     external_media_forbidden_overrides: [],
     pin_styles: true,
@@ -1935,6 +1936,7 @@ export async function loadPowerUserSettings(settings, data) {
     $('#auto-connect-checkbox').prop('checked', power_user.auto_connect);
     $('#auto-load-chat-checkbox').prop('checked', power_user.auto_load_chat);
     $('#forbid_external_media').prop('checked', power_user.forbid_external_media);
+    $('#allow_card_scripts').prop('checked', !!power_user.allow_card_scripts);
     $('#pin_styles').prop('checked', power_user.pin_styles);
     $('#click_to_edit').prop('checked', power_user.click_to_edit);
     $('#media_display').val(power_user.media_display);
@@ -4259,6 +4261,11 @@ jQuery(async () => {
         power_user.forbid_external_media = !!$(this).prop('checked');
         saveSettingsDebounced();
         reloadCurrentChat();
+    });
+
+    $('#allow_card_scripts').on('input', function () {
+        power_user.allow_card_scripts = !!$(this).prop('checked');
+        saveSettingsDebounced();
     });
 
     $('#pin_styles').on('input', function () {

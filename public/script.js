@@ -305,6 +305,15 @@ import { compressRequest, setRequestCompressionConfig } from './scripts/request-
 import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker } from './scripts/swipe-picker.js';
 import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
 import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
+import {
+    CARD_SCRIPT_MARKER_TAG,
+    buildCardScriptToastKey,
+    forgetAllCardScripts,
+    getCardScriptSnapshot,
+    hasCardScriptToastBeenShown,
+    markCardScriptHtml,
+    markCardScriptToastShown,
+} from './scripts/card-script-detection.js';
 
 const DEFERRED_STARTUP_STYLESHEETS = Object.freeze([
     { href: 'css/bright.min.css', id: 'deferred-highlight-theme-css' },
@@ -918,6 +927,8 @@ async function firstLoadInit() {
         initLibraryShims();
         addShowdownPatch(showdown);
         addDOMPurifyHooks();
+        // SillyBunny: card script detection - see #94.
+        eventSource.on(event_types.CHAT_CHANGED, forgetAllCardScripts);
         reloadMarkdownProcessor();
         applyBrowserFixes();
         await getClientVersion();
@@ -2329,6 +2340,7 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
         return '';
     }
 
+    const originalMessageHtml = mes;
     const oocBlocks = [];
 
     const resolvedMessageId = messageId !== null && messageId !== undefined && messageId !== ''
@@ -2499,15 +2511,54 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
         RETURN_DOM_FRAGMENT: false,
         RETURN_TRUSTED_TYPE: false,
         MESSAGE_SANITIZE: true,
-        ADD_TAGS: ['custom-style'],
+        ADD_TAGS: ['custom-style', CARD_SCRIPT_MARKER_TAG],
         ...sanitizerOverrides,
     };
     mes = restoreOocBlocksForDisplay(mes, oocBlocks);
+    // SillyBunny: card script detection - see #94.
+    mes = markCardScriptHtml(mes, messageId, originalMessageHtml);
     mes = encodeStyleTags(mes);
     mes = DOMPurify.sanitize(mes, config);
     mes = decodeStyleTags(mes, { prefix: '.mes_text ' });
 
     return mes;
+}
+
+function notifyCardScriptStripped(messageElement, messageId) {
+    const normalizedMessageId = Number(messageId);
+
+    if (!Number.isInteger(normalizedMessageId) || normalizedMessageId < 0) {
+        return;
+    }
+
+    const $messageElement = messageElement?.jquery ? messageElement : $(messageElement);
+
+    if ($messageElement.length === 0) {
+        return;
+    }
+
+    const marker = $messageElement.find(CARD_SCRIPT_MARKER_TAG).filter((_, markerElement) => {
+        return Number(markerElement.dataset.msgId) === normalizedMessageId;
+    }).first();
+
+    if (marker.length === 0) {
+        return;
+    }
+
+    const snapshot = getCardScriptSnapshot(normalizedMessageId);
+
+    if (!snapshot) {
+        return;
+    }
+
+    const toastKey = buildCardScriptToastKey(getCurrentChatId(), normalizedMessageId, snapshot.hash);
+
+    if (hasCardScriptToastBeenShown(toastKey)) {
+        return;
+    }
+
+    markCardScriptToastShown(toastKey);
+    toastr.warning(t`This message contains card scripts. SillyBunny does not run them by default.`, t`Card scripts blocked`, { timeOut: 6000, preventDuplicates: true });
 }
 
 /**
@@ -2657,6 +2708,7 @@ function applyMessageBlockUpdate(messageId, message, { rerenderMessage = true } 
     if (rerenderMessage) {
         const text = message?.extra?.display_text ?? message.mes;
         messageElement.find('.mes_text').html(messageFormatting(text, message.name, message.is_system, message.is_user, messageId, {}, false));
+        notifyCardScriptStripped(messageElement, messageId);
     }
     updateMessageMetaBadges(messageElement, message);
 
@@ -3380,6 +3432,7 @@ export function updateMessageElement(mes, { messageId = chat.length - 1, message
 
     appendMediaToMessage(mes, messageElement, adjustMediaScroll);
     messageElement.find('.mes_text').html(messageHTML);
+    notifyCardScriptStripped(messageElement, messageId);
     addCopyToCodeBlocks(messageElement);
 
     // Set the swipes counter for all non-user messages.
@@ -9923,6 +9976,7 @@ function messageEditAuto(div) {
         {},
         false,
     ));
+    notifyCardScriptStripped(mesBlock.closest('.mes'), this_edit_mes_id);
     mesBlock.find('.mes_bias').empty();
     mesBlock.find('.mes_bias').append(messageFormatting(bias, '', false, false, -1, {}, false));
     saveChatDebounced();
@@ -10038,6 +10092,7 @@ async function messageEditCancel(messageId = this_edit_mes_id) {
             {},
             false,
         ));
+    notifyCardScriptStripped(thisMesDiv, messageId);
     appendMediaToMessage(chat[messageId], thisMesDiv);
     addCopyToCodeBlocks(thisMesDiv);
 
@@ -10134,6 +10189,7 @@ async function messageEditDone(div) {
             false,
         ),
     );
+    notifyCardScriptStripped(div.closest('.mes'), this_edit_mes_id);
     mesBlock.find('.mes_bias').empty();
     mesBlock.find('.mes_bias').append(messageFormatting(bias, '', false, false, -1, {}, false));
     appendMediaToMessage(mes, div.closest('.mes'));
