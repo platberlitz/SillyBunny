@@ -103,13 +103,10 @@ function parseMovingUIPixel(value, fallback = 0) {
 }
 
 var RPanelPin = document.getElementById('rm_button_panel_pin');
-var LPanelPin = document.getElementById('lm_button_panel_pin');
 var WIPanelPin = document.getElementById('WI_panel_pin');
 
 var RightNavPanel = document.getElementById('right-nav-panel');
 var RightNavDrawerIcon = document.getElementById('rightNavDrawerIcon');
-var LeftNavPanel = document.getElementById('left-nav-panel');
-var LeftNavDrawerIcon = document.getElementById('leftNavDrawerIcon');
 var WorldInfo = document.getElementById('WorldInfo');
 var WIDrawerIcon = document.getElementById('WIDrawerIcon');
 
@@ -491,16 +488,6 @@ function OpenNavPanels() {
             $('#rightNavDrawerIcon').trigger('click');
         }
 
-        //auto-open L nav if locked and previously open
-        if (accountStorage.getItem('LNavLockOn') == 'true' && accountStorage.getItem('LNavOpened') == 'true') {
-            console.debug('RA -- opening left shell');
-            if (window.SillyBunnyShell?.openTab) {
-                window.SillyBunnyShell.openTab('left');
-            } else {
-                $('#leftNavDrawerIcon').trigger('click');
-            }
-        }
-
         //auto-open WI if locked and previously open
         if (accountStorage.getItem('WINavLockOn') == 'true' && accountStorage.getItem('WINavOpened') == 'true') {
             console.debug('RA -- clicking WI to open');
@@ -802,24 +789,6 @@ export function initRossMods() {
             }
         }
     });
-    $(LPanelPin).on('click', function () {
-        accountStorage.setItem('LNavLockOn', $(LPanelPin).prop('checked'));
-        if ($(LPanelPin).prop('checked') == true) {
-            //console.log('adding pin class to Left nav');
-            $(LeftNavPanel).addClass('pinnedOpen');
-            $(LeftNavDrawerIcon).addClass('drawerPinnedOpen');
-        } else {
-            //console.log('removing pin class from Left nav');
-            $(LeftNavPanel).removeClass('pinnedOpen');
-            $(LeftNavDrawerIcon).removeClass('drawerPinnedOpen');
-
-            if ($(LeftNavPanel).hasClass('openDrawer') && $('.openDrawer').length > 1) {
-                const toggle = $('#ai-config-button>.drawer-toggle');
-                doNavbarIconClick.call(toggle);
-            }
-        }
-    });
-
     $(WIPanelPin).on('click', async function () {
         accountStorage.setItem('WINavLockOn', $(WIPanelPin).prop('checked'));
         if ($(WIPanelPin).prop('checked') == true) {
@@ -852,20 +821,7 @@ export function initRossMods() {
             $(RightNavPanel).addClass('pinnedOpen');
             $(RightNavDrawerIcon).addClass('drawerPinnedOpen');
         }
-        // read the state of left Nav Lock and apply to leftnav classlist
-        $(LPanelPin).prop('checked', accountStorage.getItem('LNavLockOn') === 'true');
-        if (accountStorage.getItem('LNavLockOn') == 'true') {
-            //console.log('setting pin class via local var');
-            $(LeftNavPanel).addClass('pinnedOpen');
-            $(LeftNavDrawerIcon).addClass('drawerPinnedOpen');
-        }
-        if ($(LPanelPin).prop('checked')) {
-            console.debug('setting pin class via checkbox state');
-            $(LeftNavPanel).addClass('pinnedOpen');
-            $(LeftNavDrawerIcon).addClass('drawerPinnedOpen');
-        }
-
-        // read the state of left Nav Lock and apply to leftnav classlist
+        // read the state of WI Lock and apply to WI classlist
         $(WIPanelPin).prop('checked', accountStorage.getItem('WINavLockOn') === 'true');
         if (accountStorage.getItem('WINavLockOn') == 'true') {
             //console.log('setting pin class via local var');
@@ -888,14 +844,7 @@ export function initRossMods() {
         } else { accountStorage.setItem('NavOpened', 'false'); }
     });
 
-    //save state of Left nav being open or closed
-    $('#leftNavDrawerIcon').on('click', function () {
-        if (!$('#leftNavDrawerIcon').hasClass('openIcon')) {
-            accountStorage.setItem('LNavOpened', 'true');
-        } else { accountStorage.setItem('LNavOpened', 'false'); }
-    });
-
-    //save state of Left nav being open or closed
+    //save state of WI being open or closed
     $('#WorldInfo').on('click', function () {
         if (!$('#WorldInfo').hasClass('openIcon')) {
             accountStorage.setItem('WINavOpened', 'true');
@@ -1334,8 +1283,8 @@ export function initRossMods() {
                 }
             }
 
-            if ($('#left-nav-panel').is(':visible') &&
-                $(LPanelPin).prop('checked') === false) {
+            // SillyBunny removes the legacy left-panel pin, so Escape always closes this shell.
+            if ($('#left-nav-panel').is(':visible')) {
                 $('#leftNavDrawerIcon').trigger('click');
                 return;
             }

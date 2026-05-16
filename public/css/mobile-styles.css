@@ -37,8 +37,7 @@
         flex-basis: 100%;
     }
 
-    #rm_button_panel_pin_div,
-    #lm_button_panel_pin_div {
+    #rm_button_panel_pin_div {
         display: none;
     }
 
