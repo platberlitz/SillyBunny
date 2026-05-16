@@ -136,6 +136,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #100 (2026-05-16) `fix(chat): stop chat scroll jumps on macOS browsers`
 - PR #103 (2026-05-15) `fix: align group controls UI`
 - PR #109 (2026-05-16) `chore: update prose polisher template`
+- PR #116 (2026-05-16) `fix: enable Prose Polisher for impersonation catalog`
 
 ### Direct Staging Commits
 - `fix(chat): restore scroll anchoring so scrolling up no longer skips messages`
