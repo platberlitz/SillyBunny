@@ -483,6 +483,40 @@
     #right-nav-panel.openDrawer {
         padding-bottom: env(keyboard-inset-height, 0px) !important;
     }
+
+    #left-nav-panel.openDrawer #openai_settings .reasoning-effort-wrapper,
+    #left-nav-panel.openDrawer #openai_settings .reasoning-effort-row {
+        box-sizing: border-box !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+
+    #left-nav-panel.openDrawer #openai_settings .reasoning-effort-row {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        align-items: stretch !important;
+        justify-items: stretch !important;
+    }
+
+    #left-nav-panel.openDrawer #openai_settings .reasoning-effort-row > label,
+    #left-nav-panel.openDrawer #openai_settings .reasoning-effort-row > #openai_reasoning_effort,
+    #left-nav-panel.openDrawer #openai_settings .reasoning-effort-row > :is(.toggle-description, strong.toggle-description) {
+        grid-column: 1 !important;
+        box-sizing: border-box !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    #left-nav-panel.openDrawer #openai_settings .reasoning-effort-row > :is(.toggle-description, strong.toggle-description) {
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word;
+    }
 }
 
 @supports (-webkit-overflow-scrolling: touch) {
