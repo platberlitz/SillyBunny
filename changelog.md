@@ -6,6 +6,9 @@ Date: 2026-05-13
 
 This update consolidates the v1.5.4 staging work since v1.5.3: preset and connection profile save reliability, full-chat navigation and search, mobile bottom-bar and drawer polish, chat completion tabs, pre-generation agent interceptors, iOS streaming stabilization, context-depth controls, character-menu rework, runtime update hardening, and release documentation automation.
 
+### Character Cards
+- fix(cards): warn when card HTML contains stripped `<script>`/`<iframe>` blocks (#94).
+
 ### Presets And Connection Profiles
 - Connection profile changes now serialize in order, abort superseded applications cleanly, and save only after the latest selected profile finishes applying.
 - OpenAI preset changes now expose an awaitable completion path and ignore stale async preset applications, keeping linked provider/model settings from being overwritten by older selections.
