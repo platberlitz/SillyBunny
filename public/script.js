@@ -3909,10 +3909,11 @@ export function getStoppingStrings(isImpersonate, isContinue, api = main_api) {
  * @prop {object} [jsonSchema] JSON schema to use for the structured generation. Usually requires a special instruction.
  * @prop {boolean} [removeReasoning] Parses and removes the reasoning block according to reasoning format preferences
  * @prop {boolean} [trimToSentence] Whether to trim the response to the last complete sentence
+ * @prop {'main'|'auxiliary'|'none'} [cacheScope] Prompt cache lane for local backends.
  * @param {GenerateQuietPromptParams} params Parameters for the quiet prompt generation
  * @returns {Promise<string>} Generated text. If using structured output, will contain a serialized JSON object.
  */
-export async function generateQuietPrompt({ quietPrompt = '', quietToLoud = false, skipWIAN = false, quietImage = null, quietName = null, responseLength = null, forceChId = null, jsonSchema = null, removeReasoning = true, trimToSentence = false } = {}) {
+export async function generateQuietPrompt({ quietPrompt = '', quietToLoud = false, skipWIAN = false, quietImage = null, quietName = null, responseLength = null, forceChId = null, jsonSchema = null, removeReasoning = true, trimToSentence = false, cacheScope = 'auxiliary' } = {}) {
     if (arguments.length > 0 && typeof arguments[0] !== 'object') {
         console.trace('generateQuietPrompt called with positional arguments. Please use an object instead.');
         [quietPrompt, quietToLoud, skipWIAN, quietImage, quietName, responseLength, forceChId, jsonSchema] = arguments;
@@ -3931,6 +3932,7 @@ export async function generateQuietPrompt({ quietPrompt = '', quietToLoud = fals
             quietName: quietName ?? null,
             force_chid: forceChId ?? null,
             jsonSchema: jsonSchema ?? null,
+            cacheScope,
         };
         if (responseLengthCustomized) {
             TempResponseLength.save(main_api, responseLength);
@@ -4893,6 +4895,7 @@ export function createRawPrompt(prompt, api, instructOverride, quietToLoud, syst
  * @prop {string} [prefill] An optional prefill for the prompt.
  * @prop {JsonSchema} [jsonSchema] JSON schema to use for the structured generation. Usually requires a special instruction.
  * @prop {AbortSignal} [signal] Optional signal to abort the request.
+ * @prop {'main'|'auxiliary'|'none'} [cacheScope] Prompt cache lane for local backends.
  */
 
 /**
@@ -4901,7 +4904,7 @@ export function createRawPrompt(prompt, api, instructOverride, quietToLoud, syst
  * @param {GenerateRawParams} params Parameters for generating a message
  * @returns {Promise<object | string>} Raw API response data, or a JSON string extracted from the response when `jsonSchema` is provided.
  */
-export async function generateRawData({ prompt = '', api = null, instructOverride = false, quietToLoud = false, systemPrompt = '', responseLength = null, prefill = '', jsonSchema = null, signal = null } = {}) {
+export async function generateRawData({ prompt = '', api = null, instructOverride = false, quietToLoud = false, systemPrompt = '', responseLength = null, prefill = '', jsonSchema = null, signal = null, cacheScope = 'auxiliary' } = {}) {
     if (!api) {
         api = main_api;
     }
@@ -4973,7 +4976,7 @@ export async function generateRawData({ prompt = '', api = null, instructOverrid
                 break;
             }
             case 'textgenerationwebui':
-                generateData = await getTextGenGenerationData(prompt, amount_gen, false, false, null, 'quiet');
+                generateData = await getTextGenGenerationData(prompt, amount_gen, false, false, null, 'quiet', { cacheScope });
                 TempResponseLength.restore(api);
                 break;
             case 'openai': {
@@ -4987,7 +4990,7 @@ export async function generateRawData({ prompt = '', api = null, instructOverrid
         if (api === 'koboldhorde') {
             data = await generateHorde(prompt.toString(), generateData, abortController.signal, false);
         } else if (api === 'openai') {
-            data = await sendOpenAIRequest('quiet', generateData, abortController.signal, { jsonSchema });
+            data = await sendOpenAIRequest('quiet', generateData, abortController.signal, { jsonSchema, cacheScope });
         } else {
             const generateUrl = getGenerateUrl(api);
             const response = await fetch(generateUrl, {
@@ -5035,13 +5038,13 @@ export async function generateRawData({ prompt = '', api = null, instructOverrid
  * @param {GenerateRawParams} params Parameters for generating a message
  * @returns {Promise<string>} Generated output: a cleaned-up message string when `jsonSchema` is not provided, or an extracted JSON string conforming to `jsonSchema` when it is.
  */
-export async function generateRaw({ prompt = '', api = null, instructOverride = false, quietToLoud = false, systemPrompt = '', responseLength = null, trimNames = true, prefill = '', jsonSchema = null, signal = null } = {}) {
+export async function generateRaw({ prompt = '', api = null, instructOverride = false, quietToLoud = false, systemPrompt = '', responseLength = null, trimNames = true, prefill = '', jsonSchema = null, signal = null, cacheScope = 'auxiliary' } = {}) {
     if (arguments.length > 0 && typeof arguments[0] !== 'object') {
         console.trace('generateRaw called with positional arguments. Please use an object instead.');
         [prompt, api, instructOverride, quietToLoud, systemPrompt, responseLength, trimNames, prefill, jsonSchema] = arguments;
     }
 
-    const data = await generateRawData({ prompt, api, instructOverride, quietToLoud, systemPrompt, responseLength, prefill, jsonSchema, signal });
+    const data = await generateRawData({ prompt, api, instructOverride, quietToLoud, systemPrompt, responseLength, prefill, jsonSchema, signal, cacheScope });
 
     // JSON string (matching the provided schema) will already be extracted.
     if (jsonSchema) {
@@ -5194,6 +5197,7 @@ function removeLastMessage() {
  * @property {number} [depth] Recursion depth for the generation. Used to prevent infinite loops in tool calls.
  * @property {JsonSchema} [jsonSchema] JSON schema to use for the structured generation. Usually requires a special instruction.
  * @property {boolean} [suppressUserMessage] Whether the visible user message was already rendered by a caller.
+ * @property {'main'|'auxiliary'|'none'} [cacheScope] Prompt cache lane for local backends.
  */
 
 /**
@@ -5238,7 +5242,7 @@ function consumePendingUserMessageExtra(message) {
     pendingUserMessageExtra = null;
 }
 
-export async function Generate(type, { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, quietName, jsonSchema = null, depth = 0, suppressUserMessage = false } = {}, dryRun = false) {
+export async function Generate(type, { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, quietName, jsonSchema = null, depth = 0, suppressUserMessage = false, cacheScope = null } = {}, dryRun = false) {
     console.log('Generate entered');
     setGenerationProgress(0);
     generation_started = new Date();
@@ -5247,7 +5251,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     await unshallowCharacter(this_chid);
 
     // Occurs every time, even if the generation is aborted due to slash commands execution
-    await eventSource.emit(event_types.GENERATION_STARTED, type, { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage }, dryRun);
+    await eventSource.emit(event_types.GENERATION_STARTED, type, { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, cacheScope }, dryRun);
 
     // Don't recreate abort controller if signal is passed
     if (!(abortController && signal)) {
@@ -5257,6 +5261,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     // OpenAI doesn't need instruct mode. Use OAI main prompt instead.
     const isInstruct = power_user.instruct.enabled && main_api !== 'openai';
     const isImpersonate = type == 'impersonate';
+    const resolvedCacheScope = cacheScope ?? (type === 'quiet' ? 'auxiliary' : 'main');
     const shouldConsumeUserInput = type !== 'regenerate' && type !== 'swipe' && type !== 'quiet' && !isImpersonate && !dryRun && !depth && !suppressUserMessage;
     let textareaText = '';
     let renderedUserMessage = false;
@@ -5328,7 +5333,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     }
 
     // Occurs only if the generation is not aborted due to slash commands execution
-    await eventSource.emit(event_types.GENERATION_AFTER_COMMANDS, type, { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage }, dryRun);
+    await eventSource.emit(event_types.GENERATION_AFTER_COMMANDS, type, { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, cacheScope: resolvedCacheScope }, dryRun);
 
     if (main_api == 'kobold' && kai_settings.streaming_kobold && !kai_flags.can_use_streaming) {
         toastr.error(t`Streaming is enabled, but the version of Kobold used does not support token streaming.`, undefined, { timeOut: 10000, preventDuplicates: true });
@@ -5351,7 +5356,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     if (selected_group && !is_group_generating) {
         if (!dryRun) {
             // Returns the promise that generateGroupWrapper returns; resolves when generation is done
-            return generateGroupWrapper(false, type, { quiet_prompt, force_chid, signal: abortController.signal, quietImage, jsonSchema });
+            return generateGroupWrapper(false, type, { quiet_prompt, force_chid, signal: abortController.signal, quietImage, jsonSchema, cacheScope: resolvedCacheScope });
         }
 
         const characterIndexMap = new Map(characters.map((char, index) => [char.avatar, index]));
@@ -6250,7 +6255,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             break;
         case 'textgenerationwebui': {
             const cfgValues = useCfgPrompt ? { guidanceScale: cfgGuidanceScale, negativePrompt: await getCombinedPrompt(true) } : null;
-            generate_data = await getTextGenGenerationData(finalPrompt, maxLength, isImpersonate, isContinue, cfgValues, type);
+            generate_data = await getTextGenGenerationData(finalPrompt, maxLength, isImpersonate, isContinue, cfgValues, type, { cacheScope: resolvedCacheScope });
             break;
         }
         case 'novel': {
@@ -6278,7 +6283,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 messages: oaiMessages,
                 messageExamples: oaiMessageExamples,
             }, dryRun);
-            generate_data = { prompt: prompt };
+            generate_data = { prompt: prompt, cacheScope: resolvedCacheScope };
 
             // TODO: move these side-effects somewhere else, so this switch-case solely sets generate_data
             // counts will return false if the user has not enabled the token breakdown feature
@@ -6368,7 +6373,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 activeStreamingProcessor.firstMessageText = '';
             }
 
-            activeStreamingProcessor.generator = await sendStreamingRequest(type, generate_data, { jsonSchema });
+            activeStreamingProcessor.generator = await sendStreamingRequest(type, generate_data, { jsonSchema, cacheScope: generate_data.cacheScope });
 
             hideSwipeButtons();
             let getMessage = await activeStreamingProcessor.generate();
@@ -6430,7 +6435,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             clearStreamingProcessorIfCurrent(activeStreamingProcessor);
             return;
         } else {
-            return await sendGenerationRequest(type, generate_data, { jsonSchema });
+            return await sendGenerationRequest(type, generate_data, { jsonSchema, cacheScope: generate_data.cacheScope });
         }
     }
 
@@ -7097,6 +7102,7 @@ function setInContextMessages(msgInContextCount, type) {
 /**
  * @typedef {object} AdditionalRequestOptions
  * @property {JsonSchema} [jsonSchema]
+ * @property {'main'|'auxiliary'|'none'} [cacheScope]
  */
 
 /**

@@ -3,6 +3,7 @@ import process from 'node:process';
 import express from 'express';
 import fetch from 'node-fetch';
 import urlJoin from 'url-join';
+import { isLikelyLocalServerUrl } from '../../../public/scripts/local-url-utils.js';
 
 import {
     AIMLAPI_HEADERS,
@@ -247,6 +248,28 @@ function applyCustomReasoningParameters(bodyParams, requestBody) {
         case 'thinking_object':
             bodyParams[paramName] = { type: isEnabled ? enabledValue : disabledValue };
             break;
+    }
+}
+
+function getOpenAiCompatibleServerUrl(requestBody) {
+    return requestBody.chat_completion_source === CHAT_COMPLETION_SOURCES.CUSTOM ? requestBody.custom_url : '';
+}
+
+function applyLocalPromptCacheScope(bodyParams, requestBody) {
+    if (requestBody.chat_completion_source !== CHAT_COMPLETION_SOURCES.CUSTOM) {
+        return;
+    }
+
+    const serverUrl = getOpenAiCompatibleServerUrl(requestBody);
+    if (!isLikelyLocalServerUrl(serverUrl)) {
+        return;
+    }
+
+    // SillyBunny: isolate helper generations so local prompt caches keep the main chat lane hot.
+    if (String(requestBody.cacheScope ?? 'auxiliary') === 'main') {
+        bodyParams.cache_prompt = true;
+    } else {
+        delete bodyParams.cache_prompt;
     }
 }
 
@@ -2921,6 +2944,8 @@ router.post('/generate', async function (request, response) {
                 bodyParams['verbosity'] = request.body.verbosity;
             }
         }
+
+        applyLocalPromptCacheScope(bodyParams, request.body);
 
         if (!apiKey && !request.body.reverse_proxy && request.body.chat_completion_source !== CHAT_COMPLETION_SOURCES.CUSTOM) {
             console.warn('OpenAI API key is missing.');
