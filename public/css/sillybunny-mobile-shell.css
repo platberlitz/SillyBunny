@@ -34,6 +34,115 @@
         font-size: 14px;
     }
 
+    #nonQRFormItems {
+        --sb-mobile-composer-input-height: clamp(34px, calc(42px * var(--sb-bottom-bar-scale, 1)), 56px);
+        --sb-composer-action-size: clamp(20px, calc(26px * var(--sb-bottom-bar-scale, 1)), 36px);
+        --sb-composer-send-width: calc(var(--sb-composer-action-size) * 1.45);
+        --sb-composer-action-icon-size: clamp(10px, calc(13px * var(--sb-bottom-bar-scale, 1)), 18px);
+        --sb-composer-left-rail-width: min(28vw, calc(var(--sb-composer-action-size) * 2 + 3px));
+        --sb-composer-right-rail-width: calc(var(--sb-composer-action-size) + var(--sb-composer-send-width) + 3px);
+        display: grid !important;
+        grid-template-columns: var(--sb-composer-left-rail-width) minmax(0, 1fr) var(--sb-composer-right-rail-width) !important;
+        grid-template-rows: minmax(var(--sb-mobile-composer-input-height), auto) !important;
+        grid-template-areas: 'tools input action' !important;
+        align-items: center !important;
+        gap: 0 4px !important;
+        min-height: calc(var(--sb-mobile-composer-input-height) + 4px) !important;
+        padding: 2px 4px !important;
+        box-sizing: border-box !important;
+        overflow: visible !important;
+    }
+
+    :root[data-sb-compact-mode='true'] #nonQRFormItems {
+        --sb-mobile-composer-input-height: clamp(30px, calc(34px * var(--sb-bottom-bar-scale, 1)), 48px);
+        --sb-composer-action-size: clamp(18px, calc(22px * var(--sb-bottom-bar-scale, 1)), 32px);
+        --sb-composer-send-width: calc(var(--sb-composer-action-size) * 1.42);
+        --sb-composer-action-icon-size: clamp(9px, calc(11px * var(--sb-bottom-bar-scale, 1)), 16px);
+        --sb-composer-left-rail-width: min(26vw, calc(var(--sb-composer-action-size) * 2 + 2px));
+        --sb-composer-right-rail-width: calc(var(--sb-composer-action-size) + var(--sb-composer-send-width) + 2px);
+        gap: 0 3px !important;
+    }
+
+    #leftSendForm {
+        grid-area: tools !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: var(--sb-composer-action-size) !important;
+        min-height: var(--sb-composer-action-size) !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scrollbar-width: none !important;
+        gap: 3px !important;
+    }
+
+    #rightSendForm {
+        grid-area: action !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: var(--sb-composer-action-size) !important;
+        min-height: var(--sb-composer-action-size) !important;
+        overflow: visible !important;
+        justify-content: flex-end !important;
+        gap: 3px !important;
+    }
+
+    #rightSendForm > div:not(#send_but):not(#mes_stop):not(#qig-input-btn):not(.stscript_btn) {
+        display: none !important;
+    }
+
+    #leftSendForm > div,
+    #rightSendForm > div:not(.stscript_btn),
+    #send_but,
+    #send_form .mes_stop,
+    #send_form.sb-generating-controls #mes_stop {
+        width: var(--sb-composer-action-size) !important;
+        min-width: var(--sb-composer-action-size) !important;
+        max-width: var(--sb-composer-action-size) !important;
+        height: var(--sb-composer-action-size) !important;
+        min-height: var(--sb-composer-action-size) !important;
+        max-height: var(--sb-composer-action-size) !important;
+        flex: 0 0 var(--sb-composer-action-size) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        font-size: var(--sb-composer-action-icon-size) !important;
+        line-height: 1 !important;
+    }
+
+    #send_textarea {
+        grid-area: input !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        min-height: var(--sb-mobile-composer-input-height) !important;
+        max-height: 42dvh !important;
+        field-sizing: content !important;
+        resize: none !important;
+        overflow-y: auto !important;
+        box-sizing: border-box !important;
+        padding: 5px 7px !important;
+        line-height: 1.18 !important;
+        align-self: stretch !important;
+        justify-self: stretch !important;
+    }
+
+    #send_but {
+        width: var(--sb-composer-send-width) !important;
+        min-width: var(--sb-composer-send-width) !important;
+        max-width: var(--sb-composer-send-width) !important;
+        flex: 0 0 var(--sb-composer-send-width) !important;
+    }
+
+    #send_form .mes_stop,
+    #send_form.sb-generating-controls #mes_stop {
+        width: var(--sb-composer-send-width) !important;
+        min-width: var(--sb-composer-send-width) !important;
+        max-width: var(--sb-composer-send-width) !important;
+        flex: 0 0 var(--sb-composer-send-width) !important;
+    }
+
     body.sb-mobile-modal-open {
         overflow: hidden !important;
     }

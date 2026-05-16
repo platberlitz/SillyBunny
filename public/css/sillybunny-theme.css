@@ -45,7 +45,11 @@
     --sb-row-gap: 10px;
     --sb-section-gap: 14px;
     --sb-settings-card-padding: var(--spacing-md) 14px;
-    --sb-message-icon-size: 1.75rem;
+    --sb-message-icon-size: clamp(24px, calc(var(--bottomFormBlockSize, 36px) * 0.78), 30px);
+    --sb-composer-action-size: clamp(24px, calc(var(--bottomFormBlockSize, 36px) * 0.72), 30px);
+    --sb-composer-send-width: calc(var(--sb-composer-action-size) * 1.45);
+    --sb-composer-action-icon-size: clamp(12px, calc(var(--bottomFormIconSize, 20px) * 0.62), 15px);
+    --sb-composer-side-rail-width: min(16%, calc(var(--sb-composer-action-size) * 4 + 12px));
     --sb-message-meta-line-height: 1.18;
     --sb-chat-composer-gap: var(--spacing-sm);
     --sb-chat-composer-edge-gap: var(--spacing-sm);
@@ -150,6 +154,11 @@
     --sb-chat-composer-edge-gap: 6px;
     --sb-icon-control-size: 1.85rem;
     --sb-inline-drawer-icon-size: 1.85rem;
+    --sb-message-icon-size: clamp(20px, calc(var(--bottomFormBlockSize, 34px) * 0.68), 26px);
+    --sb-composer-action-size: clamp(20px, calc(var(--bottomFormBlockSize, 34px) * 0.62), 26px);
+    --sb-composer-send-width: calc(var(--sb-composer-action-size) * 1.42);
+    --sb-composer-action-icon-size: clamp(11px, calc(var(--bottomFormIconSize, 18px) * 0.58), 13px);
+    --sb-composer-side-rail-width: min(14%, calc(var(--sb-composer-action-size) * 4 + 10px));
 }
 
 @media (pointer: coarse), screen and (max-width: 760px) {
@@ -632,7 +641,7 @@ h3:not(.popup h3):not(#chat h3) {
     box-sizing: border-box;
     line-height: 1;
     text-align: center;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty::before,
@@ -791,8 +800,8 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     position: relative;
     isolation: isolate;
     box-sizing: border-box;
-    padding: 8px;
-    border-radius: var(--sb-radius-xl);
+    padding: 4px;
+    border-radius: 16px;
     border-color: color-mix(in srgb, var(--sb-shell-border) 92%, transparent);
     box-shadow: 0 -10px 40px color-mix(in srgb, var(--SmartThemeShadowColor) 14%, transparent);
     background:
@@ -816,15 +825,45 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 
 #nonQRFormItems {
     align-items: center;
-    gap: 6px;
-    padding: 6px 8px;
+    gap: 4px;
+    padding: 4px 6px;
     font-size: calc(var(--bottomFormIconSize) * 0.76);
+    min-width: 0;
+    overflow: visible;
+    border: 1px solid color-mix(in srgb, var(--sb-shell-border) 88%, var(--SmartThemeBodyColor) 12%);
+    border-radius: 999px;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--SmartThemeBodyColor) 8%, var(--sb-composer-surface-base, transparent)),
+        color-mix(in srgb, var(--SmartThemeBodyColor) 3%, var(--sb-composer-surface-base, transparent))
+    );
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--SmartThemeBodyColor) 14%, transparent),
+        0 6px 14px color-mix(in srgb, var(--SmartThemeShadowColor) 14%, transparent);
 }
 
 #leftSendForm,
 #rightSendForm {
     gap: 6px;
     align-items: center;
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+#leftSendForm {
+    max-width: min(35%, calc(var(--sb-composer-action-size) * 6 + 30px));
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
+
+#leftSendForm::-webkit-scrollbar {
+    display: none;
+}
+
+#rightSendForm {
+    max-width: max-content;
+    overflow: visible;
 }
 
 #leftSendForm > div,
@@ -834,16 +873,16 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: var(--bottomFormBlockSize);
-    min-width: var(--bottomFormBlockSize);
-    height: var(--bottomFormBlockSize);
+    width: var(--sb-composer-action-size);
+    min-width: var(--sb-composer-action-size);
+    height: var(--sb-composer-action-size);
     margin: 0;
     padding: 0;
     border-radius: var(--sb-radius-button);
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 6%, transparent);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 82%, transparent);
     box-shadow: 0 10px 18px color-mix(in srgb, var(--SmartThemeShadowColor) 10%, transparent);
-    font-size: calc(var(--bottomFormIconSize) * 0.75);
+    font-size: var(--sb-composer-action-icon-size);
 }
 
 #send_form .mes_stop {
@@ -1053,42 +1092,45 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 }
 
 #send_textarea {
-    min-height: 68px;
+    min-width: 0;
+    width: auto;
+    flex: 1 1 0;
+    min-height: 46px;
     height: auto;
     field-sizing: content;
     max-height: min(50vh, 28rem);
     overflow-y: auto;
-    padding: var(--input-padding-y, 14px) var(--input-padding-x, 16px);
-    line-height: 1.56;
-    border-radius: var(--sb-radius-md);
+    padding: 6px 8px;
+    line-height: 1.28;
+    border-radius: 10px;
     background: var(--sb-composer-input-bg);
     color: var(--SmartThemeBodyColor);
     caret-color: var(--color-primary, var(--sb-accent));
-    font-size: calc(var(--mainFontSize) * 0.98);
+    font-size: calc(var(--mainFontSize) * 0.9);
     transition: border-color var(--sb-transition-fast), box-shadow var(--sb-transition-fast), background-color var(--sb-transition-fast);
 }
 
 :root[data-sb-compact-mode='true'] #send_form {
-    padding: 6px;
-    border-radius: 20px;
+    padding: 3px;
+    border-radius: 12px;
 }
 
 :root[data-sb-compact-mode='true'] #nonQRFormItems {
-    gap: 5px;
-    padding: 4px 6px;
+    gap: 3px;
+    padding: 3px 5px;
 }
 
 :root[data-sb-compact-mode='true'] #leftSendForm,
 :root[data-sb-compact-mode='true'] #rightSendForm {
-    gap: 5px;
+    gap: 3px;
 }
 
 :root[data-sb-compact-mode='true'] #send_textarea {
-    min-height: 56px;
-    padding: 10px 12px;
-    line-height: 1.45;
-    border-radius: 12px;
-    font-size: calc(var(--mainFontSize) * 0.94);
+    min-height: 38px;
+    padding: 5px 7px;
+    line-height: 1.18;
+    border-radius: 8px;
+    font-size: calc(var(--mainFontSize) * 0.86);
 }
 
 #send_textarea::placeholder {
@@ -1114,7 +1156,40 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 }
 
 #send_but {
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 30%, transparent);
+    width: var(--sb-composer-send-width) !important;
+    min-width: var(--sb-composer-send-width) !important;
+    max-width: var(--sb-composer-send-width) !important;
+    height: var(--sb-composer-action-size) !important;
+    min-height: var(--sb-composer-action-size) !important;
+    max-height: var(--sb-composer-action-size) !important;
+    flex: 0 0 var(--sb-composer-send-width) !important;
+    border-radius: var(--sb-radius-button) !important;
+    background: var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) !important;
+    border: 1px solid transparent !important;
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 30%, transparent),
+        0 10px 18px color-mix(in srgb, var(--SmartThemeShadowColor) 10%, transparent);
+    color: var(--sb-on-solid-accent, var(--sb-on-accent, var(--color-background, var(--SmartThemeBlurTintColor)))) !important;
+    font-size: var(--sb-composer-action-icon-size) !important;
+}
+
+#send_form .mes_stop,
+#send_form.sb-generating-controls #mes_stop {
+    width: var(--sb-composer-send-width) !important;
+    min-width: var(--sb-composer-send-width) !important;
+    max-width: var(--sb-composer-send-width) !important;
+    height: var(--sb-composer-action-size) !important;
+    min-height: var(--sb-composer-action-size) !important;
+    max-height: var(--sb-composer-action-size) !important;
+    flex: 0 0 var(--sb-composer-send-width) !important;
+    border-radius: var(--sb-radius-button) !important;
+    background: var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) !important;
+    border: 1px solid transparent !important;
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 30%, transparent),
+        0 10px 18px color-mix(in srgb, var(--SmartThemeShadowColor) 10%, transparent);
+    color: var(--sb-on-solid-accent, var(--sb-on-accent, var(--color-background, var(--SmartThemeBlurTintColor)))) !important;
+    font-size: var(--sb-composer-action-icon-size) !important;
 }
 
 /*
@@ -1167,33 +1242,33 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     #leftSendForm > div,
     #rightSendForm > div:not(.mes_stop),
     #options_button {
-        width: var(--bottomFormBlockSize) !important;
-        min-width: var(--bottomFormBlockSize) !important;
-        height: var(--bottomFormBlockSize) !important;
-        min-height: var(--bottomFormBlockSize) !important;
-        max-width: var(--bottomFormBlockSize) !important;
-        max-height: var(--bottomFormBlockSize) !important;
+        width: var(--sb-composer-action-size) !important;
+        min-width: var(--sb-composer-action-size) !important;
+        height: var(--sb-composer-action-size) !important;
+        min-height: var(--sb-composer-action-size) !important;
+        max-width: var(--sb-composer-action-size) !important;
+        max-height: var(--sb-composer-action-size) !important;
     }
 
     /* Override any optional theme-specific sizing. */
     #leftSendForm > *,
     #rightSendForm > *:not(.mes_stop),
     #form_sheld #options_button {
-        width: var(--bottomFormBlockSize) !important;
-        min-width: var(--bottomFormBlockSize) !important;
-        height: var(--bottomFormBlockSize) !important;
-        min-height: var(--bottomFormBlockSize) !important;
-        max-width: var(--bottomFormBlockSize) !important;
-        max-height: var(--bottomFormBlockSize) !important;
+        width: var(--sb-composer-action-size) !important;
+        min-width: var(--sb-composer-action-size) !important;
+        height: var(--sb-composer-action-size) !important;
+        min-height: var(--sb-composer-action-size) !important;
+        max-width: var(--sb-composer-action-size) !important;
+        max-height: var(--sb-composer-action-size) !important;
     }
 
     #send_form .mes_stop {
-        width: var(--bottomFormBlockSize);
-        min-width: var(--bottomFormBlockSize);
-        max-width: var(--bottomFormBlockSize);
-        height: var(--bottomFormBlockSize);
-        min-height: var(--bottomFormBlockSize);
-        max-height: var(--bottomFormBlockSize);
+        width: var(--sb-composer-action-size);
+        min-width: var(--sb-composer-action-size);
+        max-width: var(--sb-composer-action-size);
+        height: var(--sb-composer-action-size);
+        min-height: var(--sb-composer-action-size);
+        max-height: var(--sb-composer-action-size);
     }
 
     #send_textarea {
@@ -1282,7 +1357,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 #chat .mes .mes_buttons,
 #chat .mes .extraMesButtons {
     align-items: center;
-    gap: 4px;
+    gap: 3px;
     min-block-size: var(--sb-message-icon-size);
     padding: 0;
 }
@@ -1300,10 +1375,19 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     justify-content: center;
     flex: 0 0 var(--sb-message-icon-size);
     padding: 0;
-    border-radius: 8px;
+    border-radius: 7px;
     box-sizing: border-box;
     line-height: var(--sb-message-icon-size);
     text-align: center;
+    font-size: calc(var(--sb-message-icon-size) * 0.52);
+}
+
+#chat .mes .mes_button:is(.fa, .fa-solid, .fa-regular, .fa-brands),
+#chat .mes .extraMesButtons > div:is(.fa, .fa-solid, .fa-regular, .fa-brands),
+#chat .mes .mes_button > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg),
+#chat .mes .extraMesButtons > div > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg) {
+    font-size: calc(var(--sb-message-icon-size) * 0.52);
+    line-height: 1;
 }
 
 #chat .mes[is_system="true"] .mes_hide,
@@ -1333,6 +1417,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     aspect-ratio: 1 / 1;
     line-height: 1 !important;
     overflow: hidden;
+    font-size: calc(var(--sb-message-icon-size) * 0.52) !important;
 }
 
 #chat .mes .mes_view_agent_changes[style*="display: none"],
@@ -1388,10 +1473,10 @@ body.bubblechat .mes[is_user='true']::before {
 
 .mes[is_user='true'] .mes_block {
     box-sizing: border-box;
-    border: 1px solid color-mix(in srgb, var(--color-primary, var(--sb-accent)) 24%, transparent);
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor) 14%, transparent);
     border-radius: var(--sb-radius-md);
     padding: 10px 12px;
-    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 4%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 3%, transparent);
 }
 
 body.flatchat .mes[is_user='true'] .mes_block,
@@ -1421,12 +1506,13 @@ body.bubblechat .mes[is_user='true'] .mes_block {
         --sb-icon-control-size: 2.5rem;
         --sb-control-min-height: var(--sb-mobile-touch-target);
         --sb-control-icon-physical-size: max(var(--sb-icon-control-size), var(--sb-control-min-height));
-        --sb-message-icon-size: 2rem;
+        --sb-message-icon-size: clamp(28px, calc(var(--bottomFormBlockSize, 44px) * 0.62), 34px);
     }
 
     :root[data-sb-compact-mode='true'] {
         --sb-control-min-height: var(--sb-mobile-touch-target);
         --sb-control-icon-physical-size: max(var(--sb-icon-control-size), var(--sb-control-min-height));
+        --sb-message-icon-size: clamp(24px, calc(var(--bottomFormBlockSize, 36px) * 0.62), 30px);
     }
 
     #form_sheld {
@@ -1507,7 +1593,7 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     #chat .mes .mes_button,
     #chat .mes .extraMesButtons > div,
     #chat .mes :is(.swipe_left, .swipe_right) {
-        border-radius: 9px;
+        border-radius: 8px;
     }
 
     #completion_prompt_manager_popup {
@@ -4914,15 +5000,20 @@ input[type='range']::-moz-range-thumb {
     #rightSendForm > div:not(.mes_stop),
     #send_form .mes_stop,
     #options_button {
-        width: var(--bottomFormBlockSize);
-        min-width: var(--bottomFormBlockSize);
-        height: var(--bottomFormBlockSize);
-        min-height: var(--bottomFormBlockSize);
-        max-height: var(--bottomFormBlockSize);
+        width: var(--sb-composer-action-size);
+        min-width: var(--sb-composer-action-size);
+        height: var(--sb-composer-action-size);
+        min-height: var(--sb-composer-action-size);
+        max-height: var(--sb-composer-action-size);
     }
 
     #send_textarea {
-        min-height: 74px;
-        padding: var(--input-padding-y) var(--input-padding-x);
+        min-height: 46px;
+        padding: 6px 8px;
+    }
+
+    :root[data-sb-compact-mode='true'] #send_textarea {
+        min-height: 38px;
+        padding: 5px 7px;
     }
 }

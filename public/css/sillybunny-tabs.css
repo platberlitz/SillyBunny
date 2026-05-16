@@ -8,6 +8,7 @@
     --sb-topbar-scale-mobile: 1;
     --sb-mobile-button-scale: 1;
     --sb-bottom-bar-scale: 1;
+    --sb-bottom-chat-min-touch: 32px;
     --sb-topbar-scale-active: var(--sb-topbar-scale-desktop);
     --sb-chatbar-scale-active: calc(var(--sb-topbar-scale-active) * var(--sb-bottom-bar-scale));
     --sb-topbar-primary-height-base: var(--topBarBlockSize);
@@ -147,6 +148,7 @@
 
 :root[data-sb-compact-mode='true'] {
     --sb-density-scale: 0.88;
+    --sb-bottom-chat-min-touch: 28px;
     --sb-topbar-primary-height-base: 34px;
     --sb-topbar-padding-x-base: 7px;
     --sb-topbar-stack-gap-base: 3px;
@@ -3718,18 +3720,95 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 }
 
 /* Bottom chat management bar */
+#nonQRFormItems {
+    display: grid !important;
+    grid-template-columns: var(--sb-composer-side-rail-width, min(16%, 132px)) minmax(0, 1fr) var(--sb-composer-side-rail-width, min(16%, 132px)) !important;
+    grid-template-areas: 'tools input action' !important;
+    align-items: center !important;
+    gap: 0 4px !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+}
+
+#leftSendForm {
+    grid-area: tools !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+}
+
+#leftSendForm::-webkit-scrollbar {
+    display: none !important;
+}
+
+#send_textarea {
+    grid-area: input !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    resize: none !important;
+    box-sizing: border-box !important;
+    justify-self: stretch !important;
+}
+
+#rightSendForm {
+    grid-area: action !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    justify-self: end !important;
+    justify-content: flex-end !important;
+}
+
+#send_but {
+    width: var(--sb-composer-send-width, calc(var(--sb-composer-action-size, 30px) * 1.45)) !important;
+    min-width: var(--sb-composer-send-width, calc(var(--sb-composer-action-size, 30px) * 1.45)) !important;
+    max-width: var(--sb-composer-send-width, calc(var(--sb-composer-action-size, 30px) * 1.45)) !important;
+    height: var(--sb-composer-action-size, 30px) !important;
+    min-height: var(--sb-composer-action-size, 30px) !important;
+    max-height: var(--sb-composer-action-size, 30px) !important;
+    flex: 0 0 var(--sb-composer-send-width, calc(var(--sb-composer-action-size, 30px) * 1.45)) !important;
+    border-radius: var(--sb-radius-button, 14px) !important;
+}
+
+#send_form .mes_stop,
+#send_form.sb-generating-controls #mes_stop {
+    width: var(--sb-composer-send-width, calc(var(--sb-composer-action-size, 30px) * 1.45)) !important;
+    min-width: var(--sb-composer-send-width, calc(var(--sb-composer-action-size, 30px) * 1.45)) !important;
+    max-width: var(--sb-composer-send-width, calc(var(--sb-composer-action-size, 30px) * 1.45)) !important;
+    height: var(--sb-composer-action-size, 30px) !important;
+    min-height: var(--sb-composer-action-size, 30px) !important;
+    max-height: var(--sb-composer-action-size, 30px) !important;
+    flex: 0 0 var(--sb-composer-send-width, calc(var(--sb-composer-action-size, 30px) * 1.45)) !important;
+    border-radius: var(--sb-radius-button, 14px) !important;
+}
+
+@media screen and (min-width: 1001px) {
+    #send_form #qig-input-btn {
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        font-size: var(--sb-composer-action-icon-size, 15px) !important;
+        line-height: 1 !important;
+    }
+}
+
 #sb-bottom-chat-bar {
     display: flex;
     align-items: center;
-    gap: calc(8px * var(--sb-bottom-bar-scale));
+    gap: calc(4px * var(--sb-bottom-bar-scale));
     box-sizing: border-box;
     margin-block-end: var(--sb-chat-composer-gap, 8px);
-    padding: calc(6px * var(--sb-bottom-bar-scale)) calc(12px * var(--sb-bottom-bar-scale));
+    padding: calc(3px * var(--sb-bottom-bar-scale)) calc(8px * var(--sb-bottom-bar-scale));
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 72%, transparent);
-    border-radius: var(--sb-radius-xl, 22px);
+    border-radius: var(--sb-radius-md, 14px);
     background: var(--sb-composer-surface-bg, var(--sb-chat-surface-bg, color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, var(--SmartThemeChatTintColor) 8%)));
     box-shadow: 0 10px 26px color-mix(in srgb, var(--SmartThemeShadowColor) 12%, transparent);
-    min-height: max(44px, calc(34px * var(--sb-bottom-bar-scale)));
+    min-height: max(var(--sb-bottom-chat-min-touch), calc(26px * var(--sb-bottom-bar-scale)));
     overflow: hidden;
 }
 
@@ -3740,10 +3819,10 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 #sb-bottom-chat-select {
     flex: 0 1 clamp(120px, 22vw, 260px);
     min-width: 0;
-    height: max(44px, calc(28px * var(--sb-bottom-bar-scale)));
-    min-height: max(44px, calc(28px * var(--sb-bottom-bar-scale)));
+    height: max(var(--sb-bottom-chat-min-touch), calc(23px * var(--sb-bottom-bar-scale)));
+    min-height: max(var(--sb-bottom-chat-min-touch), calc(23px * var(--sb-bottom-bar-scale)));
     margin: 0;
-    padding: 0 calc(12px * var(--sb-bottom-bar-scale));
+    padding: 0 calc(9px * var(--sb-bottom-bar-scale));
     box-sizing: border-box;
     font: inherit;
     font-size: calc(var(--mainFontSize) * 0.85 * var(--sb-bottom-bar-scale));
@@ -3751,7 +3830,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     color: var(--SmartThemeBodyColor);
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-composer-surface-base, var(--SmartThemeBlurTintColor)));
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 40%, transparent);
-    border-radius: calc(14px * var(--sb-bottom-bar-scale));
+    border-radius: calc(10px * var(--sb-bottom-bar-scale));
     appearance: none;
     cursor: pointer;
     overflow: hidden;
@@ -3765,18 +3844,18 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     isolation: isolate;
     display: flex;
     align-items: center;
-    gap: calc(7px * var(--sb-bottom-bar-scale));
+    gap: calc(4px * var(--sb-bottom-bar-scale));
     flex: 1 1 180px;
     min-width: 110px;
-    height: max(44px, calc(28px * var(--sb-bottom-bar-scale)));
-    min-height: max(44px, calc(28px * var(--sb-bottom-bar-scale)));
+    height: max(var(--sb-bottom-chat-min-touch), calc(23px * var(--sb-bottom-bar-scale)));
+    min-height: max(var(--sb-bottom-chat-min-touch), calc(23px * var(--sb-bottom-bar-scale)));
     margin: 0;
-    padding: 0 calc(10px * var(--sb-bottom-bar-scale));
+    padding: 0 calc(8px * var(--sb-bottom-bar-scale));
     box-sizing: border-box;
     color: var(--SmartThemeBodyColor);
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-composer-surface-base, var(--SmartThemeBlurTintColor)));
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 40%, transparent);
-    border-radius: calc(14px * var(--sb-bottom-bar-scale));
+    border-radius: calc(10px * var(--sb-bottom-bar-scale));
     overflow: hidden;
 }
 
@@ -3790,7 +3869,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     flex: 1 1 auto;
     min-width: 0;
     width: 100%;
-    height: calc(20px * var(--sb-bottom-bar-scale)) !important;
+    height: calc(17px * var(--sb-bottom-bar-scale)) !important;
     min-height: 0 !important;
     margin: 0;
     padding: 0 !important;
@@ -3852,10 +3931,10 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: max(44px, calc(28px * var(--sb-bottom-bar-scale)));
-    min-height: max(44px, calc(28px * var(--sb-bottom-bar-scale)));
+    min-width: max(var(--sb-bottom-chat-min-touch), calc(23px * var(--sb-bottom-bar-scale)));
+    min-height: max(var(--sb-bottom-chat-min-touch), calc(23px * var(--sb-bottom-bar-scale)));
     margin: 0;
-    padding: calc(4px * var(--sb-bottom-bar-scale)) calc(8px * var(--sb-bottom-bar-scale));
+    padding: calc(2px * var(--sb-bottom-bar-scale)) calc(6px * var(--sb-bottom-bar-scale));
     box-sizing: border-box;
     border-radius: calc(8px * var(--sb-bottom-bar-scale));
     font-size: calc(var(--mainFontSize) * 0.9 * var(--sb-bottom-bar-scale));
@@ -3890,13 +3969,13 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     #sb-bottom-chat-bar {
         --sb-bottom-chat-mobile-gutter: max(14px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
         --sb-bottom-chat-mobile-width: calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2));
-        --sb-bottom-chat-mobile-gap: clamp(2px, calc(4px * var(--sb-bottom-bar-scale)), 6px);
-        --sb-bottom-chat-mobile-padding-block: clamp(3px, calc(4px * var(--sb-bottom-bar-scale)), 6px);
-        --sb-bottom-chat-mobile-padding-inline: clamp(5px, calc(6px * var(--sb-bottom-bar-scale)), 9px);
-        --sb-bottom-chat-mobile-button-size: var(--bottomFormBlockSize, clamp(44px, calc(44px * var(--sb-bottom-bar-scale)), 52px));
-        --sb-bottom-chat-mobile-select-height: clamp(44px, calc(44px * var(--sb-bottom-bar-scale)), 52px);
-        --sb-bottom-chat-mobile-persona-size: clamp(44px, calc(44px * var(--sb-bottom-bar-scale)), 52px);
-        --sb-bottom-chat-mobile-radius: clamp(12px, calc(14px * var(--sb-bottom-bar-scale)), 18px);
+        --sb-bottom-chat-mobile-gap: clamp(1px, calc(2px * var(--sb-bottom-bar-scale)), 4px);
+        --sb-bottom-chat-mobile-padding-block: clamp(1px, calc(2px * var(--sb-bottom-bar-scale)), 3px);
+        --sb-bottom-chat-mobile-padding-inline: clamp(4px, calc(5px * var(--sb-bottom-bar-scale)), 7px);
+        --sb-bottom-chat-mobile-button-size: clamp(28px, calc(30px * var(--sb-bottom-bar-scale)), 34px);
+        --sb-bottom-chat-mobile-select-height: clamp(28px, calc(30px * var(--sb-bottom-bar-scale)), 34px);
+        --sb-bottom-chat-mobile-persona-size: clamp(28px, calc(30px * var(--sb-bottom-bar-scale)), 34px);
+        --sb-bottom-chat-mobile-radius: clamp(9px, calc(11px * var(--sb-bottom-bar-scale)), 14px);
         width: min(var(--sb-bottom-chat-mobile-width), calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2)));
         max-width: calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2));
         display: grid;
@@ -4035,12 +4114,13 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     #sb-bottom-chat-bar {
         --sb-bottom-chat-mobile-gutter: max(4px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
         --sb-bottom-chat-mobile-width: calc(100% - (var(--sb-bottom-chat-mobile-gutter) * 2));
-        --sb-bottom-chat-mobile-gap: clamp(2px, calc(2px * var(--sb-bottom-bar-scale)), 4px);
-        --sb-bottom-chat-mobile-padding-block: clamp(3px, calc(3px * var(--sb-bottom-bar-scale)), 5px);
-        --sb-bottom-chat-mobile-padding-inline: clamp(4px, calc(5px * var(--sb-bottom-bar-scale)), 7px);
-        --sb-bottom-chat-mobile-select-height: clamp(44px, calc(44px * var(--sb-bottom-bar-scale)), 50px);
-        --sb-bottom-chat-mobile-persona-size: clamp(44px, calc(44px * var(--sb-bottom-bar-scale)), 50px);
-        --sb-bottom-chat-mobile-radius: clamp(11px, calc(13px * var(--sb-bottom-bar-scale)), 16px);
+        --sb-bottom-chat-mobile-gap: clamp(1px, calc(1.5px * var(--sb-bottom-bar-scale)), 3px);
+        --sb-bottom-chat-mobile-padding-block: clamp(1px, calc(1.5px * var(--sb-bottom-bar-scale)), 2px);
+        --sb-bottom-chat-mobile-padding-inline: clamp(3px, calc(4px * var(--sb-bottom-bar-scale)), 6px);
+        --sb-bottom-chat-mobile-button-size: clamp(26px, calc(28px * var(--sb-bottom-bar-scale)), 32px);
+        --sb-bottom-chat-mobile-select-height: clamp(26px, calc(28px * var(--sb-bottom-bar-scale)), 32px);
+        --sb-bottom-chat-mobile-persona-size: clamp(26px, calc(28px * var(--sb-bottom-bar-scale)), 32px);
+        --sb-bottom-chat-mobile-radius: clamp(8px, calc(10px * var(--sb-bottom-bar-scale)), 13px);
     }
 
     #sb-bottom-chat-select {

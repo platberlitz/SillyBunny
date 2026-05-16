@@ -90,6 +90,8 @@ let sbInlineDrawerPersistenceObserver = null;
 let sbInlineDrawerPersistenceQueued = false;
 let sbChatScriptModulePromise = null;
 let sbMainScriptModulePromise = null;
+let sbComposerControlsObserver = null;
+let sbComposerControlsSyncQueued = false;
 let sbStorageFlushTimer = 0;
 let sbStorageFlushEventsBound = false;
 let sbMessageActionEventsBound = false;
@@ -1190,6 +1192,107 @@ function setMobileButtonScale(value, { persist = true } = {}) {
     updateThemePickerUi();
 }
 
+function moveElementBefore(element, parent, referenceNode) {
+    if (!(element instanceof HTMLElement) || !(parent instanceof HTMLElement)) {
+        return;
+    }
+
+    if (referenceNode instanceof Node) {
+        if (element.parentElement === parent && element.nextElementSibling === referenceNode) {
+            return;
+        }
+
+        parent.insertBefore(element, referenceNode);
+        return;
+    }
+
+    if (element.parentElement === parent && element.nextSibling === null) {
+        return;
+    }
+
+    parent.appendChild(element);
+}
+
+function moveElementToStart(element, parent) {
+    if (!(element instanceof HTMLElement) || !(parent instanceof HTMLElement)) {
+        return;
+    }
+
+    if (element.parentElement === parent && element.previousElementSibling === null) {
+        return;
+    }
+
+    parent.insertBefore(element, parent.firstChild);
+}
+
+function moveElementAfter(element, referenceElement, parent) {
+    if (!(element instanceof HTMLElement)
+        || !(referenceElement instanceof HTMLElement)
+        || !(parent instanceof HTMLElement)) {
+        return;
+    }
+
+    if (element.parentElement === parent && element.previousElementSibling === referenceElement) {
+        return;
+    }
+
+    parent.insertBefore(element, referenceElement.nextSibling);
+}
+
+function placeComposerControls() {
+    const leftForm = document.getElementById('leftSendForm');
+    const rightForm = document.getElementById('rightSendForm');
+
+    if (!(leftForm instanceof HTMLElement) || !(rightForm instanceof HTMLElement)) {
+        return;
+    }
+
+    const paletteButton = document.getElementById('qig-input-btn');
+    const optionsButton = document.getElementById('options_button');
+    const wandButton = document.getElementById('extensionsMenuButton');
+    const sendButton = document.getElementById('send_but');
+
+    moveElementToStart(optionsButton, leftForm);
+
+    if (optionsButton instanceof HTMLElement && optionsButton.parentElement === leftForm) {
+        moveElementAfter(wandButton, optionsButton, leftForm);
+    } else {
+        moveElementToStart(wandButton, leftForm);
+    }
+
+    moveElementBefore(paletteButton, rightForm, sendButton);
+}
+
+function queueComposerControlPlacement() {
+    if (sbComposerControlsSyncQueued) {
+        return;
+    }
+
+    sbComposerControlsSyncQueued = true;
+    window.requestAnimationFrame(() => {
+        sbComposerControlsSyncQueued = false;
+        placeComposerControls();
+    });
+}
+
+function bindComposerControlPlacement() {
+    const leftForm = document.getElementById('leftSendForm');
+    const rightForm = document.getElementById('rightSendForm');
+
+    if (!(leftForm instanceof HTMLElement) || !(rightForm instanceof HTMLElement)) {
+        return;
+    }
+
+    if (!(sbComposerControlsObserver instanceof MutationObserver)) {
+        sbComposerControlsObserver = new MutationObserver(() => queueComposerControlPlacement());
+    }
+
+    sbComposerControlsObserver.disconnect();
+    sbComposerControlsObserver.observe(leftForm, { childList: true });
+    sbComposerControlsObserver.observe(rightForm, { childList: true });
+    queueComposerControlPlacement();
+}
+
 function setCompactMode(enabled, { persist = true } = {}) {
     const nextEnabled = Boolean(enabled);
     sbState.compactMode = nextEnabled;
@@ -1201,6 +1304,7 @@ function setCompactMode(enabled, { persist = true } = {}) {
         safeSetItem(SB_STORAGE_KEYS.compactMode, String(nextEnabled));
     }
 
+    queueComposerControlPlacement();
     updateThemePickerUi();
 }
 
@@ -12254,6 +12358,7 @@ function initAll() {
     setTopbarScale('mobile', sbState.topbarScale.mobile, { persist: false });
     setBottomBarScale(sbState.bottomBarScale, { persist: false });
     setMobileButtonScale(sbState.mobileButtonScale, { persist: false });
+    bindComposerControlPlacement();
     initChatAvatarVariables();
     syncDesktopShellSizing();
     buildTopBar();
