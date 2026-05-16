@@ -1,6 +1,8 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 import express from 'express';
 import sanitize from 'sanitize-filename';
@@ -11,8 +13,28 @@ import { getConfigValue, isValidUrl } from '../util.js';
 import { createGitClient } from '../git/client.js';
 
 const gitBackend = getConfigValue('git.backend', 'auto');
+const execFileAsync = promisify(execFile);
+const CORE_EXTENSIONS = new Set([
+    'translate',
+    'connection-manager',
+    'regex',
+    'attachments',
+    'caption',
+    'gallery',
+    'quick-reply',
+    'assets',
+    'token-counter',
+    'vectors',
+    'in-chat-agents',
+]);
 const BUNDLED_THIRD_PARTY_EXTENSIONS = new Set([
     'BunnyPresetTools',
+]);
+const MANUAL_SYNC_EXTENSIONS = new Map([
+    ['quick-image-gen', {
+        script: path.resolve('scripts/sync-quick-image-gen.sh'),
+        repo: 'https://github.com/platberlitz/sillytavern-image-gen',
+    }],
 ]);
 
 /**
@@ -165,6 +187,11 @@ async function ensureExtensionRepo(extensionPath, isGlobal = false) {
 
 function isBundledThirdPartyExtension(extensionName) {
     return BUNDLED_THIRD_PARTY_EXTENSIONS.has(sanitize(extensionName));
+}
+
+function getBuiltInExtensionType(extensionName) {
+    const sanitizedName = sanitize(extensionName);
+    return CORE_EXTENSIONS.has(sanitizedName) ? 'core' : 'system';
 }
 
 function rejectBundledThirdPartyExtension(extensionName, response, action) {
@@ -635,6 +662,59 @@ router.post('/version', async (request, response) => {
     }
 });
 
+router.post('/sync', async (request, response) => {
+    try {
+        if (typeof request.body.extensionName !== 'string') {
+            return response.status(400).send('Bad Request: A valid extensionName is required in the request body.');
+        }
+
+        const extensionNameSanitized = sanitize(request.body.extensionName);
+        if (!extensionNameSanitized) {
+            return response.status(400).send('Bad Request: A valid extensionName is required in the request body.');
+        }
+
+        if (!request.user.profile.admin) {
+            console.error(`User ${request.user.profile.handle} does not have permission to sync bundled extensions.`);
+            return response.status(403).send('Forbidden: No permission to sync bundled extensions.');
+        }
+
+        const syncConfig = MANUAL_SYNC_EXTENSIONS.get(extensionNameSanitized);
+        if (!syncConfig) {
+            return response.status(400).send(`Bad Request: ${extensionNameSanitized} does not support manual sync.`);
+        }
+
+        const extensionPath = path.join(PUBLIC_DIRECTORIES.extensions, extensionNameSanitized);
+        const manifest = await getManifest(extensionPath);
+        if (manifest.auto_update !== true) {
+            return response.status(400).send(`Bad Request: ${extensionNameSanitized} is not configured for manual sync.`);
+        }
+
+        const repoUrl = getManifestRepoUrl(manifest).replace(/\/$/, '');
+        if (repoUrl !== syncConfig.repo) {
+            return response.status(400).send(`Bad Request: ${extensionNameSanitized} sync source must be ${syncConfig.repo}.`);
+        }
+
+        const metadataPath = path.join(os.tmpdir(), `sillybunny-${extensionNameSanitized}-${Date.now()}.env`);
+        try {
+            const { stdout, stderr } = await execFileAsync('bash', [syncConfig.script, '--metadata-file', metadataPath], {
+                cwd: process.cwd(),
+                timeout: 5 * 60 * 1000,
+                maxBuffer: 1024 * 1024,
+            });
+
+            const metadata = fs.existsSync(metadataPath) ? fs.readFileSync(metadataPath, 'utf8') : '';
+            const version = metadata.match(/^QIG_VERSION=(.*)$/m)?.[1] || '';
+            const shortCommitHash = metadata.match(/^QIG_SHORT_COMMIT=(.*)$/m)?.[1] || '';
+            return response.send({ stdout, stderr, version, shortCommitHash });
+        } finally {
+            fs.rmSync(metadataPath, { force: true });
+        }
+    } catch (error) {
+        console.error('Syncing extension failed', error);
+        return response.status(500).send(error.stderr || error.message || 'Internal Server Error. Check the server logs for more details.');
+    }
+});
+
 /**
  * HTTP POST handler function to delete a git repository based on the extension name provided in the request body.
  *
@@ -698,7 +778,7 @@ router.get('/discover', function (request, response) {
         .readdirSync(PUBLIC_DIRECTORIES.extensions)
         .filter(f => fs.statSync(path.join(PUBLIC_DIRECTORIES.extensions, f)).isDirectory())
         .filter(f => f !== 'third-party')
-        .map(f => ({ type: 'system', name: f }));
+        .map(f => ({ type: getBuiltInExtensionType(f), name: f }));
 
     // Get all folders in local extensions folder
     const userExtensions = fs
@@ -712,7 +792,7 @@ router.get('/discover', function (request, response) {
     const globalExtensions = fs
         .readdirSync(PUBLIC_DIRECTORIES.globalExtensions)
         .filter(f => fs.statSync(path.join(PUBLIC_DIRECTORIES.globalExtensions, f)).isDirectory())
-        .map(f => ({ type: isBundledThirdPartyExtension(f) ? 'system' : 'global', name: `third-party/${f}` }))
+        .map(f => ({ type: isBundledThirdPartyExtension(f) ? 'bundled' : 'global', name: `third-party/${f}` }))
         .filter(f => !userExtensions.some(e => e.name === f.name));
 
     // Combine all extensions
