@@ -3042,11 +3042,18 @@ input[type='range']::-moz-range-thumb {
         min-width: 0;
     }
 
+    #openai_settings .reasoning-effort-wrapper,
     #openai_settings .reasoning-effort-row {
         box-sizing: border-box;
         inline-size: 100%;
+        min-inline-size: 0;
         max-inline-size: 100%;
         overflow-x: hidden;
+    }
+
+    #openai_settings .reasoning-effort-wrapper {
+        width: min(100%, 100vw) !important;
+        max-width: 100vw !important;
     }
 
     #openai_settings .reasoning-effort-row > label,
