@@ -23,6 +23,7 @@ import { power_user, registerDebugFunction } from './power-user.js';
 import { getActiveManualApiSamplers, loadApiSelectedSamplers, isSamplerManualPriorityEnabled } from './samplerSelect.js';
 import { SECRET_KEYS, writeSecret } from './secrets.js';
 import { getEventSourceStream } from './sse-stream.js';
+import { isLikelyLocalServerUrl } from './local-url-utils.js';
 import { getCurrentDreamGenModelTokenizer, getCurrentOpenRouterModelTokenizer, loadAphroditeModels, loadDreamGenModels, loadFeatherlessModels, loadGenericModels, loadInfermaticAIModels, loadLlamaCppModels, loadMancerModels, loadOllamaModels, loadOpenRouterModels, loadTabbyModels, loadTogetherAIModels, loadVllmModels, updateOpenRouterProvidersWarning } from './textgen-models.js';
 import { ENCODE_TOKENIZERS, TEXTGEN_TOKENIZERS, TOKENIZER_SUPPORTED_KEY, getTextTokens, getTokenizerBestMatch, tokenizers } from './tokenizers.js';
 import { AbortReason } from './util/AbortReason.js';
@@ -142,27 +143,9 @@ export const SERVER_INPUTS = {
 
 const KOBOLDCPP_ORDER = [6, 0, 1, 3, 4, 2, 5];
 
-function isLikelyLocalServerUrl(serverUrl) {
-    if (typeof serverUrl !== 'string' || !serverUrl.trim()) {
-        return false;
-    }
-
-    try {
-        const url = new URL(serverUrl, window.location.href);
-        const host = String(url.hostname ?? '').toLowerCase();
-        return [
-            'localhost',
-            '127.0.0.1',
-            '::1',
-        ].includes(host) || host.endsWith('.local') || /^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
-    } catch {
-        return /(^|[^\w])localhost([^\w]|$)/i.test(serverUrl) || /127\.0\.0\.1|\b10\.\d+\.\d+\.\d+\b|\b192\.168\.\d+\.\d+\b|\b172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+\b/.test(serverUrl);
-    }
-}
-
 function shouldUseLocalPromptCache(settings) {
     const serverUrl = getTextGenServer(settings?.type);
-    return isLikelyLocalServerUrl(serverUrl);
+    return isLikelyLocalServerUrl(serverUrl, window.location.href);
 }
 
 export const textgenerationwebui_settings = {

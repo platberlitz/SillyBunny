@@ -3,6 +3,7 @@ import process from 'node:process';
 import express from 'express';
 import fetch from 'node-fetch';
 import urlJoin from 'url-join';
+import { isLikelyLocalServerUrl } from '../../../public/scripts/local-url-utils.js';
 
 import {
     AIMLAPI_HEADERS,
@@ -246,24 +247,6 @@ function applyCustomReasoningParameters(bodyParams, requestBody) {
         case 'thinking_object':
             bodyParams[paramName] = { type: isEnabled ? enabledValue : disabledValue };
             break;
-    }
-}
-
-function isLikelyLocalServerUrl(serverUrl) {
-    if (typeof serverUrl !== 'string' || !serverUrl.trim()) {
-        return false;
-    }
-
-    try {
-        const url = new URL(serverUrl);
-        const host = String(url.hostname ?? '').toLowerCase();
-        return [
-            'localhost',
-            '127.0.0.1',
-            '::1',
-        ].includes(host) || host.endsWith('.local') || /^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
-    } catch {
-        return /(^|[^\w])localhost([^\w]|$)/i.test(serverUrl) || /127\.0\.0\.1|\b10\.\d+\.\d+\.\d+\b|\b192\.168\.\d+\.\d+\b|\b172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+\b/.test(serverUrl);
     }
 }
 
