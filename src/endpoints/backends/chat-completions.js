@@ -190,6 +190,12 @@ function getOpenRouterPlugins(request) {
     return plugins;
 }
 
+export function shouldIncludeOpenRouterQuantizations(requestBody) {
+    return Array.isArray(requestBody.quantizations)
+        && requestBody.quantizations.length > 0
+        && !Object.hasOwn(requestBody, 'secret_id');
+}
+
 function hasCustomReasoningParamConfig(requestBody) {
     return requestBody.chat_completion_source === CHAT_COMPLETION_SOURCES.CUSTOM
         && typeof requestBody.custom_reasoning_param_name === 'string'
@@ -2694,7 +2700,8 @@ router.post('/generate', async function (request, response) {
                 };
             }
 
-            if (Array.isArray(request.body.quantizations) && request.body.quantizations.length > 0) {
+            // Connection Manager profile requests use secret_id and may target models that reject quantizations.
+            if (shouldIncludeOpenRouterQuantizations(request.body)) {
                 bodyParams['provider'] ??= {};
                 bodyParams['provider']['quantizations'] = request.body.quantizations;
             }
