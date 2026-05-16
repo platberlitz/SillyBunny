@@ -58,6 +58,17 @@ describe('card script detection', () => {
         expect(getStoredCardScriptCount()).toBe(0);
     });
 
+    test('does not stash or mark nullish or empty message ids as message zero', () => {
+        const html = '<script>alert(1)</script>';
+
+        expect(markCardScriptHtml(html, null)).toBe(html);
+        expect(markCardScriptHtml(html, undefined)).toBe(html);
+        expect(markCardScriptHtml(html, '')).toBe(html);
+
+        expect(getCardScriptSnapshot(0)).toBeNull();
+        expect(getStoredCardScriptCount()).toBe(0);
+    });
+
     test('documents the accepted false positive for script text in code blocks', () => {
         const markdown = '```html\n<script>alert(1)</script>\n```';
         const markedHtml = markCardScriptHtml('<pre><code>&lt;script&gt;alert(1)&lt;/script&gt;</code></pre>', 10, markdown);

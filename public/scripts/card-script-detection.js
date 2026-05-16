@@ -7,6 +7,10 @@ const cardScriptSnapshots = new Map();
 const shownCardScriptToastKeys = new Set();
 
 function normalizeMessageId(messageId) {
+    if (messageId === null || messageId === undefined || messageId === '') {
+        return null;
+    }
+
     const normalized = Number(messageId);
     return Number.isInteger(normalized) && normalized >= 0 ? normalized : null;
 }
