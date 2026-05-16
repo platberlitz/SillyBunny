@@ -166,6 +166,7 @@ export async function hideChatMessageRange(start, end, unhide, nameFitler = null
     refreshSwipeButtons();
 
     await saveChatConditional();
+    await eventSource.emit(event_types.MESSAGE_UPDATED, start);
 }
 
 /**
