@@ -13,6 +13,20 @@ let extension_settings, getContext, saveSettingsDebounced, generateQuietPrompt, 
 let createGenerationParameters, getChatCompletionModel;
 let saveBase64AsFile, getSanitizedFilename, humanizedDateTime;
 
+const DEFAULT_PROXY_CHAT_IMAGE_SYSTEM_PROMPT = "You are a visual image generation assistant. Use the user's text as the image instruction and any attached images as visual references. Return the generated image in the provider's supported image format.";
+const DEFAULT_PROXY_CHAT_IMAGE_MAX_TOKENS = 16384;
+const DEFAULT_PROXY_STANDARD_CHAT_MAX_TOKENS = 4096;
+const PROXY_CHAT_IMAGE_MAX_TOKENS_MIN = 1;
+const PROXY_CHAT_IMAGE_MAX_TOKENS_MAX = 65536;
+
+const PROXY_CHAT_IMAGE_DEFAULTS = Object.freeze({
+    proxyChatImageMode: false,
+    proxyChatImageAllowImagesEndpoint: false,
+    proxyChatImageSystemPrompt: DEFAULT_PROXY_CHAT_IMAGE_SYSTEM_PROMPT,
+    proxyChatImageIncludePersonality: false,
+    proxyChatImageMaxTokens: DEFAULT_PROXY_CHAT_IMAGE_MAX_TOKENS,
+});
+
 const DEFAULT_INJECT_TAG_NAME = "image";
 const LEGACY_INJECT_PROMPT_DEFAULT = 'When describing a scene visually, include an image tag: <pic prompt="detailed visual description">\nUse this for important visual moments. The prompt should describe the scene in detail including character appearances, poses, expressions, clothing, and setting.';
 const LEGACY_INJECT_REGEX_DEFAULT = '<pic\\s+prompt="([^"]+)"\\s*/?>';
@@ -364,6 +378,8 @@ const defaultSettings = {
     proxyComfyTimeout: 300,
     proxyComfyNodeId: "",
     proxyComfyWorkflow: "",
+    // New-API / chat-completions image workflow
+    ...PROXY_CHAT_IMAGE_DEFAULTS,
     // NovelAI
     naiKey: "",
     naiModel: "nai-diffusion-4-5-curated",
@@ -1155,7 +1171,7 @@ const PROVIDER_KEYS = {
     together: ["togetherKey", "togetherModel"],
     zai: ["zaiKey", "zaiModel", "zaiQuality"],
     local: ["localUrl", "localType", "localModel", "localRefImage", "localDenoise", "a1111Model", "a1111ClipSkip", "a1111Scheduler", "a1111RestoreFaces", "a1111Tiling", "a1111Subseed", "a1111SubseedStrength", "a1111Adetailer", "a1111AdetailerModel", "a1111AdetailerPrompt", "a1111AdetailerNegative", "a1111AdetailerDenoise", "a1111AdetailerConfidence", "a1111AdetailerMaskBlur", "a1111AdetailerDilateErode", "a1111AdetailerInpaintOnlyMasked", "a1111AdetailerInpaintPadding", "a1111Adetailer2", "a1111Adetailer2Model", "a1111Adetailer2Prompt", "a1111Adetailer2Negative", "a1111Adetailer2Denoise", "a1111Adetailer2Confidence", "a1111Adetailer2MaskBlur", "a1111Adetailer2DilateErode", "a1111Adetailer2InpaintOnlyMasked", "a1111Adetailer2InpaintPadding", "a1111Loras", "a1111Vae", "a1111HiresFix", "a1111HiresUpscaler", "a1111HiresScale", "a1111HiresSteps", "a1111HiresDenoise", "a1111HiresSampler", "a1111HiresScheduler", "a1111HiresPrompt", "a1111HiresNegative", "a1111HiresResizeX", "a1111HiresResizeY", "a1111SaveToWebUI", "a1111IpAdapter", "a1111IpAdapterMode", "a1111IpAdapterWeight", "a1111IpAdapterPixelPerfect", "a1111IpAdapterResizeMode", "a1111IpAdapterControlMode", "a1111IpAdapterStartStep", "a1111IpAdapterEndStep", "a1111ControlNet", "a1111ControlNetModel", "a1111ControlNetModule", "a1111ControlNetWeight", "a1111ControlNetResizeMode", "a1111ControlNetControlMode", "a1111ControlNetPixelPerfect", "a1111ControlNetGuidanceStart", "a1111ControlNetGuidanceEnd", "a1111ControlNetImage", "comfyWorkflow", "comfyClipSkip", "comfyDenoise", "comfyScheduler", "comfyTimeout", "comfyUpscale", "comfyUpscaleModel", "comfyLoras", "comfySkipNegativePrompt", "comfyFluxClipModel1", "comfyFluxClipModel2", "comfyFluxVaeModel", "comfyFluxClipType"],
-    proxy: ["proxyUrl", "proxyKey", "proxyModel", "proxyLoras", "proxyFacefix", "proxySteps", "proxyCfg", "proxySampler", "proxySeed", "proxyExtraInstructions", "proxyRefImages", "proxyEndpointMode", "proxyPayloadMode", "proxyRefImageMode", "proxySse", "proxyTimeout", "proxyComfyMode", "proxyComfyTimeout", "proxyComfyNodeId", "proxyComfyWorkflow"]
+    proxy: ["proxyUrl", "proxyKey", "proxyModel", "proxyLoras", "proxyFacefix", "proxySteps", "proxyCfg", "proxySampler", "proxySeed", "proxyExtraInstructions", "proxyRefImages", "proxyEndpointMode", "proxyPayloadMode", "proxyRefImageMode", "proxySse", "proxyTimeout", "proxyComfyMode", "proxyComfyTimeout", "proxyComfyNodeId", "proxyComfyWorkflow", "proxyChatImageMode", "proxyChatImageAllowImagesEndpoint", "proxyChatImageSystemPrompt", "proxyChatImageIncludePersonality", "proxyChatImageMaxTokens"]
 };
 
 const PROVIDERS = {
@@ -1510,6 +1526,46 @@ function normalizeProxySseSetting(value) {
     return ["auto", "on", "off"].includes(value) ? value : "auto";
 }
 
+function getProxyChatImageEndpointMode(settings = getSettings()) {
+    if (!settings?.proxyChatImageMode) return null;
+    return settings.proxyChatImageAllowImagesEndpoint ? "auto" : "chat_completions";
+}
+
+function normalizeProxyChatImageMaxTokens(value) {
+    return Math.trunc(clampNumber(value, PROXY_CHAT_IMAGE_MAX_TOKENS_MIN, PROXY_CHAT_IMAGE_MAX_TOKENS_MAX, DEFAULT_PROXY_CHAT_IMAGE_MAX_TOKENS));
+}
+
+function normalizeProxyChatImageSettings(target, source = target) {
+    if (!target || typeof target !== "object") return target;
+    const sourceSettings = source && typeof source === "object" ? source : target;
+    const hasOwn = (key) => Object.prototype.hasOwnProperty.call(sourceSettings, key);
+
+    target.proxyChatImageMode = hasOwn("proxyChatImageMode")
+        ? !!sourceSettings.proxyChatImageMode
+        : PROXY_CHAT_IMAGE_DEFAULTS.proxyChatImageMode;
+    target.proxyChatImageAllowImagesEndpoint = hasOwn("proxyChatImageAllowImagesEndpoint")
+        ? !!sourceSettings.proxyChatImageAllowImagesEndpoint
+        : PROXY_CHAT_IMAGE_DEFAULTS.proxyChatImageAllowImagesEndpoint;
+    target.proxyChatImageIncludePersonality = hasOwn("proxyChatImageIncludePersonality")
+        ? !!sourceSettings.proxyChatImageIncludePersonality
+        : PROXY_CHAT_IMAGE_DEFAULTS.proxyChatImageIncludePersonality;
+    target.proxyChatImageSystemPrompt = String(
+        hasOwn("proxyChatImageSystemPrompt")
+            ? sourceSettings.proxyChatImageSystemPrompt
+            : PROXY_CHAT_IMAGE_DEFAULTS.proxyChatImageSystemPrompt,
+    ).trim() || DEFAULT_PROXY_CHAT_IMAGE_SYSTEM_PROMPT;
+    target.proxyChatImageMaxTokens = normalizeProxyChatImageMaxTokens(
+        hasOwn("proxyChatImageMaxTokens")
+            ? sourceSettings.proxyChatImageMaxTokens
+            : PROXY_CHAT_IMAGE_DEFAULTS.proxyChatImageMaxTokens,
+    );
+
+    if (target.proxyChatImageMode && !target.proxyChatImageAllowImagesEndpoint) {
+        target.proxyEndpointMode = "chat_completions";
+    }
+    return target;
+}
+
 function inferProxyEndpointMode(proxyUrl) {
     const trimmed = String(proxyUrl || "").trim().replace(/\/$/, "");
     if (/\/chat\/completions$/i.test(trimmed)) return "chat_completions";
@@ -1519,6 +1575,8 @@ function inferProxyEndpointMode(proxyUrl) {
 }
 
 function resolveProxyEndpointMode(proxyUrl, settings) {
+    const chatImageMode = getProxyChatImageEndpointMode(settings);
+    if (chatImageMode === "chat_completions") return "chat_completions";
     const configured = normalizeProxyEndpointSetting(settings?.proxyEndpointMode);
     return configured === "auto" ? inferProxyEndpointMode(proxyUrl) : configured;
 }
@@ -1724,10 +1782,19 @@ function buildProxyChatPayload(prompt, negative, s, refImages, payloadMode, prox
         : `Generate an image: ${promptText}`;
     content.push({ type: "text", text: `${textPrompt}${negPrompt}${extraInstr}` });
 
+    const messages = [];
+    if (s.proxyChatImageMode) {
+        const systemPrompt = buildProxyChatImageSystemPrompt(s, getContext?.());
+        if (systemPrompt) {
+            messages.push({ role: "system", content: systemPrompt });
+        }
+    }
+    messages.push({ role: "user", content });
+
     const payload = {
         model: s.proxyModel,
-        messages: [{ role: "user", content }],
-        max_tokens: 4096,
+        messages,
+        max_tokens: getProxyChatMaxTokens(s),
     };
 
     if (payloadMode !== "openai_strict") {
@@ -1746,6 +1813,10 @@ function buildProxyChatPayload(prompt, negative, s, refImages, payloadMode, prox
         payload.response_modalities = ["TEXT", "IMAGE"];
         payload.generationConfig = { responseModalities: ["TEXT", "IMAGE"] };
         log("Gemini image model detected, adding responseModalities");
+    }
+
+    if (s.proxyChatImageMode) {
+        log(`New-API Chat Image payload: messages=${messages.length}, refs=${allRefImages.length}, max_tokens=${payload.max_tokens}`);
     }
 
     return payload;
@@ -1949,21 +2020,140 @@ function parseIntOr(value, fallback) {
     return Number.isFinite(n) ? n : fallback;
 }
 
+function clampNumber(value, min, max, fallback) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(min, Math.min(max, n));
+}
+
 function isComfyFluxMode(s) {
     return !!s?.comfySkipNegativePrompt && !!(s?.comfyFluxClipModel1 || "").trim();
 }
 
+const QIG_RELAY_BASE = "/api/plugins/quick-image-gen-relay";
+const CORS_PROXY_BASIC_AUTH_MESSAGE = "SillyTavern basicAuthMode is blocking the CORS proxy for requests that need their own Authorization header. Install the optional Quick Image Gen server plugin (see README), or disable basicAuthMode to use CivitAI/Replicate.";
+
+class CorsProxyBasicAuthError extends Error {
+    constructor(url) {
+        super(CORS_PROXY_BASIC_AUTH_MESSAGE);
+        this.name = "CorsProxyBasicAuthError";
+        this.url = url;
+    }
+}
+
+function isBasicAuthChallenge(header) {
+    return /(^|\s|,)Basic\b/i.test(header || "");
+}
+
+function hasAuthorizationHeader(headers) {
+    if (!headers) return false;
+    if (headers instanceof Headers) return headers.has("Authorization");
+    if (Array.isArray(headers)) return headers.some(([key]) => String(key).toLowerCase() === "authorization");
+    return Object.keys(headers).some(key => key.toLowerCase() === "authorization");
+}
+
+function getSameOriginHeaders() {
+    const headers = typeof getRequestHeaders === 'function' ? { ...getRequestHeaders() } : {};
+    delete headers.Authorization;
+    delete headers.authorization;
+    return headers;
+}
+
+function getSameOriginJsonHeaders() {
+    return { ...getSameOriginHeaders(), "Content-Type": "application/json" };
+}
+
+let _qigRelayState = 0; // 0=unknown, 1=available, -1=unavailable
+async function qigRelayAvailable(signal) {
+    if (_qigRelayState !== 0) return _qigRelayState === 1;
+    try {
+        const res = await fetch(`${QIG_RELAY_BASE}/healthz`, {
+            method: "GET",
+            headers: getSameOriginHeaders(),
+            credentials: "same-origin",
+            signal,
+        });
+        _qigRelayState = res.ok ? 1 : -1;
+        return res.ok;
+    } catch (e) {
+        if (e?.name === 'AbortError') throw e;
+        _qigRelayState = -1;
+        return false;
+    }
+}
+
+async function qigRelayFetch(provider, payload, signal) {
+    return fetch(`${QIG_RELAY_BASE}/${provider}`, {
+        method: "POST",
+        headers: getSameOriginJsonHeaders(),
+        body: JSON.stringify(payload),
+        credentials: "same-origin",
+        signal,
+    });
+}
+
+async function civitaiFetch(action, payload, signal) {
+    if (await qigRelayAvailable(signal)) {
+        return qigRelayFetch("civitai", { action, ...payload }, signal);
+    }
+    if (action === "createJob") {
+        return corsFetch("https://civitai.com/api/v1/consumer/jobs", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${payload.apiKey}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload.body),
+            signal,
+        });
+    }
+    if (action === "getJobs") {
+        const url = new URL("https://civitai.com/api/v1/consumer/jobs");
+        url.searchParams.set("token", payload.token);
+        return corsFetch(url.toString(), {
+            headers: { "Authorization": `Bearer ${payload.apiKey}` },
+            signal,
+        });
+    }
+    throw new Error(`Unknown CivitAI relay action: ${action}`);
+}
+
+async function replicateFetch(action, payload, signal) {
+    if (await qigRelayAvailable(signal)) {
+        return qigRelayFetch("replicate", { action, ...payload }, signal);
+    }
+    if (action === "createPrediction") {
+        return corsFetch("https://api.replicate.com/v1/predictions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Token ${payload.apiKey}`,
+            },
+            body: JSON.stringify(payload.body),
+            signal,
+        });
+    }
+    if (action === "getPrediction") {
+        return corsFetch(`https://api.replicate.com/v1/predictions/${encodeURIComponent(payload.id)}`, {
+            headers: { "Authorization": `Token ${payload.apiKey}` },
+            signal,
+        });
+    }
+    throw new Error(`Unknown Replicate relay action: ${action}`);
+}
+
 // CORS-aware fetch: tries direct, falls back to ST's /proxy/ endpoint
-let _corsProxyState = 0; // 0=unknown, 1=direct works, 2=proxy works, -1=proxy disabled
+let _corsProxyState = 0; // 0=unknown, 1=direct works, 2=proxy works, -1=proxy disabled, -2=blocked by basicAuth
 async function corsFetch(url, opts = {}) {
     const crossOrigin = (() => {
         try { return new URL(url).origin !== location.origin; } catch { return true; }
     })();
+    const requestHasOwnAuthorization = hasAuthorizationHeader(opts.headers);
     // Prefer direct fetch; only skip direct cross-origin when proxy has already been proven required.
     if (!crossOrigin || _corsProxyState !== 2) {
         try {
             const res = await fetch(url, opts);
-            if (crossOrigin) _corsProxyState = 1;
+            if (crossOrigin && _corsProxyState !== -2) _corsProxyState = 1;
             return res;
         } catch (e) {
             if (e.name === 'AbortError') throw e;
@@ -1971,6 +2161,9 @@ async function corsFetch(url, opts = {}) {
             if (!crossOrigin) throw e;
             // TypeError on cross-origin usually means CORS/network failure, try proxy.
         }
+    }
+    if (_corsProxyState === -2 && requestHasOwnAuthorization) {
+        throw new CorsProxyBasicAuthError(url);
     }
     if (_corsProxyState === -1) {
         throw new TypeError(`Cannot reach ${url} (CORS). Enable enableCorsProxy in SillyTavern config.yaml or launch A1111 with --cors-allow-origins=*`);
@@ -1980,6 +2173,11 @@ async function corsFetch(url, opts = {}) {
     const stHeaders = typeof getRequestHeaders === 'function' ? getRequestHeaders() : {};
     const mergedHeaders = { ...stHeaders, ...opts.headers };
     const res = await fetch(proxyUrl, { ...opts, headers: mergedHeaders });
+    if (requestHasOwnAuthorization && res.status === 401 && isBasicAuthChallenge(res.headers.get("www-authenticate"))) {
+        _corsProxyState = -2;
+        await res.text().catch(() => {});
+        throw new CorsProxyBasicAuthError(url);
+    }
     if (res.status === 404) {
         const text = await res.text();
         if (text.includes('CORS proxy is disabled')) {
@@ -2421,7 +2619,9 @@ async function loadSettings() {
     }
     if (!s.injectRegex) s.injectRegex = buildDefaultInjectRegex(savedTagName);
     if (!s.injectPrompt) s.injectPrompt = buildDefaultInjectPrompt(savedTagName);
+    normalizeProxyChatImageSettings(s, saved);
     s.proxyEndpointMode = normalizeProxyEndpointSetting(s.proxyEndpointMode);
+    normalizeProxyChatImageSettings(s, s);
     s.proxyPayloadMode = normalizeProxyPayloadSetting(s.proxyPayloadMode);
     s.proxyRefImageMode = normalizeProxyRefImageSetting(s.proxyRefImageMode);
     s.proxySse = normalizeProxySseSetting(s.proxySse);
@@ -2475,7 +2675,15 @@ async function loadSettings() {
         log(`Restored ${restoredCount} preset store(s) from server backup`);
         toastr?.info?.(`Restored ${restoredCount} setting(s) from server backup (localStorage was empty)`);
     }
+    const normalizedPresets = normalizeGenerationPresetStore(generationPresets);
     ensureGenerationPresetIds({ persist: true });
+    if (normalizedPresets) {
+        saveGenerationPresetStore("Failed to migrate chat-image preset settings. Browser storage may be full.");
+    }
+    if (normalizeProxyProfileStore(connectionProfiles)) {
+        safeSetStorage("qig_profiles", JSON.stringify(connectionProfiles), "Failed to migrate chat-image profiles. Browser storage may be full.");
+        backupToSettings("qig_profiles", connectionProfiles);
+    }
     syncActiveGenerationPresetSetting({ persist: true });
     ensureFilterPoolsState({ persist: true });
     migrateLegacyReplacementStores(s);
@@ -3309,6 +3517,98 @@ function resolveContextualFilterText(value) {
         charName: profile.charNameJoined,
         userName: profile.userName,
     }).trim();
+}
+
+function buildProxyChatImagePersonalityContext(ctx = getContext()) {
+    const profile = resolveLLMPromptProfileContext(ctx);
+    const lines = [];
+    if (profile.charNameJoined) {
+        lines.push(`Active character(s): ${profile.charNameJoined}`);
+    }
+    if (profile.charDescResolved) {
+        lines.push(`Character description:\n${truncateForContext(profile.charDescResolved, 2200)}`);
+    }
+    if (profile.charScenarioResolved) {
+        lines.push(`Scenario:\n${truncateForContext(profile.charScenarioResolved, 900)}`);
+    }
+    if (profile.charTagsResolved) {
+        lines.push(`Character tags: ${truncateForContext(profile.charTagsResolved, 600)}`);
+    }
+    if (profile.userDescResolved) {
+        lines.push(`${profile.userName || "User"} persona:\n${truncateForContext(profile.userDescResolved, 700)}`);
+    }
+    return lines.join("\n\n").trim();
+}
+
+function buildProxyChatImageSystemPrompt(settings = getSettings(), ctx = getContext()) {
+    const base = String(settings?.proxyChatImageSystemPrompt || DEFAULT_PROXY_CHAT_IMAGE_SYSTEM_PROMPT).trim();
+    if (!settings?.proxyChatImageIncludePersonality) return base;
+    const personality = buildProxyChatImagePersonalityContext(ctx || getContext());
+    if (!personality) return base;
+    return [base, "Use this chat personality context when it helps preserve identity, tone, outfit, and scene continuity:", personality]
+        .filter(Boolean)
+        .join("\n\n");
+}
+
+function getProxyChatMaxTokens(settings = getSettings()) {
+    if (!settings?.proxyChatImageMode) return DEFAULT_PROXY_STANDARD_CHAT_MAX_TOKENS;
+    return normalizeProxyChatImageMaxTokens(settings?.proxyChatImageMaxTokens);
+}
+
+function shouldAutoInsertChatImageAsAssistant(settings = getSettings()) {
+    return settings?.provider === "proxy" && !!settings.proxyChatImageMode && !!settings.autoInsert;
+}
+
+function applyProxyChatImageSimpleMode({ persist = true, notify = true } = {}) {
+    const s = getSettings();
+    Object.assign(s, {
+        provider: "proxy",
+        proxyChatImageMode: true,
+        proxyChatImageAllowImagesEndpoint: false,
+        proxyEndpointMode: "chat_completions",
+        proxyPayloadMode: "openai_strict",
+        proxyRefImageMode: "inline_or_url",
+        proxySse: "off",
+        proxyTimeout: Math.max(600, parseIntOr(s.proxyTimeout, 600)),
+        proxyComfyMode: false,
+        useLastMessage: true,
+        messageRange: "-1",
+        useLLMPrompt: false,
+        appendQuality: false,
+        style: "none",
+        batchCount: 1,
+        sequentialSeeds: false,
+        autoInsert: true,
+        outputMode: "inline",
+        manualInsertTarget: "assistant",
+    });
+    if (!String(s.proxyChatImageSystemPrompt || "").trim()) {
+        s.proxyChatImageSystemPrompt = DEFAULT_PROXY_CHAT_IMAGE_SYSTEM_PROMPT;
+    }
+    s.proxyChatImageMaxTokens = DEFAULT_PROXY_CHAT_IMAGE_MAX_TOKENS;
+    s.proxyChatImageMaxTokens = getProxyChatMaxTokens(s);
+    if (persist) saveSettingsDebounced?.();
+    if (notify) toastr?.success?.("Configured New-API Chat Image mode");
+    refreshAllUI?.(s);
+    return s;
+}
+
+function setProxyChatImageCheckboxMode(enabled) {
+    const s = getSettings();
+    s.proxyChatImageMode = !!enabled;
+    if (s.proxyChatImageMode) {
+        if (!String(s.proxyChatImageSystemPrompt || "").trim()) {
+            s.proxyChatImageSystemPrompt = DEFAULT_PROXY_CHAT_IMAGE_SYSTEM_PROMPT;
+        }
+        s.proxyChatImageMaxTokens = normalizeProxyChatImageMaxTokens(s.proxyChatImageMaxTokens);
+        s.proxyChatImageAllowImagesEndpoint = false;
+        s.proxyEndpointMode = "chat_completions";
+    }
+    normalizeProxyChatImageSettings(s, s);
+    saveSettingsDebounced?.();
+    refreshAllUI?.(s);
+    updateProxyCompatibilityUI?.();
+    return s;
 }
 
 function resolveContextualFilter(filter) {
@@ -5458,15 +5758,10 @@ async function genCivitAI(prompt, negative, s, signal) {
     };
     if (additionalNetworks) input.additionalNetworks = additionalNetworks;
 
-    const res = await fetch("https://civitai.com/api/v1/consumer/jobs", {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${s.civitaiKey}`,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ $type: "textToImage", input }),
-        signal
-    });
+    const res = await civitaiFetch("createJob", {
+        apiKey: s.civitaiKey,
+        body: { $type: "textToImage", input },
+    }, signal);
     if (!res.ok) {
         const errText = await res.text();
         throw new Error(`CivitAI error: ${res.status} - ${errText}`);
@@ -5481,10 +5776,10 @@ async function genCivitAI(prompt, negative, s, signal) {
     for (let i = 0; i < 60; i++) {
         if (signal?.aborted) throw new DOMException("Generation cancelled", "AbortError");
         await new Promise(r => setTimeout(r, 2000));
-        const statusRes = await fetch(`https://civitai.com/api/v1/consumer/jobs?token=${jobToken}`, {
-            headers: { "Authorization": `Bearer ${s.civitaiKey}` },
-            signal
-        });
+        const statusRes = await civitaiFetch("getJobs", {
+            apiKey: s.civitaiKey,
+            token: jobToken,
+        }, signal);
         if (!statusRes.ok) {
             lastError = `Status error: ${statusRes.status}`;
             continue;
@@ -7571,13 +7866,9 @@ async function genReplicate(prompt, negative, s, signal) {
     const version = s.replicateModel || "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b";
 
     // Create prediction
-    const res = await fetch("https://api.replicate.com/v1/predictions", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Token ${s.replicateKey}`
-        },
-        body: JSON.stringify({
+    const res = await replicateFetch("createPrediction", {
+        apiKey: s.replicateKey,
+        body: {
             version: version,
             input: {
                 prompt: prompt,
@@ -7598,9 +7889,8 @@ async function genReplicate(prompt, negative, s, signal) {
                     "heun": "K_HEUN"
                 })[s.sampler] || "K_EULER"
             }
-        }),
-        signal
-    });
+        },
+    }, signal);
     if (!res.ok) throw new Error(`Replicate error: ${res.status}`);
     const pred = await res.json();
 
@@ -7608,10 +7898,10 @@ async function genReplicate(prompt, negative, s, signal) {
     for (let i = 0; i < 60; i++) {
         if (signal?.aborted) throw new DOMException("Generation cancelled", "AbortError");
         await new Promise(r => setTimeout(r, 2000));
-        const statusRes = await fetch(`https://api.replicate.com/v1/predictions/${pred.id}`, {
-            headers: { "Authorization": `Token ${s.replicateKey}` },
-            signal
-        });
+        const statusRes = await replicateFetch("getPrediction", {
+            apiKey: s.replicateKey,
+            id: pred.id,
+        }, signal);
         if (!statusRes.ok) throw new Error(`Replicate polling error: ${statusRes.status}`);
         const status = await statusRes.json();
         if (status.status === "succeeded") {
@@ -9612,6 +9902,11 @@ function loadConnectionProfile(name) {
     const profile = connectionProfiles[provider]?.[name];
     if (!profile) return;
     Object.assign(s, profile);
+    if (provider === "proxy") {
+        normalizeProxyChatImageSettings(s, profile);
+        s.proxyEndpointMode = normalizeProxyEndpointSetting(s.proxyEndpointMode);
+        normalizeProxyChatImageSettings(s, s);
+    }
     saveSettingsDebounced();
     refreshProviderInputs(provider);
     renderProfileSelect(name);
@@ -9778,7 +10073,7 @@ function deleteSelectedComfyWorkflowPreset() {
 }
 
 // === Generation Presets ===
-const PRESET_KEYS = ["provider", "style", "width", "height", "steps", "cfgScale", "sampler", "seed", "prompt", "negativePrompt", "qualityTags", "appendQuality", "useLastMessage", "useLLMPrompt", "llmPromptStyle", "llmPrefill", "llmCustomInstruction", "batchCount", "sequentialSeeds", "a1111Scheduler", "comfyScheduler", "a1111RestoreFaces", "a1111Tiling", "a1111Subseed", "a1111SubseedStrength", "proxyEndpointMode", "proxyPayloadMode", "proxyRefImageMode", "proxySse"];
+const PRESET_KEYS = ["provider", "style", "width", "height", "steps", "cfgScale", "sampler", "seed", "prompt", "negativePrompt", "qualityTags", "appendQuality", "useLastMessage", "useLLMPrompt", "llmPromptStyle", "llmPrefill", "llmCustomInstruction", "batchCount", "sequentialSeeds", "a1111Scheduler", "comfyScheduler", "a1111RestoreFaces", "a1111Tiling", "a1111Subseed", "a1111SubseedStrength", "proxyEndpointMode", "proxyPayloadMode", "proxyRefImageMode", "proxySse", "proxyChatImageMode", "proxyChatImageAllowImagesEndpoint", "proxyChatImageSystemPrompt", "proxyChatImageIncludePersonality", "proxyChatImageMaxTokens"];
 
 function saveGenerationPresetStore(errorMessage = "Failed to save preset. Browser storage may be full.") {
     if (!safeSetStorage("qig_gen_presets", JSON.stringify(generationPresets), errorMessage)) return false;
@@ -9818,6 +10113,65 @@ function syncActiveGenerationPresetSetting({ persist = false } = {}) {
     if (persist) saveSettingsDebounced();
 }
 
+function normalizeGenerationPresetStore(presets = generationPresets) {
+    if (!Array.isArray(presets)) return false;
+    let changed = false;
+    for (const preset of presets) {
+        if (!preset || typeof preset !== "object") continue;
+        const before = JSON.stringify([
+            preset.proxyChatImageMode,
+            preset.proxyChatImageAllowImagesEndpoint,
+            preset.proxyChatImageSystemPrompt,
+            preset.proxyChatImageIncludePersonality,
+            preset.proxyChatImageMaxTokens,
+            preset.proxyEndpointMode,
+        ]);
+        normalizeProxyChatImageSettings(preset, preset);
+        preset.proxyEndpointMode = normalizeProxyEndpointSetting(preset.proxyEndpointMode);
+        normalizeProxyChatImageSettings(preset, preset);
+        const after = JSON.stringify([
+            preset.proxyChatImageMode,
+            preset.proxyChatImageAllowImagesEndpoint,
+            preset.proxyChatImageSystemPrompt,
+            preset.proxyChatImageIncludePersonality,
+            preset.proxyChatImageMaxTokens,
+            preset.proxyEndpointMode,
+        ]);
+        if (before !== after) changed = true;
+    }
+    return changed;
+}
+
+function normalizeProxyProfileStore(profiles = connectionProfiles) {
+    const proxyProfiles = profiles?.proxy;
+    if (!proxyProfiles || typeof proxyProfiles !== "object") return false;
+    let changed = false;
+    for (const profile of Object.values(proxyProfiles)) {
+        if (!profile || typeof profile !== "object") continue;
+        const before = JSON.stringify([
+            profile.proxyChatImageMode,
+            profile.proxyChatImageAllowImagesEndpoint,
+            profile.proxyChatImageSystemPrompt,
+            profile.proxyChatImageIncludePersonality,
+            profile.proxyChatImageMaxTokens,
+            profile.proxyEndpointMode,
+        ]);
+        normalizeProxyChatImageSettings(profile, profile);
+        profile.proxyEndpointMode = normalizeProxyEndpointSetting(profile.proxyEndpointMode);
+        normalizeProxyChatImageSettings(profile, profile);
+        const after = JSON.stringify([
+            profile.proxyChatImageMode,
+            profile.proxyChatImageAllowImagesEndpoint,
+            profile.proxyChatImageSystemPrompt,
+            profile.proxyChatImageIncludePersonality,
+            profile.proxyChatImageMaxTokens,
+            profile.proxyEndpointMode,
+        ]);
+        if (before !== after) changed = true;
+    }
+    return changed;
+}
+
 function setActiveGenerationPresetId(presetId = "", { persist = true } = {}) {
     const s = getSettings();
     if (!s) return;
@@ -9854,6 +10208,9 @@ function loadPreset(i) {
     if (!p) return;
     const s = getSettings();
     PRESET_KEYS.forEach(k => { if (p[k] !== undefined) s[k] = p[k]; });
+    normalizeProxyChatImageSettings(s, p);
+    s.proxyEndpointMode = normalizeProxyEndpointSetting(s.proxyEndpointMode);
+    normalizeProxyChatImageSettings(s, s);
     ensureFilterPoolsState();
     renderContextualFilters();
     // Restore ST Style toggle
@@ -9954,7 +10311,9 @@ function refreshAllUI(s) {
         "qig-inject-tag-name": "injectTagName",
         "qig-inject-prompt": "injectPrompt", "qig-inject-regex": "injectRegex",
         "qig-inject-position": "injectPosition", "qig-inject-depth": "injectDepth",
-        "qig-inject-insert-mode": "injectInsertMode"
+        "qig-inject-insert-mode": "injectInsertMode",
+        "qig-proxy-chat-system": "proxyChatImageSystemPrompt",
+        "qig-proxy-chat-max-tokens": "proxyChatImageMaxTokens"
     };
     Object.entries(fields).forEach(([id, key]) => {
         const el = document.getElementById(id);
@@ -9964,7 +10323,9 @@ function refreshAllUI(s) {
         "qig-append-quality": "appendQuality", "qig-use-last": "useLastMessage",
         "qig-use-llm": "useLLMPrompt", "qig-seq-seeds": "sequentialSeeds",
         "qig-use-st-style": "useSTStyle", "qig-inject-enabled": "injectEnabled",
-        "qig-inject-autoclean": "injectAutoClean"
+        "qig-inject-autoclean": "injectAutoClean", "qig-proxy-chat-mode": "proxyChatImageMode",
+        "qig-proxy-chat-allow-images": "proxyChatImageAllowImagesEndpoint",
+        "qig-proxy-chat-personality": "proxyChatImageIncludePersonality"
     };
     Object.entries(checks).forEach(([id, key]) => {
         const el = document.getElementById(id);
@@ -10031,6 +10392,7 @@ function importSettings() {
             if (!confirm(`Import settings from ${data.exportDate || 'unknown date'}? This will overwrite current settings.`)) return;
             if (data.connectionProfiles) {
                 connectionProfiles = data.connectionProfiles;
+                normalizeProxyProfileStore(connectionProfiles);
                 if (!safeSetStorage("qig_profiles", JSON.stringify(connectionProfiles))) throw new Error("Could not save imported profiles. Browser storage may be full.");
                 backupToSettings("qig_profiles", connectionProfiles);
             }
@@ -10042,6 +10404,7 @@ function importSettings() {
             if (data.generationPresets) {
                 generationPresets = data.generationPresets;
                 ensureGenerationPresetIds();
+                normalizeGenerationPresetStore(generationPresets);
                 if (!saveGenerationPresetStore("Could not save imported presets. Browser storage may be full.")) throw new Error("Could not save imported presets. Browser storage may be full.");
             }
             if (data.charSettings) {
@@ -10126,7 +10489,7 @@ function syncA1111VisibilityFromSettings(s) {
     if (controlnetOpts) controlnetOpts.style.display = s.a1111ControlNet ? "block" : "none";
 }
 
-function refreshProviderInputs(provider) {
+function refreshProviderInputs(provider, { updateProviderVisibility = true } = {}) {
     const s = getSettings();
     const map = {
         pollinations: [["qig-pollinations-model", "pollinationsModel"]],
@@ -10219,7 +10582,7 @@ function refreshProviderInputs(provider) {
             ["qig-comfy-flux-vae", "comfyFluxVaeModel"],
             ["qig-comfy-flux-clip-type", "comfyFluxClipType"]
         ],
-        proxy: [["qig-proxy-url", "proxyUrl"], ["qig-proxy-key", "proxyKey"], ["qig-proxy-model", "proxyModel"], ["qig-proxy-timeout", "proxyTimeout"], ["qig-proxy-endpoint-mode", "proxyEndpointMode"], ["qig-proxy-payload-mode", "proxyPayloadMode"], ["qig-proxy-ref-mode", "proxyRefImageMode"], ["qig-proxy-sse-mode", "proxySse"], ["qig-proxy-loras", "proxyLoras"], ["qig-proxy-steps", "proxySteps"], ["qig-proxy-cfg", "proxyCfg"], ["qig-proxy-sampler", "proxySampler"], ["qig-proxy-seed", "proxySeed"], ["qig-proxy-extra", "proxyExtraInstructions"], ["qig-proxy-facefix", "proxyFacefix"], ["qig-proxy-comfy-mode", "proxyComfyMode"], ["qig-proxy-comfy-timeout", "proxyComfyTimeout"], ["qig-proxy-comfy-node-id", "proxyComfyNodeId"], ["qig-proxy-comfy-workflow", "proxyComfyWorkflow"]]
+        proxy: [["qig-proxy-url", "proxyUrl"], ["qig-proxy-key", "proxyKey"], ["qig-proxy-model", "proxyModel"], ["qig-proxy-timeout", "proxyTimeout"], ["qig-proxy-endpoint-mode", "proxyEndpointMode"], ["qig-proxy-payload-mode", "proxyPayloadMode"], ["qig-proxy-ref-mode", "proxyRefImageMode"], ["qig-proxy-sse-mode", "proxySse"], ["qig-proxy-loras", "proxyLoras"], ["qig-proxy-steps", "proxySteps"], ["qig-proxy-cfg", "proxyCfg"], ["qig-proxy-sampler", "proxySampler"], ["qig-proxy-seed", "proxySeed"], ["qig-proxy-extra", "proxyExtraInstructions"], ["qig-proxy-facefix", "proxyFacefix"], ["qig-proxy-chat-mode", "proxyChatImageMode"], ["qig-proxy-chat-allow-images", "proxyChatImageAllowImagesEndpoint"], ["qig-proxy-chat-system", "proxyChatImageSystemPrompt"], ["qig-proxy-chat-personality", "proxyChatImageIncludePersonality"], ["qig-proxy-chat-max-tokens", "proxyChatImageMaxTokens"], ["qig-proxy-comfy-mode", "proxyComfyMode"], ["qig-proxy-comfy-timeout", "proxyComfyTimeout"], ["qig-proxy-comfy-node-id", "proxyComfyNodeId"], ["qig-proxy-comfy-workflow", "proxyComfyWorkflow"]]
     };
     (map[provider] || []).forEach(([id, key]) => {
         const el = document.getElementById(id);
@@ -10243,23 +10606,31 @@ function refreshProviderInputs(provider) {
 
     // Update reference images display
     if (provider === "proxy") {
+        normalizeProxyChatImageSettings(s, s);
         s.proxyEndpointMode = normalizeProxyEndpointSetting(s.proxyEndpointMode);
+        normalizeProxyChatImageSettings(s, s);
         s.proxyPayloadMode = normalizeProxyPayloadSetting(s.proxyPayloadMode);
         s.proxyRefImageMode = normalizeProxyRefImageSetting(s.proxyRefImageMode);
         s.proxySse = normalizeProxySseSetting(s.proxySse);
-        ["qig-proxy-endpoint-mode", "qig-proxy-payload-mode", "qig-proxy-ref-mode", "qig-proxy-sse-mode"].forEach((id) => {
+        ["qig-proxy-endpoint-mode", "qig-proxy-payload-mode", "qig-proxy-ref-mode", "qig-proxy-sse-mode", "qig-proxy-chat-mode", "qig-proxy-chat-allow-images", "qig-proxy-chat-personality", "qig-proxy-chat-system", "qig-proxy-chat-max-tokens"].forEach((id) => {
             const el = document.getElementById(id);
             if (!el) return;
             if (id === "qig-proxy-endpoint-mode") el.value = s.proxyEndpointMode;
             if (id === "qig-proxy-payload-mode") el.value = s.proxyPayloadMode;
             if (id === "qig-proxy-ref-mode") el.value = s.proxyRefImageMode;
             if (id === "qig-proxy-sse-mode") el.value = s.proxySse;
+            if (id === "qig-proxy-chat-system") el.value = s.proxyChatImageSystemPrompt || DEFAULT_PROXY_CHAT_IMAGE_SYSTEM_PROMPT;
+            if (id === "qig-proxy-chat-max-tokens") el.value = getProxyChatMaxTokens(s);
+            if (id === "qig-proxy-chat-mode") el.checked = !!s.proxyChatImageMode;
+            if (id === "qig-proxy-chat-allow-images") el.checked = !!s.proxyChatImageAllowImagesEndpoint;
+            if (id === "qig-proxy-chat-personality") el.checked = !!s.proxyChatImageIncludePersonality;
         });
         renderRefImages();
         updateProxyCompatibilityUI();
     }
     if (provider === "nanobanana") renderNanobananaRefImages();
     if (provider === "nanogpt") renderNanogptRefImages();
+    if (updateProviderVisibility) updateProviderUI();
 }
 
 function updateProviderUI() {
@@ -10312,6 +10683,20 @@ function updateProxyCompatibilityUI() {
     const stdOpts = document.getElementById("qig-proxy-standard-opts");
     if (comfyOpts) comfyOpts.style.display = s.proxyComfyMode ? "block" : "none";
     if (stdOpts) stdOpts.style.display = s.proxyComfyMode ? "none" : "block";
+
+    const chatMode = !!s.proxyChatImageMode;
+    const chatPanel = getOrCacheElement("qig-proxy-chat-image-panel");
+    const chatRouteStatus = getOrCacheElement("qig-proxy-chat-route-status");
+    const endpointModeEl = getOrCacheElement("qig-proxy-endpoint-mode");
+    if (chatPanel) chatPanel.style.display = chatMode ? "block" : "none";
+    if (endpointModeEl) endpointModeEl.disabled = chatMode && !s.proxyChatImageAllowImagesEndpoint;
+    if (chatRouteStatus) {
+        chatRouteStatus.textContent = chatMode
+            ? (s.proxyChatImageAllowImagesEndpoint
+                ? "Route permission is on: Auto may use /images/generations when the URL implies it."
+                : "Route permission is off: QIG will use chat/completions for this mode.")
+            : "Simple mode is off. Endpoint routing follows the Advanced selector.";
+    }
 
     const isUrlOnly = normalizeProxyRefImageSetting(s.proxyRefImageMode) === "url_only";
     const invalidRefCount = (s.proxyRefImages || []).filter(img => typeof img === "string" && img.trim() && !isHttpUrl(img)).length;
@@ -11175,6 +11560,40 @@ function createUI() {
                     <input id="qig-proxy-url" type="text" value="${esc(s.proxyUrl)}" placeholder="https://proxy.com/v1">
                     <label>API Key (optional)</label>
                     <input id="qig-proxy-key" type="password" value="${esc(s.proxyKey)}">
+                    <div class="qig-provider-ready">
+                        <div>
+                            <strong>New-API Chat Image mode</strong>
+                            <small>Simple path for providers that generate images through chat/completions. Uses the latest chat message text and attached images.</small>
+                        </div>
+                        <label class="checkbox_label qig-inline-checkbox">
+                            <input id="qig-proxy-chat-mode" type="checkbox" ${s.proxyChatImageMode ? "checked" : ""}>
+                            <span>Enable</span>
+                        </label>
+                    </div>
+                    <div id="qig-proxy-chat-image-panel" class="qig-dependent-panel" style="display:${s.proxyChatImageMode ? "block" : "none"}">
+                        <div class="qig-action-strip">
+                            <button id="qig-proxy-chat-setup" class="menu_button qig-inline-action" title="Apply the recommended New-API chat image defaults"><span class="fa-solid fa-bolt"></span><span>Apply Chat Image Defaults</span></button>
+                        </div>
+                        <label>Personality / System Prompt</label>
+                        <textarea id="qig-proxy-chat-system" rows="3" placeholder="Tell the image model how to behave in chat-image mode.">${esc(s.proxyChatImageSystemPrompt || DEFAULT_PROXY_CHAT_IMAGE_SYSTEM_PROMPT)}</textarea>
+                        <label class="checkbox_label qig-switch-row">
+                            <input id="qig-proxy-chat-personality" type="checkbox" ${s.proxyChatImageIncludePersonality ? "checked" : ""}>
+                            <span>Append active chat character and persona context</span>
+                        </label>
+                        <small class="qig-muted">Keep this off for predictable provider calls. Turn it on when the image model should preserve the current character card and persona details.</small>
+                        <div class="qig-row">
+                            <div>
+                                <label>Max Tokens</label>
+                                <input id="qig-proxy-chat-max-tokens" type="number" value="${esc(getProxyChatMaxTokens(s))}" min="1" max="65536" step="256">
+                                <small>Defaults to 16k so chat-image providers can return verbose image payloads.</small>
+                            </div>
+                            <label class="checkbox_label qig-switch-row">
+                                <input id="qig-proxy-chat-allow-images" type="checkbox" ${s.proxyChatImageAllowImagesEndpoint ? "checked" : ""}>
+                                <span>Permit /images/generations routing</span>
+                            </label>
+                        </div>
+                        <div id="qig-proxy-chat-route-status" class="form-hint" style="margin-top:4px;"></div>
+                    </div>
                     <label class="checkbox_label">
                         <input id="qig-proxy-comfy-mode" type="checkbox" ${s.proxyComfyMode ? "checked" : ""}>
                         <span>ComfyUI Proxy Mode</span>
@@ -12048,6 +12467,36 @@ function createUI() {
     bind("qig-proxy-seed", "proxySeed", true);
     bindCheckbox("qig-proxy-facefix", "proxyFacefix");
     bind("qig-proxy-extra", "proxyExtraInstructions");
+    bind("qig-proxy-chat-system", "proxyChatImageSystemPrompt");
+    bind("qig-proxy-chat-max-tokens", "proxyChatImageMaxTokens", (value) => {
+        const s = getSettings();
+        s.proxyChatImageMaxTokens = value;
+        updateProxyCompatibilityUI();
+    });
+    const chatModeEl = getOrCacheElement("qig-proxy-chat-mode");
+    if (chatModeEl) chatModeEl.onchange = (e) => {
+        setProxyChatImageCheckboxMode(e.target.checked);
+    };
+    const chatAllowImagesEl = getOrCacheElement("qig-proxy-chat-allow-images");
+    if (chatAllowImagesEl) chatAllowImagesEl.onchange = (e) => {
+        const s = getSettings();
+        s.proxyChatImageAllowImagesEndpoint = e.target.checked;
+        if (!s.proxyChatImageAllowImagesEndpoint) {
+            s.proxyEndpointMode = "chat_completions";
+        } else if (s.proxyEndpointMode === "chat_completions") {
+            s.proxyEndpointMode = "auto";
+        }
+        saveSettingsDebounced();
+        refreshProviderInputs("proxy", { updateProviderVisibility: false });
+        updateProxyCompatibilityUI();
+    };
+    const chatPersonalityEl = getOrCacheElement("qig-proxy-chat-personality");
+    if (chatPersonalityEl) chatPersonalityEl.onchange = (e) => {
+        getSettings().proxyChatImageIncludePersonality = e.target.checked;
+        saveSettingsDebounced();
+    };
+    const chatSetupEl = getOrCacheElement("qig-proxy-chat-setup");
+    if (chatSetupEl) chatSetupEl.onclick = () => applyProxyChatImageSimpleMode({ persist: true, notify: true });
     bind("qig-proxy-comfy-timeout", "proxyComfyTimeout", true);
     bind("qig-proxy-comfy-node-id", "proxyComfyNodeId");
     bind("qig-proxy-comfy-workflow", "proxyComfyWorkflow");
@@ -13226,6 +13675,8 @@ async function generateImage() {
                     try {
                         if (s.insertAsHiddenReply) {
                             await insertImageAsHiddenReply(r);
+                        } else if (shouldAutoInsertChatImageAsAssistant(s)) {
+                            await insertImageAsNewMessage(r);
                         } else {
                             await insertImageIntoMessage(r, autoInsertTarget);
                         }
