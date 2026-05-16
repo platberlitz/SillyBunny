@@ -13,6 +13,35 @@ const canonicalMessage = Object.freeze({
     command: '/echo hello',
 });
 
+const nonObjectPayloads = [
+    null,
+    undefined,
+    '/echo hello',
+    1,
+    [],
+    new Date(),
+];
+
+const badMessageIds = [
+    undefined,
+    '5',
+    1.5,
+    -1,
+];
+
+const badNonces = [
+    undefined,
+    123,
+    '',
+    '   ',
+];
+
+const badCommands = [
+    undefined,
+    123,
+    null,
+];
+
 describe('card script sandbox message validation', () => {
     test('accepts the canonical slash request shape', () => {
         expect(validateSlashRequestMessage(canonicalMessage)).toEqual({
@@ -21,15 +50,10 @@ describe('card script sandbox message validation', () => {
         });
     });
 
-    test.each([
-        null,
-        undefined,
-        '/echo hello',
-        1,
-        [],
-        new Date(),
-    ])('rejects non-object payload %#', (data) => {
-        expect(validateSlashRequestMessage(data)).toEqual({ ok: false, reason: 'not_object' });
+    test('rejects non-object payloads', () => {
+        for (const data of nonObjectPayloads) {
+            expect(validateSlashRequestMessage(data)).toEqual({ ok: false, reason: 'not_object' });
+        }
     });
 
     test('rejects wrong type and version values', () => {
@@ -43,39 +67,31 @@ describe('card script sandbox message validation', () => {
         });
     });
 
-    test.each([
-        undefined,
-        '5',
-        1.5,
-        -1,
-    ])('rejects bad messageId %#', (messageId) => {
-        expect(validateSlashRequestMessage({ ...canonicalMessage, messageId })).toEqual({
-            ok: false,
-            reason: 'bad_message_id',
-        });
+    test('rejects bad messageId values', () => {
+        for (const messageId of badMessageIds) {
+            expect(validateSlashRequestMessage({ ...canonicalMessage, messageId })).toEqual({
+                ok: false,
+                reason: 'bad_message_id',
+            });
+        }
     });
 
-    test.each([
-        undefined,
-        123,
-        '',
-        '   ',
-    ])('rejects bad nonce %#', (nonce) => {
-        expect(validateSlashRequestMessage({ ...canonicalMessage, nonce })).toEqual({
-            ok: false,
-            reason: 'bad_nonce',
-        });
+    test('rejects bad nonce values', () => {
+        for (const nonce of badNonces) {
+            expect(validateSlashRequestMessage({ ...canonicalMessage, nonce })).toEqual({
+                ok: false,
+                reason: 'bad_nonce',
+            });
+        }
     });
 
-    test.each([
-        undefined,
-        123,
-        null,
-    ])('rejects non-string command %#', (command) => {
-        expect(validateSlashRequestMessage({ ...canonicalMessage, command })).toEqual({
-            ok: false,
-            reason: 'bad_command',
-        });
+    test('rejects non-string commands', () => {
+        for (const command of badCommands) {
+            expect(validateSlashRequestMessage({ ...canonicalMessage, command })).toEqual({
+                ok: false,
+                reason: 'bad_command',
+            });
+        }
     });
 
     test('rejects oversized commands', () => {

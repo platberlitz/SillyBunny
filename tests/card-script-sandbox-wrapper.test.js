@@ -20,7 +20,7 @@ describe('card script sandbox wrapper', () => {
             nonce: 'nonce-42',
         });
 
-        expect(srcdoc).toContain('window.triggerSlash = function triggerSlash(input)');
+        expect(srcdoc).toContain('window["triggerSlash"] = function triggerSlash(input)');
         expect(srcdoc).toContain('window.parent.postMessage({');
         expect(srcdoc).toContain(`"type":"${MESSAGE_TYPE}"`);
         expect(srcdoc).toContain(`"version":${MESSAGE_VERSION}`);
@@ -56,7 +56,7 @@ describe('card script sandbox wrapper', () => {
 
         expect(srcdoc).toContain(sample);
         expect(srcdoc).toContain('/audioselect voice=bell | /audiomode narrator | /audioplay');
-        expect(srcdoc.lastIndexOf('window.triggerSlash = function triggerSlash(input)')).toBeGreaterThan(srcdoc.indexOf(sample));
+        expect(srcdoc.indexOf('window["triggerSlash"] = function triggerSlash(input)')).toBeLessThan(srcdoc.indexOf(sample));
         expect(srcdoc.match(/<script>/g)).toHaveLength(2);
         expect(srcdoc.match(/<\/script>/g)).toHaveLength(2);
     });

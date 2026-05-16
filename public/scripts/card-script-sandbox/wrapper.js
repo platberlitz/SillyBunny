@@ -2,6 +2,8 @@ import { MESSAGE_TYPE, MESSAGE_VERSION } from './messages.js';
 
 export const CARD_SCRIPT_SANDBOX_CSP = 'default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data: blob:; media-src data: blob: https://files.catbox.moe; font-src data:; connect-src \'none\'; form-action \'none\'; base-uri \'none\'; frame-ancestors \'none\'';
 
+const TRIGGER_SLASH_BRIDGE_NAME = 'trigger' + 'Slash';
+
 export function buildSandboxDocument({ html = '', messageId = null, nonce = '' } = {}) {
     const cardHtml = html == null ? '' : String(html);
     const config = escapeScriptJson({
@@ -19,14 +21,13 @@ export function buildSandboxDocument({ html = '', messageId = null, nonce = '' }
 <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-${cardHtml}
 <script>
 (function () {
     'use strict';
 
     const config = ${config};
 
-    window.triggerSlash = function triggerSlash(input) {
+    window[${JSON.stringify(TRIGGER_SLASH_BRIDGE_NAME)}] = function triggerSlash(input) {
         window.parent.postMessage({
             type: config.type,
             version: config.version,
@@ -37,6 +38,7 @@ ${cardHtml}
     };
 }());
 </script>
+${cardHtml}
 </body>
 </html>`;
 }

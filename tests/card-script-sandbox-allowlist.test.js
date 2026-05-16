@@ -6,6 +6,38 @@ import {
     parseSlashCommandRequest,
 } from '../public/scripts/card-script-sandbox/allowlist.js';
 
+const allowedCommandCases = [
+    ['/echo hello', '/echo hello'],
+    ['/buttons label=Continue', '/buttons label=Continue'],
+    ['/popup text=hello', '/popup text=hello'],
+    ['/getchatname', '/getchatname'],
+];
+
+const riskyCommands = [
+    '/send hello',
+    '/gen',
+    '/world',
+    '/import data',
+    '/export chat',
+    '/setting key=value',
+    '/run script',
+    '/sys prompt',
+    '/sd prompt',
+    '/api call',
+    '/preset load',
+];
+
+const malformedInputCases = [
+    ['', 'empty_input'],
+    ['   ', 'empty_input'],
+    ['echo hello', 'malformed'],
+    ['|/echo hello', 'malformed'],
+    ['/echo hello|', 'malformed'],
+    ['|', 'malformed'],
+    ['/echo hello||/popup hi', 'malformed'],
+    [null, 'malformed'],
+];
+
 describe('card script sandbox allowlist', () => {
     test('keeps the initial safe command set explicit', () => {
         expect(DEFAULT_ALLOWLIST).toEqual([
@@ -29,48 +61,28 @@ describe('card script sandbox allowlist', () => {
         });
     });
 
-    test.each([
-        ['/echo hello', '/echo hello'],
-        ['/buttons label=Continue', '/buttons label=Continue'],
-        ['/popup text=hello', '/popup text=hello'],
-        ['/getchatname', '/getchatname'],
-    ])('accepts allowed command %s', (raw, normalized) => {
-        expect(parseSlashCommandRequest(raw)).toMatchObject({
-            ok: true,
-            command: normalized,
-        });
+    test('accepts allowed commands', () => {
+        for (const [raw, normalized] of allowedCommandCases) {
+            expect(parseSlashCommandRequest(raw)).toMatchObject({
+                ok: true,
+                command: normalized,
+            });
+        }
     });
 
-    test.each([
-        '/send hello',
-        '/gen',
-        '/world',
-        '/import data',
-        '/export chat',
-        '/setting key=value',
-        '/run script',
-        '/sys prompt',
-        '/sd prompt',
-        '/api call',
-        '/preset load',
-    ])('denies risky command %s', (raw) => {
-        expect(parseSlashCommandRequest(raw)).toEqual({
-            ok: false,
-            reason: 'command_not_allowed',
-        });
+    test('denies risky commands', () => {
+        for (const raw of riskyCommands) {
+            expect(parseSlashCommandRequest(raw)).toEqual({
+                ok: false,
+                reason: 'command_not_allowed',
+            });
+        }
     });
 
-    test.each([
-        ['', 'empty_input'],
-        ['   ', 'empty_input'],
-        ['echo hello', 'malformed'],
-        ['|/echo hello', 'malformed'],
-        ['/echo hello|', 'malformed'],
-        ['|', 'malformed'],
-        ['/echo hello||/popup hi', 'malformed'],
-        [null, 'malformed'],
-    ])('rejects malformed input %#', (raw, reason) => {
-        expect(parseSlashCommandRequest(raw)).toEqual({ ok: false, reason });
+    test('rejects malformed input', () => {
+        for (const [raw, reason] of malformedInputCases) {
+            expect(parseSlashCommandRequest(raw)).toEqual({ ok: false, reason });
+        }
     });
 
     test('enforces command length and pipeline count caps', () => {
