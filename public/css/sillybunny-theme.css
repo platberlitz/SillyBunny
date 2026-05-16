@@ -3042,14 +3042,23 @@ input[type='range']::-moz-range-thumb {
         min-width: 0;
     }
 
-    #openai_settings .oneline-dropdown:has(> #openai_reasoning_effort),
-    #openai_reasoning_effort,
-    #openai_reasoning_effort ~ .toggle-description {
-        min-width: 0;
-        max-width: 100%;
+    #openai_settings .reasoning-effort-row {
+        box-sizing: border-box;
+        inline-size: 100%;
+        max-inline-size: 100%;
+        overflow-x: hidden;
     }
 
-    #openai_reasoning_effort ~ .toggle-description {
+    #openai_settings .reasoning-effort-row > label,
+    #openai_settings .reasoning-effort-row > #openai_reasoning_effort,
+    #openai_settings .reasoning-effort-row > .toggle-description {
+        box-sizing: border-box;
+        inline-size: 100% !important;
+        min-inline-size: 0 !important;
+        max-inline-size: 100% !important;
+    }
+
+    #openai_settings .reasoning-effort-row > .toggle-description {
         overflow-wrap: anywhere;
         word-break: break-word;
     }
