@@ -3788,6 +3788,15 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     border-radius: var(--sb-radius-button, 14px) !important;
 }
 
+@media screen and (min-width: 1001px) {
+    #send_form #qig-input-btn {
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        font-size: var(--sb-composer-action-icon-size, 15px) !important;
+        line-height: 1 !important;
+    }
+}
+
 #sb-bottom-chat-bar {
     display: flex;
     align-items: center;
