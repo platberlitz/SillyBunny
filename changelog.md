@@ -130,6 +130,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #96 (2026-05-14) `fix(presets): add connection field guardrails`
 - PR #98 (2026-05-14) `chore(presets): update Geechan roleplay prompts to v5.2`
 - PR #103 (2026-05-15) `fix: align group controls UI`
+- PR #109 (2026-05-16) `chore: update prose polisher template`
 
 ### Direct Staging Commits
 - `fix(chat): restore scroll anchoring so scrolling up no longer skips messages`
