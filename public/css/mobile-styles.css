@@ -1556,7 +1556,7 @@
         --bottomFormIconSize: clamp(14px, calc(17px * var(--sb-bottom-bar-scale, 1)), 21px);
         --sb-composer-action-size: clamp(22px, calc(var(--bottomFormBlockSize) * 0.56), 28px);
         --sb-composer-action-icon-size: clamp(11px, calc(var(--bottomFormIconSize, 20px) * 0.62), 14px);
-        --sb-mobile-composer-input-height: 44px;
+        --sb-mobile-composer-input-height: clamp(34px, calc(44px * var(--sb-bottom-bar-scale, 1)), 58px);
     }
 
     :root[data-sb-compact-mode='true'] {
@@ -1564,7 +1564,7 @@
         --bottomFormIconSize: clamp(13px, calc(15px * var(--sb-bottom-bar-scale, 1)), 19px);
         --sb-composer-action-size: clamp(20px, calc(var(--bottomFormBlockSize) * 0.54), 25px);
         --sb-composer-action-icon-size: clamp(10px, calc(var(--bottomFormIconSize, 18px) * 0.58), 12px);
-        --sb-mobile-composer-input-height: 36px;
+        --sb-mobile-composer-input-height: clamp(30px, calc(36px * var(--sb-bottom-bar-scale, 1)), 50px);
     }
 
     #form_sheld {
@@ -1658,7 +1658,7 @@
         overflow: visible !important;
     }
 
-    #rightSendForm > div:not(#send_but):not(#mes_stop):not(#extensionsMenuButton):not(.stscript_btn) {
+    #rightSendForm > div:not(#send_but):not(#mes_stop):not(#qig-input-btn):not(.stscript_btn) {
         display: none !important;
     }
 

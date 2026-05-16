@@ -1252,15 +1252,15 @@ function placeComposerControls() {
     const wandButton = document.getElementById('extensionsMenuButton');
     const sendButton = document.getElementById('send_but');
 
-    moveElementToStart(paletteButton, leftForm);
+    moveElementToStart(optionsButton, leftForm);
 
-    if (paletteButton instanceof HTMLElement && paletteButton.parentElement === leftForm) {
-        moveElementAfter(optionsButton, paletteButton, leftForm);
+    if (optionsButton instanceof HTMLElement && optionsButton.parentElement === leftForm) {
+        moveElementAfter(wandButton, optionsButton, leftForm);
     } else {
-        moveElementToStart(optionsButton, leftForm);
+        moveElementToStart(wandButton, leftForm);
     }
 
-    moveElementBefore(wandButton, rightForm, sendButton);
+    moveElementBefore(paletteButton, rightForm, sendButton);
 }
 
 function queueComposerControlPlacement() {
