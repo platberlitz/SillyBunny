@@ -3042,6 +3042,18 @@ input[type='range']::-moz-range-thumb {
         min-width: 0;
     }
 
+    #openai_settings .oneline-dropdown:has(> #openai_reasoning_effort),
+    #openai_reasoning_effort,
+    #openai_reasoning_effort ~ .toggle-description {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    #openai_reasoning_effort ~ .toggle-description {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
     #openai_api-presets .flex-container.marginLeft5,
     #openai_api-presets .flex-container.gap3px {
         width: 100%;
