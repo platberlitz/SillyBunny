@@ -19,6 +19,10 @@
                     <span>Guided Swipe button</span>
                 </label>
                 <label class="checkbox_label">
+                    <input type="checkbox" id="gg_showGuidedCorrection" name="showGuidedCorrection" class="gg-setting-input">
+                    <span>Guided Correction button</span>
+                </label>
+                <label class="checkbox_label">
                     <input type="checkbox" id="gg_showImpersonate1stPerson" name="showImpersonate1stPerson" class="gg-setting-input">
                     <span>Guided Impersonate button</span>
                 </label>
@@ -60,6 +64,16 @@
                     <label for="gg_depthPromptGuidedSwipe">Depth</label>
                     <input id="gg_depthPromptGuidedSwipe" name="depthPromptGuidedSwipe" class="gg-setting-input text_pole" type="number" min="0" step="1">
                     <button type="button" class="menu_button gg-default-button" data-target="promptGuidedSwipe">Reset</button>
+                </div>
+            </div>
+
+            <div class="setting_item">
+                <label for="gg_promptGuidedCorrection">Guided Correction prompt</label>
+                <textarea id="gg_promptGuidedCorrection" name="promptGuidedCorrection" class="gg-setting-input text_pole gg-prompt-field" rows="3"></textarea>
+                <div class="flex-container flexGap5">
+                    <label for="gg_depthPromptGuidedCorrection">Depth</label>
+                    <input id="gg_depthPromptGuidedCorrection" name="depthPromptGuidedCorrection" class="gg-setting-input text_pole" type="number" min="0" step="1">
+                    <button type="button" class="menu_button gg-default-button" data-target="promptGuidedCorrection">Reset</button>
                 </div>
             </div>
 
