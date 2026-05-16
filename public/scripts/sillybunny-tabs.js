@@ -2528,7 +2528,7 @@ function setSurfaceTransparency(value, { persist = true } = {}) {
     const overlayOpacity = Math.min(1, surfaceOpacity + 0.08);
     sbState.surfaceTransparency = nextTransparency;
 
-    document.documentElement.style.setProperty('--sb-shell-surface-opacity', '1');
+    document.documentElement.style.setProperty('--sb-shell-surface-opacity', surfaceOpacity.toFixed(2));
     document.documentElement.style.setProperty('--sb-shell-card-opacity', '1');
     document.documentElement.style.setProperty('--sb-shell-control-opacity', '1');
     document.documentElement.style.setProperty('--sb-shell-overlay-opacity', '1');
