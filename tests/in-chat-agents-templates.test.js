@@ -7,6 +7,16 @@ function readTemplate(filename) {
     return JSON.parse(fs.readFileSync(new URL(filename, templateDir), 'utf8'));
 }
 
+function findCatalogTemplate(catalog, templateId) {
+    const template = catalog.find(template => template.id === templateId);
+
+    if (!template) {
+        throw new Error(`Missing catalog template: ${templateId}`);
+    }
+
+    return template;
+}
+
 describe('in-chat agent bundled templates', () => {
     test('keeps source files synced with the template browser catalog', () => {
         const catalog = readTemplate('index.json');
@@ -41,5 +51,18 @@ describe('in-chat agent bundled templates', () => {
             maxTokens: 4096,
         }));
         expect(template.conditions.generationTypes).toEqual(['normal', 'continue', 'impersonate']);
+    });
+
+    test('keeps Prose Polisher enabled for impersonation prompt rewrites in the catalog', () => {
+        const catalog = readTemplate('index.json');
+        const template = findCatalogTemplate(catalog, 'tpl-prose-polisher');
+
+        expect(template.postProcess).toEqual(expect.objectContaining({
+            promptTransformEnabled: true,
+            promptTransformMode: 'rewrite',
+        }));
+        expect(template.conditions).toEqual(expect.objectContaining({
+            runOnImpersonate: true,
+        }));
     });
 });
