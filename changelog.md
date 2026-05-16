@@ -16,6 +16,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 
 ### Chat Loading And Search
 - Re-applied chat scroll anchoring across staging and main so scrolling upward no longer skips earlier messages.
+- Disabled native chat scroll anchoring on macOS browsers so it no longer fights SillyBunny's scroll preservation and jumps messages while scrolling.
 - Existing chats now force-scroll to the latest message on initial load across desktop and mobile, even when the normal auto-scroll preference is disabled.
 - Streaming and other non-forced chat scrolling still respect the user's auto-scroll preference and mobile manual-scroll suppression.
 - Bottom chat navigation now includes go-to-top and go-to-bottom controls for the active chat.
