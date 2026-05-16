@@ -123,6 +123,7 @@
     --sb-ambient-a: color-mix(in srgb, var(--SmartThemeQuoteColor) 12%, transparent);
     --sb-ambient-b: color-mix(in srgb, var(--SmartThemeUnderlineColor) 9%, transparent);
     --sb-shell-surface-opacity: 1;
+    --sb-shell-surface-opacity-percent: 100%;
     --sb-shell-card-opacity: 1;
     --sb-shell-control-opacity: 1;
     --sb-shell-overlay-opacity: 1;

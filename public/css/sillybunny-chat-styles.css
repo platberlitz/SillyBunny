@@ -43,6 +43,8 @@
     --moonlit-sb-swipe-edge-offset: 8px;
     --moonlit-sb-swipe-gap: 4px;
     --moonlit-sb-swipe-inline-offset: 24px;
+    --moonlit-sb-user-message-bg: color-mix(in srgb, var(--SmartThemeUserMesBlurTintColor) var(--sb-shell-surface-opacity-percent, 100%), transparent);
+    --moonlit-sb-bot-message-bg: color-mix(in srgb, var(--SmartThemeBotMesBlurTintColor) var(--sb-shell-surface-opacity-percent, 100%), transparent);
 }
 body.hideChatAvatars.echostyle #chat,
 body.hideChatAvatars.whisperstyle #chat,
@@ -158,7 +160,7 @@ body.echostyle #chat {
                 left: auto;
                 border-radius: 10px;
                 overflow: hidden;
-                background-color: var(--SmartThemeUserMesBlurTintColor);
+                background-color: var(--moonlit-sb-user-message-bg);
 
                 &::before {
                     content: "";
@@ -199,7 +201,7 @@ body.echostyle #chat {
             .mes_text,
             .last_mes .mes_text {
                 padding: 10px 20px 10px var(--custom-EchoAvatarWidth, 25%) !important;
-                background-color: var(--SmartThemeUserMesBlurTintColor);
+                background-color: var(--moonlit-sb-user-message-bg);
 
                 @media screen and (max-width: 1000px) {
                     padding: 10px 20px 10px var(--custom-EchoAvatarMobileWidth, 25%) !important;
@@ -210,7 +212,7 @@ body.echostyle #chat {
         /* Echo: Character Message 回聲：角色訊息 */
         &[is_user="false"] {
             .mes_text {
-                background-color: var(--SmartThemeBotMesBlurTintColor);
+                background-color: var(--moonlit-sb-bot-message-bg);
 
                 &::before {
                     content: "";
@@ -393,7 +395,7 @@ body.whisperstyle #chat {
 
         /* Whisper: User Message 低語：使用者訊息 */
         &[is_user="true"] {
-            background-color: var(--SmartThemeUserMesBlurTintColor) !important;
+            background-color: var(--moonlit-sb-user-message-bg) !important;
 
             &::after {
                 border-right: 3.5px solid var(--customThemeColor);
@@ -401,7 +403,7 @@ body.whisperstyle #chat {
         }
         /* Whisper: Character Message 低語：角色訊息 */
         &[is_user="false"] {
-            background-color: var(--SmartThemeBotMesBlurTintColor) !important;
+            background-color: var(--moonlit-sb-bot-message-bg) !important;
 
             &::after {
                 border-right: 3.5px solid var(--SmartThemeBodyColor);
@@ -556,7 +558,7 @@ body.hushstyle #chat {
 
         /* Soft: User Message 輕聲：使用者訊息 */
         &[is_user="true"] {
-            background-color: var(--SmartThemeUserMesBlurTintColor) !important;
+            background-color: var(--moonlit-sb-user-message-bg) !important;
 
             &::after {
                 border-right: 3.5px solid var(--customThemeColor);
@@ -564,7 +566,7 @@ body.hushstyle #chat {
         }
         /* Soft: Character Message 輕聲：角色訊息 */
         &[is_user="false"] {
-            background-color: var(--SmartThemeBotMesBlurTintColor) !important;
+            background-color: var(--moonlit-sb-bot-message-bg) !important;
 
             &::after {
                 border-right: 3.5px solid var(--SmartThemeBodyColor);
@@ -686,13 +688,13 @@ body.hushstyle #chat {
 
 body.ripplestyle #chat {
     .mes {
-        background: var(--SmartThemeBotMesBlurTintColor) !important;
+        background: var(--moonlit-sb-bot-message-bg) !important;
         border-radius: 15px;
         padding: 0 !important;
         margin: 8px 0 !important;
 
         &[is_user="true"] {
-            background-color: var(--SmartThemeUserMesBlurTintColor) !important;
+            background-color: var(--moonlit-sb-user-message-bg) !important;
         }
 
         .mesAvatarWrapper {
@@ -909,7 +911,7 @@ body.tidestyle #chat {
                 width: fit-content;
                 margin: 0;
                 margin-bottom: 8px !important;
-                background: var(--SmartThemeBotMesBlurTintColor);
+                background: var(--moonlit-sb-bot-message-bg);
                 padding: 6px 14px !important;
                 border-radius: 18px;
             }
@@ -969,7 +971,7 @@ body.tidestyle #chat {
             }
 
             p {
-                background: var(--SmartThemeUserMesBlurTintColor);
+                background: var(--moonlit-sb-user-message-bg);
                 border-radius: 18px;
             }
         }
