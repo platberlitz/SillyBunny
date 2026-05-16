@@ -477,6 +477,14 @@
         -webkit-overflow-scrolling: touch !important;
     }
 
+    #left-nav-panel .toggle-description {
+        width: auto !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+
     #left-nav-panel.openDrawer,
     #user-settings-block.openDrawer,
     .sb-shell-root.openDrawer,
