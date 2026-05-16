@@ -7850,6 +7850,14 @@
                     </form>
                 </div>
             </div>
+            <div id="completion_prompt_manager_popup_tabs" class="completion_prompt_manager_popup_tabs" style="display: none;">
+                <button type="button" class="completion_prompt_manager_tab_button active" data-tab="edit">
+                    <span data-i18n="prompt_manager_edit">Edit</span>
+                </button>
+                <button type="button" class="completion_prompt_manager_tab_button" data-tab="preview">
+                    <span data-i18n="prompt_manager_preview">Preview</span>
+                </button>
+            </div>
             <div id="completion_prompt_manager_popup_edit">
                 <h3 data-i18n="prompt_manager_edit">Edit</h3>
                 <div class="completion_prompt_manager_popup_entry">
@@ -7947,6 +7955,35 @@
                             <a id="completion_prompt_manager_popup_entry_form_save" title="Save" data-i18n="[title]save" class="fa-solid fa-save menu_button" data-pm-prompt=""></a>
                         </div>
                     </form>
+                </div>
+            </div>
+            <div id="completion_prompt_manager_popup_preview" style="display: none;">
+                <h3 data-i18n="prompt_manager_preview">Preview</h3>
+                <div class="completion_prompt_manager_popup_entry">
+                    <div class="completion_prompt_manager_popup_entry_form">
+                        <div class="completion_prompt_manager_popup_entry_form_control">
+                            <div class="completion_prompt_manager_popup_header">
+                                <label>
+                                    <span data-i18n="prompt_manager_rendered_prompt">Rendered Prompt</span>
+                                </label>
+                                <a id="completion_prompt_manager_popup_preview_close_button" title="close" data-i18n="[title]close" class="fa-solid fa-close menu_button"></a>
+                            </div>
+                            <div class="text_muted" data-i18n="Preview this prompt with macros substituted before saving changes.">Preview this prompt with macros substituted before saving changes.</div>
+                            <div class="completion_prompt_manager_preview_content">
+                                <div class="completion_prompt_manager_preview_meta">
+                                    <span class="completion_prompt_manager_preview_role">
+                                        <strong data-i18n="Role">Role</strong>
+                                        <span id="completion_prompt_manager_preview_role_value">system</span>
+                                    </span>
+                                    <span class="completion_prompt_manager_preview_tokens" title="Token counts may be inaccurate and provided just for reference." data-i18n="[title]Token counts may be inaccurate and provided just for reference.">
+                                        <strong data-i18n="Tokens">Tokens</strong>
+                                        <span id="completion_prompt_manager_preview_token_count">0</span>
+                                    </span>
+                                </div>
+                                <div id="completion_prompt_manager_preview_text" class="completion_prompt_manager_preview_text"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
