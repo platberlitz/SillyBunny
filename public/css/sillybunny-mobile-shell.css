@@ -132,6 +132,14 @@
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch !important;
     }
+
+    #left-nav-panel .toggle-description {
+        width: auto !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
 }
 
 @supports (-webkit-touch-callout: none) {
