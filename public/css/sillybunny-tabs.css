@@ -1692,7 +1692,7 @@ body.sb-shell-resizing * {
     flex-direction: column;
     align-items: flex-start;
     gap: var(--sb-shell-space-xs);
-    padding: var(--sb-shell-space-lg) var(--sb-shell-panel-padding-inline) var(--sb-shell-space-xl);
+    padding: var(--sb-shell-space-md) var(--sb-shell-panel-padding-inline) var(--sb-shell-space-xl);
     border-bottom: 1px solid color-mix(in srgb, var(--sb-shell-border) 80%, transparent);
     background: transparent;
     text-align: left;

@@ -13,8 +13,6 @@ const MIGRATABLE_KEYS = [
     /^FeatherlessModels_PerPage$/,
     /^GroupMembers_PerPage$/,
     /^GroupCandidates_PerPage$/,
-    /^LNavLockOn$/,
-    /^LNavOpened$/,
     /^mediaWarningShown:/,
     /^NavLockOn$/,
     /^NavOpened$/,
