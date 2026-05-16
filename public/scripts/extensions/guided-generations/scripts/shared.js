@@ -45,6 +45,24 @@ function isGroupChat() {
     return Boolean(context?.groupId && context?.groups);
 }
 
+function getLastAiMessage() {
+    const context = getContext();
+    const chat = context?.chat;
+
+    if (!Array.isArray(chat) || chat.length === 0) {
+        return null;
+    }
+
+    for (let i = chat.length - 1; i >= 0; i--) {
+        const message = chat[i];
+        if (message && !message.is_user && !message.is_system) {
+            return { message, index: i };
+        }
+    }
+
+    return null;
+}
+
 function applyPromptTemplate(template, input) {
     return String(template ?? '').split('{{input}}').join(input ?? '');
 }
@@ -57,6 +75,7 @@ export {
     extension_settings,
     getContext,
     getCurrentProfile,
+    getLastAiMessage,
     getLastImpersonateResult,
     getPresetsForApiType,
     getPreviousImpersonateInput,
