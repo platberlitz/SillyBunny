@@ -1473,10 +1473,10 @@ body.bubblechat .mes[is_user='true']::before {
 
 .mes[is_user='true'] .mes_block {
     box-sizing: border-box;
-    border: 1px solid color-mix(in srgb, var(--color-primary, var(--sb-accent)) 24%, transparent);
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor) 14%, transparent);
     border-radius: var(--sb-radius-md);
     padding: 10px 12px;
-    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 4%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 3%, transparent);
 }
 
 body.flatchat .mes[is_user='true'] .mes_block,
