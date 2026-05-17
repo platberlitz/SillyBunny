@@ -475,6 +475,8 @@ export function deleteSecret(directories, key) {
  * @returns {string} Secret value
  */
 export function readSecret(directories, key, id = null) {
+    // SillyBunny: preserve the upstream call shape while allowing profile-linked
+    // secrets to be resolved by explicit ID when the caller has one.
     return new SecretManager(directories).readSecret(key, id);
 }
 

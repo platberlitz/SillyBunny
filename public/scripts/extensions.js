@@ -431,7 +431,7 @@ function maybeShowMoonlitEchoesMovedNotice() {
             const button = toast?.querySelector?.(`.${buttonClass}`);
             button?.addEventListener('click', async () => {
                 accountStorage.setItem(MOONLIT_ECHOES_NOTICE_STORAGE_KEY, 'true');
-                await window.SillyBunnyShell?.highlightLaunchpadItem?.(SILLYBUNNY_MOONLIT_ECHOES_EXTENSION_NAME);
+                await globalThis.SillyBunnyShell?.highlightLaunchpadItem?.(SILLYBUNNY_MOONLIT_ECHOES_EXTENSION_NAME);
             });
         },
         onCloseClick() {

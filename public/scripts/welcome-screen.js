@@ -1039,8 +1039,8 @@ async function highlightLaunchpadItem(extensionId) {
     return true;
 }
 
-window.SillyBunnyShell = window.SillyBunnyShell || {};
-window.SillyBunnyShell.highlightLaunchpadItem = highlightLaunchpadItem;
+globalThis.SillyBunnyShell = globalThis.SillyBunnyShell || {};
+globalThis.SillyBunnyShell.highlightLaunchpadItem = highlightLaunchpadItem;
 
 /**
  * Gets the filter bucket used by the Recent Chats tabs.
@@ -1124,8 +1124,8 @@ function openShellTab(route) {
         return;
     }
 
-    if (window.SillyBunnyShell?.openTab) {
-        window.SillyBunnyShell.openTab(shellKey, tabId);
+    if (globalThis.SillyBunnyShell?.openTab) {
+        globalThis.SillyBunnyShell.openTab(shellKey, tabId);
         return;
     }
 
@@ -1375,13 +1375,13 @@ async function handleWelcomeAction(button, sendTextArea) {
             }
             break;
         case 'open-characters-menu':
-            window.SillyBunnyShell?.openCharacters?.();
+            globalThis.SillyBunnyShell?.openCharacters?.();
             break;
         case 'open-global-search':
-            window.SillyBunnyShell?.openGlobalSearch?.({ focusInput: true });
+            globalThis.SillyBunnyShell?.openGlobalSearch?.({ focusInput: true });
             break;
         case 'open-import-characters': {
-            window.SillyBunnyShell?.openCharacters?.();
+            globalThis.SillyBunnyShell?.openCharacters?.();
             const importButton = document.getElementById('character_import_button')
                 || document.getElementById('character_import_paste_button')
                 || document.querySelector('.open_characters_library');

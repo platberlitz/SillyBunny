@@ -166,6 +166,8 @@ export async function hideChatMessageRange(start, end, unhide, nameFitler = null
     refreshSwipeButtons();
 
     await saveChatConditional();
+    // SillyBunny: keep chat listeners in sync after range-hiding messages so the
+    // shell and footer controls can refresh immediately.
     await eventSource.emit(event_types.MESSAGE_UPDATED, start);
 }
 
@@ -907,6 +909,7 @@ function expandMessageMedia(messageId, mediaIndex) {
         function getImageElement() {
             const img = document.createElement('img');
             img.src = mediaAttachment.url;
+            // SillyBunny: defer enlarged image decoding to keep large chats responsive.
             img.loading = 'lazy';
             img.decoding = 'async';
             img.classList.add('img_enlarged');

@@ -3788,7 +3788,7 @@ jQuery(() => {
         const groupId = $(this).attr('data-chid') || $(this).attr('data-grid');
         openGroupById(groupId);
         if (shouldCloseCharacterMenu) {
-            window.SillyBunnyShell?.closeCharacters?.();
+            globalThis.SillyBunnyShell?.closeCharacters?.();
         }
     });
     $('#rm_group_filter').on('input', filterGroupMembers);

@@ -6,8 +6,6 @@ import { testSetup } from './frontent-test-utils.js';
 import { serverDirectory } from '../../src/server-directory.js';
 
 test.describe('MacroStoryString', () => {
-    test.beforeEach(testSetup.awaitST);
-
     /** @type {any[]} */
     const defaultContextPresets = [];
 
@@ -21,6 +19,8 @@ test.describe('MacroStoryString', () => {
             defaultContextPresets.push(preset);
         }
     });
+
+    test.beforeEach(testSetup.awaitST);
 
     test('should produce equivalent story strings with new macro engine', async ({ page }) => {
         const output = await page.evaluate(async ([defaultContextPresets]) => {

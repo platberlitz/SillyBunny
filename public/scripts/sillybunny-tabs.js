@@ -12398,7 +12398,7 @@ function initAll() {
     // Group Advanced Formatting sections into collapsible drawers
     groupAdvancedFormattingIntoDrawers();
 
-    window.SillyBunnyShell = Object.assign(window.SillyBunnyShell || {}, {
+    globalThis.SillyBunnyShell = Object.assign(globalThis.SillyBunnyShell || {}, {
         openTab(shellKey, tabId) {
             if (shellKey === 'characters') {
                 openCharacterPanelTab(tabId);

@@ -1,3 +1,4 @@
+/* eslint-disable playwright/no-duplicate-hooks */
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import { MockServer } from './util/mock-server.js';
 
