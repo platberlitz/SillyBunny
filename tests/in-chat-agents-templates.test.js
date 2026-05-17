@@ -136,10 +136,12 @@ describe('in-chat agent bundled templates', () => {
         expect(agent).not.toHaveProperty('subcategory');
     });
 
-    test('retires Pathfinder from default bundled in-chat agent templates', () => {
+    test('hides Pathfinder from the in-chat template browser without purging the internal agent', () => {
         const pathfinderTemplateId = '\'tpl-pathfinder\'';
 
-        expect(readIndexSetBody('REMOVED_BUNDLED_TEMPLATE_IDS')).toContain(pathfinderTemplateId);
+        expect(readIndexSetBody('HIDDEN_TEMPLATE_BROWSER_IDS')).toContain(pathfinderTemplateId);
+        expect(readIndexSetBody('INTERNAL_BUNDLED_TEMPLATE_IDS')).toContain(pathfinderTemplateId);
+        expect(readIndexSetBody('REMOVED_BUNDLED_TEMPLATE_IDS')).not.toContain(pathfinderTemplateId);
         expect(readIndexSetBody('DEFAULT_BUNDLED_TEMPLATE_IDS')).not.toContain(pathfinderTemplateId);
     });
 });

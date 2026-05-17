@@ -85,6 +85,16 @@ const DEFAULT_BUNDLED_TEMPLATE_IDS = new Set([
     'tpl-prose-polisher',
 ]);
 
+// Internal bundled templates stay available for migrations/settings even when
+// their agent card is hidden from the In-Chat Agents management UI.
+const INTERNAL_BUNDLED_TEMPLATE_IDS = new Set([
+    'tpl-pathfinder',
+]);
+
+const HIDDEN_TEMPLATE_BROWSER_IDS = new Set([
+    'tpl-pathfinder',
+]);
+
 /** Whether the agent list is in multi-select mode. */
 let selectModeActive = false;
 /** Set of agent IDs currently selected in select mode. */
@@ -96,14 +106,12 @@ const REMOVED_BUNDLED_TEMPLATE_IDS = new Set([
     'tpl-anti-slop-regex',
     'tpl-director-core',
     'tpl-nsfw-mode',
-    'tpl-pathfinder',
 ]);
 
 const REMOVED_BUNDLED_AGENT_NAMES = new Set([
     'anti-slop regex',
     'director core',
     'nsfw mode',
-    'pathfinder',
 ]);
 
 const REMOVED_BUNDLED_GROUP_IDS = new Set([
@@ -361,7 +369,18 @@ function mergeTemplateDefaults(template) {
 }
 
 function getDefaultBundledTemplates() {
-    return templates.filter(template => DEFAULT_BUNDLED_TEMPLATE_IDS.has(String(template?.id ?? '').trim()));
+    return templates.filter(template => {
+        const templateId = String(template?.id ?? '').trim();
+        return DEFAULT_BUNDLED_TEMPLATE_IDS.has(templateId) || INTERNAL_BUNDLED_TEMPLATE_IDS.has(templateId);
+    });
+}
+
+function getVisibleTemplateBrowserTemplates() {
+    return templates.filter(template => !HIDDEN_TEMPLATE_BROWSER_IDS.has(String(template?.id ?? '').trim()));
+}
+
+function getVisibleInChatAgents(agentList = getAgents()) {
+    return agentList.filter(agent => !isPathfinderAgent(agent));
 }
 
 function getTemplateRegexCount(template) {
@@ -1086,12 +1105,15 @@ async function ensureDefaultBundledAgents() {
             continue;
         }
 
-        if (!autoSeededTemplateIds.has(templateId)) {
+        const shouldEnsureTemplate = INTERNAL_BUNDLED_TEMPLATE_IDS.has(templateId) || !autoSeededTemplateIds.has(templateId);
+        if (shouldEnsureTemplate) {
             const seededAgent = buildAgentFromTemplate(template);
             if (!hasMatchingAgentSnapshot(seededAgent)) {
                 await saveAgent(seededAgent);
             }
+        }
 
+        if (!autoSeededTemplateIds.has(templateId)) {
             autoSeededTemplateIds.add(templateId);
             touchedSeedState = true;
         }
@@ -1435,7 +1457,7 @@ function renderAgentList() {
     container.empty();
     updateCancelGenerationButton();
     const profileNames = buildConnectionProfileNameMap();
-    const allAgents = sortAgentsByOrder(getAgents());
+    const allAgents = sortAgentsByOrder(getVisibleInChatAgents());
 
     const searchTerm = ($('#ica--search').val() || '').toString().toLowerCase();
     const categoryFilter = ($('#ica--categoryFilter').val() || '').toString();
@@ -2286,7 +2308,8 @@ async function loadTemplates() {
 async function openTemplateBrowser() {
     await loadTemplates();
 
-    if (templates.length === 0) {
+    const visibleTemplates = getVisibleTemplateBrowserTemplates();
+    if (visibleTemplates.length === 0) {
         toastr.info('No templates available.');
         return;
     }
@@ -2363,7 +2386,7 @@ async function openTemplateBrowser() {
     tplSection.append('<p class="ica--template-section-desc">Bundled trackers and helpers live here. Click any card to install it into your agent list.</p>');
 
     let selectedCategory = '';
-    const categoryOrder = getTemplateBrowserCategoryOrder(templates);
+    const categoryOrder = getTemplateBrowserCategoryOrder(visibleTemplates);
     const filterBar = $(`
         <div class="ica--template-filter-bar">
             <input type="text" class="text_pole ica--template-search" placeholder="Search templates…" value="${escapeHtml(templateBrowserSearchValue)}" />
@@ -2443,7 +2466,7 @@ async function openTemplateBrowser() {
     }
 
     function updateTemplatePills(searchTerm) {
-        const searchedTemplates = filterTemplates(templates, { searchTerm });
+        const searchedTemplates = filterTemplates(visibleTemplates, { searchTerm });
         const countsByCategory = new Map();
         for (const template of searchedTemplates) {
             countsByCategory.set(template.category, (countsByCategory.get(template.category) ?? 0) + 1);
@@ -2503,7 +2526,7 @@ async function openTemplateBrowser() {
     function renderTemplateResults() {
         const searchTerm = filterBar.find('.ica--template-search').val()?.toString() ?? '';
         templateBrowserSearchValue = searchTerm;
-        const visibleTemplates = filterTemplates(templates, {
+        const filteredTemplates = filterTemplates(visibleTemplates, {
             searchTerm,
             category: selectedCategory,
         });
@@ -2512,13 +2535,13 @@ async function openTemplateBrowser() {
         updateTemplatePills(searchTerm);
         templateResults.empty();
 
-        if (visibleTemplates.length === 0) {
+        if (filteredTemplates.length === 0) {
             templateResults.append('<div class="ica--template-empty">No templates match your filter.</div>');
             return;
         }
 
         for (const category of categoryOrder) {
-            const categoryTemplates = visibleTemplates.filter(template => template.category === category);
+            const categoryTemplates = filteredTemplates.filter(template => template.category === category);
             if (categoryTemplates.length === 0) {
                 continue;
             }
@@ -2595,7 +2618,7 @@ async function applyGroup(group) {
  * Creates a custom group from the user's current agents.
  */
 async function createCustomGroup() {
-    const currentAgents = getAgents();
+    const currentAgents = getVisibleInChatAgents();
     if (currentAgents.length === 0) {
         toastr.info('No agents to group. Add some agents first.');
         return;
@@ -2706,12 +2729,15 @@ async function handleImport(event) {
  * Exports all agents to a JSON file.
  */
 function handleExportAll() {
-    const agents = getAgents();
+    const agents = getVisibleInChatAgents();
     if (agents.length === 0) {
         toastr.info('No agents to export.');
         return;
     }
-    const data = exportAllAgents();
+    const data = {
+        ...exportAllAgents(),
+        agents,
+    };
     download(JSON.stringify(data, null, 2), 'in-chat-agents.json', 'application/json');
 }
 
@@ -3883,7 +3909,7 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     });
     $('#ica--bulkCancel').on('click', exitSelectMode);
     $('#ica--bulkSelectAll').on('click', () => {
-        for (const agent of getAgents()) {
+        for (const agent of getVisibleInChatAgents()) {
             selectedAgentIds.add(agent.id);
         }
         updateBulkBar();
@@ -4005,8 +4031,10 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         persistExtensionState();
     });
     $('#ica--resetDefaults').on('click', async () => {
-        const agents = getAgents();
-        const missingDefaultBundledTemplates = getDefaultBundledTemplates()
+        const agents = getVisibleInChatAgents();
+        const visibleDefaultBundledTemplates = getDefaultBundledTemplates()
+            .filter(template => !HIDDEN_TEMPLATE_BROWSER_IDS.has(String(template?.id ?? '').trim()));
+        const missingDefaultBundledTemplates = visibleDefaultBundledTemplates
             .filter(template => !hasMatchingAgentSnapshot(buildAgentFromTemplate(template), agents));
         const bundledCount = agents.filter(a => findTemplateForAgent(a)).length + missingDefaultBundledTemplates.length;
         if (bundledCount === 0) {
