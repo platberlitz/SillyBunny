@@ -1614,6 +1614,13 @@ function shouldShowPromptTransformNotifications(agent) {
     );
 }
 
+function shouldShowPreInterceptNotifications(agent) {
+    return Boolean(
+        getGlobalSettings()?.promptTransformShowNotifications &&
+        agent?.preProcess?.mode === 'intercept',
+    );
+}
+
 function describePromptTransformTarget(profileId = '', runner = '') {
     if (runner === 'main') {
         return 'the main model';
@@ -1657,14 +1664,21 @@ function getPromptTransformRunMetadata(agent, profileId = '') {
     };
 }
 
-function showPromptTransformRunningToast(agent, mode, profileId = '') {
+function showPromptTransformRunningToast(agent, mode, profileId = '', options = {}) {
     const agentName = agent?.name || 'In-Chat Agent';
     const modeLabel = describePromptTransformMode(mode);
     const targetLabel = describePromptTransformTarget(profileId, profileId ? 'profile' : 'main');
     const metadata = getPromptTransformRunMetadata(agent, profileId);
     const cancelButtonClass = 'ica--toast-cancel-agent';
+    const kind = options?.kind === 'preIntercept' ? 'preIntercept' : 'postGen';
+    const applyMode = ['wrap', 'patch'].includes(String(options?.applyMode))
+        ? String(options.applyMode)
+        : 'replace';
+    const runningLabel = kind === 'preIntercept'
+        ? `Running pre-generation ${applyMode} intercept...`
+        : `Running ${modeLabel} via ${targetLabel}...`;
     const messageHtml = `
-        <div>${escapeToastHtml(`Running ${modeLabel} via ${targetLabel}...`)}</div>
+        <div>${escapeToastHtml(runningLabel)}</div>
         <div>${escapeToastHtml(`Order ${metadata.order} | Model: ${metadata.modelLabel}`)}</div>
         <button type="button" class="menu_button menu_button_icon caution ${cancelButtonClass}">
             <i class="fa-solid fa-stop"></i>
@@ -1716,7 +1730,7 @@ function clearAllPromptTransformRunningToasts() {
         const title = $(element).find('.toast-title').text().trim();
         const message = $(element).find('.toast-message').text().trim();
         return $(element).find('.ica--toast-cancel-agent').length > 0 ||
-            (title === 'In-Chat Agent' && /^Running prompt (rewrite|append) via /u.test(message));
+            (title === 'In-Chat Agent' && /^Running (?:prompt (?:rewrite|append) via |pre-generation )/u.test(message));
     }).each((_, element) => toastr.clear($(element)));
 }
 
@@ -3226,6 +3240,7 @@ async function runContextInterceptAgent(agent, currentContextText, generationTyp
     const applyMode = ['wrap', 'patch'].includes(String(agent?.preProcess?.applyMode))
         ? String(agent.preProcess.applyMode)
         : 'replace';
+    const profileId = resolveAgentConnectionProfile(agent);
     const baseResult = {
         agentId: agent.id,
         agentName: agent.name,
@@ -3252,31 +3267,50 @@ async function runContextInterceptAgent(agent, currentContextText, generationTyp
     }
 
     const promptMessages = buildContextInterceptMessages(expandedPrompt, currentContextText, generationType, contextFormat);
-    const response = await requestPromptTransform(
-        agent,
-        promptMessages,
-        normalizePreProcessMaxTokens(agent.preProcess?.maxTokens),
-    );
-    const outputText = unwrapContextInterceptOutput(response.output).trim();
+    const cancelRevision = agentGenerationCancelRevision;
+    const runningToast = shouldShowPreInterceptNotifications(agent)
+        ? showPromptTransformRunningToast(agent, applyMode, profileId, { kind: 'preIntercept', applyMode })
+        : null;
 
-    if (!outputText) {
-        console.warn(`[InChatAgents] pre-generation intercept agent "${agent.name}" returned an empty response.`);
+    try {
+        const response = await requestPromptTransform(
+            agent,
+            promptMessages,
+            normalizePreProcessMaxTokens(agent.preProcess?.maxTokens),
+        );
+
+        if (agentGenerationCancelRevision !== cancelRevision) {
+            return {
+                ...baseResult,
+                status: 'cancelled',
+                profileId: response.profileId,
+                runner: response.runner,
+            };
+        }
+
+        const outputText = unwrapContextInterceptOutput(response.output).trim();
+
+        if (!outputText) {
+            console.warn(`[InChatAgents] pre-generation intercept agent "${agent.name}" returned an empty response.`);
+            return {
+                ...baseResult,
+                status: 'empty-response',
+                profileId: response.profileId,
+                runner: response.runner,
+            };
+        }
+
         return {
             ...baseResult,
-            status: 'empty-response',
+            status: 'changed',
+            changed: true,
+            outputText,
             profileId: response.profileId,
             runner: response.runner,
         };
+    } finally {
+        clearPromptTransformRunningToast(runningToast);
     }
-
-    return {
-        ...baseResult,
-        status: 'changed',
-        changed: true,
-        outputText,
-        profileId: response.profileId,
-        runner: response.runner,
-    };
 }
 
 function getGenerationContextSnapshot(generationType = null) {
@@ -3307,10 +3341,17 @@ async function runPreGenerationInterceptorsOnText(initialContextText, generation
 
     const runs = [];
     for (const agent of interceptAgents) {
+        if (generationStopRequested) {
+            break;
+        }
+
         try {
             const result = await runContextInterceptAgent(agent, currentContextText, activationSnapshot.generationType, contextFormat);
             if (result.status !== 'changed') {
                 runs.push(result);
+                if (result.status === 'cancelled') {
+                    break;
+                }
                 continue;
             }
 
@@ -3384,12 +3425,20 @@ async function runPreGenerationInterceptorsOnChat(initialChatMessages, generatio
 
     const runs = [];
     for (const agent of interceptAgents) {
+        if (generationStopRequested) {
+            break;
+        }
+
         const contextText = serializeChatContext(currentChatMessages);
+        let result = null;
 
         try {
-            const result = await runContextInterceptAgent(agent, contextText, activationSnapshot.generationType, 'chat');
+            result = await runContextInterceptAgent(agent, contextText, activationSnapshot.generationType, 'chat');
             if (result.status !== 'changed') {
                 runs.push(result);
+                if (result.status === 'cancelled') {
+                    break;
+                }
                 continue;
             }
 
@@ -3434,10 +3483,10 @@ async function runPreGenerationInterceptorsOnChat(initialChatMessages, generatio
                 error: error instanceof Error ? error.message : String(error),
                 beforeText: contextText,
                 afterText: contextText,
-                outputText: '',
-                profileId: '',
-                runner: 'error',
-                timestamp: new Date().toISOString(),
+                outputText: normalizeContentText(result?.outputText),
+                profileId: result?.profileId ?? '',
+                runner: result?.runner ?? 'error',
+                timestamp: result?.timestamp ?? new Date().toISOString(),
             });
         }
     }

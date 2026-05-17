@@ -1,0 +1,223 @@
+import { afterAll, beforeAll, describe, expect, jest, test } from '@jest/globals';
+
+let summarizeChatInterceptChange;
+let warnSpy;
+
+beforeAll(async () => {
+    jest.resetModules();
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await jest.unstable_mockModule('../public/scripts/extensions.js', () => ({
+        extension_settings: {},
+        renderExtensionTemplateAsync: jest.fn(async () => ''),
+        getContext: jest.fn(() => ({})),
+    }));
+
+    await jest.unstable_mockModule('../public/lib.js', () => ({
+        DiffMatchPatch: class DiffMatchPatch {
+            diff_main(beforeText, afterText) {
+                return [[0, beforeText], [1, afterText]];
+            }
+
+            diff_cleanupSemantic() {}
+        },
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/popup.js', () => ({
+        Popup: class Popup {
+            async show() {
+                return null;
+            }
+        },
+        POPUP_TYPE: { CONFIRM: 'confirm' },
+        POPUP_RESULT: { AFFIRMATIVE: 'affirmative' },
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/utils.js', () => ({
+        download: jest.fn(),
+        escapeHtml: jest.fn(value => String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')),
+        escapeRegex: jest.fn(value => String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+        getSortableDelay: jest.fn(() => 0),
+        uuidv4: jest.fn(() => 'test-uuid'),
+    }));
+
+    await jest.unstable_mockModule('../public/script.js', () => ({
+        CLIENT_VERSION: 'test',
+        chat: [],
+        getRequestHeaders: jest.fn(() => ({})),
+        generateQuietPrompt: jest.fn(),
+        normalizeContentText: jest.fn(value => String(value ?? '')),
+        saveSettingsDebounced: jest.fn(),
+        substituteParams: jest.fn(value => String(value ?? '')),
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/events.js', () => ({
+        eventSource: { on: jest.fn() },
+        event_types: {},
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/agent-store.js', () => ({
+        AGENT_CATEGORIES: {},
+        DEFAULT_AGENT_MAX_TOKENS: 8192,
+        LEGACY_AGENT_MAX_TOKENS: 2048,
+        areAgentsGloballyEnabled: jest.fn(() => true),
+        getAgents: jest.fn(() => []),
+        getEnabledAgents: jest.fn(() => []),
+        getAgentById: jest.fn(() => null),
+        getAgentRegexScripts: jest.fn(() => []),
+        loadAgents: jest.fn(),
+        saveAgent: jest.fn(async () => {}),
+        deleteAgent: jest.fn(async () => {}),
+        createDefaultAgent: jest.fn(() => ({
+            id: 'agent-id',
+            name: 'Agent',
+            prompt: '',
+            injection: {},
+            preProcess: {},
+            postProcess: {},
+            conditions: {},
+        })),
+        importAgents: jest.fn(() => []),
+        exportAllAgents: jest.fn(() => []),
+        exportAgent: jest.fn(() => null),
+        getGlobalSettings: jest.fn(() => ({})),
+        initializeScopedAgentEnableState: jest.fn(() => false),
+        isAgentEnabledForCurrentScope: jest.fn(() => false),
+        normalizeAgentCategory: jest.fn(value => value),
+        getAgentChatScopeLabel: jest.fn(() => 'Individual chat'),
+        getPromptTransformMode: jest.fn(() => 'rewrite'),
+        findTemplateForAgentSnapshot: jest.fn(() => null),
+        getRedundantBundledAgentDuplicateIds: jest.fn(() => []),
+        reconcileScopedEnabledAgentIdsFromLegacyFlags: jest.fn(() => false),
+        resolveConnectionProfile: jest.fn(value => value ?? ''),
+        setAgentEnabledForCurrentScope: jest.fn(),
+        setGlobalSettings: jest.fn(),
+        getGroups: jest.fn(() => []),
+        getCustomGroups: jest.fn(() => []),
+        loadBuiltinGroups: jest.fn(),
+        loadCustomGroups: jest.fn(),
+        saveGroup: jest.fn(async () => {}),
+        deleteGroup: jest.fn(async () => {}),
+        createDefaultGroup: jest.fn(() => ({ id: 'group-id', name: 'Group' })),
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/agent-runner.js', () => ({
+        cancelAgentGeneration: jest.fn(),
+        buildPromptDynamicMacros: jest.fn(() => ({})),
+        initAgentRunner: jest.fn(),
+        isAgentGenerationActive: jest.fn(() => false),
+        onAgentGenerationStateChanged: jest.fn(),
+        getPreGenerationInterceptHistoryForMessage: jest.fn(() => []),
+        getPromptTransformHistoryForMessage: jest.fn(() => []),
+        runAgentOnMessage: jest.fn(),
+        syncToolAgentRegistrations: jest.fn(),
+        undoPromptTransform: jest.fn(async () => false),
+        redoPromptTransform: jest.fn(async () => false),
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/regex-scripts.js', () => ({
+        AGENT_REGEX_PLACEMENT: {
+            AI_OUTPUT: 'ai-output',
+            USER_INPUT: 'user-input',
+            SLASH_COMMAND: 'slash-command',
+            WORLD_INFO: 'world-info',
+            REASONING: 'reasoning',
+        },
+        AGENT_REGEX_SUBSTITUTE: {
+            RAW: 'raw',
+            ESCAPED: 'escaped',
+        },
+        createDefaultRegexScript: jest.fn(() => ({})),
+        normalizeRegexScript: jest.fn(value => value),
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder-init.js', () => ({
+        initPathfinder: jest.fn(),
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder-settings-ui.js', () => ({
+        openPathfinderSettings: jest.fn(),
+        isPathfinderAgent: jest.fn(() => false),
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/tool-definitions.js', () => ({
+        getPathfinderToolDefinitions: jest.fn(() => []),
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/llm-utils.js', () => ({
+        buildFallbackPromptText: jest.fn(() => ''),
+        extractProfileResponseText: jest.fn(() => ''),
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/profile-utils.js', () => ({
+        buildConnectionProfileNameMap: jest.fn(() => new Map()),
+        getConnectionManagerRequestService: jest.fn(() => null),
+        populateConnectionProfileSelect: jest.fn(),
+    }));
+
+    ({ summarizeChatInterceptChange } = await import('../public/scripts/extensions/in-chat-agents/index.js'));
+});
+
+afterAll(() => {
+    warnSpy?.mockRestore();
+});
+
+describe('summarizeChatInterceptChange', () => {
+    test('reports a wrapped system message as an added change', () => {
+        const before = JSON.stringify([{ role: 'user', content: 'Original prompt' }], null, 2);
+        const after = JSON.stringify([
+            { role: 'user', content: 'Original prompt' },
+            { role: 'system', content: 'Follow the extra instruction.' },
+        ], null, 2);
+
+        const result = summarizeChatInterceptChange(before, after);
+
+        expect(result).toEqual({
+            ok: true,
+            changes: [expect.objectContaining({
+                changeKind: 'added',
+                role: 'system',
+                beforeIndex: null,
+                afterIndex: 1,
+                afterContent: 'Follow the extra instruction.',
+            })],
+        });
+    });
+
+    test('reports an in-place replacement as a modified change', () => {
+        const before = JSON.stringify([
+            { role: 'system', content: 'Keep tone warm.' },
+            { role: 'user', content: 'Original prompt' },
+        ], null, 2);
+        const after = JSON.stringify([
+            { role: 'system', content: 'Keep tone warm.' },
+            { role: 'user', content: 'Rewritten prompt' },
+        ], null, 2);
+
+        const result = summarizeChatInterceptChange(before, after);
+
+        expect(result).toEqual({
+            ok: true,
+            changes: [expect.objectContaining({
+                changeKind: 'modified',
+                role: 'user',
+                beforeIndex: 1,
+                afterIndex: 1,
+                beforeContent: 'Original prompt',
+                afterContent: 'Rewritten prompt',
+            })],
+        });
+    });
+
+    test('reports malformed JSON as a parse error', () => {
+        expect(summarizeChatInterceptChange('{not-json', '[]')).toEqual({
+            ok: false,
+            reason: 'parse-error',
+        });
+    });
+});

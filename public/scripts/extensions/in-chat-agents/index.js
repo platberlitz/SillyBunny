@@ -2672,11 +2672,209 @@ function getPreGenerationInterceptModeLabel(entry) {
     return 'replace';
 }
 
+function parseChatInterceptSummaryMessages(value) {
+    let parsed;
+    try {
+        parsed = JSON.parse(String(value ?? ''));
+    } catch {
+        return { ok: false, reason: 'parse-error' };
+    }
+
+    if (!Array.isArray(parsed)) {
+        return { ok: false, reason: 'shape-error' };
+    }
+
+    const messages = [];
+    for (const [index, message] of parsed.entries()) {
+        if (!message || typeof message !== 'object' || Array.isArray(message)) {
+            return { ok: false, reason: 'shape-error' };
+        }
+
+        if (typeof message.role !== 'string' || typeof message.content !== 'string') {
+            return { ok: false, reason: 'shape-error' };
+        }
+
+        messages.push({
+            index,
+            role: message.role,
+            content: message.content,
+        });
+    }
+
+    return { ok: true, messages };
+}
+
+export function summarizeChatInterceptChange(beforeText, afterText) {
+    const beforeResult = parseChatInterceptSummaryMessages(beforeText);
+    const afterResult = parseChatInterceptSummaryMessages(afterText);
+
+    if (!beforeResult.ok) {
+        return { ok: false, reason: beforeResult.reason };
+    }
+
+    if (!afterResult.ok) {
+        return { ok: false, reason: afterResult.reason };
+    }
+
+    const beforeMessages = beforeResult.messages;
+    const afterMessages = afterResult.messages;
+    const matchedBefore = new Set();
+    const matchedAfter = new Set();
+
+    for (const beforeMessage of beforeMessages) {
+        const afterMessage = afterMessages.find(candidate =>
+            !matchedAfter.has(candidate.index) &&
+            candidate.role === beforeMessage.role &&
+            candidate.content === beforeMessage.content,
+        );
+
+        if (!afterMessage) {
+            continue;
+        }
+
+        matchedBefore.add(beforeMessage.index);
+        matchedAfter.add(afterMessage.index);
+    }
+
+    const changes = [];
+    for (const beforeMessage of beforeMessages) {
+        if (matchedBefore.has(beforeMessage.index)) {
+            continue;
+        }
+
+        const afterMessage = afterMessages[beforeMessage.index];
+        if (!afterMessage || matchedAfter.has(afterMessage.index)) {
+            continue;
+        }
+
+        matchedBefore.add(beforeMessage.index);
+        matchedAfter.add(afterMessage.index);
+        changes.push({
+            changeKind: 'modified',
+            role: afterMessage.role || beforeMessage.role,
+            beforeIndex: beforeMessage.index,
+            afterIndex: afterMessage.index,
+            beforeContent: beforeMessage.content,
+            afterContent: afterMessage.content,
+        });
+    }
+
+    for (const beforeMessage of beforeMessages) {
+        if (matchedBefore.has(beforeMessage.index)) {
+            continue;
+        }
+
+        changes.push({
+            changeKind: 'removed',
+            role: beforeMessage.role,
+            beforeIndex: beforeMessage.index,
+            afterIndex: null,
+            beforeContent: beforeMessage.content,
+            afterContent: '',
+        });
+    }
+
+    for (const afterMessage of afterMessages) {
+        if (matchedAfter.has(afterMessage.index)) {
+            continue;
+        }
+
+        changes.push({
+            changeKind: 'added',
+            role: afterMessage.role,
+            beforeIndex: null,
+            afterIndex: afterMessage.index,
+            beforeContent: '',
+            afterContent: afterMessage.content,
+        });
+    }
+
+    const changeKindOrder = {
+        removed: 0,
+        modified: 1,
+        added: 2,
+    };
+    changes.sort((left, right) => {
+        const leftIndex = left.afterIndex ?? left.beforeIndex ?? 0;
+        const rightIndex = right.afterIndex ?? right.beforeIndex ?? 0;
+        if (leftIndex !== rightIndex) {
+            return leftIndex - rightIndex;
+        }
+
+        return changeKindOrder[left.changeKind] - changeKindOrder[right.changeKind];
+    });
+
+    return { ok: true, changes };
+}
+
+function buildPreGenerationChatChangeMarkup(change) {
+    let diffMarkup = '';
+    if (change.changeKind === 'added') {
+        diffMarkup = `<span class="ica-transform-diff-part--ins">${escapeHtml(change.afterContent)}</span>`;
+    } else if (change.changeKind === 'removed') {
+        diffMarkup = `<span class="ica-transform-diff-part--del">${escapeHtml(change.beforeContent)}</span>`;
+    } else {
+        diffMarkup = buildPromptTransformDiffMarkup(change.beforeContent, change.afterContent);
+    }
+
+    return `
+        <div class="ica-preintercept-message-change">
+            <div class="ica-preintercept-message-header">
+                <span class="ica-preintercept-role">${escapeHtml(change.role || 'message')}</span>
+                <span class="ica-preintercept-change-kind">${escapeHtml(change.changeKind)}</span>
+            </div>
+            <div class="ica-transform-diff">${diffMarkup}</div>
+        </div>
+    `;
+}
+
+function buildPreGenerationInterceptSummaryMarkup(entry) {
+    const beforeText = entry.beforeText ?? '';
+    const outputText = String(entry.outputText ?? '').trim();
+    const afterText = entry.contextFormat === 'chat' && entry.status === 'error' && outputText
+        ? outputText
+        : entry.afterText ?? '';
+
+    if (entry.contextFormat !== 'chat') {
+        return `
+            <div class="ica-transform-output-title">Prompt diff</div>
+            <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(beforeText, afterText)}</div>
+        `;
+    }
+
+    try {
+        const summary = summarizeChatInterceptChange(beforeText, afterText);
+        if (!summary.ok) {
+            return `
+                <div class="ica-preintercept-fallback-notice">Could not summarize chat messages; showing raw diff.</div>
+                <div class="ica-transform-output-title">Context diff</div>
+                <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(beforeText, afterText)}</div>
+            `;
+        }
+
+        const changesMarkup = summary.changes.length > 0
+            ? summary.changes.map(buildPreGenerationChatChangeMarkup).join('')
+            : '<div class="ica-preintercept-empty">No effective change.</div>';
+
+        return `
+            <div class="ica-transform-output-title">Chat changes</div>
+            ${changesMarkup}
+        `;
+    } catch (error) {
+        console.warn('[InChatAgents] Failed to summarize pre-generation intercept history entry:', error);
+        return `
+            <div class="ica-preintercept-fallback-notice">Could not summarize chat messages; showing raw diff.</div>
+            <div class="ica-transform-output-title">Context diff</div>
+            <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(beforeText, afterText)}</div>
+        `;
+    }
+}
+
 function buildPreGenerationInterceptEntryMarkup(entry, i) {
     const timestamp = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
     const status = String(entry.status ?? 'changed');
     const statusText = status === 'error'
-        ? `Error: ${escapeHtml(entry.error || 'unknown error')}`
+        ? `Error: ${entry.error || 'unknown error'}`
         : `${entry.changed ? 'Changed' : 'No visible change'} the ${entry.contextFormat === 'chat' ? 'chat message array' : 'text prompt'}`;
     const modeLabel = getPreGenerationInterceptModeLabel(entry);
     const output = String(entry.outputText ?? '').trim();
@@ -2685,9 +2883,11 @@ function buildPreGenerationInterceptEntryMarkup(entry, i) {
         <div class="ica-transform-history-entry ica-preintercept-history-entry" data-index="${i}">
             <h5>${escapeHtml(entry.agentName || 'Agent')} <small>(pre-gen ${escapeHtml(modeLabel)})</small></h5>
             <small>${escapeHtml(timestamp)}${timestamp ? ' · ' : ''}${escapeHtml(statusText)}</small>
-            ${output ? `<div class="ica-transform-output-title">Agent output</div><div class="ica-transform-diff">${escapeHtml(output)}</div>` : ''}
-            <div class="ica-transform-output-title">Context diff</div>
-            <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(entry.beforeText ?? '', entry.afterText ?? '')}</div>
+            ${buildPreGenerationInterceptSummaryMarkup(entry)}
+            <details class="ica-preintercept-raw">
+                <summary>Raw agent output</summary>
+                <pre class="ica-transform-diff">${escapeHtml(output)}</pre>
+            </details>
         </div>
     `;
 }

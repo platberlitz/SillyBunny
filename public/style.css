@@ -7461,6 +7461,54 @@ body:not(.movingUI) .drawer-content.maximized {
     flex-wrap: wrap;
 }
 
+.ica-preintercept-message-change {
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 38%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #222) 14%, transparent);
+}
+
+.ica-preintercept-message-change + .ica-preintercept-message-change {
+    margin-top: 8px;
+}
+
+.ica-preintercept-message-header {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.ica-preintercept-role {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ica-preintercept-change-kind {
+    font-size: 0.78em;
+    padding: 1px 6px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 45%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #ddd) 10%, transparent);
+}
+
+.ica-preintercept-empty,
+.ica-preintercept-fallback-notice {
+    font-style: italic;
+    opacity: 0.72;
+}
+
+.ica-preintercept-raw {
+    margin-top: 10px;
+}
+
+.ica-preintercept-raw > summary {
+    cursor: pointer;
+    opacity: 0.78;
+}
+
 
 .group_speaker_controls {
     display: flex;
