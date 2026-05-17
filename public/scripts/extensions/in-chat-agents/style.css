@@ -1259,6 +1259,10 @@ button.ica--card-pill--version-update {
         flex-direction: column;
     }
 
+    .ica--template-search {
+        flex: 0 0 auto;
+    }
+
     .ica--template-pill-row {
         flex-wrap: nowrap;
         overflow-x: auto;
