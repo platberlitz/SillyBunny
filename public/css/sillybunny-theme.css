@@ -4883,6 +4883,15 @@ input[type='range']::-moz-range-thumb {
         min-width: 68px;
     }
 
+    #AdvancedFormatting > .flex-container.alignItemsBaseline {
+        gap: 8px;
+    }
+
+    #af_master_import > span,
+    #af_master_export > span {
+        display: none;
+    }
+
     #PersonaManagement .persona-management-actions {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
