@@ -9,6 +9,8 @@ This update consolidates the v1.6.0 staging work into main: safer preset/profile
 - Chat Completion Tabs are now bundled natively for provider-specific chat completion controls.
 - Pre-Generation Intercepts are a new In-Chat Agents feature for running agents before the main reply, with preserved mutations, stronger validation, and visible intercept history.
 - NPC Motivator by Sheep is bundled as a starter Pre-Generation Intercept template.
+- Pura's Director Preset is updated to V13.1, Geechan's Universal Roleplay presets are updated to V5.2, and Geechan's Universal Online Chat V1.0 is now bundled.
+- Prose Polisher now supports Guided Generations impersonation polishing through its bundled opt-in prompt-pass update.
 - Character menu and drawer updates improve mobile compactness, tab scrolling, desktop drawer alignment, and stale iOS cache handling.
 - Bun launcher updates now retry dependency installs without `--frozen-lockfile` when the locked install fails.
 - Echo, Whisper, Hush, Ripple, and Tide chat styles are now included natively.
