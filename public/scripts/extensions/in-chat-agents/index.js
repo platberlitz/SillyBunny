@@ -3517,6 +3517,9 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
             setGlobalSettings(savedState.globalSettings);
         }
         restoreAutoSeededTemplateIds(savedState);
+        if (savedState.dismissedTemplatesCallout === true) {
+            $('.ica--templates-callout').hide();
+        }
     }
 
     const initResults = await Promise.allSettled([
@@ -3656,6 +3659,16 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     $('#ica--exportAll').on('click', handleExportAll);
     $('#ica--templates').on('click', openTemplateBrowser);
     $('#ica--templatesCallout').on('click', openTemplateBrowser);
+    $('#ica--templatesCalloutDismiss').on('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        $('.ica--templates-callout').hide();
+        extension_settings.inChatAgents = {
+            ...(extension_settings.inChatAgents ?? {}),
+            dismissedTemplatesCallout: true,
+        };
+        saveSettingsDebounced();
+    });
     $('#ica--cancelGeneration').on('click', () => {
         cancelAgentGeneration();
         updateCancelGenerationButton();
