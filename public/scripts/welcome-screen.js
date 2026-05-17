@@ -77,14 +77,6 @@ const STARTER_PACK_EXTENSIONS = Object.freeze({
         id: 'third-party/SB-GroupUtilities',
         repoUrl: 'https://github.com/DrMortum/SB-GroupUtilities',
     }),
-    promptInspector: Object.freeze({
-        id: 'third-party/Extension-PromptInspector',
-        repoUrl: 'https://github.com/SillyTavern/Extension-PromptInspector',
-    }),
-    chatCompletionTabs: Object.freeze({
-        id: 'third-party/SillyTavern-ChatCompletionTabs',
-        repoUrl: 'https://github.com/RivelleDays/SillyTavern-ChatCompletionTabs',
-    }),
     laLib: Object.freeze({
         id: 'third-party/SillyTavern-LALib',
         repoUrl: 'https://github.com/LenAnderson/SillyTavern-LALib',
@@ -895,20 +887,6 @@ function buildStarterPackItems() {
                 icon: 'fa-users',
                 chips: ['Extension', 'Groups', 'Presence', 'SendAs'],
                 extensionName: STARTER_PACK_EXTENSIONS.groupUtilities.id,
-            }),
-            buildExtensionStarterPackItem({
-                title: 'Prompt Inspector',
-                body: 'See the prompt stack more clearly when you need to understand what is being sent to the model, debug formatting, or compare how your setup changes the final payload.',
-                icon: 'fa-magnifying-glass',
-                chips: ['Extension', 'Recommended', 'Prompting'],
-                extensionName: STARTER_PACK_EXTENSIONS.promptInspector.id,
-            }),
-            buildExtensionStarterPackItem({
-                title: 'Chat Completion Tabs',
-                body: 'Split chat-completions settings into cleaner tabs so model setup is easier to scan and less overwhelming when you are tuning providers, presets, and request options.',
-                icon: 'fa-table-columns',
-                chips: ['Extension', 'Recommended', 'Layout'],
-                extensionName: STARTER_PACK_EXTENSIONS.chatCompletionTabs.id,
             }),
             buildExtensionStarterPackItem({
                 title: 'LALib',
