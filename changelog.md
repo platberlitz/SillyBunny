@@ -148,6 +148,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #126 (2026-05-17) `feat: categorise templates browser, retire Pathfinder agent`
 - PR #127 (2026-05-17) `chore: remove Prompt Inspector and Chat Completion Tabs from Launchpad`
 - PR #128 (2026-05-17) `fix(webpack): alias chevrotain to its prebundled ESM file`
+- PR #129 (2026-05-17) `fix: pre-gen intercept running toast and structured edits view`
 
 ### Direct Staging Commits
 - `fix(chat): restore scroll anchoring so scrolling up no longer skips messages`
