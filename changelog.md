@@ -154,6 +154,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #130 (2026-05-17) `fix: unblock UI on cancelled stream and prevent auto-continue race`
 - PR #131 (2026-05-17) `fix: strip reasoning blocks from profile-based prompt transform output`
 - PR #134 (2026-05-17) `fix: tighten advanced formatting mobile header`
+- PR #135 (2026-05-17) `chore: v1.6.0 pre-release cleanup`
 
 ### Direct Staging Commits
 - `fix(chat): restore scroll anchoring so scrolling up no longer skips messages`
