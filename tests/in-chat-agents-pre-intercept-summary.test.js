@@ -63,6 +63,7 @@ beforeAll(async () => {
 
     await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/agent-store.js', () => ({
         AGENT_CATEGORIES: {},
+        AGENT_SUBCATEGORIES: {},
         DEFAULT_AGENT_MAX_TOKENS: 8192,
         LEGACY_AGENT_MAX_TOKENS: 2048,
         areAgentsGloballyEnabled: jest.fn(() => true),

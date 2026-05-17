@@ -204,6 +204,10 @@ describe('in-chat agent post-processing runner', () => {
             event_types: eventTypes,
         }));
 
+        await jest.unstable_mockModule('../public/scripts/reasoning.js', () => ({
+            removeReasoningFromString: jest.fn(value => String(value ?? '')),
+        }));
+
         await jest.unstable_mockModule('../public/scripts/tool-calling.js', () => ({
             ToolManager: {
                 RECURSE_LIMIT: 5,
