@@ -9,9 +9,13 @@ export const DEFAULT_ALLOWLIST = Object.freeze([
     '/audiomode',
     '/audioplay',
     '/echo',
+    '/getchatname',
+]);
+
+export const DEFAULT_ADVANCED_ALLOWLIST = Object.freeze([
+    ...DEFAULT_ALLOWLIST,
     '/buttons',
     '/popup',
-    '/getchatname',
 ]);
 
 export const DEFAULT_LIMITS = Object.freeze({
@@ -20,9 +24,11 @@ export const DEFAULT_LIMITS = Object.freeze({
 });
 
 export function createDefaultPolicy(overrides = {}) {
+    const mode = overrides.mode ?? POLICY_MODES.DISABLED;
+
     return {
-        mode: overrides.mode ?? POLICY_MODES.ALLOWLIST,
-        allowlist: buildAllowlistSet(overrides.allowlist ?? DEFAULT_ALLOWLIST),
+        mode,
+        allowlist: buildAllowlistSet(overrides.allowlist ?? getDefaultAllowlistForMode(mode)),
         limits: {
             ...DEFAULT_LIMITS,
             ...(overrides.limits ?? {}),
@@ -41,16 +47,21 @@ export function parseSlashCommandRequest(raw, policy = createDefaultPolicy()) {
         return { ok: false, reason: 'malformed' };
     }
 
-    if (raw.length > activePolicy.limits.maxCommandLength) {
-        return { ok: false, reason: 'too_long' };
-    }
-
     const trimmed = raw.trim();
     if (!trimmed) {
         return { ok: false, reason: 'empty_input' };
     }
 
-    const segments = trimmed.split('|');
+    if (trimmed.length > activePolicy.limits.maxCommandLength) {
+        return { ok: false, reason: 'too_long' };
+    }
+
+    const pipeline = splitSlashPipeline(trimmed);
+    if (!pipeline.ok) {
+        return pipeline;
+    }
+
+    const { segments } = pipeline;
     if (segments.length > activePolicy.limits.maxPipedCommands) {
         return { ok: false, reason: 'too_many_commands' };
     }
@@ -75,7 +86,7 @@ export function parseSlashCommandRequest(raw, policy = createDefaultPolicy()) {
 
 function normalizePolicy(policy) {
     if (!policy || typeof policy !== 'object') {
-        return createDefaultPolicy({ mode: POLICY_MODES.DISABLED });
+        return createDefaultPolicy();
     }
 
     const validModes = new Set(Object.values(POLICY_MODES));
@@ -83,7 +94,7 @@ function normalizePolicy(policy) {
 
     return {
         mode,
-        allowlist: buildAllowlistSet(policy.allowlist ?? []),
+        allowlist: buildAllowlistSet(policy.allowlist ?? getDefaultAllowlistForMode(mode)),
         limits: {
             ...DEFAULT_LIMITS,
             ...(policy.limits ?? {}),
@@ -115,6 +126,56 @@ function parseCommandSegment(segment, allowlist) {
     };
 }
 
+function splitSlashPipeline(input) {
+    const segments = [];
+    let current = '';
+    let quote = '';
+    let escaped = false;
+
+    for (const char of input) {
+        if (escaped) {
+            current += char;
+            escaped = false;
+            continue;
+        }
+
+        if (char === '\\') {
+            current += char;
+            escaped = true;
+            continue;
+        }
+
+        if (quote) {
+            current += char;
+            if (char === quote) {
+                quote = '';
+            }
+            continue;
+        }
+
+        if (char === '"') {
+            current += char;
+            quote = char;
+            continue;
+        }
+
+        if (char === '|') {
+            segments.push(current);
+            current = '';
+            continue;
+        }
+
+        current += char;
+    }
+
+    if (quote) {
+        return { ok: false, reason: 'malformed' };
+    }
+
+    segments.push(current);
+    return { ok: true, segments };
+}
+
 function buildAllowlistSet(allowlist) {
     const allowed = new Set();
 
@@ -130,6 +191,10 @@ function buildAllowlistSet(allowlist) {
     }
 
     return allowed;
+}
+
+function getDefaultAllowlistForMode(mode) {
+    return mode === POLICY_MODES.ADVANCED ? DEFAULT_ADVANCED_ALLOWLIST : DEFAULT_ALLOWLIST;
 }
 
 function normalizeAllowedCommand(command) {

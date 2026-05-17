@@ -1,8 +1,11 @@
 import { MESSAGE_TYPE, MESSAGE_VERSION } from './messages.js';
 
-export const CARD_SCRIPT_SANDBOX_CSP = 'default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data: blob:; media-src data: blob: https://files.catbox.moe; font-src data:; connect-src \'none\'; form-action \'none\'; base-uri \'none\'; frame-ancestors \'none\'';
+export const CARD_SCRIPT_SANDBOX_CSP = 'default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data: blob: https:; media-src data: blob: https:; font-src data: https:; connect-src \'none\'; form-action \'none\'; base-uri \'none\'';
 
-const TRIGGER_SLASH_BRIDGE_NAME = 'trigger' + 'Slash';
+const TRIGGER_SLASH_BRIDGE_NAME = 'triggerSlash';
+
+// Sandboxed srcdoc frames have opaque origins, so postMessage needs '*'. The
+// parent listener must authenticate by event.source plus message metadata.
 
 export function buildSandboxDocument({ html = '', messageId = null, nonce = '' } = {}) {
     const cardHtml = html == null ? '' : String(html);
