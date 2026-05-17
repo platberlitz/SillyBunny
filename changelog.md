@@ -40,6 +40,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 
 ### Chat Completion Tabs
 - Added the default Chat Completion Tabs extension for provider-specific chat completion controls.
+- Added the default Prompt Inspector extension for inspecting and editing chat completion and text completion prompts before they are sent.
 - Preserved tab content and scroll positions while switching, disabling, or scrolling through chat completion tabs.
 - Omitted disabled `top_k` controls and sampler-owned chat completion controls from places where they should not be saved or shown.
 - Honored connection profile secret IDs for custom chat completions so profile-backed secrets remain linked correctly.
