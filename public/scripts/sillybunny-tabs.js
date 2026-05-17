@@ -2674,7 +2674,6 @@ function bindMessageActionExtensionEvents() {
     context.eventSource.on(context.event_types.SETTINGS_UPDATED, () => syncMessageActionExtensionVisibility());
     context.eventSource.on(context.event_types.USER_MESSAGE_RENDERED, data => syncMessageActionExtensionVisibility(data?.element || data));
     context.eventSource.on(context.event_types.CHARACTER_MESSAGE_RENDERED, data => syncMessageActionExtensionVisibility(data?.element || data));
-    context.eventSource.on(context.event_types.MESSAGE_UPDATED, () => scheduleTopbarContextRefresh(0));
 }
 
 function getChatScriptModule() {
@@ -3116,6 +3115,7 @@ function bindTopBarBrand() {
         eventTypes.GROUP_CHAT_CREATED,
         eventTypes.MESSAGE_EDITED,
         eventTypes.MESSAGE_DELETED,
+        eventTypes.MESSAGE_UPDATED,
         eventTypes.CHARACTER_EDITED,
         eventTypes.CHARACTER_RENAMED,
         eventTypes.CHARACTER_DELETED,
