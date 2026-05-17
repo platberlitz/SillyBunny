@@ -141,6 +141,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #112 (2026-05-16) `feat: make bundled image modules manually syncable`
 - PR #113 (2026-05-16) `feat: add prompt manager preview`
 - PR #116 (2026-05-16) `fix: enable Prose Polisher for impersonation catalog`
+- PR #125 (2026-05-17) `fix(agents): prevent duplicate Prose Polisher after template prompt update`
 - PR #128 (2026-05-17) `fix(webpack): alias chevrotain to its prebundled ESM file`
 
 ### Direct Staging Commits
