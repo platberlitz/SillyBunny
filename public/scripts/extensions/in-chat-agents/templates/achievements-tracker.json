@@ -4,6 +4,7 @@
     "description": "Track notable firsts, milestones, and memorable moments",
     "icon": "",
     "category": "tracker",
+    "subcategory": "progress",
     "tags": [
         "achievements",
         "milestones"
