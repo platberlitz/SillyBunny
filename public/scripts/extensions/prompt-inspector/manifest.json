@@ -1,0 +1,14 @@
+{
+    "display_name": "Prompt Inspector",
+    "loading_order": 5,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Cohee1207",
+    "version": "1.1.0",
+    "homePage": "https://github.com/SillyTavern/Extension-PromptInspector",
+    "hooks": {
+        "activate": "init"
+    }
+}
