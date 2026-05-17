@@ -624,17 +624,36 @@ function hasIdenticalAgent(agent, existingAgents = getAgents()) {
     );
 }
 
-async function confirmDuplicateAgentAddition(agent) {
-    if (!hasIdenticalAgent(agent)) {
+async function confirmDuplicateAgentAddition(agent, existingAgents = getAgents()) {
+    if (hasIdenticalAgent(agent, existingAgents)) {
+        const result = await new Popup(
+            'An identical agent is already active. Add anyway?',
+            POPUP_TYPE.CONFIRM,
+            'Duplicate agent',
+            {
+                okButton: 'Add Agent',
+                cancelButton: 'Cancel',
+            },
+        ).show();
+
+        return result === POPUP_RESULT.AFFIRMATIVE;
+    }
+
+    const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+    const hasSameTemplateAgent = sourceTemplateId && existingAgents.some(existingAgent =>
+        String(existingAgent?.sourceTemplateId ?? '').trim() === sourceTemplateId,
+    );
+    if (!hasSameTemplateAgent) {
         return true;
     }
 
+    const agentName = String(agent?.name ?? 'this template').trim() || 'this template';
     const result = await new Popup(
-        'An identical agent is already active. Add anyway?',
+        `You already have a "${escapeHtml(agentName)}" agent installed. Add another copy?`,
         POPUP_TYPE.CONFIRM,
         'Duplicate agent',
         {
-            okButton: 'Add Agent',
+            okButton: 'Add Another',
             cancelButton: 'Cancel',
         },
     ).show();
@@ -2353,6 +2372,7 @@ async function openTemplateBrowser() {
     `);
     const pillRow = filterBar.find('.ica--template-pill-row');
     const templateResults = $('<div class="ica--template-results"></div>');
+    const existingAgents = getAgents();
     const allPill = $(`
         <button type="button" class="ica--template-pill is-active" data-category="">
             <span>All</span>
@@ -2375,11 +2395,15 @@ async function openTemplateBrowser() {
     function buildTemplateCard(tpl) {
         const catInfo = AGENT_CATEGORIES[tpl.category] || AGENT_CATEGORIES.custom;
         const regexCount = getTemplateRegexCount(tpl);
+        const alreadyAdded = hasMatchingAgentSnapshot(buildAgentFromTemplate(tpl), existingAgents);
         const trackerBadge = tpl.category === 'tracker'
             ? '<span class="ica--card-pill"><i class="fa-solid fa-chart-line fa-xs"></i> Bundled tracker</span>'
             : '';
+        const addedBadge = alreadyAdded
+            ? '<span class="ica--card-pill"><i class="fa-solid fa-check fa-xs"></i> Added</span>'
+            : '';
         const card = $(`
-            <div class="ica--template-card" data-id="${tpl.id}">
+            <div class="ica--template-card${alreadyAdded ? ' ica--template-card--added' : ''}" data-id="${tpl.id}">
                 <div class="ica--template-card-header">
                     <span class="ica--template-card-name">${escapeHtml(tpl.name)}</span>
                     <span class="ica--template-card-category"><i class="fa-solid ${catInfo.icon}"></i> ${escapeHtml(catInfo.label)}</span>
@@ -2387,6 +2411,7 @@ async function openTemplateBrowser() {
                 <div class="ica--template-card-description">${escapeHtml(tpl.description)}</div>
                 <div class="ica--template-card-badges">
                     <span class="ica--card-pill ica--card-pill--version">v${escapeHtml(getTemplateVersionValue(tpl))}</span>
+                    ${addedBadge}
                     ${trackerBadge}
                     ${regexCount > 0 ? `<span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${buildRegexTemplateLabel(regexCount)}</span>` : ''}
                 </div>
@@ -2396,7 +2421,7 @@ async function openTemplateBrowser() {
 
         card.on('click', async () => {
             const newAgent = buildAgentFromTemplate(tpl);
-            if (!await confirmDuplicateAgentAddition(newAgent)) {
+            if (!await confirmDuplicateAgentAddition(newAgent, existingAgents)) {
                 toastr.info('Duplicate agent not added.');
                 return;
             }

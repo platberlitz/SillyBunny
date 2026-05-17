@@ -247,6 +247,61 @@ describe('in-chat agent scoped enabled state', () => {
         expect(store.getRedundantBundledAgentDuplicateIds(agents, templates)).toEqual(['duplicate-pathfinder']);
     });
 
+    test('removes same-template duplicates while keeping the current template prompt', async () => {
+        const store = await importStore();
+        const templates = [{
+            id: 'tpl-prose-polisher',
+            name: 'Prose Polisher',
+            prompt: 'new bundled wording',
+            category: 'content',
+        }];
+        const agents = [
+            {
+                id: 'old-prose-polisher',
+                name: 'Prose Polisher',
+                prompt: 'old bundled wording',
+                sourceTemplateId: 'tpl-prose-polisher',
+                enabled: true,
+            },
+            {
+                id: 'current-prose-polisher',
+                name: 'Prose Polisher',
+                prompt: 'new bundled wording',
+                sourceTemplateId: 'tpl-prose-polisher',
+                enabled: false,
+            },
+        ];
+
+        expect(store.getRedundantBundledAgentDuplicateIds(agents, templates)).toEqual(['old-prose-polisher']);
+    });
+
+    test('does not mark phase-locked same-template duplicates redundant', async () => {
+        const store = await importStore();
+        const templates = [{
+            id: 'tpl-prose-polisher',
+            name: 'Prose Polisher',
+            prompt: 'new bundled wording',
+            category: 'content',
+        }];
+        const agents = [
+            {
+                id: 'old-locked-prose-polisher',
+                name: 'Prose Polisher',
+                prompt: 'old bundled wording',
+                sourceTemplateId: 'tpl-prose-polisher',
+                phaseLocked: true,
+            },
+            {
+                id: 'current-prose-polisher',
+                name: 'Prose Polisher',
+                prompt: 'new bundled wording',
+                sourceTemplateId: 'tpl-prose-polisher',
+            },
+        ];
+
+        expect(store.getRedundantBundledAgentDuplicateIds(agents, templates)).toEqual([]);
+    });
+
     test('matches bundled template snapshots after template prompt wording changes', async () => {
         const store = await importStore();
         const templates = [{

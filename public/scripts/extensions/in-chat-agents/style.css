@@ -1184,6 +1184,15 @@ button.ica--card-pill--version-update {
     border-color: var(--SmartThemeQuoteColor, #8b8);
 }
 
+.ica--template-card--added {
+    filter: saturate(0.72);
+    opacity: 0.74;
+}
+
+.ica--template-card--added:hover {
+    opacity: 0.9;
+}
+
 .ica--template-card-header {
     display: flex;
     justify-content: space-between;
