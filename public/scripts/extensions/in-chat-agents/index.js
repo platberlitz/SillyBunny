@@ -479,17 +479,36 @@ function hasIdenticalAgent(agent, existingAgents = getAgents()) {
     );
 }
 
-async function confirmDuplicateAgentAddition(agent) {
-    if (!hasIdenticalAgent(agent)) {
+async function confirmDuplicateAgentAddition(agent, existingAgents = getAgents()) {
+    if (hasIdenticalAgent(agent, existingAgents)) {
+        const result = await new Popup(
+            'An identical agent is already active. Add anyway?',
+            POPUP_TYPE.CONFIRM,
+            'Duplicate agent',
+            {
+                okButton: 'Add Agent',
+                cancelButton: 'Cancel',
+            },
+        ).show();
+
+        return result === POPUP_RESULT.AFFIRMATIVE;
+    }
+
+    const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+    const hasSameTemplateAgent = sourceTemplateId && existingAgents.some(existingAgent =>
+        String(existingAgent?.sourceTemplateId ?? '').trim() === sourceTemplateId,
+    );
+    if (!hasSameTemplateAgent) {
         return true;
     }
 
+    const agentName = String(agent?.name ?? 'this template').trim() || 'this template';
     const result = await new Popup(
-        'An identical agent is already active. Add anyway?',
+        `You already have a "${escapeHtml(agentName)}" agent installed. Add another copy?`,
         POPUP_TYPE.CONFIRM,
         'Duplicate agent',
         {
-            okButton: 'Add Agent',
+            okButton: 'Add Another',
             cancelButton: 'Cancel',
         },
     ).show();
@@ -2191,22 +2210,28 @@ async function openTemplateBrowser() {
     tplSection.append('<p class="ica--template-section-desc">Bundled trackers and helpers live here. Click any card to install it into your agent list.</p>');
 
     const grid = $('<div class="ica--template-grid"></div>');
+    const existingAgents = getAgents();
 
     for (const tpl of templates) {
         const catInfo = AGENT_CATEGORIES[tpl.category] || AGENT_CATEGORIES.custom;
         const regexCount = getTemplateRegexCount(tpl);
+        const alreadyAdded = hasMatchingAgentSnapshot(buildAgentFromTemplate(tpl), existingAgents);
         const trackerBadge = tpl.category === 'tracker'
             ? '<span class="ica--card-pill"><i class="fa-solid fa-chart-line fa-xs"></i> Bundled tracker</span>'
             : '';
+        const addedBadge = alreadyAdded
+            ? '<span class="ica--card-pill"><i class="fa-solid fa-check fa-xs"></i> Added</span>'
+            : '';
         const card = $(`
-            <div class="ica--template-card" data-id="${tpl.id}">
+            <div class="ica--template-card${alreadyAdded ? ' ica--template-card--added' : ''}" data-id="${tpl.id}">
                 <div class="ica--template-card-header">
                     <span class="ica--template-card-name">${escapeHtml(tpl.name)}</span>
                     <span class="ica--template-card-category"><i class="fa-solid ${catInfo.icon}"></i> ${catInfo.label}</span>
                 </div>
                 <div class="ica--template-card-description">${escapeHtml(tpl.description)}</div>
-                ${(trackerBadge || regexCount > 0) ? `
+                ${(trackerBadge || regexCount > 0 || addedBadge) ? `
                     <div class="ica--template-card-badges">
+                        ${addedBadge}
                         ${trackerBadge}
                         ${regexCount > 0 ? `<span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${buildRegexTemplateLabel(regexCount)}</span>` : ''}
                     </div>
