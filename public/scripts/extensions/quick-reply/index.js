@@ -33,6 +33,8 @@ const defaultSettings = {
 
 /** @type {Boolean}*/
 let isReady = false;
+/** @type {Boolean}*/
+let initStarted = false;
 /** @type {Function[]}*/
 let executeQueue = [];
 /** @type {string}*/
@@ -168,6 +170,12 @@ const handleCharChange = () => {
 };
 
 export async function init() {
+    if (initStarted) {
+        debug('init() already started; skipping duplicate call');
+        return;
+    }
+    initStarted = true;
+
     await loadSets();
     await loadSettings();
     log('settings: ', settings);

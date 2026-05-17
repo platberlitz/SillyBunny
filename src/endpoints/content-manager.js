@@ -81,6 +81,7 @@ const OBSOLETE_CONTENT_ITEMS = Object.freeze([
 ]);
 
 const MANAGED_BUNDLED_PRESETS = Object.freeze([
+    { filename: 'presets/quick-replies/Default.json', type: CONTENT_TYPES.QUICK_REPLIES },
     { filename: 'presets/quick-replies/Memory Sharding.json', type: CONTENT_TYPES.QUICK_REPLIES },
 ]);
 
