@@ -197,6 +197,8 @@ const WELCOME_BUNDLED_ASSISTANTS = Object.freeze([
     Object.freeze({
         id: 'guide',
         avatarStorageKey: assistantAvatarKey,
+        identityStorageKey: 'bundledAssistantGuideAvatar',
+        deletedStorageKey: 'bundledAssistantGuideDeleted',
         defaultAvatar: 'default_SillyBunnyGuide.png',
         fileName: 'default_SillyBunnyGuide',
         portrait: 'img/sillybunny-guide-assistant-portrait.png',
@@ -225,6 +227,8 @@ const WELCOME_BUNDLED_ASSISTANTS = Object.freeze([
     Object.freeze({
         id: 'nahida',
         avatarStorageKey: bundledAssistantNahidaAvatarKey,
+        identityStorageKey: 'bundledAssistantNahidaIdentityAvatar',
+        deletedStorageKey: 'bundledAssistantNahidaDeleted',
         defaultAvatar: 'default_AssistantNahida.png',
         fileName: 'default_AssistantNahida',
         cardAsset: 'img/assistant-nahida-portrait.png',
@@ -451,6 +455,66 @@ function getBundledAssistantConfig(assistantId = DEFAULT_BUNDLED_ASSISTANT_ID) {
     return WELCOME_BUNDLED_ASSISTANTS.find(item => item.id === assistantId) ?? WELCOME_BUNDLED_ASSISTANTS[0];
 }
 
+function isBundledAssistantMarkedDeleted(config) {
+    return accountStorage.getItem(config.deletedStorageKey) === 'true';
+}
+
+function clearBundledAssistantDeleted(config) {
+    accountStorage.removeItem(config.deletedStorageKey);
+}
+
+function markBundledAssistantDeleted(config, deletedAvatar) {
+    accountStorage.setItem(config.deletedStorageKey, 'true');
+    const storedAvatar = accountStorage.getItem(config.avatarStorageKey);
+    if (!storedAvatar || storedAvatar === deletedAvatar) {
+        accountStorage.removeItem(config.avatarStorageKey);
+    }
+    const identityAvatar = accountStorage.getItem(config.identityStorageKey);
+    if (!identityAvatar || identityAvatar === deletedAvatar) {
+        accountStorage.removeItem(config.identityStorageKey);
+    }
+}
+
+function getBundledAssistantIdentityAvatar(config) {
+    return accountStorage.getItem(config.identityStorageKey) || config.defaultAvatar;
+}
+
+function setBundledAssistantIdentityAvatar(config, avatar) {
+    if (!avatar || avatar === config.defaultAvatar) {
+        accountStorage.removeItem(config.identityStorageKey);
+    } else {
+        accountStorage.setItem(config.identityStorageKey, avatar);
+    }
+
+    clearBundledAssistantDeleted(config);
+}
+
+function hasBundledAssistantFingerprint(config, character) {
+    const creator = typeof character?.creator === 'string' ? character.creator.toLowerCase() : '';
+    const creatorNotes = typeof character?.creator_notes === 'string' ? character.creator_notes.toLowerCase() : '';
+    const name = typeof character?.name === 'string' ? character.name.toLowerCase() : '';
+    const tags = Array.isArray(character?.tags) ? character.tags.map(tag => String(tag).toLowerCase()) : [];
+
+    return creatorNotes.includes('bundled')
+        || creatorNotes.includes(config.title.toLowerCase())
+        || (creator === String(config.creator).toLowerCase() && name === String(config.characterName).toLowerCase())
+        || (creator === String(config.creator).toLowerCase() && name === config.title.toLowerCase())
+        || tags.includes('bundled');
+}
+
+function isBundledAssistantCharacter(config, character) {
+    const avatar = typeof character?.avatar === 'string' ? character.avatar : '';
+    if (!avatar) {
+        return false;
+    }
+
+    const identityAvatar = getBundledAssistantIdentityAvatar(config);
+    const storedAvatar = accountStorage.getItem(config.avatarStorageKey);
+    return avatar === config.defaultAvatar
+        || avatar === identityAvatar
+        || (avatar === storedAvatar && hasBundledAssistantFingerprint(config, character));
+}
+
 function setBundledAssistantStoredAvatar(config, avatar) {
     if (!avatar || avatar === config.defaultAvatar) {
         accountStorage.removeItem(config.avatarStorageKey);
@@ -507,13 +571,17 @@ function findBundledAssistantCharacterId(config, avatar = getBundledAssistantAva
  * @param {object} [options]
  * @param {boolean} [options.tryCreate=true] Whether a missing assistant should be created automatically.
  * @param {boolean} [options.created=false] Whether the current resolution came from a fresh create flow.
+ * @param {boolean} [options.forceCreate=false] Whether to create even if the bundled assistant was deleted.
  * @returns {Promise<{avatar: string, characterId: number, created: boolean} | null>}
  */
-async function ensureBundledAssistantCharacter(config, { tryCreate = true, created = false } = {}) {
+async function ensureBundledAssistantCharacter(config, { tryCreate = true, created = false, forceCreate = false } = {}) {
     const avatar = getBundledAssistantAvatar(config);
     const characterId = findBundledAssistantCharacterId(config, avatar);
 
     if (characterId !== -1) {
+        if (avatar === config.defaultAvatar || avatar === getBundledAssistantIdentityAvatar(config)) {
+            clearBundledAssistantDeleted(config);
+        }
         return { avatar, characterId, created };
     }
 
@@ -522,10 +590,15 @@ async function ensureBundledAssistantCharacter(config, { tryCreate = true, creat
         return null;
     }
 
+    if (isBundledAssistantMarkedDeleted(config) && !forceCreate) {
+        console.info(`Bundled assistant "${config.id}" was deleted by the user. Skipping automatic recreation.`);
+        return null;
+    }
+
     try {
         console.log(`Character not found for avatar ID: ${avatar}. Creating new bundled assistant.`, config.id);
         await createBundledAssistant(config);
-        return ensureBundledAssistantCharacter(config, { tryCreate: false, created: true });
+        return ensureBundledAssistantCharacter(config, { tryCreate: false, created: true, forceCreate });
     } catch (error) {
         console.error(`Error creating bundled assistant "${config.id}":`, error);
         toastr.error(t`Failed to create ${config.characterName}. See console for details.`);
@@ -1991,7 +2064,7 @@ async function getRecentChats() {
 export async function openPermanentAssistantChat({ tryCreate = true, created = false } = {}) {
     try {
         const assistantConfig = getBundledAssistantConfig(DEFAULT_BUNDLED_ASSISTANT_ID);
-        const assistant = await ensureBundledAssistantCharacter(assistantConfig, { tryCreate, created });
+        const assistant = await ensureBundledAssistantCharacter(assistantConfig, { tryCreate, created, forceCreate: tryCreate });
         if (!assistant) {
             return;
         }
@@ -2055,6 +2128,7 @@ async function createBundledAssistant(config) {
 
         const resolvedAvatar = characters[createdCharacterId]?.avatar;
         setBundledAssistantStoredAvatar(config, resolvedAvatar || '');
+        setBundledAssistantIdentityAvatar(config, resolvedAvatar || config.defaultAvatar);
         return;
     }
 
@@ -2098,11 +2172,12 @@ async function createBundledAssistant(config) {
 
     const resolvedAvatar = characters[createdCharacterId]?.avatar;
     setBundledAssistantStoredAvatar(config, resolvedAvatar || '');
+    setBundledAssistantIdentityAvatar(config, resolvedAvatar || config.defaultAvatar);
 }
 
 async function openBundledAssistantCard(assistantId = DEFAULT_BUNDLED_ASSISTANT_ID) {
     const assistantConfig = getBundledAssistantConfig(assistantId);
-    const assistant = await ensureBundledAssistantCharacter(assistantConfig);
+    const assistant = await ensureBundledAssistantCharacter(assistantConfig, { forceCreate: true });
     if (!assistant) {
         return;
     }
@@ -2175,8 +2250,22 @@ export function initWelcomeScreen() {
     eventSource.on(event_types.CHARACTER_RENAMED, (oldAvatar, newAvatar) => {
         for (const assistant of WELCOME_BUNDLED_ASSISTANTS) {
             const storedAvatar = accountStorage.getItem(assistant.avatarStorageKey);
+            const identityAvatar = getBundledAssistantIdentityAvatar(assistant);
+            if (identityAvatar === oldAvatar || assistant.defaultAvatar === oldAvatar) {
+                setBundledAssistantIdentityAvatar(assistant, newAvatar);
+            }
+
             if (storedAvatar === oldAvatar || (!storedAvatar && assistant.defaultAvatar === oldAvatar)) {
                 setBundledAssistantStoredAvatar(assistant, newAvatar);
+            }
+        }
+    });
+
+    eventSource.on(event_types.CHARACTER_DELETED, (event) => {
+        const deletedCharacter = event?.character;
+        for (const assistant of WELCOME_BUNDLED_ASSISTANTS) {
+            if (isBundledAssistantCharacter(assistant, deletedCharacter)) {
+                markBundledAssistantDeleted(assistant, deletedCharacter?.avatar || '');
             }
         }
     });

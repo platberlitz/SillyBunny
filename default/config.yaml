@@ -64,6 +64,8 @@ enableForwardedWhitelist: true
 whitelist:
   - ::1
   - 127.0.0.1
+  - 172.16.0.0/12
+  - 192.168.0.0/16
 # Automatically whitelist Docker host and gateway IPs
 whitelistDockerHosts: true
 # Toggle basic authentication for endpoints
