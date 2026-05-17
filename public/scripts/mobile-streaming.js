@@ -16,6 +16,8 @@ export function isSmoothStreamingEffectivelyEnabled({
     iosWebKitDisableSmoothStreaming = false,
     navigatorRef = globalThis.navigator,
 } = {}) {
+    // SillyBunny: let iOS WebKit opt out of smooth streaming even when the global
+    // preference is enabled, because that platform is the main regression target.
     return Boolean(smoothStreaming) && !(Boolean(iosWebKitDisableSmoothStreaming) && isIOSWebKitPlatform(navigatorRef));
 }
 

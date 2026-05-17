@@ -533,6 +533,8 @@ async function translateOutgoingMessage(messageId) {
     const originalText = message.mes;
     message.extra.display_text = originalText;
     message.mes = await translate(originalText, extension_settings.translate.internal_language);
+    // SillyBunny: translated assistant text should keep token accounting aligned
+    // with the visible message body.
     await updateMessageTokenAccounting(message);
     updateMessageBlock(messageId, message);
 

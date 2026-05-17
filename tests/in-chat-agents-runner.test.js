@@ -1,3 +1,4 @@
+/* eslint-disable playwright/no-duplicate-hooks */
 /* global document, globalThis */
 import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
 

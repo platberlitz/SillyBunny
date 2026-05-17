@@ -82,6 +82,8 @@ function renderAlternativeTokensView() {
     renderTopLogprobs();
 
     const { messageLogprobs, continueFrom } = getActiveMessageLogprobData() || {};
+    // SillyBunny: honor the iOS WebKit smooth-streaming bypass so token
+    // probability UI state matches the stream renderer's effective mode.
     const usingSmoothStreaming = isStreamingEnabled() && isSmoothStreamingEffectivelyEnabled({
         smoothStreaming: power_user.smooth_streaming,
         iosWebKitDisableSmoothStreaming: power_user.ios_webkit_disable_smooth_streaming,

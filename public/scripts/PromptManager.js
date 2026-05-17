@@ -706,6 +706,8 @@ class PromptManager {
             }
         };
 
+        // SillyBunny: the prompt editor now exposes a preview tab that needs its own
+        // click handler and state sync separate from upstream edit/inspect flows.
         this.handlePromptEditorTabClick = (event) => {
             const tabName = event.currentTarget?.dataset?.tab;
             if (!['edit', 'preview'].includes(tabName)) return;
@@ -1099,6 +1101,7 @@ class PromptManager {
         // Clear forms on closing the popup
         document.getElementById(this.configuration.prefix + 'prompt_manager_popup_entry_form_close').addEventListener('click', closeAndClearPopup);
         document.getElementById(this.configuration.prefix + 'prompt_manager_popup_close_button').addEventListener('click', closeAndClearPopup);
+        // SillyBunny: preview mode has its own close button and field listeners.
         document.getElementById(this.configuration.prefix + 'prompt_manager_popup_preview_close_button').addEventListener('click', closeAndClearPopup);
         document.querySelectorAll('.' + this.configuration.prefix + 'prompt_manager_tab_button').forEach(button => {
             button.addEventListener('click', this.handlePromptEditorTabClick);

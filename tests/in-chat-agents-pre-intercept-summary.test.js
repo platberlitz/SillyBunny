@@ -1,3 +1,4 @@
+/* eslint-disable playwright/no-duplicate-hooks */
 import { afterAll, beforeAll, describe, expect, jest, test } from '@jest/globals';
 
 let summarizeChatInterceptChange;

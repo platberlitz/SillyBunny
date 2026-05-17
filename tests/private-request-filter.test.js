@@ -1,3 +1,4 @@
+/* eslint-disable playwright/no-duplicate-hooks */
 import { describe, test, expect, jest, beforeAll, beforeEach, afterAll } from '@jest/globals';
 
 const mockNetConnect = jest.fn(() => ({ type: 'net-socket' }));
