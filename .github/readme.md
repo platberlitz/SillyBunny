@@ -197,14 +197,14 @@ SillyBunny has support for In-Chat Agents. These are custom prompt fields that c
 
 * **Trackers:** Achievements, CYOA Choices, Direction Menu, Event, Item, NPC Profiles, Parallel Off-Screen, Relationship, Reputation, Scene, Secrets, Status, Time, and World Detail.
 * **Randomizers:** Chaos Mode, Combined Director's Cut, Dead Dove Escalation, Genre, Grounded Complication, Intimacy & Kink, Scene Driving Force, and Scene Pressure Cocktail.
-* **Content:** Difficulty Increase, Don't Write for User, Friction Mode, Grounded Prose, HTML Toggle, and Write for User.
+* **Content:** Difficulty Increase, Don't Write for User, Friction Mode, Grounded Prose, HTML Toggle, NPC Motivator by Sheep, and Write for User.
 * **Post Generation Editors:** Prose Polisher
 * **Additional Agents:** Pathfinder (an agentic lorebook navigator with 8 tools for retrieval, memory maintenance, and tree building).
 
 **Agent Behaviors and Settings**
 * Agentic prompts feature inline run-order editing, click-to-edit functionality, and fullscreen prompt editors.
 * Agents use the main connection profile by default with an 8192 max token limit. Separate connection profile support is available when explicitly selected.
-* Pre-generation interceptors can replace the outgoing context, wrap or append helper output, or add tagged patches. Multiple interceptors run in agent order.
+* Pre-Generation Intercepts can replace the outgoing context, wrap or append helper output, or add tagged patches before the main model replies. Multiple interceptors run in agent order, and NPC Motivator by Sheep is bundled as a starter intercept template.
 * Bundled trackers, including CYOA Choices, are configured for pre-generation. The main model emits clickable options directly in the response.
 * All bundled tracker and menu agents default to the User injection role to maintain compatibility with models that deprioritize System injections.
 * Built-in groups are available for the full preset, trackers only, and randomizers only.
@@ -213,7 +213,8 @@ SillyBunny has support for In-Chat Agents. These are custom prompt fields that c
 ### Bundled Goodies & Tutorials
 SillyBunny includes some extras by default to help you get started right away:
 * A tutorial that guides you through the SillyBunny interface.
-* Pre-bundled roleplay presets from purachina and Geechan.
+* Pre-bundled roleplay presets from purachina and Geechan, including Pura's Director Preset V13.1, Geechan's Universal Roleplay V5.2, and Geechan's Universal Online Chat V1.0.
+* Pre-bundled workflow extensions including Guided Generations, Input History, Quick Image Gen, and Prompt Inspector.
 * A character card conversion preset from TLD to help you generate character cards from scratch, or convert from existing cards to a better format.
 * A friendly quick-start guide with bundled workflow helpers plus optional recommended extensions such as Summary Sharder, Dialogue Colours, and CSS Snippets.
 * Two custom assistants to help you get started - Bunny Guide, and Assistant Nahida.
@@ -227,12 +228,15 @@ SillyBunny includes some extras by default to help you get started right away:
 This update turns the staging line after v1.5.3 into the v1.6.0 release, with new prompt tools, steadier profile and preset saves, cleaner mobile chat controls, and safer runtime updates.
 
 **Added**
-* Pre-Generation Agents now support Pre-Generation Intercepts with mutation preservation, validation hardening, and visible intercept history.
-* Chat Completion Tabs are bundled for provider-specific chat completion controls, alongside the new bundled Prompt Inspector for reviewing and editing chat completion and text completion prompts before sending.
+* Pre-Generation Intercepts are a new In-Chat Agents feature for running agents before the main reply, with mutation preservation, validation hardening, visible intercept history, and NPC Motivator by Sheep bundled as a starter intercept template.
+* Guided Generations, Input History, Quick Image Gen, and Prompt Inspector are now pre-bundled.
+* Chat Completion Tabs are bundled for provider-specific chat completion controls.
 * Guided Generations now includes Guided Correction, and Prompt Manager adds a prompt preview before use.
+* Prose Polisher now supports Guided Generations impersonation polishing through its bundled opt-in prompt-pass update.
+* Pura's Director Preset is updated to V13.1, Geechan's Universal Roleplay presets are updated to V5.2, and Geechan's Universal Online Chat V1.0 is now bundled.
 * OOC and HTML context-depth controls now make those context windows adjustable from the UI.
 * Echo, Whisper, Hush, Ripple, and Tide chat styles are bundled natively.
-* Reasoning options now include `xhigh`, with `auto` renamed to a blank label.
+* Reasoning options now include `xhigh`, with `auto` renamed to `None`.
 
 **Changed**
 * Connection Profiles now serialize changes in order, cancel superseded applications, await OpenAI preset updates, preserve profile secret IDs, and show expanded summaries.
