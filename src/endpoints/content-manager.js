@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
 
 import express from 'express';
 import fetch from 'node-fetch';
@@ -78,6 +79,17 @@ const OBSOLETE_CONTENT_ITEMS = Object.freeze([
     { filename: 'presets/sysprompt/Geechan - Universal Roleplay (NSFW) (V5.0).json', type: CONTENT_TYPES.SYSPROMPT },
     { filename: 'presets/sysprompt/Geechan - Universal Roleplay (Simplified) (V5.0).json', type: CONTENT_TYPES.SYSPROMPT },
     { filename: 'presets/sysprompt/Geechan - Universal Roleplay (NSFW Simplified) (V5.0).json', type: CONTENT_TYPES.SYSPROMPT },
+]);
+
+// SillyBunny divergence: reconcile only the bundled Memory Sharding quick reply
+// during the existing default content pass. Hash-gating keeps user-authored or
+// edited files untouched, repeated runs stay idempotent, and staleHashes is a
+// migration ledger for future bundled prompt updates.
+const MANAGED_BUNDLED_QUICK_REPLIES = Object.freeze([
+    {
+        bundledPath: 'presets/quick-replies/Memory Sharding.json',
+        staleHashes: Object.freeze([]),
+    },
 ]);
 
 function isPresetContentType(type) {
@@ -430,6 +442,120 @@ function removeObsoleteContent(contentLog, directories) {
     }
 }
 
+function getSha256(buffer) {
+    return createHash('sha256').update(buffer).digest('hex');
+}
+
+function getJsonFilesRecursive(directory) {
+    const files = [];
+
+    try {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+            const entryPath = path.join(directory, entry.name);
+
+            if (entry.isDirectory()) {
+                files.push(...getJsonFilesRecursive(entryPath));
+                continue;
+            }
+
+            if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.json') {
+                files.push(entryPath);
+            }
+        }
+    } catch (error) {
+        console.warn(`Failed to scan quick replies directory ${directory}`, error);
+    }
+
+    return files;
+}
+
+/**
+ * Reconciles managed bundled quick replies without touching user-modified files.
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ */
+export function reconcileManagedBundledQuickReplies(directories) {
+    const quickRepliesDirectory = getUserTargetByType(CONTENT_TYPES.QUICK_REPLIES, directories);
+
+    if (!quickRepliesDirectory || !fs.existsSync(quickRepliesDirectory)) {
+        return;
+    }
+
+    for (const managedQuickReply of MANAGED_BUNDLED_QUICK_REPLIES) {
+        const bundledPath = path.join(contentDirectory, managedQuickReply.bundledPath);
+        let bundledContent;
+
+        try {
+            bundledContent = fs.readFileSync(bundledPath);
+        } catch (error) {
+            console.warn(`Failed to read bundled quick reply ${managedQuickReply.bundledPath}`, error);
+            continue;
+        }
+
+        const currentHash = getSha256(bundledContent);
+        const staleHashes = new Set(managedQuickReply.staleHashes);
+        const currentMatches = [];
+        const staleMatches = [];
+
+        for (const filePath of getJsonFilesRecursive(quickRepliesDirectory)) {
+            try {
+                const fileHash = getSha256(fs.readFileSync(filePath));
+
+                if (fileHash === currentHash) {
+                    currentMatches.push(filePath);
+                } else if (staleHashes.has(fileHash)) {
+                    staleMatches.push(filePath);
+                }
+            } catch (error) {
+                console.warn(`Failed to inspect quick reply file ${filePath}`, error);
+            }
+        }
+
+        if (currentMatches.length === 0 && staleMatches.length === 0) {
+            continue;
+        }
+
+        for (const filePath of staleMatches) {
+            try {
+                fs.rmSync(filePath, { force: true });
+                console.info(`Stale bundled quick reply removed from ${filePath}`);
+            } catch (error) {
+                console.warn(`Failed to remove stale bundled quick reply ${filePath}`, error);
+            }
+        }
+
+        const bundledName = path.parse(managedQuickReply.bundledPath).name;
+        const canonicalPath = path.join(quickRepliesDirectory, `${sanitize(bundledName)}.json`);
+
+        if (currentMatches.length >= 2) {
+            const keepPath = currentMatches.includes(canonicalPath) ? canonicalPath : currentMatches[0];
+
+            for (const filePath of currentMatches) {
+                if (filePath === keepPath) {
+                    continue;
+                }
+
+                try {
+                    fs.rmSync(filePath, { force: true });
+                    console.info(`Duplicate bundled quick reply removed from ${filePath}`);
+                } catch (error) {
+                    console.warn(`Failed to remove duplicate bundled quick reply ${filePath}`, error);
+                }
+            }
+        }
+
+        if (currentMatches.length === 0 && staleMatches.length > 0) {
+            try {
+                fs.mkdirSync(path.dirname(canonicalPath), { recursive: true });
+                writeFileAtomicSync(canonicalPath, bundledContent);
+                setPermissionsSync(canonicalPath);
+                console.info(`Bundled quick reply restored to ${canonicalPath}`);
+            } catch (error) {
+                console.warn(`Failed to restore bundled quick reply ${canonicalPath}`, error);
+            }
+        }
+    }
+}
+
 /**
  * Seeds content for a user.
  * @param {ContentItem[]} contentIndex Content index
@@ -446,6 +572,7 @@ async function seedContentForUser(contentIndex, directories, forceCategories) {
     const contentLog = getContentLog(contentLogPath);
     removeObsoleteContent(contentLog, directories);
     writeFileAtomicSync(contentLogPath, contentLog.join('\n'));
+    reconcileManagedBundledQuickReplies(directories);
     const filteredContentIndex = contentIndex.filter(contentItem => {
         if (!isPresetContentType(contentItem.type)) {
             return true;

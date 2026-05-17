@@ -33,6 +33,8 @@ const defaultSettings = {
 
 /** @type {Boolean}*/
 let isReady = false;
+// SillyBunny divergence: shared in-flight init promise; resets on rejection.
+let initPromise = null;
 /** @type {Function[]}*/
 let executeQueue = [];
 /** @type {string}*/
@@ -167,7 +169,7 @@ const handleCharChange = () => {
     settings.charConfig = charConfig;
 };
 
-export async function init() {
+async function doInit() {
     await loadSets();
     await loadSettings();
     log('settings: ', settings);
@@ -222,6 +224,18 @@ export async function init() {
     eventSource.on(event_types.APP_READY, async () => await finalizeInit());
 
     globalThis.quickReplyApi = quickReplyApi;
+}
+
+export function init() {
+    if (initPromise) {
+        return initPromise;
+    }
+
+    initPromise = doInit().catch(err => {
+        initPromise = null;
+        throw err;
+    });
+    return initPromise;
 }
 
 const finalizeInit = async () => {
