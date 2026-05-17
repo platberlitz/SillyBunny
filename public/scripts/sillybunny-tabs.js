@@ -3115,6 +3115,7 @@ function bindTopBarBrand() {
         eventTypes.GROUP_CHAT_CREATED,
         eventTypes.MESSAGE_EDITED,
         eventTypes.MESSAGE_DELETED,
+        eventTypes.MESSAGE_UPDATED,
         eventTypes.CHARACTER_EDITED,
         eventTypes.CHARACTER_RENAMED,
         eventTypes.CHARACTER_DELETED,
