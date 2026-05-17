@@ -689,6 +689,19 @@ export const AGENT_CATEGORIES = {
     custom: { label: 'Custom', icon: 'fa-puzzle-piece' },
 };
 
+/**
+ * Modal-only template subgroup labels.
+ */
+export const AGENT_SUBCATEGORIES = {
+    world: { category: 'tracker', label: 'World & Scene', icon: 'fa-map' },
+    characters: { category: 'tracker', label: 'Character State', icon: 'fa-users' },
+    progress: { category: 'tracker', label: 'Player Progress', icon: 'fa-trophy' },
+    'player-choices': { category: 'tracker', label: 'Player Choices', icon: 'fa-list-check' },
+    'prose-quality': { category: 'content', label: 'Prose Quality', icon: 'fa-feather' },
+    pov: { category: 'content', label: 'Point of View', icon: 'fa-user-pen' },
+    behaviour: { category: 'content', label: 'Behaviour & Tone', icon: 'fa-masks-theater' },
+};
+
 function escapeRegexLiteral(value) {
     return String(value ?? '').replaceAll('/', '\\/');
 }
@@ -832,13 +845,16 @@ export function normalizeToolDef(raw = {}) {
  */
 export function normalizeAgent(rawAgent = {}) {
     const defaults = createDefaultAgent();
+    const rawAgentWithoutModalMetadata = { ...rawAgent };
+    delete rawAgentWithoutModalMetadata.subcategory;
+
     const rawPreProcess = rawAgent.preProcess && typeof rawAgent.preProcess === 'object' ? rawAgent.preProcess : {};
     const rawPostProcess = rawAgent.postProcess && typeof rawAgent.postProcess === 'object' ? rawAgent.postProcess : {};
     const conditions = rawAgent.conditions && typeof rawAgent.conditions === 'object' ? rawAgent.conditions : {};
 
     return {
         ...defaults,
-        ...rawAgent,
+        ...rawAgentWithoutModalMetadata,
         id: typeof rawAgent.id === 'string' && rawAgent.id.trim() ? rawAgent.id.trim() : defaults.id,
         name: typeof rawAgent.name === 'string' ? rawAgent.name : defaults.name,
         description: typeof rawAgent.description === 'string' ? rawAgent.description : defaults.description,

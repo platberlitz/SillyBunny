@@ -4,6 +4,7 @@
     "description": "Mark scene transitions, time shifts, and location changes",
     "icon": "",
     "category": "tracker",
+    "subcategory": "world",
     "tags": [
         "scene",
         "location",

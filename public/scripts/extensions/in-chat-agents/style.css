@@ -59,6 +59,31 @@
     border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 48%, transparent);
 }
 
+.ica--templates-callout-dismiss {
+    flex: 0 0 auto;
+    align-self: flex-start;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    opacity: 0.55;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.ica--templates-callout-dismiss:hover,
+.ica--templates-callout-dismiss:focus-visible {
+    opacity: 1;
+    background-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 18%, transparent);
+    outline: none;
+}
+
 /* Toolbar */
 .ica--toolbar {
     display: flex;
@@ -531,6 +556,53 @@
     opacity: 0.7;
 }
 
+button.ica--card-pill {
+    border: 0;
+    color: inherit;
+    font: inherit;
+    cursor: default;
+}
+
+.ica--card-pill--order {
+    font-variant-numeric: tabular-nums;
+    background: color-mix(in srgb, var(--SmartThemeBorderColor) 34%, transparent);
+}
+
+.ica--card-pill--version {
+    font-variant-numeric: tabular-nums;
+    background: color-mix(in srgb, var(--SmartThemeBorderColor) 28%, transparent);
+}
+
+.ica--card-pill--version-update {
+    cursor: pointer;
+    opacity: 0.95;
+    color: var(--SmartThemeQuoteColor, #8b8);
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 13%, transparent);
+    transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+button.ica--card-pill--version-update {
+    border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 46%, transparent);
+}
+
+.ica--card-pill--version-update:hover,
+.ica--card-pill--version-update:focus-visible {
+    opacity: 1;
+    border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 72%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 22%, transparent);
+    animation: ica--version-pulse 0.85s ease-in-out;
+}
+
+@keyframes ica--version-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 0%, transparent);
+    }
+
+    50% {
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 18%, transparent);
+    }
+}
+
 /* Card actions row */
 .ica--card-actions {
     display: flex;
@@ -750,6 +822,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
     font-size: calc(var(--mainFontSize) * 0.85);
 }
 
@@ -760,6 +833,13 @@
 
 .ica--profile-label select {
     flex: 1;
+}
+
+.ica--profile-help {
+    flex-basis: 100%;
+    font-size: calc(var(--mainFontSize) * 0.76);
+    line-height: 1.35;
+    opacity: 0.6;
 }
 
 /* ── Prompt Manager button ──────────────────────────── */
@@ -968,6 +1048,90 @@
     opacity: 0.6;
 }
 
+.ica--template-filter-bar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 4px 10px;
+    background: var(--SmartThemeBlurTintColor, #222);
+}
+
+.ica--template-search {
+    flex: 1 1 220px;
+    min-width: 0;
+}
+
+.ica--template-pill-row {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.ica--template-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 28%, transparent);
+    color: inherit;
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 8%, transparent);
+    font: inherit;
+    font-size: calc(var(--mainFontSize) * 0.78);
+    cursor: pointer;
+    opacity: 0.76;
+    transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.ica--template-pill:hover,
+.ica--template-pill:focus-visible,
+.ica--template-pill.is-active {
+    opacity: 1;
+    border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 58%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 18%, transparent);
+}
+
+.ica--template-pill-count {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.72;
+}
+
+.ica--template-results,
+.ica--template-category-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ica--template-results {
+    padding-top: 2px;
+}
+
+.ica--template-category-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 2px;
+    font-size: calc(var(--mainFontSize) * 0.88);
+    font-weight: 700;
+    text-transform: uppercase;
+    opacity: 0.72;
+}
+
+.ica--template-category-count,
+.ica--template-subgroup-title span:last-child {
+    margin-left: auto;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.72;
+}
+
 /* Group cards */
 .ica--group-grid {
     display: grid;
@@ -1093,10 +1257,37 @@
     word-break: break-word;
 }
 
+.ica--template-subgroup-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 2px 4px 0 14px;
+    font-size: calc(var(--mainFontSize) * 0.78);
+    font-weight: 600;
+    opacity: 0.75;
+}
+
+.ica--template-empty {
+    padding: 24px;
+    text-align: center;
+    opacity: 0.6;
+}
+
 @media (max-width: 720px) {
     .ica--templates-callout {
+        position: relative;
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .ica--templates-callout-dismiss {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+    }
+
+    .ica--templates-callout-copy {
+        padding-right: 28px;
     }
 
     #ica--templatesCallout {
@@ -1106,6 +1297,25 @@
 
     .ica--editor-row.flex-container {
         flex-direction: column;
+    }
+
+    .ica--template-filter-bar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .ica--template-search {
+        flex: 0 0 auto;
+    }
+
+    .ica--template-pill-row {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 2px;
+    }
+
+    .ica--template-pill {
+        flex: 0 0 auto;
     }
 }
 

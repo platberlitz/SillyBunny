@@ -4,6 +4,7 @@
     "description": "Helps NPCs feel less static and gives them more agency to pursue their own goals",
     "icon": "",
     "category": "content",
+    "subcategory": "behaviour",
     "tags": [
         "npc",
         "motivation",
