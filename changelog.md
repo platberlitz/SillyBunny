@@ -142,6 +142,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #112 (2026-05-16) `feat: make bundled image modules manually syncable`
 - PR #113 (2026-05-16) `feat: add prompt manager preview`
 - PR #116 (2026-05-16) `fix: enable Prose Polisher for impersonation catalog`
+- PR #119 (2026-05-17) `Fix OpenRouter quantizations on profile requests`
 - PR #120 (2026-05-17) `fix: refresh topbar tokens after hiding messages`
 - PR #124 (2026-05-17) `feat: add native Prompt Inspector extension`
 - PR #125 (2026-05-17) `fix(agents): prevent duplicate Prose Polisher after template prompt update`
