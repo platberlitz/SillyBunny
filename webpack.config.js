@@ -9,6 +9,7 @@ import { serverDirectory } from './src/server-directory.js';
 import { getVersion, color } from './src/util.js';
 
 const BUN_LIB_BUNDLE_SIGNATURE = 'bun-no-minify-v1';
+const PUBLIC_LIB_CONFIG_SIGNATURE = 'chevrotain-esm-alias-v1';
 const WEBPACK_CACHE_KEEP_COUNT = 3;
 const PUBLIC_LIB_FILENAME = 'lib.js';
 
@@ -42,6 +43,7 @@ function getWebpackCacheVersion() {
         .update(JSON.stringify([
             appVersion.pkgVersion,
             webpack.version,
+            PUBLIC_LIB_CONFIG_SIGNATURE,
             isBunRuntime() ? BUN_LIB_BUNDLE_SIGNATURE : 'default',
             getPublicLibInputsSignature(),
         ]))
