@@ -5,7 +5,38 @@ import { oai_settings, proxies, ZAI_ENDPOINT } from '../openai.js';
 import { SECRET_KEYS, secret_state } from '../secrets.js';
 import { textgen_types, textgenerationwebui_settings } from '../textgen-settings.js';
 import { getTokenCountAsync } from '../tokenizers.js';
-import { createThumbnail, isValidUrl } from '../utils.js';
+import { createThumbnail, isTrueBoolean, isValidUrl } from '../utils.js';
+
+const CHAT_COMPLETION_PROFILE_REQUEST_FIELDS = {
+    'request-reasoning': ['include_reasoning', value => isTrueBoolean(String(value))],
+    'reasoning-effort': ['reasoning_effort', value => String(value ?? '')],
+    'verbosity': ['verbosity', value => String(value ?? '')],
+    'enable-web-search': ['enable_web_search', value => isTrueBoolean(String(value))],
+    'request-images': ['request_images', value => isTrueBoolean(String(value))],
+    'request-image-resolution': ['request_image_resolution', value => String(value ?? '')],
+    'request-image-aspect-ratio': ['request_image_aspect_ratio', value => String(value ?? '')],
+    'custom-reasoning-preset': ['custom_reasoning_preset', value => String(value ?? '')],
+    'custom-reasoning-param-format': ['custom_reasoning_param_format', value => String(value ?? '')],
+    'custom-reasoning-param-name': ['custom_reasoning_param_name', value => String(value ?? '')],
+    'custom-reasoning-enabled-value': ['custom_reasoning_enabled_value', value => String(value ?? '')],
+    'custom-reasoning-disabled-value': ['custom_reasoning_disabled_value', value => String(value ?? '')],
+};
+
+function getChatCompletionProfileRequestOverrides(profile, overridePayload) {
+    const overrides = {};
+    const profileFieldNames = [];
+
+    for (const [profileKey, [requestKey, coerceValue]] of Object.entries(CHAT_COMPLETION_PROFILE_REQUEST_FIELDS)) {
+        if (!Object.hasOwn(profile, profileKey) || Object.hasOwn(overridePayload, requestKey)) {
+            continue;
+        }
+
+        overrides[requestKey] = coerceValue(profile[profileKey]);
+        profileFieldNames.push(requestKey);
+    }
+
+    return { overrides, profileFieldNames };
+}
 
 /**
  * Generates a caption for an image using a multimodal model.
@@ -393,6 +424,7 @@ export class ConnectionManagerRequestService {
         includePreset: true,
         includeInstruct: true,
         instructSettings: {},
+        modelOverride: '',
     };
 
     static getAllowedTypes() {
@@ -413,11 +445,12 @@ export class ConnectionManagerRequestService {
      * @param {boolean?} [custom.includePreset=true]
      * @param {boolean?} [custom.includeInstruct=true]
      * @param {Partial<InstructSettings>?} [custom.instructSettings] Override instruct settings
+     * @param {string?} [custom.modelOverride] Override model name
      * @param {Record<string, any>} [overridePayload] - Override payload for the request
      * @returns {Promise<import('../custom-request.js').ExtractedData | (() => AsyncGenerator<import('../custom-request.js').StreamResponse>)>} If not streaming, returns extracted data; if streaming, returns a function that creates an AsyncGenerator
      */
     static async sendRequest(profileId, prompt, maxTokens, custom = this.defaultSendRequestParams, overridePayload = {}) {
-        const { stream, signal, extractData, includePreset, includeInstruct, instructSettings } = { ...this.defaultSendRequestParams, ...custom };
+        const { stream, signal, extractData, includePreset, includeInstruct, instructSettings, modelOverride } = { ...this.defaultSendRequestParams, ...custom };
 
         const context = SillyTavern.getContext();
         if (context.extensionSettings.disabledExtensions.includes('connection-manager')) {
@@ -426,6 +459,7 @@ export class ConnectionManagerRequestService {
 
         const profile = this.getProfile(profileId);
         const selectedApiMap = this.validateProfile(profile);
+        const profileRequestOverrides = getChatCompletionProfileRequestOverrides(profile, overridePayload);
 
         try {
             switch (selectedApiMap.selected) {
@@ -436,18 +470,24 @@ export class ConnectionManagerRequestService {
 
                     const proxyPreset = proxies.find((p) => p.name === profile.proxy);
 
+                    const model = typeof modelOverride === 'string' && modelOverride.trim()
+                        ? modelOverride.trim()
+                        : profile.model;
                     const messages = Array.isArray(prompt) ? prompt : [{ role: 'user', content: prompt }];
                     const ccRequestData = {
                         stream,
                         messages,
                         max_tokens: maxTokens,
-                        model: profile.model,
+                        model,
                         chat_completion_source: selectedApiMap.source,
                         secret_id: profile['secret-id'],
                         reverse_proxy: proxyPreset?.url,
                         proxy_password: proxyPreset?.password,
                         custom_prompt_post_processing: profile['prompt-post-processing'],
+                        // SillyBunny: persist profile-scoped reasoning and image request settings through the shared request path.
+                        ...profileRequestOverrides.overrides,
                         ...overridePayload,
+                        __connectionProfileRequestFields: profileRequestOverrides.profileFieldNames,
                     };
 
                     // Only set the URL field for the actual API source to avoid contaminating

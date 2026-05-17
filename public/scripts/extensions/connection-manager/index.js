@@ -35,6 +35,11 @@ const DEFAULT_SETTINGS = {
 const ALLOW_EMPTY = [
     'stop-strings',
     'start-reply-with',
+    'request-image-resolution',
+    'request-image-aspect-ratio',
+    'custom-reasoning-param-name',
+    'custom-reasoning-enabled-value',
+    'custom-reasoning-disabled-value',
 ];
 
 const CC_COMMANDS = [
@@ -48,6 +53,19 @@ const CC_COMMANDS = [
     'stop-strings',
     'start-reply-with',
     'reasoning-template',
+    // SillyBunny: persist Chat Completion reasoning and request behavior in connection profiles.
+    'request-reasoning',
+    'reasoning-effort',
+    'verbosity',
+    'enable-web-search',
+    'request-images',
+    'request-image-resolution',
+    'request-image-aspect-ratio',
+    'custom-reasoning-preset',
+    'custom-reasoning-param-format',
+    'custom-reasoning-param-name',
+    'custom-reasoning-enabled-value',
+    'custom-reasoning-disabled-value',
     'prompt-post-processing',
     'secret-id',
     'regex-preset',
@@ -86,6 +104,18 @@ const FANCY_NAMES = {
     'stop-strings': 'Custom Stopping Strings',
     'start-reply-with': 'Start Reply With',
     'reasoning-template': 'Reasoning Template',
+    'request-reasoning': 'Request Model Reasoning',
+    'reasoning-effort': 'Reasoning Effort',
+    'verbosity': 'Verbosity',
+    'enable-web-search': 'Enable Web Search',
+    'request-images': 'Request Inline Images',
+    'request-image-resolution': 'Request Image Resolution',
+    'request-image-aspect-ratio': 'Request Image Aspect Ratio',
+    'custom-reasoning-preset': 'Custom Reasoning Preset',
+    'custom-reasoning-param-format': 'Custom Reasoning Parameter Format',
+    'custom-reasoning-param-name': 'Custom Reasoning Parameter Name',
+    'custom-reasoning-enabled-value': 'Custom Reasoning Enabled Value',
+    'custom-reasoning-disabled-value': 'Custom Reasoning Disabled Value',
     'prompt-post-processing': 'Prompt Post-Processing',
     'secret-id': 'Secret',
     'regex-preset': 'Regex Preset',
@@ -198,6 +228,18 @@ const profilesProvider = () => [
  * @property {string} [stop-strings] Custom Stopping Strings
  * @property {string} [start-reply-with] Start Reply With
  * @property {string} [reasoning-template] Reasoning Template
+ * @property {string} [request-reasoning] Request model reasoning
+ * @property {string} [reasoning-effort] Reasoning effort
+ * @property {string} [verbosity] Verbosity
+ * @property {string} [enable-web-search] Enable web search
+ * @property {string} [request-images] Request inline images
+ * @property {string} [request-image-resolution] Request image resolution
+ * @property {string} [request-image-aspect-ratio] Request image aspect ratio
+ * @property {string} [custom-reasoning-preset] Custom reasoning preset
+ * @property {string} [custom-reasoning-param-format] Custom reasoning parameter format
+ * @property {string} [custom-reasoning-param-name] Custom reasoning parameter name
+ * @property {string} [custom-reasoning-enabled-value] Custom reasoning enabled value
+ * @property {string} [custom-reasoning-disabled-value] Custom reasoning disabled value
  * @property {string} [prompt-post-processing] Prompt Post-Processing
  * @property {string} [sysprompt] System Prompt Name
  * @property {string} [sysprompt-state] Use System Prompt
