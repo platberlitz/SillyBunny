@@ -143,6 +143,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #116 (2026-05-16) `fix: enable Prose Polisher for impersonation catalog`
 - PR #120 (2026-05-17) `fix: refresh topbar tokens after hiding messages`
 - PR #125 (2026-05-17) `fix(agents): prevent duplicate Prose Polisher after template prompt update`
+- PR #126 (2026-05-17) `feat: categorise templates browser, retire Pathfinder agent`
 - PR #128 (2026-05-17) `fix(webpack): alias chevrotain to its prebundled ESM file`
 
 ### Direct Staging Commits
