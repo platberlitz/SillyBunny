@@ -1,42 +1,39 @@
 # Changelog
 
-## v1.5.4
+## v1.6.0
 
-Date: 2026-05-13
+Date: 2026-05-18
 
-This update consolidates the v1.5.4 staging work since v1.5.3: preset and connection profile save reliability, full-chat navigation and search, mobile bottom-bar and drawer polish, chat completion tabs, pre-generation agent interceptors, iOS streaming stabilization, context-depth controls, character-menu rework, runtime update hardening, and release documentation automation.
+This update consolidates the v1.6.0 staging work since v1.5.3: preset and connection profile save reliability, full-chat navigation and search, mobile bottom-bar and drawer polish, chat completion tabs, pre-generation agent interceptors, iOS streaming stabilization, context-depth controls, character-menu rework, runtime update hardening, and release documentation automation.
 
 ### Character Cards
 - fix(cards): warn when card HTML contains stripped `<script>`/`<iframe>` blocks (#94).
 
 ### Presets And Connection Profiles
-- Connection profile changes now serialize in order, abort superseded applications cleanly, and save only after the latest selected profile finishes applying.
-- OpenAI preset changes now expose an awaitable completion path and ignore stale async preset applications, keeping linked provider/model settings from being overwritten by older selections.
+- Connection profile changes now serialize in order, abort superseded applications cleanly, save only after the latest selected profile finishes applying, and expose expanded summaries for easier review.
+- OpenAI preset changes now expose an awaitable completion path and ignore stale async preset applications, keeping linked provider and model settings from being overwritten by older selections.
 - Preset slash-command and welcome flows now wait for the active preset manager to finish applying supported preset changes before continuing.
-- Connection profile create, update, delete, reload, and profile slash commands now flush settings immediately so rapid preset/API swaps persist reliably.
+- Connection profile create, update, delete, reload, and profile slash commands now flush settings immediately so rapid preset/API swaps persist reliably, including OpenRouter quantizations on profile requests.
 - Preset saves now confirm before overwriting saved prompt text, and unsaved preset text edits warn before they are discarded.
 - OpenAI preset saves and imports now carry `bias_presets`, so selected logit bias libraries and their editable entries persist with the preset instead of snapping back to the base file.
 
 ### Chat Loading And Search
 - Re-applied chat scroll anchoring across staging and main so scrolling upward no longer skips earlier messages.
-- Disabled native chat scroll anchoring on macOS browsers so it no longer fights SillyBunny's scroll preservation and jumps messages while scrolling.
-- Existing chats now force-scroll to the latest message on initial load across desktop and mobile, even when the normal auto-scroll preference is disabled.
-- Streaming and other non-forced chat scrolling still respect the user's auto-scroll preference and mobile manual-scroll suppression.
+- Disabled native chat scroll anchoring on macOS browsers so it no longer fights SillyBunny's scroll preservation while users scroll through older messages.
+- Existing chats now force-scroll to the latest message on initial load across desktop and mobile, while streaming and other non-forced chat scrolling still respect auto-scroll preferences and mobile manual-scroll suppression.
 - Bottom chat navigation now includes go-to-top and go-to-bottom controls for the active chat.
 - Bottom-bar chat search stays synchronized with desktop and mobile chat search controls, searches the full chat data including hidden or not-yet-rendered messages, and reports whether matches are visible, hidden, data-only, or absent.
 - Mobile chat scrolling stays anchored while loading older messages or dragging SillyBunny shell tabs, with tab scrolling constrained horizontally to avoid page jumps.
 
 ### Mobile Shell, Bottom Bar, And Streaming
-- Added a mobile-only collapse button that hides or restores the second-row chat actions while preserving 44px touch targets.
-- Moved bottom chat search behind a second-row search icon so the full search field only expands when requested, reducing persistent bar height on phones.
-- Kept the mobile chat dropdown on the left with up/down controls beside it, while the single collapse control hides the additional actions row.
-- Placed the mobile chat search icon directly before the trash action in the expanded additional-actions row.
-- Fixed the mobile bottom chat bar breakpoint and first-row grid sizing so the chat dropdown, up/down controls, and collapse button no longer overlap on wider phone/tablet layouts.
-- Kept the desktop bottom chat bar layout unchanged while aligning mobile persona, chat select, action, and search controls symmetrically.
-- Remembered the mobile bottom chat action collapse state across reloads and centered the visible action row when it is shown.
-- Polished shell menu focus, mobile controls, mobile prompt editor layout, and mobile navigation accessibility.
+- Added a mobile-only collapse button that hides or restores the second-row chat actions, preserves 44px touch targets, and remembers the collapsed state across reloads.
+- Moved bottom chat search behind a second-row search icon so the full search field only expands when requested, then placed that search icon directly before the trash action in the expanded row.
+- Kept the mobile chat dropdown on the left with up/down controls beside it while the single collapse control hides the additional actions row.
+- Fixed the mobile bottom chat bar breakpoint and first-row grid sizing so controls no longer overlap on wider phone and tablet layouts, while the desktop bar stays unchanged and mobile persona, chat select, action, and search controls stay symmetrical.
+- Centered the visible mobile action row when it is shown.
+- Polished shell menu focus, mobile controls, mobile prompt editor layout, advanced formatting mobile headers, and mobile navigation accessibility.
 - Restored mobile composer auto-grow behavior and release mobile inputs correctly after closing the character drawer.
-- Reduced iOS streaming pressure, aligned smooth-streaming checks, and added stability toggles for narrow mobile streaming surfaces.
+- Reduced iOS streaming pressure, aligned smooth-streaming checks, unblocked cancelled streams, and added stability toggles for narrow mobile streaming surfaces.
 
 ### Chat Completion Tabs
 - Added the default Chat Completion Tabs extension for provider-specific chat completion controls.
@@ -49,130 +46,71 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - Added pre-generation agent interceptors with mutation preservation, validation hardening, and visible intercept history.
 - Polished in-chat agent rewrite metadata so generated rewrites are easier to inspect and track.
 - Added OOC and HTML context-depth controls, then normalized the related context-depth settings.
-- Refreshed the memory-sharding quick reply and normalized icon picker search behavior.
+- Added Guided Correction to Guided Generations and a Prompt Manager preview for inspecting prompt output before use.
+- Refreshed the Memory Sharding quick reply with dedupe and force-update handling, then normalized icon picker search behavior.
 
 ### Message Actions And Sampling Controls
 - Hid disabled extension message actions instead of leaving unavailable controls visible.
 - Hid Claude sampler omission toggles when they are not active for the selected backend path.
+- Added `xhigh` reasoning effort and renamed the `auto` reasoning effort label to blank.
 - Kept sampling cleanup scoped to the controls it owns.
 
 ### Character Menu And Drawer
-- Reworked the character menu and rotated the related service-worker, shell, and static asset cache keys so iOS WebKit clients load the updated drawer instead of stale cached files.
-- Restored horizontal scrolling in the mobile character tab strip and collapsed mobile character drawer chrome so more of the character list is visible immediately.
-- Compact mobile character drawer chrome keeps the reworked menu denser without changing the desktop drawer layout.
+- Reworked the character menu, compacted mobile character drawer chrome, and rotated the related service-worker, shell, and static asset cache keys so iOS WebKit clients load the updated drawer instead of stale cached files.
+- Restored horizontal scrolling in the mobile character tab strip so more of the character list is visible immediately on phones.
 - Centered the desktop Characters drawer section tabs while preserving the mobile horizontal-scroll layout and touch behavior.
 
 ### Character Editor
 - Character alternate greetings now save from the live editor contents, so edited greetings persist instead of falling back to stale array state.
 
+### Bundled Extensions, Templates, And Styles
+- Baked workflow extensions into the core bundle and treated Bunny Preset Tools as a bundled extension.
+- Bundled Echo, Whisper, Hush, Ripple, and Tide chat styles natively.
+- Improved Pathfinder settings and retrieval before retiring the Pathfinder agent from the categorized templates browser.
+- Removed Prompt Inspector and Chat Completion Tabs from Launchpad after bundling them natively.
+
 ### Runtime, Updates, And Docs
 - Bun launchers now retry dependency installs without `--frozen-lockfile` if the locked install fails, so users no longer need to delete `bun.lock` after an update.
 - Clean Git checkouts restore the tracked `bun.lock` after a local Bun lockfile refresh so future launcher self-updates are not blocked by a dirty lockfile.
 - Server admin status, update, and branch handling now supports linked Git worktrees and stable branch tracking for runtime worktrees.
+- Docker startup regressions were fixed, and Webpack now aliases Chevrotain to its prebundled ESM file.
 - Added the server hygiene lesson, refreshed agent repository notes, and applied documentation polish from staging follow-ups.
 
 ### Reverted Before Release
-- The topbar repository logo experiment was merged and then reverted before v1.5.4 shipped.
-- The Claude disable-`top_k` option was merged and then reverted before v1.5.4 shipped.
+- PR #47, the topbar repository logo experiment, was merged and then reverted before v1.6.0 shipped.
+- PR #48, the Claude disable-`top_k` option, was merged and then reverted before v1.6.0 shipped.
 
 ### Release Metadata
 - The welcome panel now uses the dynamic current-release label instead of a stale hardcoded 1.4.2 eyebrow.
-- Updated app, Horde client, bundled extension, package, lockfile, and README metadata to 1.5.4.
+- Updated app, Horde client, bundled extension, package, lockfile, and README metadata to 1.6.0.
 - Added a `changelog:merged-prs` script and GitHub workflow so future merged staging PRs are recorded in `changelog.md` automatically.
 
 ### Merged Staging PRs
-- PR #36 (2026-05-06) `fix: support runtime worktrees in admin updates`
-- PR #39 (2026-05-07) `fix: stabilize mobile chat scroll`
-- PR #40 (2026-05-08) `feat: add chat navigation and hidden search`
-- PR #41 (2026-05-08) `fix(extensions): treat Bunny Preset Tools as bundled`
-- PR #42 (2026-05-08) `fix(mobile): release inputs after character drawer closes`
-- PR #43 (2026-05-08) `docs: add server hygiene lesson`
-- PR #45 (2026-05-09) `fix: polish shell menu focus and mobile controls`
-- PR #46 (2026-05-09) `fix: harden update launchers for bun lock refresh`
-- PR #47 (2026-05-09) `feat: add topbar repository logo` (reverted before release)
-- PR #48 (2026-05-09) `fix: add Claude disable top k option` (reverted before release)
-- PR #49 (2026-05-10) `fix: polish UI shell and mobile prompt editor`
-- PR #50 (2026-05-11) `fix(chat-completions): omit disabled top_k`
-- PR #52 (2026-05-11) `feat: add chat completion tabs extension`
-- PR #53 (2026-05-11) `fix: preserve chat completion tab scroll`
-- PR #54 (2026-05-11) `fix: honor profile secret ids for custom chat completions`
-- PR #55 (2026-05-11) `fix: let chat completion tab switcher scroll`
-- PR #56 (2026-05-13) `feat: bake workflow extensions into core`
-- PR #57 (2026-05-12) `fix: confirm preset overwrites and unsaved text edits`
-- PR #59 (2026-05-12) `fix: restore mobile composer auto-grow`
-- PR #60 (2026-05-12) `feat: add pre-generation agent interceptors`
-- PR #62 (2026-05-12) `fix: reduce iOS streaming pressure`
-- PR #63 (2026-05-12) `fix: align iOS smooth streaming checks`
-- PR #64 (2026-05-13) `fix: restore avatar preview and shape styling`
-- PR #65 (2026-05-12) `fix: stabilize mobile shell interactions`
-- PR #66 (2026-05-13) `feat: expand connection profile summaries`
-- PR #67 (2026-05-13) `feat: add OOC and HTML context depth controls`
-- PR #68 (2026-05-13) `fix: polish in-chat agent rewrite metadata`
-- PR #69 (2026-05-12) `fix: hide Claude sampler omission toggles`
-- PR #70 (2026-05-12) `fix: hide disabled extension message actions`
-- PR #71 (2026-05-12) `fix: refresh memory sharding quick reply`
-- PR #73 (2026-05-13) `feat: rework character menu`
-- PR #74 (2026-05-13) `chore(presets): refresh Pura director preset`
-- PR #75 (2026-05-13) `docs: clarify generated runtime config`
-- PR #76 (2026-05-13) `fix: compact guided generations mobile buttons`
-- PR #77 (2026-05-13) `fix: apply geechan review follow-ups`
-- PR #78 (2026-05-13) `fix: persist guided generations fork warning`
-- PR #79 (2026-05-13) `fix: tighten mobile character editor layout`
-- PR #80 (2026-05-13) `feat: bundle Echo, Whisper, Hush, Ripple, Tide chat styles natively`
-- PR #81 (2026-05-13) `fix: refresh message token counts after edits`
-- PR #82 (2026-05-13) `Fix input history controls in chat composer`
-- PR #83 (2026-05-14) `feat(reasoning): add xhigh effort, rename auto to blank`
-- PR #84 (2026-05-14) `fix: improve mobile character drawer layout`
-- PR #85 (2026-05-15) `feat: improve Pathfinder settings and retrieval`
-- PR #86 (2026-05-14) `fix(mobile): enlarge composer textarea and balance spacing`
-- PR #87 (2026-05-14) `fix: refresh in-chat-agent token badges`
-- PR #88 (2026-05-14) `fix: keep tablet shell edge-to-edge`
-- PR #89 (2026-05-14) `fix: tighten mobile composer top gap and shrink message box`
-- PR #90 (2026-05-14) `fix: skip post-generation agents on greetings`
-- PR #91 (2026-05-14) `fix(mobile): keep controls within mobile bounds`
-- PR #92 (2026-05-15) `chore: auto-sync Quick Image Gen updates`
-- PR #95 (2026-05-14) `fix(ui): restore chat and compact layout`
-- PR #96 (2026-05-14) `fix(presets): add connection field guardrails`
-- PR #98 (2026-05-14) `chore(presets): update Geechan roleplay prompts to v5.2`
-- PR #99 (2026-05-16) `fix(mobile): center sampling sliders and add scroll guards`
-- PR #100 (2026-05-16) `fix(chat): stop chat scroll jumps on macOS browsers`
-- PR #103 (2026-05-15) `fix: align group controls UI`
-- PR #109 (2026-05-16) `chore: update prose polisher template`
-- PR #111 (2026-05-16) `feat: add Guided Correction to Guided Generations extension`
-- PR #112 (2026-05-16) `feat: make bundled image modules manually syncable`
-- PR #113 (2026-05-16) `feat: add prompt manager preview`
-- PR #116 (2026-05-16) `fix: enable Prose Polisher for impersonation catalog`
-- PR #119 (2026-05-17) `Fix OpenRouter quantizations on profile requests`
-- PR #120 (2026-05-17) `fix: refresh topbar tokens after hiding messages`
-- PR #121 (2026-05-17) `Fix Docker startup regressions`
-- PR #123 (2026-05-17) `fix(quick-replies): dedupe and force-update bundled Memory Sharding preset`
-- PR #124 (2026-05-17) `feat: add native Prompt Inspector extension`
-- PR #125 (2026-05-17) `fix(agents): prevent duplicate Prose Polisher after template prompt update`
-- PR #126 (2026-05-17) `feat: categorise templates browser, retire Pathfinder agent`
-- PR #127 (2026-05-17) `chore: remove Prompt Inspector and Chat Completion Tabs from Launchpad`
-- PR #128 (2026-05-17) `fix(webpack): alias chevrotain to its prebundled ESM file`
-- PR #129 (2026-05-17) `fix: pre-gen intercept running toast and structured edits view`
-- PR #130 (2026-05-17) `fix: unblock UI on cancelled stream and prevent auto-continue race`
-- PR #131 (2026-05-17) `fix: strip reasoning blocks from profile-based prompt transform output`
-- PR #134 (2026-05-17) `fix: tighten advanced formatting mobile header`
-- PR #135 (2026-05-17) `chore: v1.6.0 pre-release cleanup`
-
-### Direct Staging Commits
-- `fix(chat): restore scroll anchoring so scrolling up no longer skips messages`
-- `fix(settings): stabilize presets and chat loading`
-- `fix(ui): tighten mobile chat bar and update flow`
-- `fix(mobile): align bottom chat controls`
-- `fix(mobile): prevent bottom chat overlap`
-- `sync: merge main fixes into staging`
-- `fix(ui): persist mobile chat and preset edits`
-- `revert: remove topbar repository logo`
-- `revert: remove Claude disable top_k option`
-- `docs: update agent repository notes`
-- `chore: remove generated Playwright output`
-- `docs: polish release documentation`
-- `fix: compact mobile character drawer chrome`
-- `fix(shell): center character nav tabs`
-- `docs(changelog): automate merged PR changelog entries`
+| PR | Release impact |
+|---|---|
+| #36 | Runtime worktree update support |
+| #40 | Bottom chat navigation and hidden full-chat search |
+| #52 | Chat Completion Tabs |
+| #56 | Workflow extensions bundled into core |
+| #60 | Pre-generation interceptors |
+| #62/#63 | iOS streaming stabilization |
+| #66 | Expanded connection profile summaries |
+| #67 | OOC and HTML context-depth controls |
+| #73 | Character menu rework |
+| #80 | Native Echo, Whisper, Hush, Ripple, and Tide chat styles |
+| #83 | Reasoning effort updates |
+| #85 | Pathfinder settings and retrieval improvements |
+| #111 | Guided Generations Guided Correction |
+| #113 | Prompt Manager preview |
+| #119 | OpenRouter quantizations on profile requests |
+| #121 | Docker startup regression fixes |
+| #123 | Memory Sharding quick-reply dedupe and force-update |
+| #124 | Native Prompt Inspector |
+| #126 | Templates browser categories and Pathfinder retirement |
+| #128 | Webpack Chevrotain ESM alias |
+| #131 | Reasoning-block stripping for profile prompt transforms |
+| #134 | Advanced formatting mobile header |
+| #135 | v1.6.0 pre-release cleanup |
 
 ## v1.5.3
 
