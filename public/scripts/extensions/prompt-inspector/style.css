@@ -6,7 +6,8 @@
     position: absolute;
     top: 0;
     right: 0;
-    max-width: 5em;
+    width: auto;
+    min-width: 8em;
 }
 
 @media screen and (max-width: 1000px) {
