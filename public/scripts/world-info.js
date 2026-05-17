@@ -6593,7 +6593,14 @@ export function initWorldInfo() {
     });
 
     $('#group-chat-lorebook-dropdown').on('change', async function () {
+        const target = $(this.selectedOptions).attr('id');
         $(this).prop('selectedIndex', 0);
+
+        if (target === 'renameGroupButton') {
+            await globalThis.SillyBunnyShell?.renameOpenGroup?.();
+            return;
+        }
+
         await assignLorebookToChat({ shiftKey: true, altKey: false });
     });
 

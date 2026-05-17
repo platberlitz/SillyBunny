@@ -23,6 +23,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{}}
         test('should handle empty macro', async ({ page }) => {
             const input = '{{}}';
@@ -35,6 +36,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{   user   }}
         test('should handle macro with leading and trailing whitespace inside', async ({ page }) => {
             const input = '{{   user   }}';
@@ -48,6 +50,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{macro1}}{{macro2}}
         test('should handle multiple sequential macros', async ({ page }) => {
             const input = '{{macro1}}{{macro2}}';
@@ -83,6 +86,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{doStuff "inner {{nested}} string"}}
         test('should handle macros with nested quotation marks', async ({ page }) => {
             const input = '{{doStuff "inner {{nested}} string"}}';
@@ -119,6 +123,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{ some macro }}
         test('should only capture the first identifier as macro identifier when there are whitespaces between two valid identifiers', async ({ page }) => {
             const input = '{{ some macro }}';
@@ -133,6 +138,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{my2cents}}
         test('should allow numerics inside the macro identifier', async ({ page }) => {
             const input = '{{my2cents}}';
@@ -146,6 +152,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{SCREAM}}
         test('should allow capslock macro', async ({ page }) => {
             const input = '{{SCREAM}}';
@@ -159,6 +166,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{some-longer-macro}}
         test('should allow dashes in macro identifiers', async ({ page }) => {
             const input = '{{some-longer-macro}}';
@@ -172,6 +180,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{legacy_macro}}
         test('should allow underscores as legacy in macro identifiers', async ({ page }) => {
             const input = '{{legacy_macro}}';
@@ -207,6 +216,7 @@ test.describe('MacroLexer', () => {
 
                 expect(tokens).toEqual(expectedTokens);
             });
+
             // {{ma!@#%ro}}
             test('[Error] should not parse invalid chars in macro identifier as valid macro identifier', async ({ page }) => {
                 const input = '{{ma!@#%ro}}';
@@ -251,6 +261,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{doStuff key=MyValue another=AnotherValue}}
         test('should handle named arguments with key=value syntax', async ({ page }) => {
             const input = '{{doStuff key=MyValue another=AnotherValue}}';
@@ -270,6 +281,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{getvar key="My variable"}}
         test('should handle named arguments with quotation marks', async ({ page }) => {
             const input = '{{getvar key="My variable"}}';
@@ -289,6 +301,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{getvar KEY=big}}
         test('should handle capslock argument name identifiers', async ({ page }) => {
             const input = '{{getvar KEY=big}}';
@@ -305,6 +318,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{dostuff longer-key=value}}
         test('should handle argument name identifiers with dashes', async ({ page }) => {
             const input = '{{dostuff longer-key=value}}';
@@ -321,6 +335,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{macro legacy_key=blah}}
         test('should handle legacy argument name identifiers', async ({ page }) => {
             const input = '{{macro legacy_key=blah}}';
@@ -337,6 +352,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{roll:1d4}}
         test('should handle argument with legacy one colon syntax to start the arguments', async ({ page }) => {
             const input = '{{roll:1d4}}';
@@ -353,6 +369,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{random "this" "and that" "and some more"}}
         test('should handle multiple unnamed arguments in quotation marks', async ({ page }) => {
             const input = '{{random "this" "and that" "and some more"}}';
@@ -378,6 +395,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{doStuff key="My Spaced Value" otherKey=SingleKey}}
         test('should handle named arguments with mixed style', async ({ page }) => {
             const input = '{{doStuff key="My Spaced Value" otherKey=SingleKey}}';
@@ -401,6 +419,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{doStuff key=}}
         test('should handle macros with empty named arguments', async ({ page }) => {
             const input = '{{doStuff key=}}';
@@ -416,6 +435,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{random "" ""}}
         test('should handle empty unnamed arguments if quoted', async ({ page }) => {
             const input = '{{random "" ""}}';
@@ -433,6 +453,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{doStuff special chars #!@&*()}}
         test('should handle macros with special characters in arguments', async ({ page }) => {
             const input = '{{doStuff special chars #!@&*()}}';
@@ -455,6 +476,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{longMacro arg1="value1" arg2="value2" arg3="value3"}}
         test('should handle long macros with multiple arguments', async ({ page }) => {
             const input = '{{longMacro arg1="value1" arg2="value2" arg3="value3"}}';
@@ -483,6 +505,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{complexMacro "text with {{nested}} content" key=val}}
         test('should handle macros with complex argument patterns', async ({ page }) => {
             const input = '{{complexMacro "text with {{nested}} content" key=val}}';
@@ -525,6 +548,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{?lazy}}
         test('should support ? flag', async ({ page }) => {
             const input = '{{?lazy}}';
@@ -539,6 +563,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{~reevaluate}}
         test('should support ~ flag', async ({ page }) => {
             const input = '{{~reevaluate}}';
@@ -553,6 +578,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{/if}}
         test('should support / flag', async ({ page }) => {
             const input = '{{/if}}';
@@ -567,6 +593,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{#legacy}}
         test('should support legacy # flag', async ({ page }) => {
             const input = '{{#legacy}}';
@@ -581,6 +608,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{  !  identifier  }}
         test('should allow whitespaces around flags', async ({ page }) => {
             const input = '{{  !  identifier  }}';
@@ -595,6 +623,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{ ?~lateragain }}
         test('should support multiple flags', async ({ page }) => {
             const input = '{{ ?~lateragain }}';
@@ -610,6 +639,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{ ! .importantvariable }}
         test('should support multiple flags with whitespace', async ({ page }) => {
             const input = '{{ !#importantvariable }}';
@@ -625,6 +655,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{>filtered}}
         test('should support > filter flag as separate token', async ({ page }) => {
             const input = '{{>filtered}}';
@@ -639,6 +670,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{ ! > user }}
         test('should support filter flag combined with other flags', async ({ page }) => {
             const input = '{{ ! > user }}';
@@ -654,6 +686,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{ a shaaark }}
         test('should not capture single letter as flag, but as macro identifiers', async ({ page }) => {
             const input = '{{ a shaaark }}';
@@ -686,6 +719,7 @@ test.describe('MacroLexer', () => {
 
                 expect(tokens).toEqual(expectedTokens);
             });
+
             // {{ 2 cents }}
             test('should not capture numbers as flag - they are also invalid macro identifiers', async ({ page }) => {
                 const input = '{{ 2 cents }}';
@@ -947,6 +981,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{macro | outputModifier arg1=val1 arg2=val2}}
         test('should support output modifier with named arguments', async ({ page }) => {
             const input = '{{macro | outputModifier arg1=val1 arg2=val2}}';
@@ -968,6 +1003,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{macro | outputModifier "unnamed1" "unnamed2"}}
         test('should support output modifier with unnamed arguments', async ({ page }) => {
             const input = '{{macro | outputModifier "unnamed1" "unnamed2"}}';
@@ -989,6 +1025,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{macro arg1=val1 | outputModifier arg2=val2 "unnamed1"}}
         test('should support macro arguments before output modifier', async ({ page }) => {
             const input = '{{macro arg1=val1 | outputModifier arg2=val2 "unnamed1"}}';
@@ -1013,6 +1050,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{macro | outputModifier1 | outputModifier2}}
         test('should support chaining multiple output modifiers', async ({ page }) => {
             const input = '{{macro | outputModifier1 | outputModifier2}}';
@@ -1030,6 +1068,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{macro | outputModifier1 arg1=val1 | outputModifier2 arg2=val2}}
         test('should support chaining multiple output modifiers with arguments', async ({ page }) => {
             const input = '{{macro | outputModifier1 arg1=val1 | outputModifier2 arg2=val2}}';
@@ -1053,6 +1092,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{macro|outputModifier}}
         test('should support output modifiers without whitespace', async ({ page }) => {
             const input = '{{macro|outputModifier}}';
@@ -1068,6 +1108,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // {{ macro test escaped \| pipe }}
         test('should support escaped pipes, not treating them as output modifiers', async ({ page }) => {
             const input = '{{ macro test escaped \\| pipe }}';
@@ -1102,6 +1143,7 @@ test.describe('MacroLexer', () => {
 
                 expect(tokens).toEqual(expectedTokens);
             });
+
             // {{macro | Iam$peci@l}}
             test('[Error] should not allow special characters inside output modifier identifier', async ({ page }) => {
                 const input = '{{macro | Iam$peci@l}}';
@@ -1123,6 +1165,7 @@ test.describe('MacroLexer', () => {
 
                 expect(tokens).toEqual(expectedTokens);
             });
+
             // {{macro | !cannotBeImportant }}
             test('[Error] should not allow output modifiers to have execution modifiers', async ({ page }) => {
                 const input = '{{macro | !cannotBeImportant }}';
@@ -1144,6 +1187,7 @@ test.describe('MacroLexer', () => {
 
                 expect(tokens).toEqual(expectedTokens);
             });
+
             // {{macro | 2invalidIdentifier}}
             test('[Error] should not allow invalid identifier starting with a number', async ({ page }) => {
                 const input = '{{macro | 2invalidIdentifier}}';
@@ -1165,6 +1209,7 @@ test.describe('MacroLexer', () => {
 
                 expect(tokens).toEqual(expectedTokens);
             });
+
             // {{macro || outputModifier}}
             test('[Error] should not allow double pipe used without an identifier', async ({ page }) => {
                 const input = '{{macro || outputModifier}}';
@@ -1227,6 +1272,7 @@ test.describe('MacroLexer', () => {
             // Compare the actual result with expected tokens
             expect(tokens).toEqual(expectedTokens);
         });
+
         // Just some text here.
         test('should tokenize plaintext only', async ({ page }) => {
             const input = 'Just some text here.';
@@ -1252,6 +1298,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // { { not a macro } }
         test('should treat opening/closing with whitspaces between brackets not as macros', async ({ page }) => {
             const input = '{ { not a macro } }';
@@ -1263,6 +1310,7 @@ test.describe('MacroLexer', () => {
 
             expect(tokens).toEqual(expectedTokens);
         });
+
         // invalid {{ 000 }} followed by correct {{ macro }}
         test('should handle valid macro correctly after an invalid macro', async ({ page }) => {
             const input = 'invalid {{ 000 }} followed by correct {{ macro }}';

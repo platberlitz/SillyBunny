@@ -1,5 +1,5 @@
 import { mergeEntries, splitEntry } from '../entry-manager.js';
-import { getActiveTunnelVisionBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
+import { getWritableBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
 import { registerToolAction, registerToolFormatter } from '../../tool-action-registry.js';
 import { logToolCallStarted, logToolCallCompleted, logToolCallError } from '../activity-feed.js';
 
@@ -16,7 +16,7 @@ async function mergeSplitAction(args) {
         return 'Error: "action" is required. Use "merge" or "split".';
     }
 
-    const writableBooks = getActiveTunnelVisionBooks();
+    const writableBooks = getWritableBooks();
     const targetBook = resolveTargetBook(bookName, writableBooks);
     if (!targetBook) {
         logToolCallError(TOOL_NAMES.MERGE_SPLIT, 'No writable lorebooks');

@@ -1,4 +1,5 @@
 import { power_user } from './power-user.js';
+import { isSmoothStreamingEffectivelyEnabled } from './mobile-streaming.js';
 import { delay } from './utils.js';
 
 // Symbol for not primary swipe error
@@ -379,7 +380,12 @@ export class SmoothEventSourceStream extends EventSourceStream {
 }
 
 export function getEventSourceStream() {
-    if (power_user.smooth_streaming) {
+    // SillyBunny: smooth streaming can be disabled specifically for iOS
+    // WebKit even when the normal upstream setting remains enabled.
+    if (isSmoothStreamingEffectivelyEnabled({
+        smoothStreaming: power_user.smooth_streaming,
+        iosWebKitDisableSmoothStreaming: power_user.ios_webkit_disable_smooth_streaming,
+    })) {
         return new SmoothEventSourceStream();
     }
 

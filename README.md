@@ -54,7 +54,7 @@ These screenshots show the graphical shell UI across Workspace, Customize, Agent
 * [Project Goals](#project-goals-aka-why-we-made-this-fork)
 * [Changes Compared to SillyTavern](#changes-vs-sillytavern)
 * [Latest Update](#latest-update)
-    * [v1.5.4 (2026-05-08)](#v154-2026-05-08)
+    * [v1.6.0 (2026-05-18)](#v160-2026-05-18)
     * [v1.5.3 (2026-05-03)](#v153-2026-05-03)
     * [v1.5.2 (2026-04-30)](#v152-2026-04-30)
     * [v1.5.1 (2026-04-29)](#v151-2026-04-29)
@@ -175,7 +175,7 @@ SillyBunny has support for In-Chat Agents. These are custom prompt fields that c
 
 **Pipeline:**
 
-1. **Pre-generation agents** injects prompt text before the main reply is generated.
+1. **Pre-generation agents** inject prompt text before the main reply is generated, or run as interceptors that rewrite the assembled outgoing context before it reaches the main model.
 2. **Main Model** writes the main RP reply.
 3. **Post-generation agents** optionally rewrites the contents of the main response, or appends extra content after the reply.
 4. **Post-process utilities** can extract structured data, run regex cleanup/formatting, or preserve machine-readable blocks while showing cleaner UI.
@@ -202,6 +202,7 @@ SillyBunny has support for In-Chat Agents. These are custom prompt fields that c
 **Agent Behaviors and Settings**
 * Agentic prompts feature inline run-order editing, click-to-edit functionality, and fullscreen prompt editors.
 * Agents use the main connection profile by default with an 8192 max token limit. Separate connection profile support is available when explicitly selected.
+* Pre-generation interceptors can replace the outgoing context, wrap or append helper output, or add tagged patches. Multiple interceptors run in agent order.
 * Bundled trackers, including CYOA Choices, are configured for pre-generation. The main model emits clickable options directly in the response.
 * All bundled tracker and menu agents default to the User injection role to maintain compatibility with models that deprioritize System injections.
 * Built-in groups are available for the full preset, trackers only, and randomizers only.
@@ -212,46 +213,42 @@ SillyBunny includes some extras by default to help you get started right away:
 * A tutorial that guides you through the SillyBunny interface.
 * Pre-bundled roleplay presets from purachina and Geechan.
 * A character card conversion preset from TLD to help you generate character cards from scratch, or convert from existing cards to a better format.
-* A friendly quick-start guide with optional recommended extensions (Summary Sharder, Dialogue Colours, Quick Image Gen, Guided Generations, CSS Snippets).
+* A friendly quick-start guide with bundled workflow helpers plus optional recommended extensions such as Summary Sharder, Dialogue Colours, and CSS Snippets.
 * Two custom assistants to help you get started - Bunny Guide, and Assistant Nahida.
 
 ---
 
 ## Latest Update
 
-### v1.5.4 (2026-05-08)
+### v1.6.0 (2026-05-18)
 
-This update stabilizes preset and connection profile switching, adds bottom chat navigation and search polish from recent staging PRs, trims the mobile Persona bar with collapsible actions, makes Bun launcher updates recover from stale lockfiles, and updates SillyBunny release metadata to 1.5.4.
+This update turns the staging line after v1.5.3 into the v1.6.0 release, with new prompt tools, steadier profile and preset saves, cleaner mobile chat controls, and safer runtime updates.
 
-**Presets And Connection Profiles**
-* Connection profile changes now serialize in order, abort superseded applications cleanly, and save only after the latest selected profile finishes applying.
-* OpenAI preset changes now wait for linked provider/model updates before profile application continues, keeping API-to-preset links together during rapid switching.
-* Preset slash-command and welcome flows now wait for supported preset changes to finish applying before continuing.
-* Connection profile create, update, delete, reload, and profile slash commands now flush settings immediately so rapid preset/API swaps persist reliably.
+**Added**
+* Pre-Generation Agents now support Pre-Generation Intercepts with mutation preservation, validation hardening, and visible intercept history.
+* Chat Completion Tabs are bundled for provider-specific chat completion controls, alongside the new bundled Prompt Inspector for reviewing and editing chat completion and text completion prompts before sending.
+* Guided Generations now includes Guided Correction, and Prompt Manager adds a prompt preview before use.
+* OOC and HTML context-depth controls now make those context windows adjustable from the UI.
+* Echo, Whisper, Hush, Ripple, and Tide chat styles are bundled natively.
+* Reasoning options now include `xhigh`, with `auto` renamed to a blank label.
 
-**Chat Loading And Search**
-* Existing chats now force-scroll to the latest message on initial load across desktop and mobile, even when the normal auto-scroll preference is disabled.
-* Streaming and other non-forced chat scrolling still respect the user's auto-scroll preference and mobile manual-scroll suppression.
-* Bottom chat navigation now includes go-to-top and go-to-bottom controls for the active chat.
-* Bottom-bar chat search stays synchronized with desktop and mobile chat search controls, searches the full chat data including hidden or not-yet-rendered messages, and reports whether matches are visible, hidden, data-only, or absent.
-* Mobile chat scrolling stays anchored while loading older messages or dragging SillyBunny shell tabs, with tab scrolling constrained horizontally to avoid page jumps.
+**Changed**
+* Connection Profiles now serialize changes in order, cancel superseded applications, await OpenAI preset updates, preserve profile secret IDs, and show expanded summaries.
+* Bunny Preset Tools and preset saves now guard overwrites, warn before discarding unsaved prompt text, and persist `bias_presets` with OpenAI presets.
+* Chat Loading And Search now includes full-chat search with visible, hidden, and data-only match reporting, go-to-top and go-to-bottom controls, macOS scroll anchoring fixes, and an initial-load scroll to the newest message that still respects streaming auto-scroll preferences.
+* Mobile Bottom Bar now has a persisted collapse button, second-row search, left-aligned chat dropdown, adjacent up/down controls, and symmetric mobile action layout without changing the desktop bar.
+* Character Menu and mobile drawer chrome are denser, cache-keyed for iOS refreshes, and keep mobile tab scrolling while centering desktop section tabs.
+* Connection profile requests now preserve OpenRouter quantizations, and in-chat agent rewrite metadata is easier to inspect.
+* Bumped app, Horde client, bundled extension, package, lockfile, and README metadata to 1.6.0.
 
-**Mobile Bottom Chat Bar**
-* Added a mobile-only collapse button that hides or restores the second-row chat actions while preserving 44px touch targets.
-* Moved bottom chat search behind a second-row search icon so the full search field only expands when requested, reducing persistent bar height on phones.
-* Kept the mobile chat dropdown on the left with up/down controls beside it, while the single collapse control hides the additional actions row.
-* Placed the mobile chat search icon directly before the trash action in the expanded additional-actions row.
-* Fixed the mobile bottom chat bar breakpoint and first-row grid sizing so the chat dropdown, up/down controls, and collapse button no longer overlap on wider phone/tablet layouts.
-* Kept the desktop bottom chat bar layout unchanged while aligning mobile persona, chat select, action, and search controls symmetrically.
+**Fixed**
+* Docker startup regressions, Bun lockfile recovery, clean-checkout lockfile restore, runtime worktree update handling, and the Webpack Chevrotain ESM alias are hardened.
+* Advanced Formatting's mobile header, iOS streaming pressure, cancelled-stream UI recovery, and mobile composer input release after the character drawer closes are tightened.
+* Memory Sharding quick replies now dedupe and force-update correctly, while disabled message actions and inactive sampler controls stay hidden.
 
-**Runtime And Updates**
-* Bun launchers now retry dependency installs without `--frozen-lockfile` if the locked install fails, so users no longer need to delete `bun.lock` after an update.
-* Clean Git checkouts restore the tracked `bun.lock` after a local Bun lockfile refresh so future launcher self-updates are not blocked by a dirty lockfile.
-* Server admin status, update, and branch handling now supports linked Git worktrees and stable branch tracking for runtime worktrees.
-
-**Release Metadata**
-* The welcome panel now uses the dynamic current-release label instead of a stale hardcoded 1.4.2 eyebrow.
-* Updated app, Horde client, bundled extension, package, lockfile, and README metadata to 1.5.4.
+**Removed**
+* Pathfinder is retired from the active agent lineup after its settings and retrieval improvements, with the templates browser now categorized for easier discovery.
+* Prompt Inspector and Chat Completion Tabs are removed from Launchpad because they are bundled natively.
 
 ### v1.5.3 (2026-05-03)
 

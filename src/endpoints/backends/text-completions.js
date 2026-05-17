@@ -13,7 +13,7 @@ import {
     FEATHERLESS_KEYS,
     OPENAI_KEYS,
 } from '../../constants.js';
-import { forwardFetchResponse, trimV1, getConfigValue, summarizeLlmPayloadForLog } from '../../util.js';
+import { forwardFetchResponse, abortOnResponseClose, trimV1, getConfigValue, summarizeLlmPayloadForLog } from '../../util.js';
 import { setAdditionalHeaders } from '../../additional-headers.js';
 import { createHash } from 'node:crypto';
 
@@ -51,7 +51,11 @@ async function parseOllamaStream(jsonStream, request, response) {
             }
         });
 
-        request.socket.on('close', function () {
+        response.on('close', function () {
+            if (response.writableEnded) {
+                return;
+            }
+
             if (jsonStream.body instanceof Readable) jsonStream.body.destroy();
             response.end();
         });
@@ -282,13 +286,15 @@ router.post('/generate', async function (request, response) {
         console.debug('Text completion request:', summarizeLlmPayloadForLog(request.body));
 
         const controller = new AbortController();
-        request.socket.removeAllListeners('close');
-        request.socket.on('close', async function () {
+        abortOnResponseClose(response, controller);
+        response.on('close', async function () {
+            if (response.writableEnded) {
+                return;
+            }
+
             if (request.body.api_type === TEXTGEN_TYPES.KOBOLDCPP && !response.writableEnded) {
                 await abortKoboldCppRequest(request, trimV1(baseUrl));
             }
-
-            controller.abort();
         });
 
         let url = trimV1(baseUrl);

@@ -1,18 +1,76 @@
 import { getTree, createTreeNode, saveTree } from '../tree-store.js';
 import { createEntry } from '../entry-manager.js';
-import { getActiveTunnelVisionBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
+import { getWritableBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
 import { registerToolAction, registerToolFormatter } from '../../tool-action-registry.js';
 import { logToolCallStarted, logToolCallCompleted, logToolCallError } from '../activity-feed.js';
 import { setSummaryMemoryCreated } from '../summary-memory-store.js';
 
 const COMPACT_DESCRIPTION = 'Create a scene or event summary with significance level and optional narrative arc.';
+const GENERIC_SUMMARY_TITLE_PATTERN = /^(recent scene summary|scene summary|memory summary|summary|untitled summary)$/i;
+const MAX_DERIVED_TITLE_LENGTH = 64;
+const MAX_DERIVED_TITLE_WORDS = 9;
 
-export async function createSummaryMemoryEntry(args = {}) {
+function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeTitle(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function trimDerivedTitle(value) {
+    const normalized = normalizeTitle(value);
+    if (normalized.length <= MAX_DERIVED_TITLE_LENGTH) {
+        return normalized;
+    }
+
+    const clipped = normalized.slice(0, MAX_DERIVED_TITLE_LENGTH);
+    return clipped.replace(/\s+\S*$/, '').trim() || clipped.trim();
+}
+
+function stripSummaryTitle(title, arc = '') {
+    let normalized = normalizeTitle(title).replace(/^\[Summary\]\s*/i, '');
+    const arcName = normalizeTitle(arc);
+    if (arcName) {
+        normalized = normalized.replace(new RegExp(`\\s+(?:\\u2014|-|:)\\s*${escapeRegExp(arcName)}$`, 'i'), '').trim();
+    }
+
+    return normalized;
+}
+
+function stripSummaryMetadata(content) {
+    return String(content || '').replace(/^Significance:\s*[^\n]*\n+/i, '').trim();
+}
+
+function deriveTitleFromContent(content) {
+    const body = stripSummaryMetadata(content);
+    const firstSentence = body.split(/[.!?]\s+|\n+/).find(part => part.trim()) || body;
+    const withoutSpeaker = firstSentence.replace(/^[\w .'-]{1,32}:\s+/, '').trim();
+    const words = withoutSpeaker
+        .replace(/[^\w\s'-]/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, MAX_DERIVED_TITLE_WORDS);
+
+    return trimDerivedTitle(words.join(' '));
+}
+
+export function deriveSummaryLorebookTitle({ title = '', content = '', arc = '' } = {}) {
+    const existingTitle = stripSummaryTitle(title, arc);
+    if (existingTitle && !GENERIC_SUMMARY_TITLE_PATTERN.test(existingTitle)) {
+        return trimDerivedTitle(existingTitle);
+    }
+
+    return deriveTitleFromContent(content) || 'Summary note';
+}
+
+export async function createSummaryMemoryEntry(args = {}, options = {}) {
     const title = String(args.title || '').trim();
     const content = String(args.content || '').trim();
     const arc = String(args.arc || '').trim();
     const significance = String(args.significance || 'medium').trim();
     const bookName = String(args.book || '').trim();
+    const trackLatest = options.trackLatest !== false;
 
     logToolCallStarted(TOOL_NAMES.SUMMARIZE, { title, arc, bookName });
 
@@ -21,7 +79,7 @@ export async function createSummaryMemoryEntry(args = {}) {
         throw new Error('"title" and "content" are required.');
     }
 
-    const writableBooks = getActiveTunnelVisionBooks();
+    const writableBooks = getWritableBooks();
     const targetBook = resolveTargetBook(bookName, writableBooks);
     if (!targetBook) {
         logToolCallError(TOOL_NAMES.SUMMARIZE, 'No writable lorebooks');
@@ -33,14 +91,16 @@ export async function createSummaryMemoryEntry(args = {}) {
 
     try {
         const result = await createEntry(targetBook, summaryTitle, formattedContent, ['summary', significance.toLowerCase()]);
-        setSummaryMemoryCreated({
-            title: summaryTitle,
-            content,
-            significance,
-            arc,
-            bookName: targetBook,
-            uid: result.uid,
-        });
+        if (trackLatest) {
+            setSummaryMemoryCreated({
+                title: summaryTitle,
+                content,
+                significance,
+                arc,
+                bookName: targetBook,
+                uid: result.uid,
+            });
+        }
 
         const tree = getTree(targetBook);
         if (tree && arc) {
@@ -78,6 +138,23 @@ export async function createSummaryMemoryEntry(args = {}) {
         logToolCallError(TOOL_NAMES.SUMMARIZE, err.message);
         throw err;
     }
+}
+
+export async function createSeparateSummaryMemoryEntry(args = {}) {
+    const content = String(args.content || '').trim();
+    if (!content) {
+        throw new Error('No summary text is available to save as a lorebook entry.');
+    }
+
+    return await createSummaryMemoryEntry({
+        ...args,
+        title: deriveSummaryLorebookTitle({
+            title: args.title,
+            content,
+            arc: args.arc,
+        }),
+        content,
+    }, { trackLatest: false });
 }
 
 async function summarizeAction(args) {

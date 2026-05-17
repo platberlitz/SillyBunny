@@ -1,3 +1,4 @@
+/* eslint-disable playwright/no-duplicate-hooks */
 /* global document, globalThis */
 import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
 
@@ -35,7 +36,11 @@ describe('in-chat agent post-processing runner', () => {
     let generateQuietPrompt;
     let runSidecarRetrieval;
     let streamingProcessor;
+    let updateMessageTokenAccounting;
+    let updateMessageMetaBadges;
+    let connectionManagerRequestService;
     let globalSettings;
+    let currentChatId;
     let documentListeners;
     let windowListeners;
 
@@ -59,6 +64,8 @@ describe('in-chat agent post-processing runner', () => {
             CHARACTER_MESSAGE_RENDERED: 'character_message_rendered',
             IMPERSONATE_READY: 'impersonate_ready',
             MESSAGE_SWIPED: 'message_swiped',
+            GENERATE_AFTER_COMBINE_PROMPTS: 'generate_after_combine_prompts',
+            CHAT_COMPLETION_PROMPT_READY: 'chat_completion_prompt_ready',
             CHAT_COMPLETION_SETTINGS_READY: 'chat_completion_settings_ready',
             WORLDINFO_ENTRIES_LOADED: 'worldinfo_entries_loaded',
             CHAT_CHANGED: 'chat_changed',
@@ -76,11 +83,29 @@ describe('in-chat agent post-processing runner', () => {
             isStopped: false,
             abortController: { signal: { aborted: false } },
         };
+        updateMessageTokenAccounting = jest.fn(async (message) => {
+            const tokenCount = String(message?.mes ?? '').split(/\s+/).filter(Boolean).length;
+            message.extra ??= {};
+            message.extra.token_count = tokenCount;
+
+            if (typeof message?.swipe_id === 'number' && Array.isArray(message?.swipe_info)) {
+                const swipeInfo = message.swipe_info[message.swipe_id];
+                if (swipeInfo && typeof swipeInfo === 'object') {
+                    swipeInfo.extra ??= {};
+                    swipeInfo.extra.token_count = tokenCount;
+                }
+            }
+
+            return { outputTokens: tokenCount, reasoningTokens: 0 };
+        });
+        updateMessageMetaBadges = jest.fn();
+        connectionManagerRequestService = null;
         globalSettings = {
             enabled: true,
             promptTransformShowNotifications: false,
             appendAgentsExecutionMode: 'parallel',
         };
+        currentChatId = 'chat-a';
         documentListeners = new Map();
         windowListeners = new Map();
 
@@ -109,7 +134,7 @@ describe('in-chat agent post-processing runner', () => {
         globalThis.toastr = {
             clear: jest.fn(),
             error: jest.fn(),
-            info: jest.fn(),
+            info: jest.fn(() => ({ toast: true })),
             success: jest.fn(),
             warning: jest.fn(),
         };
@@ -138,7 +163,7 @@ describe('in-chat agent post-processing runner', () => {
                     extra: {},
                 }));
             }),
-            extension_prompt_roles: { SYSTEM: 0 },
+            extension_prompt_roles: { SYSTEM: 0, USER: 1, ASSISTANT: 2 },
             extension_prompt_types: { IN_PROMPT: 0, IN_CHAT: 1 },
             extension_prompts: extensionPrompts,
             setExtensionPrompt: jest.fn((key, value) => {
@@ -146,6 +171,7 @@ describe('in-chat agent post-processing runner', () => {
             }),
             substituteParams: jest.fn(value => String(value ?? '')),
             generateQuietPrompt,
+            getCurrentChatId: jest.fn(() => currentChatId),
             normalizeContentText: jest.fn(value => String(value ?? '')),
             saveChatDebounced,
             stopGeneration: jest.fn(() => false),
@@ -163,15 +189,24 @@ describe('in-chat agent post-processing runner', () => {
                 targetMessage.swipe_info[targetMessage.swipe_id].extra = structuredClone(targetMessage.extra);
                 return true;
             }),
+            updateMessageTokenAccounting,
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions.js', () => ({
-            getContext: jest.fn(() => ({ saveChat })),
+            getContext: jest.fn(() => ({
+                saveChat,
+                updateMessageMetaBadges,
+                ConnectionManagerRequestService: connectionManagerRequestService,
+            })),
         }));
 
         await jest.unstable_mockModule('../public/scripts/events.js', () => ({
             eventSource,
             event_types: eventTypes,
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/reasoning.js', () => ({
+            removeReasoningFromString: jest.fn(value => String(value ?? '')),
         }));
 
         await jest.unstable_mockModule('../public/scripts/tool-calling.js', () => ({
@@ -194,7 +229,9 @@ describe('in-chat agent post-processing runner', () => {
             getEnabledToolAgents: jest.fn(() => []),
             getGlobalSettings: jest.fn(() => globalSettings),
             getPromptTransformMode: jest.fn(agent => agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite'),
+            saveAgent: jest.fn(async () => {}),
             isToolAgent: jest.fn(() => false),
+            normalizePreProcessMaxTokens: jest.fn(value => Number.isFinite(Number(value)) ? Math.max(16, Math.min(16000, Number(value))) : 8192),
             normalizePromptTransformMaxTokens: jest.fn(value => Number.isFinite(Number(value)) ? Math.max(16, Math.min(16000, Number(value))) : 8192),
             resolveConnectionProfile: jest.fn(value => value ?? ''),
         }));
@@ -205,10 +242,19 @@ describe('in-chat agent post-processing runner', () => {
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/tree-store.js', () => ({
-            getAllEntryUids: jest.fn(() => []),
             getSettings: jest.fn(() => ({ pipelinePrompts: {}, pipelines: [] })),
-            getTree: jest.fn(() => null),
             setSettings: jest.fn(),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/tool-definitions.js', () => ({
+            getPathfinderToolDefinitions: jest.fn(() => [
+                { name: 'Pathfinder_Search', displayName: 'Search', description: 'Search', parameters: {}, actionKey: 'pathfinder.search' },
+                { name: 'Pathfinder_Summarize', displayName: 'Summarize', description: 'Summarize', parameters: {}, actionKey: 'pathfinder.summarize' },
+            ]),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/pathfinder-tool-bridge.js', () => ({
+            getContextualLorebooks: jest.fn(() => []),
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/sidecar-retrieval.js', () => ({
@@ -276,6 +322,45 @@ describe('in-chat agent post-processing runner', () => {
                 generationTypes: ['normal'],
             },
         }];
+    }
+
+    function createPreInterceptAgent(overrides = {}) {
+        return {
+            id: overrides.id ?? 'agent-pre-intercept',
+            name: overrides.name ?? 'Pre Intercept',
+            phase: overrides.phase ?? 'pre',
+            prompt: overrides.prompt ?? 'Rewrite the outgoing context.',
+            injection: {
+                position: 0,
+                depth: 4,
+                scan: false,
+                role: 0,
+                order: 100,
+                ...(overrides.injection ?? {}),
+            },
+            preProcess: {
+                mode: 'intercept',
+                applyMode: 'replace',
+                wrapPosition: 'after',
+                wrapPrefix: '',
+                wrapSuffix: '',
+                patchStartTag: '<context_patch>',
+                patchEndTag: '</context_patch>',
+                maxTokens: 8192,
+                ...(overrides.preProcess ?? {}),
+            },
+            postProcess: {
+                enabled: false,
+                promptTransformEnabled: false,
+                ...(overrides.postProcess ?? {}),
+            },
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+                ...(overrides.conditions ?? {}),
+            },
+        };
     }
 
     function useManualTransformAgents() {
@@ -505,6 +590,318 @@ describe('in-chat agent post-processing runner', () => {
         expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toEqual({ value: 'Use the current scene style.' });
     });
 
+    test('shows a processing toast while Pathfinder pipeline retrieval is running', async () => {
+        usePrePromptAgent();
+        enabledAgents.unshift({
+            id: 'agent-pathfinder',
+            name: 'Pathfinder',
+            category: 'tool',
+            sourceTemplateId: 'tpl-pathfinder',
+            phase: 'both',
+            prompt: '',
+            injection: { order: 0 },
+            settings: { pipelineEnabled: true, sidecarEnabled: false },
+            tools: [],
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        });
+
+        let resolveRetrieval;
+        const retrievalDone = new Promise(resolve => {
+            resolveRetrieval = resolve;
+        });
+        runSidecarRetrieval.mockImplementation(async () => {
+            await retrievalDone;
+        });
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        const generationPromise = eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        await Promise.resolve();
+
+        expect(globalThis.toastr.info).toHaveBeenCalledWith('Pathfinder is processing lore for this reply...', 'Please wait', { timeOut: 0, extendedTimeOut: 0 });
+        expect(globalThis.toastr.clear).not.toHaveBeenCalled();
+
+        resolveRetrieval();
+        await generationPromise;
+
+        expect(globalThis.toastr.clear).toHaveBeenCalledWith({ toast: true });
+    });
+
+    test('runs pre-generation intercept agents on text prompts without injecting their prompt', async () => {
+        enabledAgents = [createPreInterceptAgent({
+            preProcess: { applyMode: 'replace', maxTokens: 123 },
+        })];
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+
+        const eventData = { prompt: 'Original outgoing prompt', dryRun: false };
+        await eventSource.emit(eventTypes.GENERATE_AFTER_COMBINE_PROMPTS, eventData);
+
+        expect(extensionPrompts['inchat_agent_agent-pre-intercept']).toBeUndefined();
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(1);
+        expect(generateQuietPrompt.mock.calls[0][0]).toEqual(expect.objectContaining({
+            quietName: 'In-Chat Agent',
+            responseLength: 123,
+            skipWIAN: true,
+            removeReasoning: true,
+        }));
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('Outgoing context:');
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('Original outgoing prompt');
+        expect(eventData.prompt).toBe('quiet result');
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Final assistant reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await waitFor(() => Array.isArray(chat[0].extra.inChatAgentPreGenerationInterceptHistory));
+
+        expect(chat[0].extra.inChatAgentPreGenerationInterceptHistory).toEqual([expect.objectContaining({
+            agentId: 'agent-pre-intercept',
+            agentName: 'Pre Intercept',
+            applyMode: 'replace',
+            contextFormat: 'text',
+            beforeText: 'Original outgoing prompt',
+            outputText: 'quiet result',
+            afterText: 'quiet result',
+            changed: true,
+            status: 'changed',
+        })]);
+        expect(chat[0].swipe_info[0].extra.inChatAgentPreGenerationInterceptHistory).toEqual(chat[0].extra.inChatAgentPreGenerationInterceptHistory);
+    });
+
+    test('chains multiple pre-generation intercept agents by order', async () => {
+        enabledAgents = [
+            createPreInterceptAgent({
+                id: 'agent-second',
+                name: 'Second',
+                prompt: 'Second pass.',
+                injection: { order: 20 },
+            }),
+            createPreInterceptAgent({
+                id: 'agent-first',
+                name: 'First',
+                prompt: 'First pass.',
+                injection: { order: 10 },
+            }),
+        ];
+        generateQuietPrompt
+            .mockResolvedValueOnce('first output')
+            .mockResolvedValueOnce('second output');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        const eventData = { prompt: 'Original prompt', dryRun: false };
+        await eventSource.emit(eventTypes.GENERATE_AFTER_COMBINE_PROMPTS, eventData);
+
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(2);
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('First pass.');
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('Original prompt');
+        expect(generateQuietPrompt.mock.calls[1][0].quietPrompt).toContain('Second pass.');
+        expect(generateQuietPrompt.mock.calls[1][0].quietPrompt).toContain('first output');
+        expect(eventData.prompt).toBe('second output');
+    });
+
+    test('replaces chat completion prompts when intercept output is a message array', async () => {
+        enabledAgents = [createPreInterceptAgent()];
+        generateQuietPrompt.mockResolvedValue(JSON.stringify([
+            { role: 'system', content: 'rewritten system prompt' },
+            { role: 'user', content: 'rewritten user prompt' },
+        ]));
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        const originalChat = [{ role: 'user', content: 'original user prompt' }];
+        const eventData = { chat: originalChat, dryRun: false };
+        await eventSource.emit(eventTypes.CHAT_COMPLETION_PROMPT_READY, eventData);
+
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(1);
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('JSON array of chat-completion messages');
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('original user prompt');
+        expect(eventData.chat).toBe(originalChat);
+        expect(eventData.chat).toEqual([
+            { role: 'system', content: 'rewritten system prompt' },
+            { role: 'user', content: 'rewritten user prompt' },
+        ]);
+    });
+
+    test('leaves chat completion prompts unchanged when intercept output has invalid messages', async () => {
+        const invalidReplacementChats = [
+            ['a non-object entry', ['bad message']],
+            ['an unsupported role', [{ role: 'developer', content: 'bad role' }]],
+            ['missing content', [{ role: 'user' }]],
+            ['a tool message without an id', [{ role: 'tool', content: 'tool output' }]],
+        ];
+        enabledAgents = [createPreInterceptAgent()];
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        try {
+            const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+            initAgentRunner();
+
+            for (const [caseName, replacementChat] of invalidReplacementChats) {
+                const invalidOutputText = JSON.stringify(replacementChat);
+                generateQuietPrompt.mockResolvedValueOnce(invalidOutputText);
+
+                await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+                const originalMessage = { role: 'user', content: `original user prompt for ${caseName}` };
+                const originalChat = [originalMessage];
+                const eventData = { chat: originalChat, dryRun: false };
+                await eventSource.emit(eventTypes.CHAT_COMPLETION_PROMPT_READY, eventData);
+
+                expect(eventData.chat).toBe(originalChat);
+                expect(eventData.chat).toEqual([originalMessage]);
+                expect(warnSpy).toHaveBeenCalledWith(
+                    expect.stringContaining('Leaving chat context unchanged'),
+                    expect.any(Error),
+                );
+
+                const messageIndex = chat.length;
+                chat.push({
+                    name: 'Assistant',
+                    mes: `Chat reply for ${caseName}`,
+                    is_user: false,
+                    is_system: false,
+                    extra: {},
+                });
+                await eventSource.emit(eventTypes.MESSAGE_RECEIVED, messageIndex, 'normal');
+                await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+                await waitFor(() => Array.isArray(chat[messageIndex].extra.inChatAgentPreGenerationInterceptHistory));
+
+                expect(chat[messageIndex].extra.inChatAgentPreGenerationInterceptHistory).toEqual([expect.objectContaining({
+                    status: 'error',
+                    changed: false,
+                    beforeText: JSON.stringify(originalChat, null, 2),
+                    afterText: JSON.stringify(originalChat, null, 2),
+                    outputText: invalidOutputText,
+                })]);
+            }
+        } finally {
+            warnSpy.mockRestore();
+        }
+    });
+
+    test('adds patch messages for chat completion intercept agents in patch mode', async () => {
+        enabledAgents = [createPreInterceptAgent({
+            injection: { role: 1 },
+            preProcess: {
+                applyMode: 'patch',
+                wrapPosition: 'before',
+                patchStartTag: '<patch>',
+                patchEndTag: '</patch>',
+            },
+        })];
+        generateQuietPrompt.mockResolvedValue('patch note');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        const originalMessage = { role: 'user', content: 'original user prompt' };
+        const eventData = { chat: [originalMessage], dryRun: false };
+        await eventSource.emit(eventTypes.CHAT_COMPLETION_PROMPT_READY, eventData);
+
+        expect(eventData.chat).toEqual([
+            { role: 'user', content: '<patch>\npatch note\n</patch>' },
+            originalMessage,
+        ]);
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Chat reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await waitFor(() => Array.isArray(chat[0].extra.inChatAgentPreGenerationInterceptHistory));
+
+        expect(chat[0].extra.inChatAgentPreGenerationInterceptHistory).toEqual([expect.objectContaining({
+            applyMode: 'patch',
+            contextFormat: 'chat',
+            outputText: 'patch note',
+            role: 'user',
+            status: 'changed',
+        })]);
+        expect(chat[0].extra.inChatAgentPreGenerationInterceptHistory[0].beforeText).toContain('original user prompt');
+        expect(JSON.parse(chat[0].extra.inChatAgentPreGenerationInterceptHistory[0].afterText)[0].content).toBe('<patch>\npatch note\n</patch>');
+    });
+
+    test('skips pre-generation intercepts during dry runs and outside active generation', async () => {
+        enabledAgents = [createPreInterceptAgent()];
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        const inactiveEventData = { prompt: 'inactive prompt', dryRun: false };
+        await eventSource.emit(eventTypes.GENERATE_AFTER_COMBINE_PROMPTS, inactiveEventData);
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        const dryRunEventData = { prompt: 'dry run prompt', dryRun: true };
+        await eventSource.emit(eventTypes.GENERATE_AFTER_COMBINE_PROMPTS, dryRunEventData);
+
+        expect(generateQuietPrompt).not.toHaveBeenCalled();
+        expect(inactiveEventData.prompt).toBe('inactive prompt');
+        expect(dryRunEventData.prompt).toBe('dry run prompt');
+    });
+
+    test('exposes pre-generation intercept history for message document UI', async () => {
+        const { getPreGenerationInterceptHistoryForMessage } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        const message = {
+            name: 'Assistant',
+            mes: 'Visible swipe',
+            is_user: false,
+            is_system: false,
+            swipe_id: 1,
+            swipes: ['Other swipe', 'Visible swipe'],
+            swipe_info: [
+                { extra: {} },
+                {
+                    extra: {
+                        inChatAgentPreGenerationInterceptHistory: [{
+                            agentId: 'agent-pre-intercept',
+                            agentName: 'Pre Intercept',
+                            applyMode: 'patch',
+                            contextFormat: 'chat',
+                            status: 'changed',
+                            outputText: 'visible plan',
+                        }],
+                    },
+                },
+            ],
+            extra: {
+                inChatAgentPreGenerationInterceptHistory: [{
+                    agentId: 'stale',
+                    agentName: 'Stale',
+                    outputText: 'hidden plan',
+                }],
+            },
+        };
+
+        expect(getPreGenerationInterceptHistoryForMessage(message)).toEqual([expect.objectContaining({
+            agentId: 'agent-pre-intercept',
+            outputText: 'visible plan',
+        })]);
+    });
+
     test('queues manual agent runs while another manual agent is active in sequential mode', async () => {
         useManualTransformAgents();
         globalSettings.appendAgentsExecutionMode = 'sequential';
@@ -614,6 +1011,29 @@ describe('in-chat agent post-processing runner', () => {
 
         expect(chat[0].mes).toBe('Fresh reply\n[post processed]');
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not run post-processing agents for greeting messages', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Hello there',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'first_message');
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'first_message');
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Hello there');
+        expect(chat[0].extra.inChatAgentPostRuns).toBeUndefined();
+        expect(saveChatDebounced).not.toHaveBeenCalled();
     });
 
     test('snapshots regex-only agents as soon as the assistant message is received', async () => {
@@ -805,6 +1225,52 @@ describe('in-chat agent post-processing runner', () => {
     test('persists prompt-transform history into current swipe metadata', async () => {
         usePromptTransformPostAgent();
         generateQuietPrompt.mockResolvedValue('Swipe-safe rewrite');
+        const messageElement = { id: 'message-0' };
+        document.querySelector = jest.fn(selector => selector === '.mes[mesid="0"]' ? messageElement : null);
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Needs rewrite',
+            is_user: false,
+            is_system: false,
+            swipe_id: 0,
+            swipes: ['Needs rewrite'],
+            swipe_info: [{
+                extra: {
+                    token_count: 999,
+                },
+            }],
+            extra: {
+                token_count: 999,
+            },
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('Swipe-safe rewrite');
+        expect(updateMessageTokenAccounting).toHaveBeenCalledWith(chat[0]);
+        expect(chat[0].extra.token_count).toBe(2);
+        expect(chat[0].swipe_info[0].extra.token_count).toBe(2);
+        expect(updateMessageMetaBadges).toHaveBeenCalledWith(messageElement, chat[0]);
+        expect(chat[0].extra.inChatAgentTransformHistory).toHaveLength(1);
+        expect(chat[0].swipe_info[0].extra.inChatAgentTransformHistory).toEqual(chat[0].extra.inChatAgentTransformHistory);
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('shows the resolved profile model in prompt-transform running toasts', async () => {
+        usePromptTransformPostAgent();
+        enabledAgents[0].connectionProfile = 'profile-cc';
+        enabledAgents[0].postProcess.promptTransformShowNotifications = true;
+        globalSettings.promptTransformShowNotifications = true;
+        connectionManagerRequestService = {
+            getProfile: jest.fn(profileId => profileId === 'profile-cc'
+                ? { name: 'Geechan CC', model: 'claude-3.5-sonnet' }
+                : null),
+            sendRequest: jest.fn(async () => ({ content: 'Profile rewrite' })),
+        };
 
         const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
         initAgentRunner();
@@ -819,10 +1285,17 @@ describe('in-chat agent post-processing runner', () => {
 
         await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
 
-        expect(chat[0].mes).toBe('Swipe-safe rewrite');
-        expect(chat[0].extra.inChatAgentTransformHistory).toHaveLength(1);
-        expect(chat[0].swipe_info[0].extra.inChatAgentTransformHistory).toEqual(chat[0].extra.inChatAgentTransformHistory);
-        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+        expect(globalThis.toastr.info).toHaveBeenCalled();
+        const [messageHtml, title] = globalThis.toastr.info.mock.calls[0];
+        expect(title).toBe('Post Transform');
+        expect(messageHtml).toContain('Model: claude-3.5-sonnet (Geechan CC)');
+        expect(messageHtml).not.toContain('Model: Geechan CC');
+        expect(connectionManagerRequestService.sendRequest).toHaveBeenCalledWith(
+            'profile-cc',
+            expect.any(Array),
+            8192,
+            expect.objectContaining({ extractData: true, stream: false }),
+        );
     });
 
     test('keeps prompt-transform storage separate for each swipe', async () => {
@@ -1199,6 +1672,34 @@ describe('in-chat agent post-processing runner', () => {
 
         expect(chat[0].mes).toBe('Late mobile reply\n[post processed]');
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not flush stale mobile post-processing after switching chats', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        currentChatId = 'chat-a';
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+
+        currentChatId = 'chat-b';
+        chat.splice(0, chat.length, {
+            name: 'Assistant',
+            mes: 'Existing greeting',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        delete document.body.dataset.generating;
+        await eventSource.emit(eventTypes.CHAT_CHANGED, currentChatId);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Existing greeting');
+        expect(saveChatDebounced).not.toHaveBeenCalled();
     });
 
     test('polls missed mobile render events using the generation-start snapshot', async () => {

@@ -17,6 +17,18 @@ import {
  */
 
 /**
+ * @typedef {object} AgentPreProcess
+ * @property {'inject'|'intercept'} mode - Inject is the existing setExtensionPrompt flow; intercept rewrites the assembled outgoing context.
+ * @property {'replace'|'wrap'|'patch'} applyMode
+ * @property {'before'|'after'} wrapPosition
+ * @property {string} wrapPrefix
+ * @property {string} wrapSuffix
+ * @property {string} patchStartTag
+ * @property {string} patchEndTag
+ * @property {number} maxTokens
+ */
+
+/**
  * @typedef {object} AgentPostProcess
  * @property {boolean} enabled
  * @property {'regex'|'append'|'extract'} type
@@ -70,6 +82,7 @@ import {
  * @property {string} prompt
  * @property {'pre'|'post'|'both'} phase
  * @property {AgentInjection} injection
+ * @property {AgentPreProcess} preProcess
  * @property {AgentPostProcess} postProcess
  * @property {AgentRegexScript[]} regexScripts
  * @property {string} connectionProfile
@@ -520,6 +533,18 @@ function choosePathfinderAgentToKeep(agents) {
     return [...agents].sort((a, b) => getPathfinderKeepRank(a) - getPathfinderKeepRank(b))[0] ?? null;
 }
 
+function chooseSameTemplateAgentToKeep(agents, template) {
+    const templatePrompt = template ? String(template?.prompt ?? '').trim() : null;
+    if (templatePrompt !== null) {
+        const currentTemplatePromptAgent = agents.find(agent => String(agent?.prompt ?? '').trim() === templatePrompt);
+        if (currentTemplatePromptAgent) {
+            return currentTemplatePromptAgent;
+        }
+    }
+
+    return agents.find(agent => agent?.enabled) ?? agents[0] ?? null;
+}
+
 export function getRedundantBundledAgentDuplicateIds(agentList = [], templateList = []) {
     const groupedAgents = new Map();
 
@@ -573,6 +598,34 @@ export function getRedundantBundledAgentDuplicateIds(agentList = [], templateLis
         }
     }
 
+    const agentsByTemplateId = new Map();
+    for (const agent of agentList) {
+        const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+        if (!sourceTemplateId) {
+            continue;
+        }
+
+        if (!agentsByTemplateId.has(sourceTemplateId)) {
+            agentsByTemplateId.set(sourceTemplateId, []);
+        }
+
+        agentsByTemplateId.get(sourceTemplateId).push(agent);
+    }
+
+    for (const grouped of agentsByTemplateId.values()) {
+        if (grouped.length < 2) {
+            continue;
+        }
+
+        const template = findTemplateForAgentSnapshot(grouped[0], templateList);
+        const keepAgent = chooseSameTemplateAgentToKeep(grouped, template);
+        for (const agent of grouped) {
+            if (agent?.id && agent.id !== keepAgent?.id && !agent.phaseLocked) {
+                redundantIds.add(agent.id);
+            }
+        }
+    }
+
     return [...redundantIds];
 }
 
@@ -581,6 +634,14 @@ export function getPromptTransformMode(agent) {
 }
 
 export function normalizePromptTransformMaxTokens(value) {
+    if (!Number.isFinite(Number(value))) {
+        return DEFAULT_AGENT_MAX_TOKENS;
+    }
+
+    return Math.max(16, Math.min(16000, Number(value)));
+}
+
+export function normalizePreProcessMaxTokens(value) {
     if (!Number.isFinite(Number(value))) {
         return DEFAULT_AGENT_MAX_TOKENS;
     }
@@ -626,6 +687,19 @@ export const AGENT_CATEGORIES = {
     content: { label: 'Content', icon: 'fa-film' },
     tool: { label: 'Tool', icon: 'fa-screwdriver-wrench' },
     custom: { label: 'Custom', icon: 'fa-puzzle-piece' },
+};
+
+/**
+ * Modal-only template subgroup labels.
+ */
+export const AGENT_SUBCATEGORIES = {
+    world: { category: 'tracker', label: 'World & Scene', icon: 'fa-map' },
+    characters: { category: 'tracker', label: 'Character State', icon: 'fa-users' },
+    progress: { category: 'tracker', label: 'Player Progress', icon: 'fa-trophy' },
+    'player-choices': { category: 'tracker', label: 'Player Choices', icon: 'fa-list-check' },
+    'prose-quality': { category: 'content', label: 'Prose Quality', icon: 'fa-feather' },
+    pov: { category: 'content', label: 'Point of View', icon: 'fa-user-pen' },
+    behaviour: { category: 'content', label: 'Behaviour & Tone', icon: 'fa-masks-theater' },
 };
 
 function escapeRegexLiteral(value) {
@@ -706,6 +780,16 @@ export function createDefaultAgent() {
             order: 100,
             scan: false,
         },
+        preProcess: {
+            mode: 'inject',
+            applyMode: 'replace',
+            wrapPosition: 'after',
+            wrapPrefix: '',
+            wrapSuffix: '',
+            patchStartTag: '<context_patch>',
+            patchEndTag: '</context_patch>',
+            maxTokens: DEFAULT_AGENT_MAX_TOKENS,
+        },
         postProcess: {
             enabled: false,
             type: 'regex',
@@ -761,12 +845,16 @@ export function normalizeToolDef(raw = {}) {
  */
 export function normalizeAgent(rawAgent = {}) {
     const defaults = createDefaultAgent();
+    const rawAgentWithoutModalMetadata = { ...rawAgent };
+    delete rawAgentWithoutModalMetadata.subcategory;
+
+    const rawPreProcess = rawAgent.preProcess && typeof rawAgent.preProcess === 'object' ? rawAgent.preProcess : {};
     const rawPostProcess = rawAgent.postProcess && typeof rawAgent.postProcess === 'object' ? rawAgent.postProcess : {};
     const conditions = rawAgent.conditions && typeof rawAgent.conditions === 'object' ? rawAgent.conditions : {};
 
     return {
         ...defaults,
-        ...rawAgent,
+        ...rawAgentWithoutModalMetadata,
         id: typeof rawAgent.id === 'string' && rawAgent.id.trim() ? rawAgent.id.trim() : defaults.id,
         name: typeof rawAgent.name === 'string' ? rawAgent.name : defaults.name,
         description: typeof rawAgent.description === 'string' ? rawAgent.description : defaults.description,
@@ -785,6 +873,28 @@ export function normalizeAgent(rawAgent = {}) {
         injection: {
             ...defaults.injection,
             ...(rawAgent.injection ?? {}),
+        },
+        preProcess: {
+            ...defaults.preProcess,
+            ...rawPreProcess,
+            mode: ['inject', 'intercept'].includes(String(rawPreProcess.mode))
+                ? String(rawPreProcess.mode)
+                : defaults.preProcess.mode,
+            applyMode: ['replace', 'wrap', 'patch'].includes(String(rawPreProcess.applyMode))
+                ? String(rawPreProcess.applyMode)
+                : defaults.preProcess.applyMode,
+            wrapPosition: ['before', 'after'].includes(String(rawPreProcess.wrapPosition))
+                ? String(rawPreProcess.wrapPosition)
+                : defaults.preProcess.wrapPosition,
+            wrapPrefix: typeof rawPreProcess.wrapPrefix === 'string' ? rawPreProcess.wrapPrefix : defaults.preProcess.wrapPrefix,
+            wrapSuffix: typeof rawPreProcess.wrapSuffix === 'string' ? rawPreProcess.wrapSuffix : defaults.preProcess.wrapSuffix,
+            patchStartTag: typeof rawPreProcess.patchStartTag === 'string' && rawPreProcess.patchStartTag.trim()
+                ? rawPreProcess.patchStartTag
+                : defaults.preProcess.patchStartTag,
+            patchEndTag: typeof rawPreProcess.patchEndTag === 'string' && rawPreProcess.patchEndTag.trim()
+                ? rawPreProcess.patchEndTag
+                : defaults.preProcess.patchEndTag,
+            maxTokens: normalizePreProcessMaxTokens(rawPreProcess.maxTokens),
         },
         postProcess: {
             ...defaults.postProcess,

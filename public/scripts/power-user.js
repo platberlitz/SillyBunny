@@ -33,6 +33,7 @@ import {
     settingsReady,
 } from '../script.js';
 import { isMobile, initMovingUI, favsToHotswap } from './RossAscends-mods.js';
+import { normalizeContextRetentionDepth } from './ooc-blocks.js';
 import {
     groups,
     resetSelectedGroup,
@@ -181,21 +182,55 @@ export const chat_styles = Object.freeze({
     DEFAULT: 0,
     BUBBLES: 1,
     DOCUMENT: 2,
+    // SillyBunny: native fork-only chat display styles kept compatible with Moonlit Echoes body classes.
+    ECHO: 3,
+    WHISPER: 4,
+    HUSH: 5,
+    RIPPLE: 6,
+    TIDE: 7,
 });
 
 const CHAT_STYLE_BODY_CLASSES = Object.freeze({
     [chat_styles.DEFAULT]: 'flatchat',
     [chat_styles.BUBBLES]: 'bubblechat',
     [chat_styles.DOCUMENT]: 'documentstyle',
+    [chat_styles.ECHO]: 'echostyle',
+    [chat_styles.WHISPER]: 'whisperstyle',
+    [chat_styles.HUSH]: 'hushstyle',
+    [chat_styles.RIPPLE]: 'ripplestyle',
+    [chat_styles.TIDE]: 'tidestyle',
 });
 
-const LEGACY_CHAT_STYLE_BODY_CLASSES = Object.freeze([
-    'echostyle',
-    'whisperstyle',
-    'hushstyle',
-    'ripplestyle',
-    'tidestyle',
+const LEGACY_CHAT_STYLE_BODY_CLASSES = Object.freeze([]);
+const NATIVE_CHAT_STYLE_VALUES = new Set([
+    chat_styles.ECHO,
+    chat_styles.WHISPER,
+    chat_styles.HUSH,
+    chat_styles.RIPPLE,
+    chat_styles.TIDE,
 ]);
+const NATIVE_CHAT_STYLE_STYLESHEET_ID = 'sillybunny-native-chat-styles';
+const NATIVE_CHAT_STYLE_STYLESHEET_HREF = 'css/sillybunny-chat-styles.css?v=20260513b';
+
+function ensureNativeChatStyleStylesheet() {
+    if (document.getElementById(NATIVE_CHAT_STYLE_STYLESHEET_ID)) {
+        return;
+    }
+
+    const link = document.createElement('link');
+    link.id = NATIVE_CHAT_STYLE_STYLESHEET_ID;
+    link.rel = 'stylesheet';
+    link.type = 'text/css';
+    link.href = NATIVE_CHAT_STYLE_STYLESHEET_HREF;
+
+    const themeStylesheet = document.querySelector('link[href^="css/sillybunny-theme.css"]');
+    if (themeStylesheet) {
+        themeStylesheet.after(link);
+        return;
+    }
+
+    document.head.appendChild(link);
+}
 
 function isValidChatDisplayValue(value) {
     return Number.isInteger(value) && Object.hasOwn(CHAT_STYLE_BODY_CLASSES, value);
@@ -227,11 +262,17 @@ export const power_user = {
     },
     markdown_escape_strings: '',
     chat_truncation: 100,
+    ooc_context_depth: -1,
+    html_context_depth: -1,
     streaming_fps: 30,
     smooth_streaming: false,
     smooth_streaming_no_think: false,
     smooth_streaming_speed: 50,
     stream_fade_in: false,
+    ios_webkit_conservative_streaming: true,
+    ios_webkit_reduce_streaming_work: true,
+    ios_webkit_disable_smooth_streaming: true,
+    ios_webkit_disable_stream_fade_in: true,
 
     fast_ui_mode: true,
     avatar_style: avatar_styles.ROUND,
@@ -432,6 +473,7 @@ export const power_user = {
     auto_connect: false,
     auto_load_chat: false,
     forbid_external_media: true,
+    allow_card_scripts: false,
     external_media_allowed_overrides: [],
     external_media_forbidden_overrides: [],
     pin_styles: true,
@@ -1169,6 +1211,10 @@ function applyChatDisplay() {
     const nextClass = CHAT_STYLE_BODY_CLASSES[power_user.chat_display] ?? CHAT_STYLE_BODY_CLASSES[chat_styles.DEFAULT];
     const allClasses = [...Object.values(CHAT_STYLE_BODY_CLASSES), ...LEGACY_CHAT_STYLE_BODY_CLASSES].join(' ');
 
+    if (NATIVE_CHAT_STYLE_VALUES.has(power_user.chat_display)) {
+        ensureNativeChatStyleStylesheet();
+    }
+
     console.debug(`applying ${nextClass}`);
     $('body').removeClass(allClasses);
 
@@ -1860,6 +1906,8 @@ export async function loadPowerUserSettings(settings, data) {
 
     $('#chat_truncation').val(power_user.chat_truncation);
     $('#chat_truncation_counter').val(power_user.chat_truncation);
+    $('#ooc_context_depth').val(power_user.ooc_context_depth);
+    $('#html_context_depth').val(power_user.html_context_depth);
 
     $('#streaming_fps').val(power_user.streaming_fps);
     $('#streaming_fps_counter').val(power_user.streaming_fps);
@@ -1869,6 +1917,10 @@ export async function loadPowerUserSettings(settings, data) {
     $('#smooth_streaming_speed').val(power_user.smooth_streaming_speed);
 
     $('#stream_fade_in').prop('checked', power_user.stream_fade_in);
+    $('#ios_webkit_conservative_streaming').prop('checked', power_user.ios_webkit_conservative_streaming);
+    $('#ios_webkit_reduce_streaming_work').prop('checked', power_user.ios_webkit_reduce_streaming_work);
+    $('#ios_webkit_disable_smooth_streaming').prop('checked', power_user.ios_webkit_disable_smooth_streaming);
+    $('#ios_webkit_disable_stream_fade_in').prop('checked', power_user.ios_webkit_disable_stream_fade_in);
 
     $('#font_scale').val(power_user.font_scale);
     $('#font_scale_counter').val(power_user.font_scale);
@@ -1884,6 +1936,7 @@ export async function loadPowerUserSettings(settings, data) {
     $('#auto-connect-checkbox').prop('checked', power_user.auto_connect);
     $('#auto-load-chat-checkbox').prop('checked', power_user.auto_load_chat);
     $('#forbid_external_media').prop('checked', power_user.forbid_external_media);
+    $('#allow_card_scripts').prop('checked', !!power_user.allow_card_scripts);
     $('#pin_styles').prop('checked', power_user.pin_styles);
     $('#click_to_edit').prop('checked', power_user.click_to_edit);
     $('#media_display').val(power_user.media_display);
@@ -3536,6 +3589,18 @@ jQuery(async () => {
         saveSettingsDebounced();
     });
 
+    $('#ooc_context_depth').on('input', function () {
+        power_user.ooc_context_depth = normalizeContextRetentionDepth($(this).val());
+        $(this).val(power_user.ooc_context_depth);
+        saveSettingsDebounced();
+    });
+
+    $('#html_context_depth').on('input', function () {
+        power_user.html_context_depth = normalizeContextRetentionDepth($(this).val());
+        $(this).val(power_user.html_context_depth);
+        saveSettingsDebounced();
+    });
+
     $('#streaming_fps').on('input', function () {
         power_user.streaming_fps = Number($('#streaming_fps').val());
         $('#streaming_fps_counter').val(power_user.streaming_fps);
@@ -3559,6 +3624,26 @@ jQuery(async () => {
 
     $('#stream_fade_in').on('input', function () {
         power_user.stream_fade_in = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#ios_webkit_conservative_streaming').on('input', function () {
+        power_user.ios_webkit_conservative_streaming = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#ios_webkit_reduce_streaming_work').on('input', function () {
+        power_user.ios_webkit_reduce_streaming_work = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#ios_webkit_disable_smooth_streaming').on('input', function () {
+        power_user.ios_webkit_disable_smooth_streaming = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#ios_webkit_disable_stream_fade_in').on('input', function () {
+        power_user.ios_webkit_disable_stream_fade_in = !!$(this).prop('checked');
         saveSettingsDebounced();
     });
 
@@ -4176,6 +4261,11 @@ jQuery(async () => {
         power_user.forbid_external_media = !!$(this).prop('checked');
         saveSettingsDebounced();
         reloadCurrentChat();
+    });
+
+    $('#allow_card_scripts').on('input', function () {
+        power_user.allow_card_scripts = !!$(this).prop('checked');
+        saveSettingsDebounced();
     });
 
     $('#pin_styles').on('input', function () {

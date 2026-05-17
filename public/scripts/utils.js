@@ -2623,14 +2623,23 @@ export async function showFontAwesomePicker(customList = null) {
                 qry.placeholder = 'Filter icons';
                 qry.autofocus = true;
                 const qryDebounced = debounce(() => {
-                    const result = faList.filter(fa => fa.find(className => className.includes(qry.value.toLowerCase())));
+                    const query = qry.value.trim().toLowerCase();
+                    const result = faList.filter(fa => fa.find(className => className.includes(query)));
+                    const resultSet = new Set(result);
                     for (const fa of faList) {
-                        if (!result.includes(fa)) {
+                        if (!resultSet.has(fa)) {
                             fas[fa].classList.add('hidden');
                         } else {
                             fas[fa].classList.remove('hidden');
                         }
                     }
+
+                    // SillyBunny: keep matching icons at the front while preserving
+                    // the full icon grid so keyboard navigation remains stable.
+                    const ordered = query
+                        ? [...result, ...faList.filter(fa => !resultSet.has(fa))]
+                        : faList;
+                    grid.append(...ordered.map(fa => fas[fa]).filter(Boolean));
                 });
                 qry.addEventListener('input', () => qryDebounced());
                 search.append(qry);

@@ -17,7 +17,10 @@ const SB_STORAGE_KEYS = Object.freeze({
     shortcutLeft: 'sb-shortcut-left',
     shortcutRight: 'sb-shortcut-right',
     bottomBarScale: 'sb-bottom-bar-scale',
+    bottomChatSecondaryOpen: 'sb-bottom-chat-secondary-open',
     mobileButtonScale: 'sb-mobile-button-scale',
+    mobileQuickActions: 'sb-mobile-quick-actions-v2',
+    mobileQuickActionsLegacy: 'sb-mobile-quick-actions',
     settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
     compactMode: 'sb-compact-mode',
     frontendIcon: 'sb-frontend-icon',
@@ -33,7 +36,7 @@ const SB_SHORTCUT_TARGETS = Object.freeze([
     { value: 'action:search', label: 'Search', icon: 'fa-magnifying-glass' },
     { value: 'right:settings', label: 'Settings', icon: 'fa-sliders' },
     { value: 'right:extensions', label: 'Extensions', icon: 'fa-cubes' },
-    { value: 'right:persona', label: 'Persona', icon: 'fa-face-smile' },
+    { value: 'characters:persona', label: 'Persona', icon: 'fa-face-smile' },
     { value: 'right:background', label: 'Background', icon: 'fa-panorama' },
 ]);
 
@@ -73,14 +76,47 @@ const SB_STORAGE_PREFIX = 'sb-';
 const SB_STORAGE_WRITE_DEBOUNCE_MS = 120;
 const SB_MOBILE_NAV_OPEN_GRACE_MS = 450;
 const SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX = 6;
+const SB_MOBILE_ACTION_DEBOUNCE_MS = 140;
+const SB_SHELL_FOCUSABLE_SELECTOR = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+].join(',');
 
 let sbInlineDrawerPersistenceObserver = null;
 let sbInlineDrawerPersistenceQueued = false;
 let sbChatScriptModulePromise = null;
+let sbMainScriptModulePromise = null;
+let sbComposerControlsObserver = null;
+let sbComposerControlsSyncQueued = false;
 let sbStorageFlushTimer = 0;
 let sbStorageFlushEventsBound = false;
+let sbMessageActionEventsBound = false;
 const sbStorageCache = new Map();
 const sbStoragePendingWrites = new Map();
+const SB_EXTENSION_ALIASES = {
+    'stable-diffusion': ['stable-diffusion', 'sd'],
+    'sd': ['stable-diffusion', 'sd'],
+};
+
+function debounceAction(callback, wait = SB_MOBILE_ACTION_DEBOUNCE_MS) {
+    let lastRun = 0;
+
+    return function debouncedAction(event) {
+        const now = performance.now();
+        if (now - lastRun < wait) {
+            event?.preventDefault?.();
+            event?.stopPropagation?.();
+            return;
+        }
+
+        lastRun = now;
+        return callback.call(this, event);
+    };
+}
 
 function getShortcutTarget(side) {
     const stored = safeGetItem(side === 'left' ? SB_STORAGE_KEYS.shortcutLeft : SB_STORAGE_KEYS.shortcutRight);
@@ -116,6 +152,14 @@ function activateShortcutTarget(target) {
     }
 
     const [shell, tab] = String(target).split(':');
+
+    if (shell === 'characters') {
+        if (!tab || tab === 'characters') {
+            void setCharacterListEntityView('characters');
+        }
+        openCharacterPanelTab(tab);
+        return;
+    }
 
     if (shell && tab) {
         toggleShellPanel(shell, tab);
@@ -309,6 +353,36 @@ const SB_MESSAGE_STYLES = Object.freeze([
     { id: '2', label: 'Document', icon: 'fa-file-lines' },
 ]);
 
+const SB_CHARACTER_TAB_COPY = Object.freeze({
+    characters: {
+        title: 'Character Menu',
+        subtitle: 'Browse, create, and sort locally-stored character cards.',
+        description: 'Manage your personal character cards, groups, and personas here.',
+    },
+    groups: {
+        title: 'Group Menu',
+        subtitle: 'Browse, create, and sort locally-stored group chats here, using multiple character cards.',
+        description: 'Manage your personal character cards, groups, and personas here.',
+    },
+    editor: {
+        title: 'Card Editor',
+        subtitle: 'Edit or make changes to your selected character card or group chat here.',
+        description: 'Manage your personal character cards, groups, and personas here.',
+    },
+    persona: {
+        title: 'Persona',
+        subtitle: 'Manage your in-chat persona details and other configuration options.',
+        description: 'Manage your personal character cards, groups, and personas here.',
+    },
+    import: {
+        title: 'Import',
+        subtitle: 'Import character cards from files, search a website for uploaded character cards, or import them directly from a URL.',
+        description: 'Manage your personal character cards, groups, and personas here.',
+    },
+});
+
+const SB_PERSONA_HELP_LINK_HTML = '<a class="notes-link sb-character-title-help" href="https://docs.sillytavern.app/usage/core-concepts/personas/" target="_blank"><span class="fa-solid fa-circle-question note-link-span"></span></a>';
+
 const SB_SHELLS = Object.freeze({
     left: {
         rootPanelId: 'left-nav-panel',
@@ -378,9 +452,9 @@ const SB_SHELLS = Object.freeze({
         proxyIcon: 'fa-gear',
         proxyLabel: 'Customize',
         title: 'Customize',
-        subtitle: 'Personalize your workspace, add/remove extensions, change personas, modify server settings, or check logs here.',
-        searchPlaceholder: 'Search themes, top bar, personas, backgrounds, or extensions',
-        searchExamples: ['theme', 'top bar', 'Appearance', 'notify extension updates', 'persona'],
+        subtitle: 'Personalize your workspace, add/remove extensions, modify server settings, or check logs here.',
+        searchPlaceholder: 'Search themes, top bar, backgrounds, or extensions',
+        searchExamples: ['theme', 'top bar', 'Appearance', 'notify extension updates'],
         storageKey: SB_STORAGE_KEYS.rightTab,
         defaultTabId: 'settings',
         baseTab: {
@@ -398,14 +472,6 @@ const SB_SHELLS = Object.freeze({
                 icon: 'fa-cubes',
                 searchPlaceholder: 'Search themes, Quick Reply, Dialogue Colors, or Image Gen',
                 searchExamples: ['themes', 'Quick Reply', 'Dialogue Colors', 'Image Gen'],
-            },
-            {
-                id: 'persona',
-                drawerId: 'persona-management-button',
-                label: 'Persona',
-                icon: 'fa-face-smile',
-                searchPlaceholder: 'Search default persona, avatar, description, or lock',
-                searchExamples: ['default persona', 'avatar', 'description', 'lock'],
             },
             {
                 id: 'background',
@@ -441,7 +507,7 @@ const SB_DRAWER_ROUTES = Object.freeze({
     'advanced-formatting-button': { shell: 'left', tab: 'advanced-formatting' },
     'WI-SP-button': { shell: 'left', tab: 'world-info' },
     'extensions-settings-button': { shell: 'right', tab: 'extensions' },
-    'persona-management-button': { shell: 'right', tab: 'persona' },
+    'persona-management-button': { shell: 'characters', tab: 'persona' },
     'backgrounds-button': { shell: 'right', tab: 'background' },
 });
 
@@ -468,6 +534,16 @@ const SB_UNIVERSAL_SEARCH_IDLE_TITLE = 'Search all settings';
 const SB_UNIVERSAL_SEARCH_IDLE_HINT = 'Jump to any workspace or customization control from one place.';
 const SB_UNIVERSAL_SEARCH_EMPTY_HINT = 'Could not find query. Try a broader term or a different setting name.';
 const SB_UNIVERSAL_SEARCH_RESULT_LIMIT = 10;
+const SB_MOBILE_QUICK_ACTION_LIMIT = 12;
+const SB_MOBILE_QUICK_ACTION_LABEL_MAX_LENGTH = 36;
+const SB_MOBILE_DEFAULT_QUICK_ACTIONS = Object.freeze([
+    { type: 'tab', shellKey: 'left', tabId: 'presets', icon: 'fa-sliders', label: 'Presets' },
+    { type: 'tab', shellKey: 'left', tabId: 'api', icon: 'fa-plug', label: 'API' },
+    { type: 'tab', shellKey: 'left', tabId: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
+    { type: 'tab', shellKey: 'left', tabId: 'advanced-formatting', icon: 'fa-text-height', label: 'Formatting' },
+    { type: 'tab', shellKey: 'left', tabId: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
+    { type: 'tab', shellKey: 'left', tabId: 'agents', icon: 'fa-robot', label: 'Agents' },
+]);
 
 const sbState = {
     initialized: false,
@@ -525,13 +601,16 @@ const sbState = {
         rightLocked: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.characterDrawerRightLocked), false),
         stateObserver: null,
         observedOpen: null,
+        lastTab: 'characters',
     },
     mobileModal: {
         syncFrame: 0,
     },
     mobileNav: {
         lastOpenedAt: 0,
+        quickActionContainer: null,
     },
+    mobileQuickActions: [],
     chatbar: {
         desktop: null,
         sidebar: null,
@@ -580,7 +659,7 @@ const sbState = {
         scrollBottomButton: null,
         massDeleteButton: null,
         autoNameButton: null,
-        secondaryOpen: true,
+        secondaryOpen: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.bottomChatSecondaryOpen), true),
         searchOpen: false,
         bindingRetryTimer: 0,
         boundEventSource: null,
@@ -765,6 +844,202 @@ function normalizeTopbarOffset(value) {
     };
 }
 
+function getMobileQuickActionTabConfig(shellKey, tabId) {
+    const shellConfig = getShellConfig(shellKey);
+    if (!shellConfig || !tabId) {
+        return null;
+    }
+
+    return [
+        shellConfig.baseTab,
+        ...(Array.isArray(shellConfig.embeddedTabs) ? shellConfig.embeddedTabs : []),
+        ...(Array.isArray(shellConfig.customTabs) ? shellConfig.customTabs : []),
+    ].find(tab => tab?.id === tabId) || null;
+}
+
+function normalizeMobileQuickAction(value) {
+    if (!value || typeof value !== 'object') {
+        return null;
+    }
+
+    const shellKey = normalizeText(value.shellKey || value.shell);
+    const tabId = normalizeText(value.tabId || value.tab);
+    const shellConfig = getShellConfig(shellKey);
+
+    if (!shellConfig || !tabId) {
+        return null;
+    }
+
+    const tabConfig = getMobileQuickActionTabConfig(shellKey, tabId);
+    const dedupeKey = clampText(value.dedupeKey, 160);
+    const type = dedupeKey ? 'custom' : 'tab';
+    const displayText = clampText(value.displayText, 80);
+    const sectionLabel = clampText(value.sectionLabel, 80);
+    const fallbackLabel = type === 'custom'
+        ? displayText || sectionLabel
+        : tabConfig?.label || tabId;
+    const label = clampText(value.label || fallbackLabel, SB_MOBILE_QUICK_ACTION_LABEL_MAX_LENGTH);
+
+    if (!label) {
+        return null;
+    }
+
+    const action = {
+        type,
+        shellKey,
+        tabId,
+        icon: clampText(value.icon || (type === 'custom' ? 'fa-bolt' : tabConfig?.icon || 'fa-bars'), 60),
+        label,
+    };
+
+    if (type === 'custom') {
+        action.sectionLabel = sectionLabel;
+        action.displayText = displayText || label;
+        action.dedupeKey = dedupeKey;
+    }
+
+    return action;
+}
+
+function normalizeMobileQuickActionList(actions) {
+    const seen = new Set();
+    const nextActions = [];
+
+    if (!Array.isArray(actions)) {
+        return nextActions;
+    }
+
+    for (const action of actions) {
+        const normalizedAction = normalizeMobileQuickAction(action);
+        if (!normalizedAction) {
+            continue;
+        }
+
+        const key = getMobileQuickActionKey(normalizedAction);
+        if (seen.has(key)) {
+            continue;
+        }
+
+        seen.add(key);
+        nextActions.push(normalizedAction);
+
+        if (nextActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT) {
+            break;
+        }
+    }
+
+    return nextActions;
+}
+
+function getDefaultMobileQuickActions() {
+    return normalizeMobileQuickActionList(SB_MOBILE_DEFAULT_QUICK_ACTIONS);
+}
+
+function parseMobileQuickActionStorage(storedValue) {
+    if (storedValue === null) {
+        return null;
+    }
+
+    try {
+        const parsedValue = JSON.parse(storedValue);
+        if (!Array.isArray(parsedValue)) {
+            return null;
+        }
+
+        return normalizeMobileQuickActionList(parsedValue);
+    } catch {
+        return null;
+    }
+}
+
+function loadMobileQuickActions() {
+    const storedActions = parseMobileQuickActionStorage(safeGetItem(SB_STORAGE_KEYS.mobileQuickActions));
+    if (storedActions) {
+        return storedActions;
+    }
+
+    const defaultActions = getDefaultMobileQuickActions();
+    const legacyActions = parseMobileQuickActionStorage(safeGetItem(SB_STORAGE_KEYS.mobileQuickActionsLegacy));
+    const nextActions = legacyActions
+        ? normalizeMobileQuickActionList([...defaultActions, ...legacyActions])
+        : defaultActions;
+
+    safeSetItem(SB_STORAGE_KEYS.mobileQuickActions, JSON.stringify(nextActions));
+    return nextActions;
+}
+
+function saveMobileQuickActions() {
+    safeSetItem(SB_STORAGE_KEYS.mobileQuickActions, JSON.stringify(sbState.mobileQuickActions));
+}
+
+function getMobileQuickActionKey(action) {
+    const normalizedAction = normalizeMobileQuickAction(action);
+    if (!normalizedAction) {
+        return '';
+    }
+
+    return [
+        normalizedAction.type,
+        normalizedAction.shellKey,
+        normalizedAction.tabId,
+        normalizedAction.dedupeKey,
+    ].filter(Boolean).join('::');
+}
+
+function createMobileQuickActionFromMatch(match) {
+    const normalizedMatch = normalizeMobileQuickAction({
+        type: 'custom',
+        shellKey: match?.shellKey,
+        tabId: match?.tabId,
+        icon: 'fa-bolt',
+        sectionLabel: match?.sectionLabel,
+        displayText: match?.displayText,
+        dedupeKey: match?.dedupeKey,
+        label: match?.displayText || match?.sectionLabel,
+    });
+
+    return normalizedMatch;
+}
+
+function setMobileQuickActions(actions, { persist = true } = {}) {
+    sbState.mobileQuickActions = normalizeMobileQuickActionList(actions);
+
+    if (persist) {
+        saveMobileQuickActions();
+    }
+
+    renderMobileQuickActionSettingsList();
+    refreshMobileQuickActionSearchResults();
+    refreshMobileNavQuickActions();
+}
+
+function addMobileQuickActionFromMatch(match) {
+    const action = createMobileQuickActionFromMatch(match);
+    if (!action) {
+        return false;
+    }
+
+    if (sbState.mobileQuickActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT) {
+        return false;
+    }
+
+    const actionKey = getMobileQuickActionKey(action);
+    if (sbState.mobileQuickActions.some(existingAction => getMobileQuickActionKey(existingAction) === actionKey)) {
+        return false;
+    }
+
+    setMobileQuickActions([...sbState.mobileQuickActions, action]);
+    return true;
+}
+
+function removeMobileQuickAction(actionKey) {
+    setMobileQuickActions(sbState.mobileQuickActions.filter(action => getMobileQuickActionKey(action) !== actionKey));
+}
+
+function resetMobileQuickActions() {
+    setMobileQuickActions(getDefaultMobileQuickActions());
+}
+
 function normalizeTopbarScale(value) {
     const numericValue = Number(value);
 
@@ -814,6 +1089,7 @@ function restorePersistedTopbarState() {
     sbState.chatbar.visible = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.chatbarVisible), sbState.chatbar.visible);
     sbState.chatbar.topbarOffset = normalizeTopbarOffset(safeGetItem(SB_STORAGE_KEYS.topbarOffset));
     sbState.compactMode = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), sbState.compactMode);
+    sbState.mobileQuickActions = loadMobileQuickActions();
     sbState.characterDrawer.rightLocked = normalizeStoredBoolean(
         getPersistentStorageItem(SB_STORAGE_KEYS.characterDrawerRightLocked),
         sbState.characterDrawer.rightLocked,
@@ -916,16 +1192,119 @@ function setMobileButtonScale(value, { persist = true } = {}) {
     updateThemePickerUi();
 }
 
+function moveElementBefore(element, parent, referenceNode) {
+    if (!(element instanceof HTMLElement) || !(parent instanceof HTMLElement)) {
+        return;
+    }
+
+    if (referenceNode instanceof Node) {
+        if (element.parentElement === parent && element.nextElementSibling === referenceNode) {
+            return;
+        }
+
+        parent.insertBefore(element, referenceNode);
+        return;
+    }
+
+    if (element.parentElement === parent && element.nextSibling === null) {
+        return;
+    }
+
+    parent.appendChild(element);
+}
+
+function moveElementToStart(element, parent) {
+    if (!(element instanceof HTMLElement) || !(parent instanceof HTMLElement)) {
+        return;
+    }
+
+    if (element.parentElement === parent && element.previousElementSibling === null) {
+        return;
+    }
+
+    parent.insertBefore(element, parent.firstChild);
+}
+
+function moveElementAfter(element, referenceElement, parent) {
+    if (!(element instanceof HTMLElement)
+        || !(referenceElement instanceof HTMLElement)
+        || !(parent instanceof HTMLElement)) {
+        return;
+    }
+
+    if (element.parentElement === parent && element.previousElementSibling === referenceElement) {
+        return;
+    }
+
+    parent.insertBefore(element, referenceElement.nextSibling);
+}
+
+function placeComposerControls() {
+    const leftForm = document.getElementById('leftSendForm');
+    const rightForm = document.getElementById('rightSendForm');
+
+    if (!(leftForm instanceof HTMLElement) || !(rightForm instanceof HTMLElement)) {
+        return;
+    }
+
+    const paletteButton = document.getElementById('qig-input-btn');
+    const optionsButton = document.getElementById('options_button');
+    const wandButton = document.getElementById('extensionsMenuButton');
+    const sendButton = document.getElementById('send_but');
+
+    moveElementToStart(optionsButton, leftForm);
+
+    if (optionsButton instanceof HTMLElement && optionsButton.parentElement === leftForm) {
+        moveElementAfter(wandButton, optionsButton, leftForm);
+    } else {
+        moveElementToStart(wandButton, leftForm);
+    }
+
+    moveElementBefore(paletteButton, rightForm, sendButton);
+}
+
+function queueComposerControlPlacement() {
+    if (sbComposerControlsSyncQueued) {
+        return;
+    }
+
+    sbComposerControlsSyncQueued = true;
+    window.requestAnimationFrame(() => {
+        sbComposerControlsSyncQueued = false;
+        placeComposerControls();
+    });
+}
+
+function bindComposerControlPlacement() {
+    const leftForm = document.getElementById('leftSendForm');
+    const rightForm = document.getElementById('rightSendForm');
+
+    if (!(leftForm instanceof HTMLElement) || !(rightForm instanceof HTMLElement)) {
+        return;
+    }
+
+    if (!(sbComposerControlsObserver instanceof MutationObserver)) {
+        sbComposerControlsObserver = new MutationObserver(() => queueComposerControlPlacement());
+    }
+
+    sbComposerControlsObserver.disconnect();
+    sbComposerControlsObserver.observe(leftForm, { childList: true });
+    sbComposerControlsObserver.observe(rightForm, { childList: true });
+    queueComposerControlPlacement();
+}
+
 function setCompactMode(enabled, { persist = true } = {}) {
     const nextEnabled = Boolean(enabled);
     sbState.compactMode = nextEnabled;
     document.documentElement.dataset.sbCompactMode = String(nextEnabled);
     document.body?.classList.toggle('sb-compact-mode', nextEnabled);
+    syncTopbarLayoutState();
 
     if (persist) {
         safeSetItem(SB_STORAGE_KEYS.compactMode, String(nextEnabled));
     }
 
+    queueComposerControlPlacement();
     updateThemePickerUi();
 }
 
@@ -1195,6 +1574,86 @@ function isMobileViewport() {
 
 function prefersReducedMotion() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function getShellProxyButton(shellKey) {
+    const shellConfig = getShellConfig(shellKey);
+    const proxyButton = shellConfig?.proxyButtonId ? document.getElementById(shellConfig.proxyButtonId) : null;
+    return proxyButton instanceof HTMLElement ? proxyButton : null;
+}
+
+function getShellActivePanel(shellState) {
+    return shellState?.tabs.get(shellState.activeTabId)?.panel ?? null;
+}
+
+function getShellFocusTarget(shellState) {
+    if (shellState?.headerTitle instanceof HTMLElement) {
+        return shellState.headerTitle;
+    }
+
+    const panel = getShellActivePanel(shellState);
+    const focusable = Array.from(panel?.querySelectorAll(SB_SHELL_FOCUSABLE_SELECTOR) ?? [])
+        .find(element => element instanceof HTMLElement
+            && isActuallyVisible(element)
+            && !element.closest('[hidden], [aria-hidden="true"], [inert]'));
+
+    if (focusable instanceof HTMLElement) {
+        return focusable;
+    }
+
+    return shellState?.nav instanceof HTMLElement ? shellState.nav : null;
+}
+
+function focusShellPanel(shellKey, { force = false } = {}) {
+    const shellState = getShellState(shellKey);
+    const shellRoot = shellState?.root;
+
+    if (!(shellRoot instanceof HTMLElement) || !shellRoot.classList.contains('openDrawer')) {
+        return;
+    }
+
+    const activeElement = document.activeElement;
+    if (!force && activeElement instanceof HTMLElement && shellRoot.contains(activeElement)) {
+        return;
+    }
+
+    const target = getShellFocusTarget(shellState);
+    if (target instanceof HTMLElement) {
+        target.focus({ preventScroll: true });
+    }
+}
+
+function rememberShellFocusOrigin(shellKey) {
+    const shellState = getShellState(shellKey);
+    const shellRoot = shellState?.root;
+    const activeElement = document.activeElement;
+
+    if (!shellState || !(activeElement instanceof HTMLElement)) {
+        return;
+    }
+
+    if (shellRoot instanceof HTMLElement && shellRoot.contains(activeElement)) {
+        return;
+    }
+
+    shellState.restoreFocusTarget = activeElement;
+}
+
+function restoreShellFocus(shellKey) {
+    const shellState = getShellState(shellKey);
+    const restoreTarget = shellState?.restoreFocusTarget;
+    const proxyButton = getShellProxyButton(shellKey);
+    const target = restoreTarget instanceof HTMLElement && document.contains(restoreTarget)
+        ? restoreTarget
+        : proxyButton;
+
+    if (shellState) {
+        delete shellState.restoreFocusTarget;
+    }
+
+    if (target instanceof HTMLElement && !target.hasAttribute('disabled')) {
+        target.focus({ preventScroll: true });
+    }
 }
 
 function scrollShellTabButtonIntoView(nav, button, { smooth = false } = {}) {
@@ -1775,14 +2234,31 @@ function ensureShellReady(shellKey) {
     return Boolean(getShellState(shellKey));
 }
 
+function syncExistingMobileNavQuickActions(overlay) {
+    if (!(overlay instanceof HTMLElement)) {
+        return;
+    }
+
+    overlay.querySelectorAll('.sb-mobile-section-title').forEach(heading => heading.remove());
+
+    const list = overlay.querySelector('.sb-mobile-section-list');
+    if (list instanceof HTMLElement) {
+        sbState.mobileNav.quickActionContainer = list;
+        refreshMobileNavQuickActions();
+    }
+}
+
 function ensureMobileNavReady() {
     const existingOverlay = document.getElementById('sb-mobile-nav');
     if (existingOverlay instanceof HTMLElement) {
+        syncExistingMobileNavQuickActions(existingOverlay);
         return existingOverlay;
     }
 
     buildMobileNav();
-    return document.getElementById('sb-mobile-nav');
+    const overlay = document.getElementById('sb-mobile-nav');
+    syncExistingMobileNavQuickActions(overlay);
+    return overlay;
 }
 
 function getThemeOption(themeId) {
@@ -2052,7 +2528,8 @@ function setSurfaceTransparency(value, { persist = true } = {}) {
     const overlayOpacity = Math.min(1, surfaceOpacity + 0.08);
     sbState.surfaceTransparency = nextTransparency;
 
-    document.documentElement.style.setProperty('--sb-shell-surface-opacity', '1');
+    document.documentElement.style.setProperty('--sb-shell-surface-opacity', surfaceOpacity.toFixed(2));
+    document.documentElement.style.setProperty('--sb-shell-surface-opacity-percent', `${(surfaceOpacity * 100).toFixed(0)}%`);
     document.documentElement.style.setProperty('--sb-shell-card-opacity', '1');
     document.documentElement.style.setProperty('--sb-shell-control-opacity', '1');
     document.documentElement.style.setProperty('--sb-shell-overlay-opacity', '1');
@@ -2136,12 +2613,83 @@ function getSillyTavernContext() {
     }
 }
 
+function isExtensionEnabled(name) {
+    const context = getSillyTavernContext();
+    const disabledExtensions = context?.extensionSettings?.disabledExtensions;
+
+    if (!Array.isArray(disabledExtensions)) {
+        return true;
+    }
+
+    const normalizedName = normalizeExtensionName(name);
+    const aliases = new Set(SB_EXTENSION_ALIASES[normalizedName] ?? [normalizedName]);
+    return !disabledExtensions.some(disabled => {
+        const normalizedDisabled = normalizeExtensionName(disabled);
+        return aliases.has(normalizedDisabled);
+    });
+}
+
+function normalizeExtensionName(name) {
+    return String(name || '').replace(/^third-party\//i, '').toLowerCase();
+}
+
+function syncMessageActionExtensionVisibility(root = document) {
+    if (typeof root === 'number') {
+        root = document.querySelector(`.mes[mesid="${root}"]`) || document;
+    }
+
+    if (!root?.querySelectorAll) {
+        return;
+    }
+
+    root.querySelectorAll('[data-requires-extension]').forEach(button => {
+        if (!(button instanceof HTMLElement)) {
+            return;
+        }
+
+        const requiredExtension = button.dataset.requiresExtension;
+        const isEnabled = isExtensionEnabled(requiredExtension);
+        button.classList.toggle('displayNone', !isEnabled);
+        button.toggleAttribute('aria-hidden', !isEnabled);
+        if (!isEnabled) {
+            button.setAttribute('tabindex', '-1');
+        } else if (button.getAttribute('tabindex') === '-1') {
+            button.removeAttribute('tabindex');
+        }
+    });
+}
+
+function bindMessageActionExtensionEvents() {
+    if (sbMessageActionEventsBound) {
+        return;
+    }
+
+    const context = getSillyTavernContext();
+    if (!context?.eventSource || !context?.event_types) {
+        return;
+    }
+
+    sbMessageActionEventsBound = true;
+    context.eventSource.on(context.event_types.EXTENSION_SETTINGS_LOADED, () => syncMessageActionExtensionVisibility());
+    context.eventSource.on(context.event_types.SETTINGS_UPDATED, () => syncMessageActionExtensionVisibility());
+    context.eventSource.on(context.event_types.USER_MESSAGE_RENDERED, data => syncMessageActionExtensionVisibility(data?.element || data));
+    context.eventSource.on(context.event_types.CHARACTER_MESSAGE_RENDERED, data => syncMessageActionExtensionVisibility(data?.element || data));
+}
+
 function getChatScriptModule() {
     if (!sbChatScriptModulePromise) {
         sbChatScriptModulePromise = import('../script.js');
     }
 
     return sbChatScriptModulePromise;
+}
+
+function getMainScriptModule() {
+    if (!sbMainScriptModulePromise) {
+        sbMainScriptModulePromise = import('../script.js');
+    }
+
+    return sbMainScriptModulePromise;
 }
 
 function getCookieClearDomains(hostname) {
@@ -2567,6 +3115,7 @@ function bindTopBarBrand() {
         eventTypes.GROUP_CHAT_CREATED,
         eventTypes.MESSAGE_EDITED,
         eventTypes.MESSAGE_DELETED,
+        eventTypes.MESSAGE_UPDATED,
         eventTypes.CHARACTER_EDITED,
         eventTypes.CHARACTER_RENAMED,
         eventTypes.CHARACTER_DELETED,
@@ -2622,7 +3171,7 @@ function createProxyButton({ id, icon, label, title, className = '' }, onClick) 
 
     button.innerHTML = `<i class="fa-solid ${icon}" aria-hidden="true"></i><span>${label}</span>`;
     stopProxyPointerPropagation(button);
-    button.addEventListener('click', onClick);
+    button.addEventListener('click', debounceAction(onClick));
 
     return button;
 }
@@ -3246,11 +3795,25 @@ function bindChatDeleteVisualViewport(overlay) {
         animationFrame = 0;
         const fallbackWidth = window.innerWidth || document.documentElement.clientWidth || 0;
         const fallbackHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        const isKeyboardClosed = Math.abs(readViewportNumber(visualViewport.height, fallbackHeight) - fallbackHeight) <= 2
+            && Math.abs(readViewportNumber(visualViewport.offsetTop) || 0) <= 2
+            && Math.abs(readViewportNumber(visualViewport.offsetLeft) || 0) <= 2;
+
+        if (isKeyboardClosed) {
+            overlay.style.removeProperty('--sb-chat-delete-vv-left');
+            overlay.style.removeProperty('--sb-chat-delete-vv-top');
+            overlay.style.removeProperty('--sb-chat-delete-vv-width');
+            overlay.style.removeProperty('--sb-chat-delete-vv-height');
+            overlay.classList.remove('sb-chat-delete-overlay--keyboard-open');
+            return;
+        }
+
         const viewportLeft = Math.max(0, readViewportNumber(visualViewport.offsetLeft));
         const viewportTop = Math.max(0, readViewportNumber(visualViewport.offsetTop));
         const viewportWidth = Math.max(1, readViewportNumber(visualViewport.width, fallbackWidth));
         const viewportHeight = Math.max(1, readViewportNumber(visualViewport.height, fallbackHeight));
 
+        overlay.classList.add('sb-chat-delete-overlay--keyboard-open');
         overlay.style.setProperty('--sb-chat-delete-vv-left', `${viewportLeft}px`);
         overlay.style.setProperty('--sb-chat-delete-vv-top', `${viewportTop}px`);
         overlay.style.setProperty('--sb-chat-delete-vv-width', `${viewportWidth}px`);
@@ -4358,7 +4921,7 @@ function createBottomChatButton({ icon, title, className = '' }, onClick) {
     });
 
     button.innerHTML = `<i class="fa-solid ${icon}" aria-hidden="true"></i>`;
-    button.addEventListener('click', onClick);
+    button.addEventListener('click', debounceAction(onClick));
 
     return button;
 }
@@ -4474,6 +5037,7 @@ function setBottomChatSecondaryOpen(open, { focusSearch = false } = {}) {
     const searchInput = bottomChatBarState.searchInput;
 
     bottomChatBarState.secondaryOpen = Boolean(open);
+    safeSetItem(SB_STORAGE_KEYS.bottomChatSecondaryOpen, String(bottomChatBarState.secondaryOpen));
     if (!bottomChatBarState.secondaryOpen) {
         bottomChatBarState.searchOpen = false;
         if (searchInput instanceof HTMLElement && searchInput === document.activeElement) {
@@ -5110,16 +5674,436 @@ function hasActiveCharacterChat(context = getSillyTavernContext()) {
     );
 }
 
-function showCharacterListView() {
+async function setCharacterListEntityView(view) {
+    try {
+        const module = await getMainScriptModule();
+        module.setCharacterMenuEntityView?.(view);
+    } catch (error) {
+        console.warn('[SillyBunny] Could not set character list entity view.', error);
+    }
+}
+
+function syncCharacterListControls(view) {
+    const normalizedView = view === 'groups' ? 'groups' : 'characters';
+    const createCharacterButton = document.getElementById('rm_button_create');
+    const createGroupButton = document.getElementById('rm_button_group_chats');
+    const bulkEditButton = document.getElementById('bulkEditButton');
+    const bulkSelectAllButton = document.getElementById('bulkSelectAllButton');
+    const bulkDeleteButton = document.getElementById('bulkDeleteButton');
+
+    if (createCharacterButton instanceof HTMLElement) {
+        createCharacterButton.hidden = normalizedView === 'groups';
+    }
+
+    if (createGroupButton instanceof HTMLElement) {
+        createGroupButton.hidden = normalizedView !== 'groups';
+    }
+
+    for (const button of [bulkEditButton, bulkSelectAllButton, bulkDeleteButton]) {
+        if (button instanceof HTMLElement) {
+            button.hidden = false;
+        }
+    }
+
+    if (bulkEditButton instanceof HTMLElement) {
+        bulkEditButton.classList.toggle('disabled', normalizedView === 'groups');
+        bulkEditButton.setAttribute('aria-disabled', String(normalizedView === 'groups'));
+        bulkEditButton.title = normalizedView === 'groups'
+            ? 'Bulk edit for groups is not available yet'
+            : 'Bulk edit characters\n\nClick to toggle characters\nShift + Click to select/deselect a range of characters\nRight-click for actions';
+    }
+}
+
+function ensureCharacterListToolbarLayout() {
+    const fixedTop = document.getElementById('charListFixedTop');
+    const buttonBar = document.getElementById('rm_button_bar');
+    const createButton = document.getElementById('rm_button_create');
+    const createGroupButton = document.getElementById('rm_button_group_chats');
+    const searchButton = document.getElementById('rm_button_search');
+    const pagination = document.getElementById('rm_print_characters_pagination');
+
+    if (!(fixedTop instanceof HTMLElement) || !(buttonBar instanceof HTMLElement)) {
+        return;
+    }
+
+    let actionBar = fixedTop.querySelector('.sb-character-create-bar');
+    if (!(actionBar instanceof HTMLElement)) {
+        actionBar = createElement('div', { className: 'sb-character-create-bar' });
+        fixedTop.prepend(actionBar);
+    }
+
+    if (createButton instanceof HTMLElement && createButton.parentElement !== actionBar) {
+        actionBar.prepend(createButton);
+    }
+
+    if (createGroupButton instanceof HTMLElement && createGroupButton.parentElement !== actionBar) {
+        const afterCreate = createButton instanceof HTMLElement && createButton.parentElement === actionBar
+            ? createButton.nextSibling
+            : actionBar.firstChild;
+        actionBar.insertBefore(createGroupButton, afterCreate);
+    }
+
+    if (buttonBar.parentElement !== actionBar) {
+        const actionButton = createGroupButton instanceof HTMLElement && createGroupButton.parentElement === actionBar
+            ? createGroupButton
+            : createButton;
+        const afterAction = actionButton instanceof HTMLElement && actionButton.parentElement === actionBar
+            ? actionButton.nextSibling
+            : actionBar.firstChild;
+        actionBar.insertBefore(buttonBar, afterAction);
+    }
+
+    if (pagination instanceof HTMLElement && pagination.parentElement !== actionBar) {
+        actionBar.insertBefore(pagination, buttonBar.nextSibling);
+    }
+
+    if (searchButton instanceof HTMLElement && searchButton.parentElement !== buttonBar) {
+        buttonBar.appendChild(searchButton);
+    }
+
+    const bulkEditButton = document.getElementById('bulkEditButton');
+    if (bulkEditButton instanceof HTMLElement && bulkEditButton.dataset.sbGroupsGuardBound !== 'true') {
+        bulkEditButton.dataset.sbGroupsGuardBound = 'true';
+        bulkEditButton.addEventListener('click', (event) => {
+            const panel = document.getElementById('right-nav-panel');
+            if (panel instanceof HTMLElement && panel.dataset.menuType === 'groups') {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                globalThis.toastr?.info?.('Bulk edit for groups is not available yet.');
+            }
+        }, { capture: true });
+    }
+}
+
+async function showCharacterListView(view = 'characters') {
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    setCharacterImportPanelVisible(false);
+    const panel = document.getElementById('right-nav-panel');
+    const normalizedView = view === 'groups' ? 'groups' : 'characters';
+    sbState.characterDrawer.lastTab = normalizedView;
+
+    if (panel instanceof HTMLElement) {
+        panel.dataset.menuType = normalizedView;
+    }
+
+    syncCharacterListControls(normalizedView);
+    await setCharacterListEntityView(normalizedView);
+
     const backButton = document.getElementById('rm_button_back');
 
     if (backButton instanceof HTMLElement) {
         backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        if (panel instanceof HTMLElement) {
+            panel.dataset.menuType = normalizedView;
+        }
+        syncCharacterListControls(normalizedView);
+        syncCharacterShellTabs(normalizedView);
         return true;
     }
 
     resetCharacterPanelView();
+    if (panel instanceof HTMLElement) {
+        panel.dataset.menuType = normalizedView;
+    }
+    syncCharacterListControls(normalizedView);
+    syncCharacterShellTabs(normalizedView);
     return true;
+}
+
+function showCharacterEditorEmptyState() {
+    const panel = document.getElementById('right-nav-panel');
+    const infoPanel = document.getElementById('result_info');
+    const pinAndTabs = document.getElementById('rm_PinAndTabs');
+    const characterEditor = document.getElementById('rm_ch_create_block');
+    const groupEditor = document.getElementById('rm_group_chats_block');
+    const characterList = document.getElementById('rm_characters_block');
+
+    panel?.setAttribute('data-menu-type', 'editor_empty');
+    setCharacterPersonaPanelVisible(false);
+    setCharacterImportPanelVisible(false);
+    syncCharacterListControls('characters');
+    setCharacterEditorEmptyState(true);
+
+    if (infoPanel instanceof HTMLElement) {
+        infoPanel.style.display = 'none';
+    }
+
+    if (pinAndTabs instanceof HTMLElement) {
+        pinAndTabs.style.display = 'none';
+    }
+
+    if (characterEditor instanceof HTMLElement) {
+        characterEditor.classList.remove('sb-active-right-menu');
+        characterEditor.style.display = 'none';
+        characterEditor.style.visibility = 'hidden';
+        characterEditor.style.pointerEvents = 'none';
+    }
+
+    if (groupEditor instanceof HTMLElement) {
+        groupEditor.classList.remove('sb-active-right-menu');
+        groupEditor.style.display = 'none';
+        groupEditor.style.visibility = 'hidden';
+        groupEditor.style.pointerEvents = 'none';
+    }
+
+    if (characterList instanceof HTMLElement) {
+        characterList.classList.remove('sb-active-right-menu');
+        characterList.style.display = 'none';
+        characterList.style.visibility = 'hidden';
+        characterList.style.pointerEvents = 'none';
+    }
+
+    syncCharacterShellTabs('editor');
+}
+
+function setCharacterEditorEmptyState(visible) {
+    const emptyState = document.getElementById('sb_character_editor_empty');
+
+    if (emptyState instanceof HTMLElement) {
+        emptyState.hidden = !visible;
+    }
+
+    syncCharacterTitlebarVisibility();
+}
+
+function syncCharacterTitlebarVisibility() {
+    const panel = document.getElementById('right-nav-panel');
+    const pinAndTabs = document.getElementById('rm_PinAndTabs');
+
+    if (!(panel instanceof HTMLElement) || !(pinAndTabs instanceof HTMLElement)) {
+        return;
+    }
+
+    const shouldHide = ['characters', 'groups', 'editor_empty', 'persona', 'import'].includes(panel.dataset.menuType ?? '');
+    pinAndTabs.style.display = shouldHide ? 'none' : '';
+}
+
+function ensureCharacterPersonaPanel() {
+    const host = document.getElementById('sb_character_persona_panel');
+    const drawer = document.getElementById('persona-management-button');
+    const content = document.getElementById('PersonaManagement');
+
+    if (!(host instanceof HTMLElement) || !(drawer instanceof HTMLElement) || !(content instanceof HTMLElement)) {
+        return null;
+    }
+
+    drawer.classList.add('sb-embedded-drawer');
+    drawer.querySelector(':scope > .drawer-toggle')?.classList.add('sb-hidden-toggle');
+    content.classList.remove('drawer-content', 'openDrawer', 'closedDrawer', 'fillLeft', 'fillRight', 'pinnedOpen');
+    content.classList.add('sb-managed', 'sb-shell-embedded-content');
+    content.removeAttribute('style');
+
+    if (drawer.parentElement !== host) {
+        host.appendChild(drawer);
+    }
+
+    return host;
+}
+
+function setCharacterPersonaPanelVisible(visible) {
+    const host = ensureCharacterPersonaPanel() ?? document.getElementById('sb_character_persona_panel');
+
+    if (host instanceof HTMLElement) {
+        host.hidden = !visible;
+    }
+}
+
+function setCharacterImportPanelVisible(visible) {
+    const host = document.getElementById('sb_character_import_panel');
+
+    if (host instanceof HTMLElement) {
+        host.hidden = !visible;
+    }
+}
+
+function hideCharacterMainPanels() {
+    const infoPanel = document.getElementById('result_info');
+    const pinAndTabs = document.getElementById('rm_PinAndTabs');
+    const characterEditor = document.getElementById('rm_ch_create_block');
+    const groupEditor = document.getElementById('rm_group_chats_block');
+    const characterList = document.getElementById('rm_characters_block');
+
+    if (infoPanel instanceof HTMLElement) {
+        infoPanel.style.display = 'none';
+    }
+
+    if (pinAndTabs instanceof HTMLElement) {
+        pinAndTabs.style.display = 'none';
+    }
+
+    if (characterEditor instanceof HTMLElement) {
+        characterEditor.style.display = 'none';
+        characterEditor.style.visibility = 'hidden';
+        characterEditor.style.pointerEvents = 'none';
+    }
+
+    if (groupEditor instanceof HTMLElement) {
+        groupEditor.style.display = 'none';
+        groupEditor.style.visibility = 'hidden';
+        groupEditor.style.pointerEvents = 'none';
+    }
+
+    if (characterList instanceof HTMLElement) {
+        characterList.style.display = 'none';
+        characterList.style.visibility = 'hidden';
+        characterList.style.pointerEvents = 'none';
+    }
+}
+
+function openCharacterPersonaTab() {
+    const panel = document.getElementById('right-nav-panel');
+    sbState.characterDrawer.lastTab = 'persona';
+
+    panel?.setAttribute('data-menu-type', 'persona');
+    setCharacterEditorEmptyState(false);
+    setCharacterImportPanelVisible(false);
+    syncCharacterListControls('characters');
+    setCharacterPersonaPanelVisible(true);
+    hideCharacterMainPanels();
+
+    syncCharacterShellTabs('persona');
+    syncCharacterTitlebarVisibility();
+}
+
+function openCharacterImportTab() {
+    const panel = document.getElementById('right-nav-panel');
+    sbState.characterDrawer.lastTab = 'import';
+
+    panel?.setAttribute('data-menu-type', 'import');
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    syncCharacterListControls('characters');
+    setCharacterImportPanelVisible(true);
+    hideCharacterMainPanels();
+
+    syncCharacterShellTabs('import');
+    syncCharacterTitlebarVisibility();
+}
+
+function preserveCharacterImportTab() {
+    const panel = document.getElementById('right-nav-panel');
+
+    if (panel instanceof HTMLElement && panel.dataset.menuType !== 'import') {
+        return;
+    }
+
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    syncCharacterListControls('characters');
+    setCharacterImportPanelVisible(true);
+    hideCharacterMainPanels();
+    syncCharacterShellTabs('import');
+    syncCharacterTitlebarVisibility();
+}
+
+function openCharacterPanelTab(tabId) {
+    const normalizedTabId = ['persona', 'import', 'groups', 'editor'].includes(tabId) ? tabId : 'characters';
+    sbState.characterDrawer.lastTab = normalizedTabId;
+
+    if (!isCharacterPanelOpen()) {
+        toggleCharacterPanel();
+    } else {
+        closeShell('left');
+        closeShell('right');
+    }
+
+    window.requestAnimationFrame(() => {
+        if (tabId === 'persona') {
+            openCharacterPersonaTab();
+        } else if (tabId === 'import') {
+            openCharacterImportTab();
+        } else if (tabId === 'groups') {
+            void showCharacterListView('groups');
+        } else if (tabId === 'editor') {
+            openCharacterEditorTab();
+        } else {
+            void showCharacterListView();
+        }
+    });
+}
+
+function restoreLastCharacterPanelView() {
+    const lastTab = sbState.characterDrawer.lastTab || 'characters';
+
+    if (lastTab === 'persona') {
+        openCharacterPersonaTab();
+    } else if (lastTab === 'import') {
+        openCharacterImportTab();
+    } else if (lastTab === 'groups') {
+        void showCharacterListView('groups');
+    } else if (lastTab === 'editor') {
+        openCharacterEditorTab();
+    } else {
+        void showCharacterListView('characters');
+    }
+}
+
+function openCharacterEditorTab() {
+    sbState.characterDrawer.lastTab = 'editor';
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    setCharacterImportPanelVisible(false);
+
+    if (showActiveCharacterEditor()) {
+        syncCharacterShellTabs('editor');
+        return true;
+    }
+
+    showCharacterEditorEmptyState();
+    return false;
+}
+
+function syncCharacterShellTabs(activeTab = null) {
+    const panel = document.getElementById('right-nav-panel');
+    const menuType = panel?.dataset.menuType;
+    const normalizedTab = activeTab
+        ?? (menuType === 'persona'
+            ? 'persona'
+            : menuType === 'import'
+                ? 'import'
+                : menuType === 'groups'
+                    ? 'groups'
+                    : ['character_edit', 'group_edit', 'create', 'group_create', 'editor_empty'].includes(menuType) ? 'editor' : 'characters');
+
+    if (menuType === 'characters' || menuType === 'groups') {
+        syncCharacterListControls(menuType);
+    }
+
+    syncCharacterHeaderCopy(normalizedTab);
+
+    document.querySelectorAll('#right-nav-panel [data-sb-character-tab]').forEach(tab => {
+        if (!(tab instanceof HTMLElement)) {
+            return;
+        }
+
+        const isActive = tab.dataset.sbCharacterTab === normalizedTab;
+        tab.classList.toggle('is-active', isActive);
+        tab.setAttribute('aria-selected', String(isActive));
+    });
+}
+
+function syncCharacterHeaderCopy(activeTab = 'characters') {
+    const copy = SB_CHARACTER_TAB_COPY[activeTab] ?? SB_CHARACTER_TAB_COPY.characters;
+    const title = document.querySelector('#right-nav-panel .sb-character-shell-header .sb-shell-title');
+    const subtitle = document.querySelector('#right-nav-panel .sb-character-shell-header .sb-shell-subtitle');
+    const description = document.querySelector('#right-nav-panel .sb-character-shell-header .sb-shell-description');
+
+    if (title instanceof HTMLElement) {
+        title.textContent = '';
+        title.append(document.createTextNode(copy.title));
+        if (activeTab === 'persona') {
+            title.insertAdjacentHTML('beforeend', SB_PERSONA_HELP_LINK_HTML);
+        }
+    }
+
+    if (subtitle instanceof HTMLElement) {
+        subtitle.textContent = copy.subtitle;
+    }
+
+    if (description instanceof HTMLElement) {
+        description.textContent = copy.description;
+    }
 }
 
 function showActiveCharacterEditor() {
@@ -5133,6 +6117,10 @@ function showActiveCharacterEditor() {
     }
 
     selectedCharacterButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    setCharacterImportPanelVisible(false);
+    syncCharacterShellTabs('editor');
     return true;
 }
 
@@ -5145,8 +6133,17 @@ function resetCharacterPanelView() {
         selectedTitle.textContent = '';
     }
 
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    setCharacterImportPanelVisible(false);
+
     if (listButton instanceof HTMLElement) {
         listButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        if (panel instanceof HTMLElement) {
+            panel.dataset.menuType = 'characters';
+        }
+        syncCharacterListControls('characters');
+        syncCharacterShellTabs('characters');
         return;
     }
 
@@ -5173,6 +6170,8 @@ function resetCharacterPanelView() {
         characterList.style.visibility = 'visible';
         characterList.style.pointerEvents = 'auto';
     }
+
+    syncCharacterShellTabs('characters');
 }
 
 function setCharacterDrawerHostOverflow(shouldOpen) {
@@ -5215,10 +6214,20 @@ function bindCharacterDrawerStateObserver() {
     }
 
     sbState.characterDrawer.stateObserver?.disconnect();
-    sbState.characterDrawer.stateObserver = new MutationObserver(() => syncCharacterDrawerStateFromDom());
+    sbState.characterDrawer.stateObserver = new MutationObserver((mutations) => {
+        syncCharacterDrawerStateFromDom();
+
+        if (mutations.some(mutation => mutation.attributeName === 'data-menu-type')) {
+            setCharacterEditorEmptyState(panel.dataset.menuType === 'editor_empty');
+            setCharacterPersonaPanelVisible(panel.dataset.menuType === 'persona');
+            setCharacterImportPanelVisible(panel.dataset.menuType === 'import');
+            syncCharacterTitlebarVisibility();
+            syncCharacterShellTabs();
+        }
+    });
     sbState.characterDrawer.stateObserver.observe(panel, {
         attributes: true,
-        attributeFilter: ['class'],
+        attributeFilter: ['class', 'data-menu-type'],
     });
     syncCharacterDrawerStateFromDom({ force: true });
 }
@@ -5263,7 +6272,6 @@ function ensureCharacterResizeHandle() {
 function toggleCharacterPanel() {
     injectCharacterDrawerControls();
     ensureCharacterResizeHandle();
-    const shouldOpenActiveCharacterEditor = hasActiveCharacterChat();
 
     if (isCharacterPanelOpen()) {
         closeCharacterPanel();
@@ -5271,12 +6279,7 @@ function toggleCharacterPanel() {
     }
 
     closeAllDropdowns({ except: 'characters' });
-
-    if (shouldOpenActiveCharacterEditor) {
-        showActiveCharacterEditor();
-    } else {
-        resetCharacterPanelView();
-    }
+    restoreLastCharacterPanelView();
 
     closeShell('left');
     closeShell('right');
@@ -5293,9 +6296,7 @@ function toggleCharacterPanel() {
             forceDrawerState('right-nav-panel', true, '#rightNavDrawerIcon');
         }
 
-        if (shouldOpenActiveCharacterEditor) {
-            showActiveCharacterEditor();
-        }
+        restoreLastCharacterPanelView();
 
         syncChatbarVisibilityState();
         syncDesktopShellSizing();
@@ -5332,6 +6333,7 @@ function toggleShellPanel(shellKey, tabId = null) {
         return;
     }
 
+    rememberShellFocusOrigin(shellKey);
     closeAllDropdowns({ except: shellKey });
     window.requestAnimationFrame(() => openShell(shellKey, tabId));
 }
@@ -5743,6 +6745,27 @@ function createShellPanel(tabConfig) {
     panel.appendChild(scroller);
 
     return { panel, scroller };
+}
+
+function closeFocusedShell() {
+    const activeElement = document.activeElement;
+
+    if (!(activeElement instanceof HTMLElement)) {
+        return false;
+    }
+
+    const shellRoot = activeElement.closest('.sb-shell-root.openDrawer');
+    if (!(shellRoot instanceof HTMLElement)) {
+        return false;
+    }
+
+    const shellKey = shellRoot.dataset.sbShellKey;
+    if (!shellKey || !getShellState(shellKey)) {
+        return false;
+    }
+
+    closeShell(shellKey);
+    return true;
 }
 
 function moveChildrenIntoContainer(sourceElement, targetElement) {
@@ -8428,6 +9451,214 @@ function createShortcutSettingsGroup() {
     return group;
 }
 
+function getMobileQuickActionContextLabel(action) {
+    const normalizedAction = normalizeMobileQuickAction(action);
+    if (!normalizedAction) {
+        return '';
+    }
+
+    const shellLabel = getShellConfig(normalizedAction.shellKey)?.title || normalizedAction.shellKey;
+    const tabLabel = getShellState(normalizedAction.shellKey)?.tabs?.get(normalizedAction.tabId)?.label
+        || getMobileQuickActionTabConfig(normalizedAction.shellKey, normalizedAction.tabId)?.label
+        || normalizedAction.tabId;
+    const labels = [shellLabel, tabLabel];
+
+    if (normalizedAction.type === 'custom'
+        && normalizedAction.sectionLabel
+        && normalizeText(normalizedAction.sectionLabel) !== normalizeText(tabLabel)) {
+        labels.push(normalizedAction.sectionLabel);
+    }
+
+    return labels.join(' · ');
+}
+
+function updateMobileQuickActionSettingsStatus() {
+    const status = document.getElementById('sb-mobile-quick-action-status');
+    if (status instanceof HTMLElement) {
+        status.textContent = `${sbState.mobileQuickActions.length}/${SB_MOBILE_QUICK_ACTION_LIMIT} selected. This list replaces the Workspace drawer shortcuts.`;
+    }
+
+    const resetButton = document.getElementById('sb-mobile-quick-action-reset');
+    if (resetButton instanceof HTMLButtonElement) {
+        const currentKeys = sbState.mobileQuickActions.map(getMobileQuickActionKey);
+        const defaultKeys = getDefaultMobileQuickActions().map(getMobileQuickActionKey);
+        resetButton.disabled = currentKeys.length === defaultKeys.length
+            && currentKeys.every((key, index) => key === defaultKeys[index]);
+    }
+}
+
+function refreshMobileQuickActionSearchResults() {
+    const searchInput = document.getElementById('sb-mobile-quick-action-search');
+    const results = document.getElementById('sb-mobile-quick-action-results');
+
+    if (searchInput instanceof HTMLInputElement && results instanceof HTMLElement) {
+        renderMobileQuickActionResults(searchInput.value, results);
+    }
+}
+
+function renderMobileQuickActionResults(query, resultsElement) {
+    if (!(resultsElement instanceof HTMLElement)) {
+        return;
+    }
+
+    resultsElement.replaceChildren();
+
+    const trimmedQuery = String(query ?? '').trim();
+    if (trimmedQuery.length < 2) {
+        resultsElement.appendChild(createElement('div', {
+            className: 'sb-mobile-quick-action-empty',
+            text: 'Type at least 2 characters to find settings and extensions.',
+        }));
+        return;
+    }
+
+    const matches = getMobileQuickActionSearchMatches(trimmedQuery);
+    if (!matches.length) {
+        resultsElement.appendChild(createElement('div', {
+            className: 'sb-mobile-quick-action-empty',
+            text: `No matches for "${trimmedQuery}" yet.`,
+        }));
+        return;
+    }
+
+    const currentKeys = new Set(sbState.mobileQuickActions.map(getMobileQuickActionKey));
+    for (const match of matches) {
+        const action = createMobileQuickActionFromMatch(match);
+        if (!action) {
+            continue;
+        }
+
+        const actionKey = getMobileQuickActionKey(action);
+        const isAdded = currentKeys.has(actionKey);
+        const isFull = sbState.mobileQuickActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT;
+        const buttonText = isAdded ? 'Added' : isFull ? 'Full' : 'Add';
+        const row = createElement('div', { className: 'sb-mobile-quick-action-result' });
+        const copy = createElement('span', { className: 'sb-mobile-quick-action-copy' });
+        const title = createElement('strong', { text: action.label });
+        const detail = createElement('small', {
+            text: `${match.shellLabel} · ${match.tabLabel}${action.sectionLabel ? ` · ${action.sectionLabel}` : ''}`,
+        });
+        const button = createElement('button', {
+            className: 'menu_button sb-mobile-quick-action-add',
+            text: buttonText,
+            attrs: {
+                type: 'button',
+                'aria-label': isAdded
+                    ? `${action.label} is already in mobile Quick Actions`
+                    : `Add ${action.label} to mobile Quick Actions`,
+            },
+        });
+
+        button.disabled = isAdded || isFull;
+        button.addEventListener('click', () => addMobileQuickActionFromMatch(match));
+
+        copy.append(title, detail);
+        row.append(copy, button);
+        resultsElement.appendChild(row);
+    }
+}
+
+function renderMobileQuickActionSettingsList() {
+    updateMobileQuickActionSettingsStatus();
+
+    const list = document.getElementById('sb-mobile-quick-action-list');
+    if (!(list instanceof HTMLElement)) {
+        return;
+    }
+
+    list.replaceChildren();
+
+    if (!sbState.mobileQuickActions.length) {
+        list.appendChild(createElement('div', {
+            className: 'sb-mobile-quick-action-empty',
+            text: 'No mobile Quick Actions selected. Add one from search or reset to defaults.',
+        }));
+        return;
+    }
+
+    for (const action of sbState.mobileQuickActions) {
+        const actionKey = getMobileQuickActionKey(action);
+        const row = createElement('div', { className: 'sb-mobile-quick-action-current' });
+        const copy = createElement('span', { className: 'sb-mobile-quick-action-copy' });
+        const title = createElement('strong', { text: action.label });
+        const detail = createElement('small', { text: getMobileQuickActionContextLabel(action) });
+        const removeButton = createElement('button', {
+            className: 'menu_button sb-mobile-quick-action-remove',
+            text: 'Remove',
+            attrs: {
+                type: 'button',
+                'aria-label': `Remove ${action.label} from mobile Quick Actions`,
+            },
+        });
+
+        removeButton.addEventListener('click', () => removeMobileQuickAction(actionKey));
+
+        copy.append(title, detail);
+        row.append(copy, removeButton);
+        list.appendChild(row);
+    }
+}
+
+function createMobileQuickActionSettingsGroup() {
+    const group = createElement('section', {
+        className: 'sb-theme-slider-group sb-mobile-quick-actions-group',
+    });
+    const header = createElement('div', { className: 'sb-mobile-quick-action-header' });
+    const heading = createElement('div', { className: 'sb-mobile-quick-action-heading' });
+    const title = createElement('strong', { text: 'Mobile Quick Actions' });
+    const description = createElement('p', {
+        className: 'sb-theme-slider-caption',
+        text: 'Choose the shortcuts shown in the mobile Workspace drawer. Defaults can be removed or restored.',
+    });
+    const resetButton = createElement('button', {
+        id: 'sb-mobile-quick-action-reset',
+        className: 'menu_button sb-mobile-quick-action-reset',
+        text: 'Reset to defaults',
+        attrs: {
+            type: 'button',
+        },
+    });
+
+    const searchInput = createElement('input', {
+        id: 'sb-mobile-quick-action-search',
+        className: 'text_pole sb-mobile-quick-action-search',
+        attrs: {
+            type: 'search',
+            placeholder: 'Search settings or extensions...',
+            autocomplete: 'off',
+            'aria-label': 'Search settings and extensions to add as mobile Quick Actions',
+        },
+    });
+    const results = createElement('div', {
+        id: 'sb-mobile-quick-action-results',
+        className: 'sb-mobile-quick-action-results',
+    });
+    const list = createElement('div', {
+        id: 'sb-mobile-quick-action-list',
+        className: 'sb-mobile-quick-action-list',
+    });
+    const status = createElement('p', {
+        id: 'sb-mobile-quick-action-status',
+        className: 'sb-theme-slider-caption',
+    });
+
+    heading.append(title, description);
+    header.append(heading, resetButton);
+
+    resetButton.addEventListener('click', resetMobileQuickActions);
+
+    searchInput.addEventListener('input', event => {
+        const input = event.currentTarget;
+        renderMobileQuickActionResults(input instanceof HTMLInputElement ? input.value : '', results);
+    });
+
+    group.append(header, searchInput, results, list, status);
+    renderMobileQuickActionResults('', results);
+
+    window.requestAnimationFrame(renderMobileQuickActionSettingsList);
+    return group;
+}
+
 function createCompactModeSettingsGroup() {
     const group = createElement('section', {
         className: 'sb-theme-slider-group sb-compact-mode-group',
@@ -8664,6 +9895,7 @@ function injectThemePicker() {
     const compactModeSettingsGroup = createCompactModeSettingsGroup();
     const frontendIconSettingsGroup = createFrontendIconSettingsGroup();
     const shortcutSettingsGroup = createShortcutSettingsGroup();
+    const mobileQuickActionSettingsGroup = createMobileQuickActionSettingsGroup();
     header.append(title, description);
 
     for (const theme of SB_THEMES) {
@@ -8687,7 +9919,7 @@ function injectThemePicker() {
     getMessageStyleSelect()?.addEventListener('change', updateThemePickerUi);
     document.addEventListener('sb:chat-style-updated', updateThemePickerUi);
 
-    card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
+    card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup, mobileQuickActionSettingsGroup);
     themeBlock.prepend(card);
     updateThemePickerUi();
 }
@@ -8784,7 +10016,7 @@ function updateThemePickerUi() {
     }
 }
 
-function createSearchIndex(tabState) {
+function createSearchIndex(tabState, { includeThemeCard = false } = {}) {
     const searchRoot = tabState.searchRoot;
     if (!(searchRoot instanceof HTMLElement)) {
         return [];
@@ -8792,13 +10024,16 @@ function createSearchIndex(tabState) {
 
     const entries = [];
     const seen = new Set();
+    const excludedSelector = includeThemeCard
+        ? '.sb-search-result, .sb-legacy-search-hidden, .sb-mobile-quick-actions-group'
+        : '.sb-search-result, .sb-theme-card, .sb-legacy-search-hidden';
 
     for (const element of searchRoot.querySelectorAll(SB_SEARCH_TARGET_SELECTOR)) {
         if (!(element instanceof HTMLElement)) {
             continue;
         }
 
-        if (element.closest('.sb-search-result, .sb-theme-card, .sb-legacy-search-hidden')) {
+        if (element.closest(excludedSelector)) {
             continue;
         }
 
@@ -8862,7 +10097,7 @@ function getPersonaSearchEntries(tabState) {
             dedupeKey: getSearchEntryDedupeKey(tabState, 'Persona', name, { avatarId }),
             action: () => {
                 // Activate the persona tab and trigger ST's own persona search
-                openShell('right', 'persona');
+                openCharacterPanelTab('persona');
                 window.setTimeout(() => {
                     const searchInput = document.getElementById('persona_search_bar');
                     if (searchInput instanceof HTMLInputElement) {
@@ -8968,6 +10203,102 @@ function collectGlobalSearchMatches(query) {
     return Array.from(matches.values())
         .sort((left, right) => right.score - left.score)
         .slice(0, SB_UNIVERSAL_SEARCH_RESULT_LIMIT);
+}
+
+function getTabSearchEntries(tabState, { includeThemeCard = false } = {}) {
+    const searchIndex = includeThemeCard ? createSearchIndex(tabState, { includeThemeCard }) : tabState.searchIndex;
+
+    if (!searchIndex) {
+        tabState.searchIndex = createSearchIndex(tabState);
+    }
+
+    return [
+        ...(searchIndex || tabState.searchIndex),
+        ...(tabState.id === 'persona' ? getPersonaSearchEntries(tabState) : []),
+    ];
+}
+
+function getMobileQuickActionSearchMatches(query) {
+    const normalizedQuery = normalizeText(query);
+
+    if (normalizedQuery.length < 2) {
+        return [];
+    }
+
+    const searchTerms = normalizedQuery.split(' ').filter(Boolean);
+    const matches = new Map();
+
+    for (const [shellKey, shellState] of Object.entries(sbState.shells)) {
+        const shellLabel = getShellConfig(shellKey)?.title || shellKey;
+
+        for (const tabState of shellState.tabs.values()) {
+            for (const entry of getTabSearchEntries(tabState, { includeThemeCard: true })) {
+                if (!searchTerms.every(term => entry.searchText.includes(term))) {
+                    continue;
+                }
+
+                const match = {
+                    ...entry,
+                    shellKey,
+                    shellLabel,
+                    score: Number(entry.searchText.startsWith(normalizedQuery)) * 10 - entry.displayText.length / 1000,
+                };
+                const matchKey = [
+                    shellKey,
+                    entry.dedupeKey,
+                ].filter(Boolean).join('::');
+                const existingMatch = matches.get(matchKey);
+
+                if (!existingMatch || match.score > existingMatch.score) {
+                    matches.set(matchKey, match);
+                }
+            }
+        }
+    }
+
+    return Array.from(matches.values())
+        .sort((left, right) => right.score - left.score)
+        .slice(0, SB_UNIVERSAL_SEARCH_RESULT_LIMIT);
+}
+
+function findMobileQuickActionMatch(action) {
+    const normalizedAction = normalizeMobileQuickAction(action);
+    if (!normalizedAction) {
+        return null;
+    }
+
+    const shellState = getShellState(normalizedAction.shellKey);
+    const tabState = shellState?.tabs.get(normalizedAction.tabId);
+    if (!tabState) {
+        return null;
+    }
+
+    const entries = getTabSearchEntries(tabState, { includeThemeCard: true });
+    const exactMatch = entries.find(entry => entry.dedupeKey === normalizedAction.dedupeKey);
+    const fallbackMatch = exactMatch || entries.find(entry => (
+        normalizeText(entry.sectionLabel) === normalizeText(normalizedAction.sectionLabel)
+        && normalizeText(entry.displayText) === normalizeText(normalizedAction.displayText)
+    ));
+
+    if (!fallbackMatch) {
+        return null;
+    }
+
+    return {
+        ...fallbackMatch,
+        shellKey: normalizedAction.shellKey,
+        shellLabel: getShellConfig(normalizedAction.shellKey)?.title || normalizedAction.shellKey,
+    };
+}
+
+function activateMobileQuickAction(action) {
+    const match = findMobileQuickActionMatch(action);
+    if (!match) {
+        openShell(action.shellKey, action.tabId);
+        return;
+    }
+
+    revealSearchMatch(action.shellKey, match);
 }
 
 function renderUniversalSearchResults(query) {
@@ -9183,6 +10514,8 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
 
     if (focusButton) {
         activeTab.button?.focus();
+    } else if (isShellOpen(shellKey)) {
+        window.requestAnimationFrame(() => focusShellPanel(shellKey, { force: true }));
     }
 
     if (previousTab && previousTab.id !== activeTab.id) {
@@ -9206,6 +10539,7 @@ function openShell(shellKey, tabId = null) {
     }
 
     closeMobileNav();
+    rememberShellFocusOrigin(shellKey);
 
     if (tabId) {
         setActiveTab(shellKey, tabId);
@@ -9214,11 +10548,13 @@ function openShell(shellKey, tabId = null) {
     shellState.lastOpenedAt = performance.now();
 
     if (isDrawerActuallyOpen(shellRoot)) {
+        window.requestAnimationFrame(() => focusShellPanel(shellKey));
         return;
     }
 
     if (shellRoot.classList.contains('openDrawer')) {
         forceDrawerState(shellRoot, true, shellConfig.hostIconSelector);
+        window.requestAnimationFrame(() => focusShellPanel(shellKey));
         return;
     }
 
@@ -9228,6 +10564,7 @@ function openShell(shellKey, tabId = null) {
             if (!isDrawerActuallyOpen(shellRoot)) {
                 forceDrawerState(shellRoot, true, shellConfig.hostIconSelector);
             }
+            focusShellPanel(shellKey);
         });
     }
 }
@@ -9248,12 +10585,18 @@ function closeShell(shellKey) {
         return;
     }
 
-    if (document.activeElement instanceof HTMLElement && shellRoot.contains(document.activeElement)) {
+    const shouldRestoreFocus = document.activeElement instanceof HTMLElement && shellRoot.contains(document.activeElement);
+    if (shouldRestoreFocus) {
         document.activeElement.blur();
     }
 
     // Managed shells do not need the legacy drawer toggle close animation.
     forceDrawerState(shellRoot, false, shellConfig.hostIconSelector);
+    if (shouldRestoreFocus) {
+        window.requestAnimationFrame(() => restoreShellFocus(shellKey));
+    } else {
+        delete shellState?.restoreFocusTarget;
+    }
 }
 
 function buildShell(shellKey) {
@@ -9416,7 +10759,7 @@ function buildShell(shellKey) {
         },
     });
     const eyebrow = createElement('div', { className: 'sb-shell-kicker', text: shellConfig.title });
-    const title = createElement('h2', { className: 'sb-shell-title', text: shellConfig.baseTab.label });
+    const title = createElement('h2', { className: 'sb-shell-title', text: shellConfig.baseTab.label, attrs: { tabindex: '-1' } });
     const subtitle = createElement('p', { className: 'sb-shell-subtitle', text: shellConfig.baseTab.description });
     const shellDescription = createElement('p', { className: 'sb-shell-description', text: shellConfig.subtitle });
     const panelBody = createElement('div', { className: 'sb-shell-body' });
@@ -9429,6 +10772,16 @@ function buildShell(shellKey) {
 
     closeButton.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
     closeButton.addEventListener('click', () => closeShell(shellKey));
+    shellRoot.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') {
+            return;
+        }
+
+        if (closeFocusedShell()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    });
     bindShellResizeHandle(resizeHandle, shellKey);
 
     header.append(closeButton, eyebrow, title, subtitle, shellDescription);
@@ -9467,6 +10820,7 @@ function buildShell(shellKey) {
             activeTab?.onActivate?.();
             dispatchShellTabActivated(shellKey, activeTab);
             updateNavScrollIndicators();
+            window.requestAnimationFrame(() => focusShellPanel(shellKey));
             queueMobileModalStateSync();
             return;
         }
@@ -9626,6 +10980,20 @@ function routeDrawerTarget(targetId) {
         return false;
     }
 
+    if (route.shell === 'characters') {
+        if (!isCharacterPanelOpen()) {
+            toggleCharacterPanel();
+        } else {
+            closeShell('left');
+            closeShell('right');
+        }
+
+        if (route.tab === 'persona') {
+            openCharacterPersonaTab();
+        }
+        return true;
+    }
+
     openShell(route.shell, route.tab);
     return true;
 }
@@ -9746,12 +11114,71 @@ function bindWorldInfoRoute() {
     });
 }
 
+function createMobileQuickActionButton(item) {
+    const action = normalizeMobileQuickAction(item);
+    if (!action) {
+        return null;
+    }
+
+    const button = createElement('button', {
+        className: 'sb-nav-item',
+        attrs: {
+            type: 'button',
+        },
+    });
+    const icon = createElement('i', {
+        className: `fa-solid ${action.icon || 'fa-bolt'}`,
+        attrs: {
+            'aria-hidden': 'true',
+        },
+    });
+    const label = createElement('span', { text: action.label });
+
+    button.append(icon, label);
+    button.addEventListener('click', () => {
+        closeMobileNav();
+
+        if (action.type === 'custom') {
+            activateMobileQuickAction(action);
+        } else {
+            toggleShellPanel(action.shellKey, action.tabId);
+        }
+    });
+
+    return button;
+}
+
+function refreshMobileNavQuickActions() {
+    const list = sbState.mobileNav.quickActionContainer
+        ?? document.querySelector('#sb-mobile-nav .sb-mobile-section-list');
+    if (!(list instanceof HTMLElement)) {
+        return;
+    }
+
+    sbState.mobileNav.quickActionContainer = list;
+    list.replaceChildren();
+
+    for (const action of sbState.mobileQuickActions) {
+        const button = createMobileQuickActionButton(action);
+        if (button) {
+            list.appendChild(button);
+        }
+    }
+}
+
 function buildMobileNav() {
     if (document.getElementById('sb-mobile-nav')) {
         return;
     }
 
-    const overlay = createElement('div', { id: 'sb-mobile-nav' });
+    const overlay = createElement('div', {
+        id: 'sb-mobile-nav',
+        attrs: {
+            role: 'dialog',
+            'aria-modal': 'true',
+            'aria-labelledby': 'sb-mobile-nav-title',
+        },
+    });
     const content = createElement('div', { id: 'sb-mobile-nav-content' });
     overlay.hidden = true;
     overlay.setAttribute('aria-hidden', 'true');
@@ -9760,61 +11187,52 @@ function buildMobileNav() {
         overlay.inert = true;
     }
 
-    const sections = [
-        {
-            label: 'Quick Actions',
-            items: [
-                { shell: 'left', tab: 'presets', icon: 'fa-sliders', label: 'Presets' },
-                { shell: 'left', tab: 'api', icon: 'fa-plug', label: 'API' },
-                { shell: 'left', tab: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
-                { shell: 'left', tab: 'advanced-formatting', icon: 'fa-text-height', label: 'Formatting' },
-                { shell: 'left', tab: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
-                { shell: 'left', tab: 'agents', icon: 'fa-robot', label: 'Agents' },
-            ],
+    const sectionBlock = createElement('section', { className: 'sb-mobile-section' });
+    const list = createElement('div', { className: 'sb-mobile-section-list' });
+    sectionBlock.appendChild(list);
+    content.appendChild(sectionBlock);
+    sbState.mobileNav.quickActionContainer = list;
+    refreshMobileNavQuickActions();
+
+    const header = createElement('div', { className: 'sb-mobile-panel-header' });
+    const closeButton = createElement('button', {
+        className: 'sb-mobile-panel-close',
+        attrs: {
+            type: 'button',
+            title: 'Close navigation',
+            'aria-label': 'Close navigation',
         },
-    ];
-
-    for (const section of sections) {
-        const sectionBlock = createElement('section', { className: 'sb-mobile-section' });
-        const heading = createElement('strong', { className: 'sb-mobile-section-title', text: section.label });
-        const list = createElement('div', { className: 'sb-mobile-section-list' });
-
-        for (const item of section.items) {
-            const button = createElement('button', {
-                className: 'sb-nav-item',
-                attrs: {
-                    type: 'button',
-                },
-            });
-
-            button.innerHTML = `<i class="fa-solid ${item.icon}" aria-hidden="true"></i><span>${item.label}</span>`;
-
-            button.addEventListener('click', () => {
-                closeMobileNav();
-
-                if (item.action === 'home') {
-                    void returnToLandingPage();
-                } else if (item.action === 'chat-tools') {
-                    openMobileChatTools();
-                } else if (item.action === 'characters') {
-                    toggleCharacterPanel();
-                } else {
-                    toggleShellPanel(item.shell, item.tab);
-                }
-            });
-
-            list.appendChild(button);
-        }
-
-        sectionBlock.append(heading, list);
-        content.appendChild(sectionBlock);
-    }
+    });
+    const headerCopy = createElement('div', { className: 'sb-mobile-panel-copy' });
+    const eyebrow = createElement('div', { className: 'sb-shell-kicker', text: 'Workspace' });
+    const title = createElement('h2', {
+        id: 'sb-mobile-nav-title',
+        className: 'sb-shell-title',
+        text: 'Quick Actions',
+        attrs: {
+            tabindex: '-1',
+        },
+    });
+    closeButton.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+    closeButton.addEventListener('click', closeMobileNav);
+    headerCopy.append(eyebrow, title);
+    header.append(headerCopy, closeButton);
+    content.prepend(header);
 
     overlay.appendChild(content);
     overlay.addEventListener('click', event => {
         if (event.target === overlay) {
             closeMobileNav();
         }
+    });
+    overlay.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        closeMobileNav();
     });
 
     document.body.appendChild(overlay);
@@ -9879,6 +11297,8 @@ function setMobileNavOpenState(isOpen) {
         sbState.mobileNav.lastOpenedAt = performance.now();
     }
 
+    const wasOpen = !overlay.hidden && overlay.getAttribute('aria-hidden') === 'false';
+
     overlay.hidden = !shouldOpen;
     overlay.classList.toggle('sb-nav-open', shouldOpen);
     overlay.setAttribute('aria-hidden', String(!shouldOpen));
@@ -9894,6 +11314,15 @@ function setMobileNavOpenState(isOpen) {
         : '<i class="fa-solid fa-bars" aria-hidden="true"></i>';
 
     queueMobileModalStateSync();
+
+    if (shouldOpen) {
+        refreshMobileNavQuickActions();
+        window.requestAnimationFrame(() => {
+            overlay.querySelector('#sb-mobile-nav-title')?.focus?.({ preventScroll: true });
+        });
+    } else if (wasOpen && document.activeElement && overlay.contains(document.activeElement)) {
+        button.focus({ preventScroll: true });
+    }
 }
 
 function toggleMobileNav() {
@@ -9923,73 +11352,93 @@ function closeMobileNav() {
 
 function injectCharacterDrawerControls() {
     document.getElementById('right-nav-panel')?.classList.add('sb-character-drawer-root');
+    ensureCharacterListToolbarLayout();
+
+    const shellCloseButton = document.getElementById('sb_character_shell_close');
+    if (shellCloseButton instanceof HTMLButtonElement && shellCloseButton.dataset.sbBound !== 'true') {
+        shellCloseButton.dataset.sbBound = 'true';
+        shellCloseButton.addEventListener('click', () => closeCharacterPanel());
+    }
+
+    const charactersTab = document.getElementById('sb_character_tab_characters');
+    if (charactersTab instanceof HTMLButtonElement && charactersTab.dataset.sbBound !== 'true') {
+        charactersTab.dataset.sbBound = 'true';
+        charactersTab.addEventListener('click', () => { void showCharacterListView(); });
+    }
+
+    const groupsTab = document.getElementById('sb_character_tab_groups');
+    if (groupsTab instanceof HTMLButtonElement && groupsTab.dataset.sbBound !== 'true') {
+        groupsTab.dataset.sbBound = 'true';
+        groupsTab.addEventListener('click', () => { void showCharacterListView('groups'); });
+    }
+
+    const editorTab = document.getElementById('sb_character_tab_editor');
+    if (editorTab instanceof HTMLButtonElement && editorTab.dataset.sbBound !== 'true') {
+        editorTab.dataset.sbBound = 'true';
+        editorTab.addEventListener('click', () => openCharacterEditorTab());
+    }
+
+    const personaTab = document.getElementById('sb_character_tab_persona');
+    if (personaTab instanceof HTMLButtonElement && personaTab.dataset.sbBound !== 'true') {
+        personaTab.dataset.sbBound = 'true';
+        personaTab.addEventListener('click', () => openCharacterPersonaTab());
+    }
+
+    const importTab = document.getElementById('sb_character_tab_import');
+    if (importTab instanceof HTMLButtonElement && importTab.dataset.sbBound !== 'true') {
+        importTab.dataset.sbBound = 'true';
+        importTab.addEventListener('click', () => openCharacterImportTab());
+    }
+
+    const importFileAction = document.getElementById('sb_character_import_file_action');
+    if (importFileAction instanceof HTMLButtonElement && importFileAction.dataset.sbBound !== 'true') {
+        importFileAction.dataset.sbBound = 'true';
+        importFileAction.addEventListener('click', () => {
+            document.getElementById('character_import_button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+    }
+
+    const importUrlAction = document.getElementById('sb_character_import_url_action');
+    if (importUrlAction instanceof HTMLButtonElement && importUrlAction.dataset.sbBound !== 'true') {
+        importUrlAction.dataset.sbBound = 'true';
+        importUrlAction.addEventListener('click', () => {
+            document.getElementById('external_import_button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+    }
+
+    if (document.documentElement.dataset.sbCharacterImportPreserveBound !== 'true') {
+        document.documentElement.dataset.sbCharacterImportPreserveBound = 'true';
+        document.addEventListener('sillybunny:character-import-tab-preserve', () => {
+            window.requestAnimationFrame(preserveCharacterImportTab);
+        });
+    }
+
+    const emptyBrowseButton = document.getElementById('sb_character_empty_browse');
+    if (emptyBrowseButton instanceof HTMLButtonElement && emptyBrowseButton.dataset.sbBound !== 'true') {
+        emptyBrowseButton.dataset.sbBound = 'true';
+        emptyBrowseButton.addEventListener('click', () => { void showCharacterListView(); });
+    }
+
+    const emptyCreateButton = document.getElementById('sb_character_empty_create');
+    if (emptyCreateButton instanceof HTMLButtonElement && emptyCreateButton.dataset.sbBound !== 'true') {
+        emptyCreateButton.dataset.sbBound = 'true';
+        emptyCreateButton.addEventListener('click', () => {
+            setCharacterEditorEmptyState(false);
+            setCharacterPersonaPanelVisible(false);
+            setCharacterImportPanelVisible(false);
+            document.getElementById('rm_button_create')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            syncCharacterShellTabs('editor');
+        });
+    }
+
+    ensureCharacterPersonaPanel();
 
     const target = document.getElementById('CharListButtonAndHotSwaps');
     if (!(target instanceof HTMLElement)) {
         return;
     }
 
-    let lockButton = target.querySelector('#sb-character-right-lock');
-    if (!(lockButton instanceof HTMLButtonElement)) {
-        lockButton = createElement('button', {
-            id: 'sb-character-right-lock',
-            className: 'sb-character-right-lock menu_button menu_button_icon',
-            attrs: {
-                type: 'button',
-                title: 'Lock Characters to right',
-                'aria-label': 'Lock Characters to right',
-                'aria-pressed': 'false',
-            },
-        });
-
-        lockButton.innerHTML = '<i class="fa-solid fa-align-right" aria-hidden="true"></i>';
-        lockButton.addEventListener('click', () => {
-            setCharacterDrawerRightLock(!sbState.characterDrawer.rightLocked);
-            syncDesktopShellSizing();
-        });
-        target.appendChild(lockButton);
-    }
-
-    let backButton = target.querySelector('#sb-character-back-to-list');
-    if (!(backButton instanceof HTMLButtonElement)) {
-        backButton = createElement('button', {
-            id: 'sb-character-back-to-list',
-            className: 'sb-character-back-to-list menu_button menu_button_icon',
-            attrs: {
-                type: 'button',
-                title: 'Back to characters list',
-                'aria-label': 'Back to characters list',
-            },
-        });
-
-        backButton.innerHTML = '<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>';
-        backButton.addEventListener('click', () => {
-            showCharacterListView();
-            syncChatbarVisibilityState();
-        });
-        target.appendChild(backButton);
-    }
-
-    let closeButton = target.querySelector('#sb-character-mobile-close');
-    if (!(closeButton instanceof HTMLButtonElement)) {
-        closeButton = createElement('button', {
-            id: 'sb-character-mobile-close',
-            className: 'sb-character-close menu_button menu_button_icon',
-            attrs: {
-                type: 'button',
-                title: 'Close Characters',
-                'aria-label': 'Close Characters',
-            },
-        });
-
-        closeButton.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
-        closeButton.addEventListener('click', () => {
-            closeCharacterPanel();
-        });
-        target.appendChild(closeButton);
-    }
-
-    syncCharacterDrawerLockButton();
+    syncCharacterShellTabs();
 }
 
 function bindCharacterEditorExitButton() {
@@ -10786,7 +12235,7 @@ async function selectPersonaOption(option, picker, avatarId, context) {
         if (domAvatar instanceof HTMLElement) {
             domAvatar.click();
         } else {
-            openShell('right', 'persona');
+            openCharacterPanelTab('persona');
         }
     }
 
@@ -10911,6 +12360,7 @@ function initAll() {
     setTopbarScale('mobile', sbState.topbarScale.mobile, { persist: false });
     setBottomBarScale(sbState.bottomBarScale, { persist: false });
     setMobileButtonScale(sbState.mobileButtonScale, { persist: false });
+    bindComposerControlPlacement();
     initChatAvatarVariables();
     syncDesktopShellSizing();
     buildTopBar();
@@ -10923,6 +12373,8 @@ function initAll() {
     bindTopbarDragEvents();
     bindChatbarEvents();
     bindClearCookiesAndCacheButton();
+    bindMessageActionExtensionEvents();
+    syncMessageActionExtensionVisibility();
     scheduleChatbarRefresh(0);
     interceptDrawerOpeners();
     bindWorldInfoRoute();
@@ -10946,14 +12398,22 @@ function initAll() {
     // Group Advanced Formatting sections into collapsible drawers
     groupAdvancedFormattingIntoDrawers();
 
-    window.SillyBunnyShell = Object.assign(window.SillyBunnyShell || {}, {
+    globalThis.SillyBunnyShell = Object.assign(globalThis.SillyBunnyShell || {}, {
         openTab(shellKey, tabId) {
+            if (shellKey === 'characters') {
+                openCharacterPanelTab(tabId);
+                return;
+            }
+
             if (SB_SHELLS[shellKey]) {
                 openShell(shellKey, tabId);
             }
         },
         openCharacters() {
             toggleCharacterPanel();
+        },
+        closeCharacters() {
+            closeCharacterPanel();
         },
         openGlobalSearch({ focusInput = true } = {}) {
             closeAllDropdowns({ except: 'search' });
@@ -11031,9 +12491,13 @@ if (document.readyState === 'loading') {
 // slow networks where DOMContentLoaded fires but scripts haven't set up UI).
 const ctx = getSillyTavernContext();
 if (ctx?.eventSource && ctx?.event_types) {
+    bindMessageActionExtensionEvents();
     ctx.eventSource.on(ctx.event_types.APP_READY, () => {
         if (!sbState.initialized) {
             initAll();
+        } else {
+            bindMessageActionExtensionEvents();
+            syncMessageActionExtensionVisibility();
         }
     });
 }

@@ -16,16 +16,22 @@ import {
     setLorebookEnabled,
     listConnectionProfiles,
     normalizeAutoSummaryInterval,
+    isPathfinderToolEnabled as isRuntimePathfinderToolEnabled,
+    setPathfinderToolEnabled as setRuntimePathfinderToolEnabled,
+    setBookPermission,
+    canReadBook,
+    canWriteBook,
+    canDeleteBook,
 } from './pathfinder/tree-store.js';
 import { buildTreeFromMetadata } from './pathfinder/tree-builder.js';
 import { syncToolAgentRegistrations } from './agent-runner.js';
+import { ALL_TOOL_NAMES, getContextualLorebookDetails } from './pathfinder/pathfinder-tool-bridge.js';
 import { getPrompt, savePrompt } from './pathfinder/prompts/prompt-store.js';
 import { getDefaultPrompts } from './pathfinder/prompts/default-prompts.js';
 import { clearFeed, getFeedItems } from './pathfinder/activity-feed.js';
 import { getSummaryMemoryState, onSummaryMemoryChanged, saveSummaryMemoryContent } from './pathfinder/summary-memory-store.js';
 import { sidecarGenerate } from './pathfinder/llm-sidecar.js';
-import { createSummaryMemoryEntry } from './pathfinder/tools/summarize.js';
-import { getContextualLorebookDetails } from './pathfinder/pathfinder-tool-bridge.js';
+import { createSeparateSummaryMemoryEntry, createSummaryMemoryEntry, deriveSummaryLorebookTitle } from './pathfinder/tools/summarize.js';
 
 const MODULE_NAME = 'in-chat-agents';
 const PATHFINDER_LOG_PREFIX = '[Pathfinder]';
@@ -47,6 +53,57 @@ function ensureEnabledLorebooks(settings) {
     }
 
     return settings.enabledLorebooks;
+}
+
+function addUniqueLorebookName(names, name) {
+    const bookName = String(name ?? '').trim();
+    if (bookName && !names.includes(bookName)) {
+        names.push(bookName);
+    }
+}
+
+function getActiveLorebookNames(settings, lorebooks = []) {
+    const names = [...ensureEnabledLorebooks(settings)];
+
+    if (settings.autoUseAttachedLorebook || settings.autoSyncLorebooksOnChatChange !== false) {
+        for (const book of lorebooks) {
+            if (book.attached) {
+                addUniqueLorebookName(names, book.name);
+            }
+        }
+    }
+
+    if (settings.includeContextualLorebooks !== false) {
+        for (const source of getContextualLorebookDetails()) {
+            addUniqueLorebookName(names, source.name);
+        }
+    }
+
+    return names;
+}
+
+function getEffectiveLorebooks(lorebooks, settings) {
+    const allBooks = Array.isArray(lorebooks) ? lorebooks : [];
+    const booksByName = new Map(allBooks.map(book => [book.name, book]));
+
+    for (const source of getContextualLorebookDetails()) {
+        if (!source.name || booksByName.has(source.name)) {
+            continue;
+        }
+
+        const sourceTypes = Array.isArray(source.types) ? new Set(source.types) : new Set([source.type || 'attached']);
+        booksByName.set(source.name, {
+            name: source.name,
+            entries: '?',
+            attached: true,
+            sourceTypes,
+            type: formatLorebookSourceLabel(sourceTypes),
+        });
+    }
+
+    return getActiveLorebookNames(settings, allBooks)
+        .map(name => booksByName.get(name) ?? { name, entries: '?', attached: false, type: 'lorebook' })
+        .filter(book => book?.name);
 }
 
 export function normalizeSummaryIntervalInput(value) {
@@ -106,20 +163,41 @@ async function ensureLorebookTree(bookName) {
 }
 
 async function syncAutoAttachedLorebooks(lorebooks, settings) {
-    if (!settings.autoUseAttachedLorebook) {
+    if (!settings.autoUseAttachedLorebook && !settings.autoSyncLorebooksOnChatChange) {
         return [];
     }
 
-    const enabledLorebooks = ensureEnabledLorebooks(settings);
+    const enabledLorebooks = [...ensureEnabledLorebooks(settings)];
     const attachedLorebooks = lorebooks.filter(book => book.attached).map(book => book.name);
+    const syncedLorebooks = Array.from(new Set(attachedLorebooks));
+    const selectedLorebook = syncedLorebooks[0] ?? '';
+    const autoSyncChanged = settings.autoSyncLorebooksOnChatChange
+        && (enabledLorebooks.length !== syncedLorebooks.length
+            || enabledLorebooks.some((name, index) => name !== syncedLorebooks[index])
+            || (settings.selectedLorebook ?? '') !== selectedLorebook);
+    if (settings.autoSyncLorebooksOnChatChange) {
+        settings.enabledLorebooks = syncedLorebooks;
+        settings.selectedLorebook = selectedLorebook;
+        setPathfinderSettings(settings);
+    }
+
     const newLorebooks = attachedLorebooks.filter(name => !enabledLorebooks.includes(name));
 
     if (attachedLorebooks.length === 0) {
         logPathfinder('Auto-use attached lorebooks is enabled, but no attached lorebooks were found.');
+        if (autoSyncChanged) {
+            logPathfinder('Cleared stale Pathfinder lorebooks for a chat with no attached lorebooks.');
+            return enabledLorebooks;
+        }
         return [];
     }
 
-    settings.enabledLorebooks = Array.from(new Set([...enabledLorebooks, ...attachedLorebooks]));
+    if (!settings.autoSyncLorebooksOnChatChange) {
+        settings.enabledLorebooks = Array.from(new Set([...enabledLorebooks, ...attachedLorebooks]));
+        if (!settings.selectedLorebook || !settings.enabledLorebooks.includes(settings.selectedLorebook)) {
+            settings.selectedLorebook = settings.enabledLorebooks[0] ?? '';
+        }
+    }
     attachedLorebooks.forEach(bookName => setLorebookEnabled(bookName, true));
     setPathfinderSettings(settings);
 
@@ -128,6 +206,11 @@ async function syncAutoAttachedLorebooks(lorebooks, settings) {
         for (const bookName of newLorebooks) {
             await ensureLorebookTree(bookName);
         }
+    }
+
+    if (autoSyncChanged) {
+        const removedLorebooks = enabledLorebooks.filter(name => !syncedLorebooks.includes(name));
+        return Array.from(new Set([...newLorebooks, ...removedLorebooks]));
     }
 
     return newLorebooks;
@@ -181,7 +264,7 @@ export async function openPathfinderSettings(agent) {
  */
 async function getAvailableLorebooks() {
     const ctx = getContext();
-    if (!ctx) {
+    if (!ctx && !globalThis.window?.SillyTavern?.getContext?.() && (!Array.isArray(world_names) || world_names.length === 0)) {
         console.warn(`${PATHFINDER_LOG_PREFIX} Could not resolve the current context while gathering lorebooks.`);
         return [];
     }
@@ -259,10 +342,10 @@ async function refreshLorebookList() {
     settingsEl.find('#pf--auto-use-attached').prop('checked', Boolean(settings.autoUseAttachedLorebook));
     const autoEnabledLorebooks = await syncAutoAttachedLorebooks(lorebooks, settings);
     if (autoEnabledLorebooks.length > 0) {
-        updateAgentSettings();
+        await updateAgentSettings();
         updateStatusBanner();
     }
-    const enabledBooks = ensureEnabledLorebooks(getPathfinderSettings());
+    const enabledBooks = getActiveLorebookNames(getPathfinderSettings(), lorebooks);
 
     if (lorebooks.length === 0) {
         logPathfinder('No lorebooks were available for the current character/chat context.');
@@ -272,6 +355,7 @@ async function refreshLorebookList() {
                 <span>No lorebooks found. Create a lorebook in World Info first.</span>
             </div>
         `);
+        renderPermissionMatrix([]);
         return;
     }
 
@@ -305,6 +389,7 @@ async function refreshLorebookList() {
 
             if (checked && !s.enabledLorebooks.includes(bookName)) {
                 s.enabledLorebooks.push(bookName);
+                s.selectedLorebook = s.selectedLorebook || bookName;
                 setLorebookEnabled(bookName, true);
                 logPathfinder(`Lorebook "${bookName}" enabled.`, {
                     source: book.type,
@@ -313,6 +398,9 @@ async function refreshLorebookList() {
                 await ensureLorebookTree(bookName);
             } else if (!checked) {
                 s.enabledLorebooks = s.enabledLorebooks.filter(b => b !== bookName);
+                if (s.selectedLorebook === bookName) {
+                    s.selectedLorebook = s.enabledLorebooks[0] ?? '';
+                }
                 setLorebookEnabled(bookName, false);
                 logPathfinder(`Lorebook "${bookName}" disabled.`, {
                     source: book.type,
@@ -323,16 +411,32 @@ async function refreshLorebookList() {
             setPathfinderSettings(s);
             updateAgentSettings();
             updateStatusBanner();
+            renderPermissionMatrix(lorebooks);
         });
 
         listEl.append(item);
     }
+
+    renderPermissionMatrix(lorebooks);
 }
 
 
 function setPathfinderToolEnabled(toolName, enabled) {
-    if (!currentAgent?.tools) {
+    setRuntimePathfinderToolEnabled(toolName, enabled);
+    if (!currentAgent) {
         return;
+    }
+
+    if (!currentAgent.settings || typeof currentAgent.settings !== 'object') {
+        currentAgent.settings = {};
+    }
+    currentAgent.settings.toolStates = {
+        ...(currentAgent.settings.toolStates || {}),
+        [toolName]: Boolean(enabled),
+    };
+
+    if (!Array.isArray(currentAgent.tools)) {
+        currentAgent.tools = [];
     }
 
     const tool = currentAgent.tools.find(t => t.name === toolName);
@@ -342,12 +446,80 @@ function setPathfinderToolEnabled(toolName, enabled) {
 }
 
 function isPathfinderToolEnabled(toolName) {
-    if (!Array.isArray(currentAgent?.tools)) {
-        return false;
+    const fallbackTool = Array.isArray(currentAgent?.tools)
+        ? currentAgent.tools.find(t => t.name === toolName)
+        : null;
+
+    if (currentAgent?.settings?.toolStates && Object.hasOwn(currentAgent.settings.toolStates, toolName)) {
+        return currentAgent.settings.toolStates[toolName] !== false;
     }
 
-    const tool = currentAgent?.tools?.find(t => t.name === toolName);
-    return tool?.enabled !== false;
+    return isRuntimePathfinderToolEnabled(toolName, fallbackTool?.enabled !== false);
+}
+
+function getToolLabel(toolName) {
+    switch (toolName) {
+        case 'Pathfinder_Search': return 'Search - Browse waypoint map';
+        case 'Pathfinder_Remember': return 'Remember - Create new entries';
+        case 'Pathfinder_Update': return 'Update - Edit existing entries';
+        case 'Pathfinder_Forget': return 'Forget - Disable/delete entries';
+        case 'Pathfinder_Summarize': return 'Summarize - Write memory summaries';
+        case 'Pathfinder_Reorganize': return 'Reorganize - Move entries and waypoints';
+        case 'Pathfinder_MergeSplit': return 'Merge/Split - Combine or divide entries';
+        case 'Pathfinder_Notebook': return 'Notebook - Private AI scratchpad';
+        default: return toolName;
+    }
+}
+
+function renderToolToggles() {
+    const toolList = settingsEl.find('.pf--tool-list');
+    if (!toolList.length) {
+        return;
+    }
+
+    toolList.empty();
+    for (const toolName of ALL_TOOL_NAMES) {
+        if (toolName === 'Pathfinder_Summarize') {
+            continue;
+        }
+
+        const item = $(`
+            <label class="checkbox_label">
+                <input type="checkbox" data-tool="${escapeHtml(toolName)}" />
+                <span>${escapeHtml(getToolLabel(toolName))}</span>
+            </label>
+        `);
+        item.find('input').prop('checked', isPathfinderToolEnabled(toolName));
+        toolList.append(item);
+    }
+}
+
+function renderPermissionMatrix(lorebooks = null) {
+    const matrix = settingsEl.find('#pf--permission-matrix');
+    if (!matrix.length) {
+        return;
+    }
+
+    const books = getEffectiveLorebooks(lorebooks, getPathfinderSettings());
+
+    if (books.length === 0) {
+        matrix.html('<div class="pf--empty-state pf--permission-empty"><i class="fa-solid fa-lock-open"></i><span>Select a lorebook above, or attach one to the current character/chat with auto-select enabled.</span></div>');
+        return;
+    }
+
+    const rows = books.map(book => `
+        <div class="pf--permission-row" data-book="${escapeHtml(book.name)}">
+            <div class="pf--permission-book">
+                <strong>${escapeHtml(book.name)}</strong>
+                <span>${escapeHtml(book.type || 'lorebook')}</span>
+            </div>
+            <label class="checkbox_label"><input type="checkbox" data-permission="read" ${canReadBook(book.name) ? 'checked' : ''} /><span>Read</span></label>
+            <label class="checkbox_label"><input type="checkbox" data-permission="write" ${canWriteBook(book.name) ? 'checked' : ''} /><span>Write</span></label>
+            <label class="checkbox_label"><input type="checkbox" data-permission="delete" ${canDeleteBook(book.name) ? 'checked' : ''} /><span>Delete</span></label>
+        </div>
+    `).join('');
+
+    matrix.html(rows);
 }
 
 function readPromptMaxTokens() {
@@ -375,6 +547,8 @@ function loadSettingsIntoUI() {
     settingsEl.find('#pf--enable-tools').prop('checked', s.sidecarEnabled || false);
     settingsEl.find('#pf--mandatory-tools').prop('checked', s.mandatoryTools || false);
     settingsEl.find('#pf--auto-use-attached').prop('checked', s.autoUseAttachedLorebook || false);
+    settingsEl.find('#pf--auto-sync-lorebooks').prop('checked', s.autoSyncLorebooksOnChatChange !== false);
+    settingsEl.find('#pf--dedupe-natural-activation').prop('checked', s.dedupeNaturalActivation !== false);
     settingsEl.find('#pf--auto-summary').prop('checked', s.autoSummary || false);
     settingsEl.find('#pf--auto-summary-interval').val(s.autoSummaryInterval ?? 20);
 
@@ -384,12 +558,11 @@ function loadSettingsIntoUI() {
     populateConnectionProfiles();
 
     // Load tool states from agent
-    if (currentAgent?.tools) {
-        for (const tool of currentAgent.tools) {
-            const checkbox = settingsEl.find(`input[data-tool="${tool.name}"]`);
-            checkbox.prop('checked', tool.enabled !== false);
-        }
-    }
+    renderToolToggles();
+    settingsEl.find('input[data-tool]').each(function () {
+        const toolName = $(this).data('tool');
+        $(this).prop('checked', isPathfinderToolEnabled(toolName));
+    });
 }
 
 /**
@@ -435,6 +608,7 @@ function renderSummaryMemoryEditor() {
     const indicator = settingsEl.find('#pf--summary-injection-indicator');
     const meta = settingsEl.find('#pf--summary-meta');
     const hasSummary = Boolean(summary.content || summary.uid);
+    const currentContent = String(textarea.val() || summary.content || '').trim();
 
     if (document.activeElement !== textarea[0]) {
         textarea.val(summary.content || '');
@@ -442,6 +616,7 @@ function renderSummaryMemoryEditor() {
 
     textarea.prop('disabled', !hasSummary);
     settingsEl.find('#pf--summary-save').prop('disabled', !hasSummary);
+    settingsEl.find('#pf--summary-save-entry').prop('disabled', !currentContent);
     settingsEl.find('#pf--summary-create').toggle(!hasSummary).prop('disabled', hasSummary);
 
     indicator.removeClass('pf--summary-indicator-missing pf--summary-indicator-not-injected pf--summary-indicator-injected');
@@ -463,6 +638,22 @@ function renderSummaryMemoryEditor() {
     const updated = summary.updatedAt ? `Updated ${formatSummaryTimestamp(summary.updatedAt)}` : 'Not saved yet';
     const injected = summary.injectedAt ? `Last injected ${formatSummaryTimestamp(summary.injectedAt)}${summary.injectedMode ? ` via ${summary.injectedMode}` : ''}` : 'Not injected by retrieval yet';
     meta.text(`${title} — ${location}. ${updated}. ${injected}.`);
+}
+
+function getSummaryEditorDraft() {
+    const summary = getSummaryMemoryState();
+    const content = String(settingsEl.find('#pf--summary-content').val() || summary.content || '').trim();
+    return {
+        title: deriveSummaryLorebookTitle({
+            title: summary.title,
+            content,
+            arc: summary.arc,
+        }),
+        content,
+        significance: summary.significance || 'medium',
+        arc: summary.arc || '',
+        book: summary.bookName || getPathfinderSettings().selectedLorebook || '',
+    };
 }
 
 function getRecentChatForSummary(maxMessages = 24) {
@@ -587,6 +778,21 @@ function bindEvents() {
         updateStatusBanner();
     });
 
+    settingsEl.find('#pf--auto-sync-lorebooks').on('change', async function () {
+        const enabled = $(this).prop('checked');
+        const s = getPathfinderSettings();
+        s.autoSyncLorebooksOnChatChange = enabled;
+        setPathfinderSettings(s);
+        logPathfinder(`Chat-context lorebook auto-sync ${enabled ? 'enabled' : 'disabled'}.`);
+
+        if (enabled) {
+            await refreshLorebookList();
+        }
+
+        await updateAgentSettings();
+        updateStatusBanner();
+    });
+
     // Mode toggles
     settingsEl.find('#pf--enable-tools').on('change', function () {
         const enabled = $(this).prop('checked');
@@ -660,6 +866,14 @@ function bindEvents() {
         updateAgentSettings();
     });
 
+    settingsEl.find('#pf--dedupe-natural-activation').on('change', function () {
+        const s = getPathfinderSettings();
+        s.dedupeNaturalActivation = $(this).prop('checked');
+        setPathfinderSettings(s);
+        logPathfinder('Natural World Info activation dedupe changed.', { dedupeNaturalActivation: s.dedupeNaturalActivation });
+        updateAgentSettings();
+    });
+
     // Memory summary settings
     settingsEl.find('#pf--enable-summarize-tool').on('change', async function () {
         const enabled = $(this).prop('checked');
@@ -694,10 +908,40 @@ function bindEvents() {
         const status = settingsEl.find('#pf--summary-save-status');
         try {
             await saveSummaryMemoryContent(settingsEl.find('#pf--summary-content').val());
+            renderSummaryMemoryEditor();
             status.text('Saved!').removeClass('error').addClass('success');
             setTimeout(() => status.text(''), 3000);
         } catch (err) {
             status.text(`Save failed: ${err.message}`).removeClass('success').addClass('error');
+        }
+    });
+
+    settingsEl.find('#pf--summary-content').on('input', renderSummaryMemoryEditor);
+
+    settingsEl.find('#pf--summary-save-entry').on('click', async () => {
+        const status = settingsEl.find('#pf--summary-save-status');
+        const button = settingsEl.find('#pf--summary-save-entry');
+        const draft = getSummaryEditorDraft();
+        if (!draft.content) {
+            status.text('Write or create a summary first.').removeClass('success').addClass('error');
+            return;
+        }
+
+        button.prop('disabled', true);
+        status.text('Saving entry...').removeClass('success error');
+
+        try {
+            const result = await createSeparateSummaryMemoryEntry(draft);
+            setPathfinderToolEnabled('Pathfinder_Summarize', true);
+            settingsEl.find('#pf--enable-summarize-tool').prop('checked', true);
+            await updateAgentSettings();
+            syncToolAgentRegistrations();
+            status.text(`Saved "${result.summaryTitle}"`).removeClass('error').addClass('success');
+            setTimeout(() => status.text(''), 4000);
+        } catch (err) {
+            status.text(`Entry save failed: ${err.message}`).removeClass('success').addClass('error');
+        } finally {
+            renderSummaryMemoryEditor();
         }
     });
 
@@ -731,20 +975,30 @@ function bindEvents() {
         updateAgentSettings();
     });
 
-    settingsEl.find('.pf--tool-list input[data-tool]').on('change', async function () {
+    settingsEl.on('change', '.pf--tool-list input[data-tool]', async function () {
         const toolName = $(this).data('tool');
         const enabled = $(this).prop('checked');
 
-        if (currentAgent?.tools) {
-            const tool = currentAgent.tools.find(t => t.name === toolName);
-            if (tool) {
-                tool.enabled = enabled;
-            }
-        }
+        setPathfinderToolEnabled(toolName, enabled);
 
         logPathfinder('Tool availability changed.', { toolName, enabled });
         await updateAgentSettings();
         syncToolAgentRegistrations();
+    });
+
+    settingsEl.on('change', '#pf--permission-matrix input[data-permission]', async function () {
+        const row = $(this).closest('.pf--permission-row');
+        const bookName = row.data('book');
+        const permission = $(this).data('permission');
+        const enabled = $(this).prop('checked');
+
+        if (!bookName || !permission) {
+            return;
+        }
+
+        setBookPermission(bookName, permission, enabled ? 'readwrite' : 'none');
+        logPathfinder('Lorebook permission changed.', { bookName, permission, enabled });
+        await updateAgentSettings();
     });
 
     // Collapsible sections
@@ -798,6 +1052,21 @@ function bindEvents() {
         }
     });
 
+    settingsEl.find('#pf--copy-diagnostics').on('click', async () => {
+        const text = settingsEl.find('#pf--diagnostics-output').text() || '';
+        try {
+            await navigator.clipboard.writeText(text);
+            toastr.success('Pathfinder diagnostics copied.');
+        } catch {
+            const textarea = $('<textarea>').val(text).css({ position: 'fixed', left: '-9999px', top: '0' });
+            $('body').append(textarea);
+            textarea[0].select();
+            document.execCommand('copy');
+            textarea.remove();
+            toastr.success('Pathfinder diagnostics copied.');
+        }
+    });
+
     settingsEl.find('#pf--refresh-log').on('click', () => {
         renderRetrievalLog();
         logPathfinder('Pathfinder retrieval log refreshed.');
@@ -822,7 +1091,8 @@ function bindEvents() {
 function updateStatusBanner() {
     const banner = settingsEl.find('#pf--status-banner');
     const s = getPathfinderSettings();
-    const hasBooks = (s.enabledLorebooks || []).length > 0;
+    const activeBooks = getActiveLorebookNames(s);
+    const hasBooks = activeBooks.length > 0;
     const hasMode = s.sidecarEnabled || s.pipelineEnabled;
     const masterEnabled = currentAgent ? isAgentEnabledForCurrentScope(currentAgent) : false;
 
@@ -835,7 +1105,7 @@ function updateStatusBanner() {
         banner.removeClass('pf--status-disabled').addClass('pf--status-ready');
         banner.find('.pf--status-icon i').removeClass('fa-circle-xmark').addClass('fa-circle-check');
         banner.find('.pf--status-text strong').text('Pathfinder is ready');
-        banner.find('.pf--status-text span').text(`${s.enabledLorebooks.length} lorebook(s) enabled`);
+        banner.find('.pf--status-text span').text(`${activeBooks.length} lorebook(s) available`);
     } else if (hasBooks) {
         banner.removeClass('pf--status-disabled').addClass('pf--status-ready');
         banner.find('.pf--status-icon i').removeClass('fa-circle-xmark').addClass('fa-circle-check');
@@ -943,6 +1213,10 @@ function formatRetrievalDetail(item, { detailed = false } = {}) {
 
     if (metadata.reason) {
         lines.push(`  Note: ${metadata.reason.replace(/-/g, ' ')}`);
+    }
+
+    if (metadata.skippedNaturalActivationCount > 0) {
+        lines.push(`  Skipped native World Info activations: ${formatCount(metadata.skippedNaturalActivationCount, 'entry')}`);
     }
 
     if (stageResults.length > 0) {

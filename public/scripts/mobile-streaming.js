@@ -1,15 +1,35 @@
 import { isIOSWebKitPlatform } from './mobile-send-button.js';
 
-export const IOS_STREAMING_UPDATE_INTERVAL_MS = 125;
-export const IOS_REASONING_RENDER_INTERVAL_MS = 750;
+export const IOS_STREAMING_UPDATE_INTERVAL_MS = 250;
+export const IOS_REASONING_RENDER_INTERVAL_MS = 1500;
+
+/**
+ * Checks whether Smooth Streaming is effectively active for the current platform.
+ * @param {object} [options]
+ * @param {boolean} [options.smoothStreaming] Whether Smooth Streaming is enabled in settings
+ * @param {boolean} [options.iosWebKitDisableSmoothStreaming] Whether iOS WebKit should bypass Smooth Streaming
+ * @param {Navigator} [options.navigatorRef] Navigator-like object
+ * @returns {boolean}
+ */
+export function isSmoothStreamingEffectivelyEnabled({
+    smoothStreaming = false,
+    iosWebKitDisableSmoothStreaming = false,
+    navigatorRef = globalThis.navigator,
+} = {}) {
+    // SillyBunny: let iOS WebKit opt out of smooth streaming even when the global
+    // preference is enabled, because that platform is the main regression target.
+    return Boolean(smoothStreaming) && !(Boolean(iosWebKitDisableSmoothStreaming) && isIOSWebKitPlatform(navigatorRef));
+}
 
 /**
  * Checks whether live streaming DOM work should be reduced for the current browser.
  * @param {Navigator} [navigatorRef] Navigator-like object
+ * @param {object} [options]
+ * @param {boolean} [options.enabled] Whether the iOS WebKit reduction is enabled
  * @returns {boolean}
  */
-export function shouldReduceStreamingDomWork(navigatorRef = globalThis.navigator) {
-    return isIOSWebKitPlatform(navigatorRef);
+export function shouldReduceStreamingDomWork(navigatorRef = globalThis.navigator, { enabled = true } = {}) {
+    return Boolean(enabled) && isIOSWebKitPlatform(navigatorRef);
 }
 
 /**
@@ -17,13 +37,14 @@ export function shouldReduceStreamingDomWork(navigatorRef = globalThis.navigator
  * @param {number} baseIntervalMs Requested streaming interval
  * @param {object} [options]
  * @param {Navigator} [options.navigatorRef] Navigator-like object
+ * @param {boolean} [options.enabled] Whether the iOS WebKit floor is enabled
  * @returns {number}
  */
-export function getStreamingUpdateInterval(baseIntervalMs, { navigatorRef = globalThis.navigator } = {}) {
+export function getStreamingUpdateInterval(baseIntervalMs, { navigatorRef = globalThis.navigator, enabled = true } = {}) {
     const interval = Number(baseIntervalMs);
     const normalizedInterval = Number.isFinite(interval) && interval > 0 ? interval : 1;
 
-    if (!shouldReduceStreamingDomWork(navigatorRef)) {
+    if (!shouldReduceStreamingDomWork(navigatorRef, { enabled })) {
         return normalizedInterval;
     }
 

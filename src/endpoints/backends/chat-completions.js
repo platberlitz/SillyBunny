@@ -3,6 +3,7 @@ import process from 'node:process';
 import express from 'express';
 import fetch from 'node-fetch';
 import urlJoin from 'url-join';
+import { isLikelyLocalServerUrl } from '../../../public/scripts/local-url-utils.js';
 
 import {
     AIMLAPI_HEADERS,
@@ -22,6 +23,7 @@ import {
 } from '../../constants.js';
 import {
     forwardFetchResponse,
+    abortOnResponseClose,
     getConfigValue,
     tryParse,
     uuidv4,
@@ -188,6 +190,12 @@ function getOpenRouterPlugins(request) {
     return plugins;
 }
 
+export function shouldIncludeOpenRouterQuantizations(requestBody) {
+    return Array.isArray(requestBody.quantizations)
+        && requestBody.quantizations.length > 0
+        && !Object.hasOwn(requestBody, 'secret_id');
+}
+
 function hasCustomReasoningParamConfig(requestBody) {
     return requestBody.chat_completion_source === CHAT_COMPLETION_SOURCES.CUSTOM
         && typeof requestBody.custom_reasoning_param_name === 'string'
@@ -249,6 +257,28 @@ function applyCustomReasoningParameters(bodyParams, requestBody) {
     }
 }
 
+function getOpenAiCompatibleServerUrl(requestBody) {
+    return requestBody.chat_completion_source === CHAT_COMPLETION_SOURCES.CUSTOM ? requestBody.custom_url : '';
+}
+
+function applyLocalPromptCacheScope(bodyParams, requestBody) {
+    if (requestBody.chat_completion_source !== CHAT_COMPLETION_SOURCES.CUSTOM) {
+        return;
+    }
+
+    const serverUrl = getOpenAiCompatibleServerUrl(requestBody);
+    if (!isLikelyLocalServerUrl(serverUrl)) {
+        return;
+    }
+
+    // SillyBunny: isolate helper generations so local prompt caches keep the main chat lane hot.
+    if (String(requestBody.cacheScope ?? 'auxiliary') === 'main') {
+        bodyParams.cache_prompt = true;
+    } else {
+        delete bodyParams.cache_prompt;
+    }
+}
+
 /**
  * Hacky way to use JSON schema only if json_object format is supported.
  * @param {object} bodyParams Additional body parameters
@@ -283,10 +313,7 @@ async function sendClaudeRequest(request, response) {
 
     try {
         const controller = new AbortController();
-        request.socket.removeAllListeners('close');
-        request.socket.on('close', function () {
-            controller.abort();
-        });
+        abortOnResponseClose(response, controller);
         const additionalHeaders = {};
         const betaHeaders = ['output-128k-2025-02-19', 'context-1m-2025-08-07'];
         const useTools = Array.isArray(request.body.tools) && request.body.tools.length > 0;
@@ -313,7 +340,7 @@ async function sendClaudeRequest(request, response) {
             stop_sequences: stopSequences,
             temperature: request.body.temperature,
             top_p: request.body.top_p,
-            top_k: request.body.top_k,
+            top_k: request.body.top_k > 0 ? request.body.top_k : undefined,
             stream: request.body.stream,
         };
         if (useSystemPrompt) {
@@ -690,10 +717,7 @@ async function sendMakerSuiteRequest(request, response) {
 
     try {
         const controller = new AbortController();
-        request.socket.removeAllListeners('close');
-        request.socket.on('close', function () {
-            controller.abort();
-        });
+        abortOnResponseClose(response, controller);
 
         const apiVersion = getConfigValue('gemini.apiVersion', 'v1beta');
         const responseType = (stream ? 'streamGenerateContent' : 'generateContent');
@@ -827,10 +851,7 @@ async function sendAI21Request(request, response) {
 
     const bodyParams = {};
     const controller = new AbortController();
-    request.socket.removeAllListeners('close');
-    request.socket.on('close', function () {
-        controller.abort();
-    });
+    abortOnResponseClose(response, controller);
     // Hack to support JSON schema
     if (request.body.json_schema) {
         bodyParams.response_format = {
@@ -909,10 +930,7 @@ async function sendMistralAIRequest(request, response) {
     try {
         const messages = convertMistralMessages(request.body.messages, getPromptNames(request));
         const controller = new AbortController();
-        request.socket.removeAllListeners('close');
-        request.socket.on('close', function () {
-            controller.abort();
-        });
+        abortOnResponseClose(response, controller);
 
         const requestBody = {
             'model': request.body.model,
@@ -990,10 +1008,7 @@ async function sendMistralAIRequest(request, response) {
 async function sendCohereRequest(request, response) {
     const apiKey = readSecret(request.user.directories, SECRET_KEYS.COHERE);
     const controller = new AbortController();
-    request.socket.removeAllListeners('close');
-    request.socket.on('close', function () {
-        controller.abort();
-    });
+    abortOnResponseClose(response, controller);
 
     if (!apiKey) {
         console.warn('Cohere API key is missing.');
@@ -1020,7 +1035,7 @@ async function sendCohereRequest(request, response) {
             messages: convertedHistory.chatHistory,
             temperature: request.body.temperature,
             max_tokens: request.body.max_tokens,
-            k: request.body.top_k,
+            k: request.body.top_k > 0 ? request.body.top_k : undefined,
             p: request.body.top_p,
             seed: request.body.seed,
             stop_sequences: request.body.stop,
@@ -1097,10 +1112,7 @@ async function sendDeepSeekRequest(request, response) {
     }
 
     const controller = new AbortController();
-    request.socket.removeAllListeners('close');
-    request.socket.on('close', function () {
-        controller.abort();
-    });
+    abortOnResponseClose(response, controller);
 
     try {
         let bodyParams = {};
@@ -1214,10 +1226,7 @@ async function sendXaiRequest(request, response) {
     }
 
     const controller = new AbortController();
-    request.socket.removeAllListeners('close');
-    request.socket.on('close', function () {
-        controller.abort();
-    });
+    abortOnResponseClose(response, controller);
 
     try {
         let bodyParams = {};
@@ -1236,8 +1245,10 @@ async function sendXaiRequest(request, response) {
             bodyParams['stop'] = request.body.stop;
         }
 
-        if (request.body.reasoning_effort) {
-            bodyParams['reasoning_effort'] = request.body.reasoning_effort === 'high' ? 'high' : 'low';
+        if (request.body.reasoning_effort && !['auto', 'none'].includes(request.body.reasoning_effort)) {
+            // grok-4.20-multi-agent supports xhigh; grok-3-mini supports low/high only
+            const effort = request.body.reasoning_effort;
+            bodyParams['reasoning_effort'] = effort === 'xhigh' ? 'xhigh' : (effort === 'high' ? 'high' : 'low');
         }
 
         if (request.body.json_schema) {
@@ -1320,10 +1331,7 @@ async function sendAimlapiRequest(request, response) {
     }
 
     const controller = new AbortController();
-    request.socket.removeAllListeners('close');
-    request.socket.on('close', function () {
-        controller.abort();
-    });
+    abortOnResponseClose(response, controller);
 
     try {
         let bodyParams = {};
@@ -1425,10 +1433,7 @@ async function sendElectronHubRequest(request, response) {
     }
 
     const controller = new AbortController();
-    request.socket.removeAllListeners('close');
-    request.socket.on('close', function () {
-        controller.abort();
-    });
+    abortOnResponseClose(response, controller);
 
     try {
         let bodyParams = {};
@@ -1479,7 +1484,7 @@ async function sendElectronHubRequest(request, response) {
             'presence_penalty': request.body.presence_penalty,
             'frequency_penalty': request.body.frequency_penalty,
             'top_p': request.body.top_p,
-            'top_k': request.body.top_k,
+            'top_k': request.body.top_k > 0 ? request.body.top_k : undefined,
             'logit_bias': request.body.logit_bias,
             'seed': request.body.seed,
             ...bodyParams,
@@ -1537,10 +1542,7 @@ async function sendChutesRequest(request, response) {
     }
 
     const controller = new AbortController();
-    request.socket.removeAllListeners('close');
-    request.socket.on('close', function () {
-        controller.abort();
-    });
+    abortOnResponseClose(response, controller);
 
     try {
         let bodyParams = {};
@@ -1578,7 +1580,7 @@ async function sendChutesRequest(request, response) {
             'repetition_penalty': request.body.repetition_penalty,
             'min_p': request.body.min_p,
             'top_p': request.body.top_p,
-            'top_k': request.body.top_k,
+            'top_k': request.body.top_k > 0 ? request.body.top_k : undefined,
             'seed': request.body.seed,
             'stop': request.body.stop,
             'reasoning_effort': request.body.reasoning_effort,
@@ -1639,10 +1641,7 @@ async function sendMinimaxRequest(request, response) {
     }
 
     const controller = new AbortController();
-    request.socket.removeAllListeners('close');
-    request.socket.on('close', function () {
-        controller.abort();
-    });
+    abortOnResponseClose(response, controller);
 
     try {
         // MiniMax does not allow consecutive messages with the same role.
@@ -1758,8 +1757,7 @@ async function sendAzureOpenAIRequest(request, response) {
         : undefined;
 
     const controller = new AbortController();
-    request.socket.removeAllListeners('close');
-    request.socket.on('close', () => controller.abort());
+    abortOnResponseClose(response, controller);
 
     const config = {
         method: 'POST',
@@ -1824,7 +1822,7 @@ router.post('/status', async function (request, statusResponse) {
             headers = {};
         } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.CUSTOM) {
             apiUrl = request.body.custom_url;
-            apiKey = readSecret(request.user.directories, SECRET_KEYS.CUSTOM);
+            apiKey = readSecret(request.user.directories, SECRET_KEYS.CUSTOM, request.body.secret_id);
             headers = {};
             mergeObjectWithYaml(headers, request.body.custom_include_headers);
         } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.COHERE) {
@@ -2513,10 +2511,7 @@ async function sendOpenAIResponsesRequest(request, response) {
     }
 
     const controller = new AbortController();
-    request.socket.removeAllListeners('close');
-    request.socket.on('close', function () {
-        controller.abort();
-    });
+    abortOnResponseClose(response, controller);
 
     try {
         const { input, instructions } = convertMessagesToResponsesFormat(request.body.messages);
@@ -2705,7 +2700,8 @@ router.post('/generate', async function (request, response) {
                 };
             }
 
-            if (Array.isArray(request.body.quantizations) && request.body.quantizations.length > 0) {
+            // Connection Manager profile requests use secret_id and may target models that reject quantizations.
+            if (shouldIncludeOpenRouterQuantizations(request.body)) {
                 bodyParams['provider'] ??= {};
                 bodyParams['provider']['quantizations'] = request.body.quantizations;
             }
@@ -2762,7 +2758,7 @@ router.post('/generate', async function (request, response) {
             }
         } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.CUSTOM) {
             apiUrl = request.body.custom_url;
-            apiKey = readSecret(request.user.directories, SECRET_KEYS.CUSTOM);
+            apiKey = readSecret(request.user.directories, SECRET_KEYS.CUSTOM, request.body.secret_id);
             headers = {};
             bodyParams = {
                 logprobs: request.body.logprobs,
@@ -2956,6 +2952,8 @@ router.post('/generate', async function (request, response) {
             }
         }
 
+        applyLocalPromptCacheScope(bodyParams, request.body);
+
         if (!apiKey && !request.body.reverse_proxy && request.body.chat_completion_source !== CHAT_COMPLETION_SOURCES.CUSTOM) {
             console.warn('OpenAI API key is missing.');
             return response.status(400).send({ error: true });
@@ -2972,10 +2970,7 @@ router.post('/generate', async function (request, response) {
             `${apiUrl}/chat/completions`;
 
         const controller = new AbortController();
-        request.socket.removeAllListeners('close');
-        request.socket.on('close', function () {
-            controller.abort();
-        });
+        abortOnResponseClose(response, controller);
 
         if (!isTextCompletion && Array.isArray(request.body.tools) && request.body.tools.length > 0) {
             bodyParams['tools'] = request.body.tools;
@@ -3004,7 +2999,7 @@ router.post('/generate', async function (request, response) {
             'presence_penalty': request.body.presence_penalty,
             'frequency_penalty': request.body.frequency_penalty,
             'top_p': request.body.top_p,
-            'top_k': request.body.top_k,
+            'top_k': request.body.top_k > 0 ? request.body.top_k : undefined,
             'stop': isTextCompletion === false ? request.body.stop : undefined,
             'logit_bias': request.body.logit_bias,
             'seed': request.body.seed,

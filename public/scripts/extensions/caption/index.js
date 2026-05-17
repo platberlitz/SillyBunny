@@ -1,6 +1,6 @@
 import { ensureImageFormatSupported, getBase64Async, getFileExtension, isTrueBoolean, saveBase64AsFile } from '../../utils.js';
 import { getContext, getApiUrl, doExtrasFetch, extension_settings, modules, renderExtensionTemplateAsync } from '../../extensions.js';
-import { appendMediaToMessage, chat_metadata, eventSource, event_types, getRequestHeaders, saveChatConditional, saveSettingsDebounced, substituteParams } from '../../../script.js';
+import { appendMediaToMessage, chat_metadata, eventSource, event_types, getRequestHeaders, saveChatConditional, saveSettingsDebounced, substituteParams, updateMessageTokenAccounting } from '../../../script.js';
 import { getMessageTimeStamp } from '../../RossAscends-mods.js';
 import { SECRET_KEYS, secret_state } from '../../secrets.js';
 import { oai_settings } from '../../openai.js';
@@ -162,6 +162,9 @@ async function captionExistingMessage(message, mediaIndex) {
         message.mes = wrappedCaption;
         mediaAttachment.title = wrappedCaption;
         mediaAttachment.captioned = true;
+        // SillyBunny: caption-only messages need their token counts refreshed after
+        // the synthetic caption text replaces the empty user body.
+        await updateMessageTokenAccounting(message);
     } else {
         message.extra.inline_image = true;
         mediaAttachment.append_title = true;

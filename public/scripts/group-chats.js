@@ -1723,6 +1723,7 @@ export function getGroupBlock(group) {
     template.find('.ch_name').text(group.name).attr('title', `[Group] ${group.name}`);
     template.find('.group_fav_icon').css('display', 'none');
     template.addClass(group.fav ? 'is_fav' : '');
+    template.toggleClass('is-active-entity', selected_group === group.id);
     template.find('.ch_fav').val(String(group.fav));
     template.find('.group_select_counter').text(count + ' ' + (count != 1 ? t`characters` : t`character`));
     template.find('.group_select_block_list').text(namesList.join(', '));
@@ -2738,6 +2739,31 @@ async function onGroupNameInput() {
         await editGroup(openGroupId, false);
     }
 }
+
+async function renameOpenGroup() {
+    if (menu_type !== 'group_edit' || !openGroupId) {
+        return;
+    }
+
+    const group = groups.find((x) => x.id == openGroupId);
+    if (!group) {
+        return;
+    }
+
+    const newName = await callGenericPopup('<h3>' + t`New name:` + '</h3>', POPUP_TYPE.INPUT, group.name);
+    if (!newName || newName === group.name) {
+        return;
+    }
+
+    group.name = String(newName);
+    $('#rm_group_chat_name').val(group.name);
+    $('#rm_button_selected_ch').children('h2').text(group.name);
+    await editGroup(openGroupId, true, true);
+}
+
+globalThis.SillyBunnyShell = Object.assign(globalThis.SillyBunnyShell || {}, {
+    renameOpenGroup,
+});
 
 /**
  * Checks if a character with the given avatar ID is a member of the group.
@@ -3758,8 +3784,12 @@ jQuery(() => {
     }
 
     $(document).on('click', '.group_select', function () {
+        const shouldCloseCharacterMenu = $(this).closest('#rm_print_characters_block').length > 0;
         const groupId = $(this).attr('data-chid') || $(this).attr('data-grid');
         openGroupById(groupId);
+        if (shouldCloseCharacterMenu) {
+            globalThis.SillyBunnyShell?.closeCharacters?.();
+        }
     });
     $('#rm_group_filter').on('input', filterGroupMembers);
     $('#rm_group_members_filter').on('input', filterGroupMemberList);
@@ -3782,6 +3812,15 @@ jQuery(() => {
     });
     $('#groupCurrentMemberPopoutButton').on('click', doCurMemberListPopout);
     $('#rm_group_chat_name').on('input', onGroupNameInput);
+    $('#rm_button_selected_ch h2').on('click', async function (event) {
+        if (menu_type !== 'group_edit' || !openGroupId) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        await renameOpenGroup();
+    });
     $('#rm_group_delete').off().on('click', onDeleteGroupClick);
     $('#group_favorite_button').on('click', onFavoriteGroupClick);
     $('#rm_group_allow_self_responses').on('input', onGroupSelfResponsesClick);

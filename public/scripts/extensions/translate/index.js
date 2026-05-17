@@ -8,6 +8,7 @@ import {
     saveSettingsDebounced,
     substituteParams,
     updateMessageBlock,
+    updateMessageTokenAccounting,
 } from '../../../script.js';
 import { extension_settings, getContext, renderExtensionTemplateAsync } from '../../extensions.js';
 import { POPUP_TYPE, callGenericPopup } from '../../popup.js';
@@ -532,6 +533,9 @@ async function translateOutgoingMessage(messageId) {
     const originalText = message.mes;
     message.extra.display_text = originalText;
     message.mes = await translate(originalText, extension_settings.translate.internal_language);
+    // SillyBunny: translated assistant text should keep token accounting aligned
+    // with the visible message body.
+    await updateMessageTokenAccounting(message);
     updateMessageBlock(messageId, message);
 
     console.log('translateOutgoingMessage', messageId);

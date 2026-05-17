@@ -32,6 +32,7 @@ test.describe('MacroParser', () => {
 
             expect(macroCst).toEqual(expectedCst);
         });
+
         // {{  user  }}
         test('should generally handle whitespaces', async ({ page }) => {
             const input = '{{  user  }}';
@@ -61,6 +62,7 @@ test.describe('MacroParser', () => {
                 expect(errors).toMatchObject(expectedErrors);
                 expect(errors[0].message).toMatch(expectedMessage);
             });
+
             // {{§%€blah}}
             test('[Error] should throw an error for invalid identifier', async ({ page }) => {
                 const input = '{{§%€blah}}';
@@ -75,6 +77,7 @@ test.describe('MacroParser', () => {
                 expect(errors).toMatchObject(expectedErrors);
                 expect(errors[0].message).toMatch(expectedMessage);
             });
+
             // {{user
             test('[Error] should throw an error for incomplete macro', async ({ page }) => {
                 const input = '{{user';

@@ -1,3 +1,4 @@
+import { createWorldInfoEntry as createWorldInfoEntryFallback } from '../../../world-info.js';
 import { getTree, saveTree, findNodeById, addEntryToNode, removeEntryFromTree, createTreeNode, isTrackerTitle, setTrackerUid } from './tree-store.js';
 
 let _loadWorldInfo = null;
@@ -19,7 +20,14 @@ async function loadWI(name) {
 async function createWIE(name, data) {
     if (_createWorldInfoEntry) return _createWorldInfoEntry(name, data);
     const ctx = window?.SillyTavern?.getContext?.();
-    return ctx?.createWorldInfoEntry?.(name, data);
+    if (ctx?.createWorldInfoEntry) return ctx.createWorldInfoEntry(name, data);
+    return createWorldInfoEntryFallback(name, data);
+}
+
+function assertCreatedEntry(newEntry, bookName) {
+    if (!newEntry || newEntry.uid === undefined) {
+        throw new Error(`Could not create a new entry in "${bookName}". Lorebook may be missing or unwritable.`);
+    }
 }
 
 async function saveWI(name, data, immediate) {
@@ -32,6 +40,7 @@ export async function createEntry(bookName, title, content, keys = []) {
     const bookData = await loadWI(bookName);
     if (!bookData) throw new Error(`Lorebook "${bookName}" not found.`);
     const newEntry = await createWIE(bookName, bookData);
+    assertCreatedEntry(newEntry, bookName);
     newEntry.content = content;
     newEntry.comment = title;
     newEntry.key = keys.length > 0 ? keys : [title.replace(/^\[.*?\]\s*/, '').split(/[:|]/)[0].trim().toLowerCase()];
@@ -173,6 +182,7 @@ export async function splitEntry(bookName, uid, splitTitle1, content1, splitTitl
     original.content = content1;
     original.comment = splitTitle1 || original.comment;
     const newEntry = await createWIE(bookName, bookData);
+    assertCreatedEntry(newEntry, bookName);
     newEntry.content = content2;
     newEntry.comment = splitTitle2 || 'Split entry';
     newEntry.key = original.key ? [...original.key] : [splitTitle2?.toLowerCase() || 'split'];

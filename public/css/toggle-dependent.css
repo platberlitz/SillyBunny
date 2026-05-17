@@ -50,6 +50,7 @@ body.hideChatAvatars .swipe_left {
 body.square-avatars .avatar,
 body.square-avatars .avatar img {
     border-radius: var(--avatar-base-border-radius) !important;
+    aspect-ratio: 1 / 1;
 }
 
 body.rounded-avatars .avatar,
@@ -170,6 +171,7 @@ body.big-avatars .bogus_folder_select .avatar {
 body.big-avatars .avatar {
     width: calc(var(--avatar-base-width) * var(--big-avatar-width-factor));
     height: calc(var(--avatar-base-height) * var(--big-avatar-height-factor));
+    aspect-ratio: 3 / 4;
     /* width: unset; */
     border-style: none;
     display: flex;
@@ -196,10 +198,11 @@ body.big-avatars #user_avatar_block .avatar img {
 body.big-avatars .avatar img {
     width: calc(var(--avatar-base-width) * var(--big-avatar-width-factor));
     height: calc(var(--avatar-base-height) * var(--big-avatar-height-factor));
+    aspect-ratio: 3 / 4;
     object-fit: cover;
     object-position: center;
     border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: calc(var(--avatar-base-border-radius) * var(--big-avatar-border-factor));
+    border-radius: inherit;
 }
 
 body.big-avatars .bogus_folder_select_back .bogus_folder_back_placeholder {
@@ -430,7 +433,7 @@ body.waifuMode .zoomed_avatar {
     position: absolute;
     padding: 0;
     filter: drop-shadow(2px 2px 2px #51515199);
-    z-index: 29;
+    z-index: var(--sb-z-raised);
     overflow: hidden;
     display: none;
     left: 0;

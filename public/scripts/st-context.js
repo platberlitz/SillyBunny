@@ -46,6 +46,8 @@ import {
     this_chid,
     updateChatMetadata,
     updateMessageBlock,
+    updateMessageMetaBadges,
+    updateMessageTokenAccounting,
     printMessages,
     redisplayChat,
     showMoreMessages,
@@ -109,7 +111,7 @@ import { ToolManager } from './tool-calling.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { timestampToMoment, uuidv4, importFromExternalUrl } from './utils.js';
 import { addGlobalVariable, addLocalVariable, decrementGlobalVariable, decrementLocalVariable, deleteGlobalVariable, deleteLocalVariable, existsGlobalVariable, existsLocalVariable, getGlobalVariable, getLocalVariable, incrementGlobalVariable, incrementLocalVariable, setGlobalVariable, setLocalVariable } from './variables.js';
-import { convertCharacterBook, getWorldInfoPrompt, loadWorldInfo, reloadEditor, saveWorldInfo, updateWorldInfoList, world_info, world_names } from './world-info.js';
+import { convertCharacterBook, createWorldInfoEntry, getWorldInfoPrompt, loadWorldInfo, reloadEditor, saveWorldInfo, updateWorldInfoList, world_info, world_names } from './world-info.js';
 import { ChatCompletionService, TextCompletionService } from './custom-request.js';
 import { ConnectionManagerRequestService } from './extensions/shared.js';
 import { updateReasoningUI, parseReasoningFromString, getReasoningTemplateByName } from './reasoning.js';
@@ -250,6 +252,8 @@ export function getContext() {
         uuidv4,
         humanizedDateTime,
         updateMessageBlock,
+        updateMessageMetaBadges,
+        updateMessageTokenAccounting,
         redisplayChat,
         showMoreMessages,
         appendMediaToMessage,
@@ -290,7 +294,9 @@ export function getContext() {
                 has: existsGlobalVariable,
             },
         },
+        // SillyBunny: Pathfinder write tools need the lorebook entry factory in extension context.
         loadWorldInfo,
+        createWorldInfoEntry,
         saveWorldInfo,
         reloadWorldInfoEditor: reloadEditor,
         updateWorldInfoList,

@@ -52,7 +52,7 @@ const STARTER_PACK_PRESET_NAME_SILLYBUNNY = 'Pura\'s Director Preset (SillyBunny
 const STARTER_PACK_PRESET_TITLE = 'Pura\'s Director Preset';
 const STARTER_PACK_CREATOR_NAME = 'purachina';
 const STARTER_PACK_SITE_URL = 'https://platberlitz.github.io/';
-const GEECHAN_PRESET_NAME = 'Geechan - Universal Roleplay (Chat Completions) (v5.1)';
+const GEECHAN_PRESET_NAME = 'Geechan - Universal Roleplay (Chat Completions) (v5.2)';
 const GEECHAN_SITE_URL = 'https://rentry.org/geechan';
 const TLD_CHUB_URL = 'https://chub.ai/users/thelonelydevil';
 const TLD_DISCORD_PALS_URL = 'https://github.com/TheLonelyDevil9/discord-pals/';
@@ -61,17 +61,9 @@ const STARTER_PACK_EXTENSIONS = Object.freeze({
         id: 'third-party/sillytavern-character-colors',
         repoUrl: 'https://github.com/platberlitz/sillytavern-character-colors',
     }),
-    quickImageGen: Object.freeze({
-        id: 'third-party/sillytavern-image-gen',
-        repoUrl: 'https://github.com/platberlitz/sillytavern-image-gen',
-    }),
     summarySharder: Object.freeze({
         id: 'third-party/summary-sharder',
         repoUrl: 'https://github.com/Promansis/summary-sharder',
-    }),
-    guidedGenerations: Object.freeze({
-        id: 'third-party/GuidedGenerations-Extension',
-        repoUrl: 'https://github.com/platberlitz/GuidedGenerations-Extension',
     }),
     cssSnippets: Object.freeze({
         id: 'third-party/SillyBunny-CssSnippets',
@@ -84,18 +76,6 @@ const STARTER_PACK_EXTENSIONS = Object.freeze({
     groupUtilities: Object.freeze({
         id: 'third-party/SB-GroupUtilities',
         repoUrl: 'https://github.com/DrMortum/SB-GroupUtilities',
-    }),
-    promptInspector: Object.freeze({
-        id: 'third-party/Extension-PromptInspector',
-        repoUrl: 'https://github.com/SillyTavern/Extension-PromptInspector',
-    }),
-    chatCompletionTabs: Object.freeze({
-        id: 'third-party/SillyTavern-ChatCompletionTabs',
-        repoUrl: 'https://github.com/RivelleDays/SillyTavern-ChatCompletionTabs',
-    }),
-    inputHistory: Object.freeze({
-        id: 'third-party/SillyTavern-InputHistory',
-        repoUrl: 'https://github.com/LenAnderson/SillyTavern-InputHistory',
     }),
     laLib: Object.freeze({
         id: 'third-party/SillyTavern-LALib',
@@ -137,9 +117,9 @@ const WELCOME_TUTORIAL_STEPS = Object.freeze([
     },
     {
         title: 'Personalize your workspace',
-        body: 'The Customize menu in the top bar handles your theming and customization needs. You can optionally enable extra extensions, manage personas.',
+        body: 'The Customize menu in the top bar handles your theming and customization needs. You can optionally enable extra extensions, then manage personas from Characters.',
         hint: 'Customization and extensions are optional, but recommended. While we ship a starter pack, nothing turns itself on without your permission.',
-        chips: ['Settings', 'Extensions', 'Persona', 'Background'],
+        chips: ['Settings', 'Extensions', 'Background'],
         actionLabel: 'Open Extensions',
         actionType: 'open-tab',
         actionValue: 'right:extensions',
@@ -167,8 +147,8 @@ const WELCOME_GUIDE_CARDS = Object.freeze([
     },
     {
         title: 'Customize Menu',
-        body: 'Open the Customize button in the top bar when you want to change your workspace setup: app settings, extensions, personas, and the visual feel of SillyBunny.',
-        chips: ['Settings', 'Extensions', 'Persona', 'Background'],
+        body: 'Open the Customize button in the top bar when you want to change your workspace setup: app settings, extensions, backgrounds, and the visual feel of SillyBunny.',
+        chips: ['Settings', 'Extensions', 'Background'],
         icon: 'fa-sliders',
         actionLabel: 'Open the Customize menu',
         actionType: 'open-tab',
@@ -176,8 +156,8 @@ const WELCOME_GUIDE_CARDS = Object.freeze([
     },
     {
         title: 'Characters Menu',
-        body: 'Open the Characters button in the top bar when you want to access, modify, or create character cards. We have a few characters bundled for you to give you an idea of how to create them!',
-        chips: ['Character Cards', 'Create Character', 'Delete Character', 'Open Character'],
+        body: 'Open the Characters button in the top bar when you want to access characters, edit personas, or create character cards. We have a few characters bundled for you to give you an idea of how to create them!',
+        chips: ['Character Cards', 'Persona', 'Create Character', 'Open Character'],
         icon: 'fa-solid fa-id-card',
         actionLabel: 'Open the Characters menu',
         actionType: 'open-characters-menu',
@@ -217,6 +197,8 @@ const WELCOME_BUNDLED_ASSISTANTS = Object.freeze([
     Object.freeze({
         id: 'guide',
         avatarStorageKey: assistantAvatarKey,
+        identityStorageKey: 'bundledAssistantGuideAvatar',
+        deletedStorageKey: 'bundledAssistantGuideDeleted',
         defaultAvatar: 'default_SillyBunnyGuide.png',
         fileName: 'default_SillyBunnyGuide',
         portrait: 'img/sillybunny-guide-assistant-portrait.png',
@@ -245,6 +227,8 @@ const WELCOME_BUNDLED_ASSISTANTS = Object.freeze([
     Object.freeze({
         id: 'nahida',
         avatarStorageKey: bundledAssistantNahidaAvatarKey,
+        identityStorageKey: 'bundledAssistantNahidaIdentityAvatar',
+        deletedStorageKey: 'bundledAssistantNahidaDeleted',
         defaultAvatar: 'default_AssistantNahida.png',
         fileName: 'default_AssistantNahida',
         cardAsset: 'img/assistant-nahida-portrait.png',
@@ -471,6 +455,66 @@ function getBundledAssistantConfig(assistantId = DEFAULT_BUNDLED_ASSISTANT_ID) {
     return WELCOME_BUNDLED_ASSISTANTS.find(item => item.id === assistantId) ?? WELCOME_BUNDLED_ASSISTANTS[0];
 }
 
+function isBundledAssistantMarkedDeleted(config) {
+    return accountStorage.getItem(config.deletedStorageKey) === 'true';
+}
+
+function clearBundledAssistantDeleted(config) {
+    accountStorage.removeItem(config.deletedStorageKey);
+}
+
+function markBundledAssistantDeleted(config, deletedAvatar) {
+    accountStorage.setItem(config.deletedStorageKey, 'true');
+    const storedAvatar = accountStorage.getItem(config.avatarStorageKey);
+    if (!storedAvatar || storedAvatar === deletedAvatar) {
+        accountStorage.removeItem(config.avatarStorageKey);
+    }
+    const identityAvatar = accountStorage.getItem(config.identityStorageKey);
+    if (!identityAvatar || identityAvatar === deletedAvatar) {
+        accountStorage.removeItem(config.identityStorageKey);
+    }
+}
+
+function getBundledAssistantIdentityAvatar(config) {
+    return accountStorage.getItem(config.identityStorageKey) || config.defaultAvatar;
+}
+
+function setBundledAssistantIdentityAvatar(config, avatar) {
+    if (!avatar || avatar === config.defaultAvatar) {
+        accountStorage.removeItem(config.identityStorageKey);
+    } else {
+        accountStorage.setItem(config.identityStorageKey, avatar);
+    }
+
+    clearBundledAssistantDeleted(config);
+}
+
+function hasBundledAssistantFingerprint(config, character) {
+    const creator = typeof character?.creator === 'string' ? character.creator.toLowerCase() : '';
+    const creatorNotes = typeof character?.creator_notes === 'string' ? character.creator_notes.toLowerCase() : '';
+    const name = typeof character?.name === 'string' ? character.name.toLowerCase() : '';
+    const tags = Array.isArray(character?.tags) ? character.tags.map(tag => String(tag).toLowerCase()) : [];
+
+    return creatorNotes.includes('bundled')
+        || creatorNotes.includes(config.title.toLowerCase())
+        || (creator === String(config.creator).toLowerCase() && name === String(config.characterName).toLowerCase())
+        || (creator === String(config.creator).toLowerCase() && name === config.title.toLowerCase())
+        || tags.includes('bundled');
+}
+
+function isBundledAssistantCharacter(config, character) {
+    const avatar = typeof character?.avatar === 'string' ? character.avatar : '';
+    if (!avatar) {
+        return false;
+    }
+
+    const identityAvatar = getBundledAssistantIdentityAvatar(config);
+    const storedAvatar = accountStorage.getItem(config.avatarStorageKey);
+    return avatar === config.defaultAvatar
+        || avatar === identityAvatar
+        || (avatar === storedAvatar && hasBundledAssistantFingerprint(config, character));
+}
+
 function setBundledAssistantStoredAvatar(config, avatar) {
     if (!avatar || avatar === config.defaultAvatar) {
         accountStorage.removeItem(config.avatarStorageKey);
@@ -527,13 +571,17 @@ function findBundledAssistantCharacterId(config, avatar = getBundledAssistantAva
  * @param {object} [options]
  * @param {boolean} [options.tryCreate=true] Whether a missing assistant should be created automatically.
  * @param {boolean} [options.created=false] Whether the current resolution came from a fresh create flow.
+ * @param {boolean} [options.forceCreate=false] Whether to create even if the bundled assistant was deleted.
  * @returns {Promise<{avatar: string, characterId: number, created: boolean} | null>}
  */
-async function ensureBundledAssistantCharacter(config, { tryCreate = true, created = false } = {}) {
+async function ensureBundledAssistantCharacter(config, { tryCreate = true, created = false, forceCreate = false } = {}) {
     const avatar = getBundledAssistantAvatar(config);
     const characterId = findBundledAssistantCharacterId(config, avatar);
 
     if (characterId !== -1) {
+        if (avatar === config.defaultAvatar || avatar === getBundledAssistantIdentityAvatar(config)) {
+            clearBundledAssistantDeleted(config);
+        }
         return { avatar, characterId, created };
     }
 
@@ -542,10 +590,15 @@ async function ensureBundledAssistantCharacter(config, { tryCreate = true, creat
         return null;
     }
 
+    if (isBundledAssistantMarkedDeleted(config) && !forceCreate) {
+        console.info(`Bundled assistant "${config.id}" was deleted by the user. Skipping automatic recreation.`);
+        return null;
+    }
+
     try {
         console.log(`Character not found for avatar ID: ${avatar}. Creating new bundled assistant.`, config.id);
         await createBundledAssistant(config);
-        return ensureBundledAssistantCharacter(config, { tryCreate: false, created: true });
+        return ensureBundledAssistantCharacter(config, { tryCreate: false, created: true, forceCreate });
     } catch (error) {
         console.error(`Error creating bundled assistant "${config.id}":`, error);
         toastr.error(t`Failed to create ${config.characterName}. See console for details.`);
@@ -829,7 +882,7 @@ function buildGeechanStarterPackItem() {
     const presetManager = getPresetManager('openai');
     const isOpenAiStyleApi = main_api === 'openai';
     const isSelected = isOpenAiStyleApi && presetManager?.getSelectedPresetName() === GEECHAN_PRESET_NAME;
-    const body = 'Geechan\'s Rentry highlights his well-written character cards and guides alongside his prompts and presets. SillyBunny includes his Universal Roleplay v5.1 preset across Chat Completions, plus the matching Text Completions variant for context, system prompt, and instruct pieces. He also made our bundled Assistant Nahida card and Prose Polisher agent.';
+    const body = 'Geechan\'s Rentry highlights his well-written character cards and guides alongside his prompts and presets. SillyBunny includes his Universal Roleplay v5.2 preset across Chat Completions, plus the matching Text Completions variant for context, system prompt, and instruct pieces. He also made our bundled Assistant Nahida card and Prose Polisher agent.';
 
     return {
         title: 'Geechan',
@@ -888,20 +941,6 @@ function buildStarterPackItems() {
                 extensionName: STARTER_PACK_EXTENSIONS.dialogueColors.id,
             }),
             buildExtensionStarterPackItem({
-                title: 'Quick Image Gen',
-                body: `${STARTER_PACK_CREATOR_NAME}'s opt-in image generation companion makes visual moments easier to spin up without hunting through separate tools first.`,
-                icon: 'fa-image',
-                chips: ['Extension', 'Images', 'Opt-in'],
-                extensionName: STARTER_PACK_EXTENSIONS.quickImageGen.id,
-            }),
-            buildExtensionStarterPackItem({
-                title: 'Guided Generations',
-                body: 'A SillyBunny-compatible fork that adds structured generation controls to your chats, letting you guide the AI with specific instructions for each response.',
-                icon: 'fa-compass',
-                chips: ['Extension', 'Generation', 'SillyBunny fork'],
-                extensionName: STARTER_PACK_EXTENSIONS.guidedGenerations.id,
-            }),
-            buildExtensionStarterPackItem({
                 title: 'CSS Snippets',
                 body: 'Manage custom CSS snippets from User Settings. Link snippets to specific themes or chats for per-character styling.',
                 icon: 'fa-palette',
@@ -921,27 +960,6 @@ function buildStarterPackItems() {
                 icon: 'fa-users',
                 chips: ['Extension', 'Groups', 'Presence', 'SendAs'],
                 extensionName: STARTER_PACK_EXTENSIONS.groupUtilities.id,
-            }),
-            buildExtensionStarterPackItem({
-                title: 'Prompt Inspector',
-                body: 'See the prompt stack more clearly when you need to understand what is being sent to the model, debug formatting, or compare how your setup changes the final payload.',
-                icon: 'fa-magnifying-glass',
-                chips: ['Extension', 'Recommended', 'Prompting'],
-                extensionName: STARTER_PACK_EXTENSIONS.promptInspector.id,
-            }),
-            buildExtensionStarterPackItem({
-                title: 'Chat Completion Tabs',
-                body: 'Split chat-completions settings into cleaner tabs so model setup is easier to scan and less overwhelming when you are tuning providers, presets, and request options.',
-                icon: 'fa-table-columns',
-                chips: ['Extension', 'Recommended', 'Layout'],
-                extensionName: STARTER_PACK_EXTENSIONS.chatCompletionTabs.id,
-            }),
-            buildExtensionStarterPackItem({
-                title: 'Input History',
-                body: 'Keep a recallable history of what you typed so it is easier to retry, revise, or recover longer prompts and roleplay replies without retyping them from scratch.',
-                icon: 'fa-clock-rotate-left',
-                chips: ['Extension', 'Recommended', 'Workflow'],
-                extensionName: STARTER_PACK_EXTENSIONS.inputHistory.id,
             }),
             buildExtensionStarterPackItem({
                 title: 'LALib',
@@ -1021,8 +1039,8 @@ async function highlightLaunchpadItem(extensionId) {
     return true;
 }
 
-window.SillyBunnyShell = window.SillyBunnyShell || {};
-window.SillyBunnyShell.highlightLaunchpadItem = highlightLaunchpadItem;
+globalThis.SillyBunnyShell = globalThis.SillyBunnyShell || {};
+globalThis.SillyBunnyShell.highlightLaunchpadItem = highlightLaunchpadItem;
 
 /**
  * Gets the filter bucket used by the Recent Chats tabs.
@@ -1106,8 +1124,8 @@ function openShellTab(route) {
         return;
     }
 
-    if (window.SillyBunnyShell?.openTab) {
-        window.SillyBunnyShell.openTab(shellKey, tabId);
+    if (globalThis.SillyBunnyShell?.openTab) {
+        globalThis.SillyBunnyShell.openTab(shellKey, tabId);
         return;
     }
 
@@ -1117,7 +1135,7 @@ function openShellTab(route) {
         'left:world-info': '#WI-SP-button > .drawer-toggle',
         'right:settings': '#user-settings-button > .drawer-toggle',
         'right:extensions': '#extensions-settings-button > .drawer-toggle',
-        'right:persona': '#persona-management-button > .drawer-toggle',
+        'characters:persona': '#persona-management-button > .drawer-toggle',
         'right:background': '#backgrounds-button > .drawer-toggle',
     }[route];
 
@@ -1357,13 +1375,13 @@ async function handleWelcomeAction(button, sendTextArea) {
             }
             break;
         case 'open-characters-menu':
-            window.SillyBunnyShell?.openCharacters?.();
+            globalThis.SillyBunnyShell?.openCharacters?.();
             break;
         case 'open-global-search':
-            window.SillyBunnyShell?.openGlobalSearch?.({ focusInput: true });
+            globalThis.SillyBunnyShell?.openGlobalSearch?.({ focusInput: true });
             break;
         case 'open-import-characters': {
-            window.SillyBunnyShell?.openCharacters?.();
+            globalThis.SillyBunnyShell?.openCharacters?.();
             const importButton = document.getElementById('character_import_button')
                 || document.getElementById('character_import_paste_button')
                 || document.querySelector('.open_characters_library');
@@ -2046,7 +2064,7 @@ async function getRecentChats() {
 export async function openPermanentAssistantChat({ tryCreate = true, created = false } = {}) {
     try {
         const assistantConfig = getBundledAssistantConfig(DEFAULT_BUNDLED_ASSISTANT_ID);
-        const assistant = await ensureBundledAssistantCharacter(assistantConfig, { tryCreate, created });
+        const assistant = await ensureBundledAssistantCharacter(assistantConfig, { tryCreate, created, forceCreate: tryCreate });
         if (!assistant) {
             return;
         }
@@ -2110,6 +2128,7 @@ async function createBundledAssistant(config) {
 
         const resolvedAvatar = characters[createdCharacterId]?.avatar;
         setBundledAssistantStoredAvatar(config, resolvedAvatar || '');
+        setBundledAssistantIdentityAvatar(config, resolvedAvatar || config.defaultAvatar);
         return;
     }
 
@@ -2153,11 +2172,12 @@ async function createBundledAssistant(config) {
 
     const resolvedAvatar = characters[createdCharacterId]?.avatar;
     setBundledAssistantStoredAvatar(config, resolvedAvatar || '');
+    setBundledAssistantIdentityAvatar(config, resolvedAvatar || config.defaultAvatar);
 }
 
 async function openBundledAssistantCard(assistantId = DEFAULT_BUNDLED_ASSISTANT_ID) {
     const assistantConfig = getBundledAssistantConfig(assistantId);
-    const assistant = await ensureBundledAssistantCharacter(assistantConfig);
+    const assistant = await ensureBundledAssistantCharacter(assistantConfig, { forceCreate: true });
     if (!assistant) {
         return;
     }
@@ -2230,8 +2250,22 @@ export function initWelcomeScreen() {
     eventSource.on(event_types.CHARACTER_RENAMED, (oldAvatar, newAvatar) => {
         for (const assistant of WELCOME_BUNDLED_ASSISTANTS) {
             const storedAvatar = accountStorage.getItem(assistant.avatarStorageKey);
+            const identityAvatar = getBundledAssistantIdentityAvatar(assistant);
+            if (identityAvatar === oldAvatar || assistant.defaultAvatar === oldAvatar) {
+                setBundledAssistantIdentityAvatar(assistant, newAvatar);
+            }
+
             if (storedAvatar === oldAvatar || (!storedAvatar && assistant.defaultAvatar === oldAvatar)) {
                 setBundledAssistantStoredAvatar(assistant, newAvatar);
+            }
+        }
+    });
+
+    eventSource.on(event_types.CHARACTER_DELETED, (event) => {
+        const deletedCharacter = event?.character;
+        for (const assistant of WELCOME_BUNDLED_ASSISTANTS) {
+            if (isBundledAssistantCharacter(assistant, deletedCharacter)) {
+                markBundledAssistantDeleted(assistant, deletedCharacter?.avatar || '');
             }
         }
     });

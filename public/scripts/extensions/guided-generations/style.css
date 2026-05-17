@@ -1,0 +1,104 @@
+.gg-action-buttons-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px 6px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.gg-qr-container {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.gg-regular-buttons-container {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+    flex: 0 0 auto;
+}
+
+.gg-action-button {
+    width: var(--bottomFormBlockSize);
+    min-width: var(--bottomFormBlockSize);
+    height: var(--bottomFormBlockSize);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gg-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px 14px;
+}
+
+.guided-generations-settingslist .setting_item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.guided-generations-settingslist .gg-prompt-field {
+    width: 100%;
+    min-height: 72px;
+    resize: vertical;
+}
+
+.gg-profile-row {
+    display: grid;
+    grid-template-columns: max-content minmax(160px, 1fr) max-content minmax(160px, 1fr) max-content;
+    align-items: center;
+    gap: 8px;
+}
+
+#gg-qr-container #qr--bar {
+    margin-top: 0 !important;
+    max-width: 100%;
+}
+
+@media screen and (max-width: 600px) {
+    .gg-action-buttons-container {
+        --gg-mobile-action-size: clamp(28px, calc(var(--bottomFormBlockSize) * 0.5), 34px);
+        --gg-mobile-action-icon-size: clamp(13px, calc(var(--bottomFormIconSize, 20px) * 0.75), 16px);
+    }
+
+    .gg-action-buttons-container {
+        padding: 0 6px 0;
+        flex-wrap: wrap;
+    }
+
+    .gg-qr-container {
+        flex-basis: 100%;
+        order: 2;
+    }
+
+    .gg-regular-buttons-container {
+        width: 100%;
+        justify-content: flex-end;
+        order: 1;
+        gap: 4px;
+    }
+
+    .gg-action-button {
+        width: var(--gg-mobile-action-size) !important;
+        min-width: var(--gg-mobile-action-size) !important;
+        max-width: var(--gg-mobile-action-size) !important;
+        height: var(--gg-mobile-action-size) !important;
+        min-height: var(--gg-mobile-action-size) !important;
+        max-height: var(--gg-mobile-action-size) !important;
+        flex: 0 0 var(--gg-mobile-action-size) !important;
+        border-radius: 8px !important;
+        font-size: var(--gg-mobile-action-icon-size) !important;
+        padding: 0 !important;
+    }
+
+    .gg-profile-row {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+}

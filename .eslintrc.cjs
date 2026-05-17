@@ -79,6 +79,8 @@ module.exports = {
         '**/*.min.js',
         'public/scripts/extensions/quick-reply/lib/**',
         'public/scripts/extensions/tts/lib/**',
+        // SillyBunny-bundled third-party runtime extension; keep vendor formatting intact.
+        'public/scripts/extensions/quick-image-gen/**',
         'public/scripts/extensions/third-party/**',
     ],
     rules: {

@@ -48,7 +48,7 @@
             </div>
         </div>
         <div class="ica--editor-row">
-            <label>Connection Profile <small>(overrides the extension default connection profile for this agent's AI refinement and prompt-based post-generation rewrites)</small>
+            <label>Connection Profile <small>(overrides the extension default connection profile for this agent's AI refinement, pre-generation intercepts, and prompt-based post-generation rewrites)</small>
                 <select id="ica--editor-connectionProfile" class="text_pole">
                     <option value="">Use extension default</option>
                 </select>
@@ -91,7 +91,61 @@
     </div>
 
     <div class="ica--editor-section" id="ica--injection-section">
-        <strong>Injection Settings</strong>
+        <strong>Pre-Generation Settings</strong>
+        <div class="ica--editor-row">
+            <label>Mode
+                <select id="ica--editor-pre-mode" class="text_pole">
+                    <option value="inject">Inject prompt into context</option>
+                    <option value="intercept">Run agent to modify outgoing context</option>
+                </select>
+            </label>
+        </div>
+        <div id="ica--pre-intercept-options" style="display:none">
+            <div class="ica--editor-row flex-container flexGap5">
+                <label class="flex1">Apply Mode
+                    <select id="ica--editor-pre-applyMode" class="text_pole">
+                        <option value="replace">Replace context</option>
+                        <option value="wrap">Wrap / append</option>
+                        <option value="patch">Patch via tags</option>
+                    </select>
+                </label>
+                <label class="flex1">Max Tokens
+                    <input type="number" id="ica--editor-pre-maxTokens" class="text_pole" min="16" max="16000" value="8192" />
+                </label>
+            </div>
+            <div class="ica--editor-row" id="ica--pre-wrap-position-row">
+                <label>Insert Position
+                    <select id="ica--editor-pre-wrapPosition" class="text_pole">
+                        <option value="after">After original context</option>
+                        <option value="before">Before original context</option>
+                    </select>
+                </label>
+            </div>
+            <div id="ica--pre-wrap-options" style="display:none">
+                <div class="ica--editor-row">
+                    <label>Wrap Prefix <small>(optional)</small>
+                        <textarea id="ica--editor-pre-wrapPrefix" class="text_pole textarea_compact" rows="2" placeholder="Text before the agent output"></textarea>
+                    </label>
+                </div>
+                <div class="ica--editor-row">
+                    <label>Wrap Suffix <small>(optional)</small>
+                        <textarea id="ica--editor-pre-wrapSuffix" class="text_pole textarea_compact" rows="2" placeholder="Text after the agent output"></textarea>
+                    </label>
+                </div>
+            </div>
+            <div id="ica--pre-patch-options" style="display:none">
+                <div class="ica--editor-row flex-container flexGap5">
+                    <label class="flex1">Patch Start Tag
+                        <input type="text" id="ica--editor-pre-patchStartTag" class="text_pole" value="&lt;context_patch&gt;" />
+                    </label>
+                    <label class="flex1">Patch End Tag
+                        <input type="text" id="ica--editor-pre-patchEndTag" class="text_pole" value="&lt;/context_patch&gt;" />
+                    </label>
+                </div>
+            </div>
+            <div class="ica--regex-note">Intercept mode runs this agent before the main model receives the assembled context. Agents run by Order. Replace mode expects a full replacement context; for chat completion that must be a JSON array of chat messages. Wrap and patch add a new message on chat-completion APIs using the Role below.</div>
+        </div>
+        <div class="ica--regex-note" id="ica--pre-injection-note">Inject mode uses the existing extension prompt path. Position, Depth, Role, and World Info scanning control where the prompt is inserted.</div>
         <div class="ica--editor-row flex-container flexGap5">
             <label class="flex1">Position
                 <select id="ica--editor-position" class="text_pole">

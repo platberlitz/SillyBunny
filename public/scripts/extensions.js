@@ -77,10 +77,6 @@ const ignoredExtensionSettingsSelector = ignoredExtensionSettingsSelectors.join(
 const LEGACY_MOONLIT_ECHOES_SETTINGS_KEY = 'SillyTavernMoonlitEchoesTheme';
 const SILLYBUNNY_MOONLIT_ECHOES_EXTENSION_NAME = 'third-party/SillyBunny-MoonlitEchoesTheme';
 const MOONLIT_ECHOES_NOTICE_STORAGE_KEY = 'moonlit_echoes_moved_notice_v1';
-const GUIDED_GENERATIONS_SETTINGS_KEY = 'GuidedGenerations-Extension';
-const SILLYBUNNY_GUIDED_GENERATIONS_EXTENSION_NAME = 'third-party/GuidedGenerations-Extension';
-const SILLYBUNNY_GUIDED_GENERATIONS_REPO_KEY = 'github.com/platberlitz/guidedgenerations-extension';
-const GUIDED_GENERATIONS_NOTICE_STORAGE_KEY = 'guided_generations_fork_notice_v1';
 const genericExtensionSettingsClasses = new Set([
     'alignitemscenter',
     'alignitemsbaseline',
@@ -212,7 +208,7 @@ function scheduleExtensionAssetPrefetch() {
         }
 
         for (const [name, manifest] of Object.entries(manifests)) {
-            if (extension_settings.disabledExtensions.includes(name)) {
+            if (isExtensionDisabled(name)) {
                 continue;
             }
 
@@ -435,79 +431,11 @@ function maybeShowMoonlitEchoesMovedNotice() {
             const button = toast?.querySelector?.(`.${buttonClass}`);
             button?.addEventListener('click', async () => {
                 accountStorage.setItem(MOONLIT_ECHOES_NOTICE_STORAGE_KEY, 'true');
-                await window.SillyBunnyShell?.highlightLaunchpadItem?.(SILLYBUNNY_MOONLIT_ECHOES_EXTENSION_NAME);
+                await globalThis.SillyBunnyShell?.highlightLaunchpadItem?.(SILLYBUNNY_MOONLIT_ECHOES_EXTENSION_NAME);
             });
         },
         onCloseClick() {
             accountStorage.setItem(MOONLIT_ECHOES_NOTICE_STORAGE_KEY, 'true');
-        },
-    });
-}
-
-function getExtensionRepoKey(url) {
-    const normalized = String(url || '')
-        .trim()
-        .toLowerCase()
-        .replace(/\/+$/, '')
-        .replace(/\.git$/, '')
-        .replace(/^git@github\.com:/, 'https://github.com/');
-
-    try {
-        const parsed = new URL(normalized);
-        return `${parsed.hostname}${parsed.pathname}`.replace(/\/+$/, '');
-    } catch {
-        return normalized.replace(/^https?:\/\//, '');
-    }
-}
-
-async function getInstalledExtensionRepoUrl(extensionName) {
-    const externalId = extensionName.replace('third-party', '');
-    const manifestRepoUrl = getExtensionHomePage(manifests[extensionName]);
-    const versionData = await getExtensionVersion(externalId);
-    return versionData?.remoteUrl || manifestRepoUrl;
-}
-
-async function maybeShowGuidedGenerationsForkNotice() {
-    const guidedSettings = extension_settings[GUIDED_GENERATIONS_SETTINGS_KEY];
-    const installedExtension = findExtension(SILLYBUNNY_GUIDED_GENERATIONS_EXTENSION_NAME);
-    if ((!guidedSettings && !installedExtension) || accountStorage.getItem(GUIDED_GENERATIONS_NOTICE_STORAGE_KEY) === 'true') {
-        return;
-    }
-
-    let message = '';
-    if (installedExtension) {
-        const repoUrl = await getInstalledExtensionRepoUrl(installedExtension.name);
-        const isSillyBunnyFork = getExtensionRepoKey(repoUrl) === SILLYBUNNY_GUIDED_GENERATIONS_REPO_KEY;
-
-        if (isSillyBunnyFork && installedExtension.enabled) {
-            return;
-        }
-
-        message = isSillyBunnyFork
-            ? t`Guided Generations needs the SillyBunny-compatible fork enabled to work correctly here. Enable the Guided Generations fork from Launchpad optional installs.`
-            : t`Guided Generations needs the SillyBunny-compatible fork to work correctly here. Delete the current Guided Generations install, then download or install the fork from Launchpad optional installs.`;
-    } else {
-        message = t`Guided Generations needs the SillyBunny-compatible fork to work correctly here. Download or install the Guided Generations fork from Launchpad optional installs.`;
-    }
-
-    const buttonClass = 'guided-generations-launchpad-button';
-    const content = `${message}<br><button type="button" class="menu_button ${buttonClass}">${t`Show in Launchpad`}</button>`;
-    toastr.warning(content, t`Guided Generations fork required`, {
-        timeOut: 0,
-        extendedTimeOut: 0,
-        tapToDismiss: false,
-        closeButton: true,
-        escapeHtml: false,
-        onShown() {
-            const toast = this instanceof HTMLElement ? this : this?.[0];
-            const button = toast?.querySelector?.(`.${buttonClass}`);
-            button?.addEventListener('click', async () => {
-                accountStorage.setItem(GUIDED_GENERATIONS_NOTICE_STORAGE_KEY, 'true');
-                await window.SillyBunnyShell?.highlightLaunchpadItem?.(SILLYBUNNY_GUIDED_GENERATIONS_EXTENSION_NAME);
-            });
-        },
-        onCloseClick() {
-            accountStorage.setItem(GUIDED_GENERATIONS_NOTICE_STORAGE_KEY, 'true');
         },
     });
 }
@@ -568,6 +496,14 @@ function getExtensionType(externalId) {
 
 function isExternalExtension(externalId) {
     return ['local', 'global'].includes(getExtensionType(externalId));
+}
+
+function isAlwaysEnabledExtension(externalId) {
+    return ['core', 'bundled'].includes(getExtensionType(externalId));
+}
+
+function isExtensionDisabled(externalId) {
+    return !isAlwaysEnabledExtension(externalId) && extension_settings.disabledExtensions.includes(externalId);
 }
 
 /**
@@ -642,7 +578,7 @@ function onToggleAllExtensions(extensionsToToggle, toggleContainer) {
         const toggle = extensionsToToggle.find(ext => ext.name === name);
         return toggle
             ? !toggle.enable
-            : extension_settings.disabledExtensions.includes(name);
+            : isExtensionDisabled(name);
     };
 
     if (thirdPartyExtensions.length === 0) return [];
@@ -779,6 +715,11 @@ export async function enableExtension(name, reload = true) {
  * @param {boolean} [reload=true] If true, reload the page after disabling the extension
  */
 export async function disableExtension(name, reload = true) {
+    if (isAlwaysEnabledExtension(name)) {
+        console.warn(`Extension "${name}" is always enabled and cannot be disabled.`);
+        return;
+    }
+
     await callExtensionHook(name, 'disable');
     extension_settings.disabledExtensions.push(name);
     stateChanged = true;
@@ -801,7 +742,7 @@ export function findExtension(name) {
         return equalsIgnoreCaseAndAccents(extName, name) || equalsIgnoreCaseAndAccents(extName, `third-party/${name}`);
     });
     if (!internalExtensionName) return null;
-    const isEnabled = !extension_settings.disabledExtensions.includes(internalExtensionName);
+    const isEnabled = !isExtensionDisabled(internalExtensionName);
     return { name: internalExtensionName, enabled: isEnabled };
 }
 
@@ -1056,7 +997,7 @@ async function activateExtensions() {
                 missingDependencies = extensionDependencies.filter(dep => !extensionNames.includes(dep));
                 // Check for disabled dependencies
                 if (meetsExtensionDeps) {
-                    disabledDependencies = extensionDependencies.filter(dep => extension_settings.disabledExtensions.includes(dep));
+                    disabledDependencies = extensionDependencies.filter(dep => isExtensionDisabled(dep));
                     if (disabledDependencies.length > 0) {
                         // Fail if any dependencies are disabled
                         meetsExtensionDeps = false;
@@ -1067,7 +1008,7 @@ async function activateExtensions() {
             }
         }
 
-        const isDisabled = extension_settings.disabledExtensions.includes(name);
+        const isDisabled = isExtensionDisabled(name);
 
         if (meetsModuleRequirements && meetsExtensionDeps && meetsClientMinimumVersion && !isDisabled) {
             const activateExtension = async () => {
@@ -1346,8 +1287,12 @@ function generateExtensionHtml(name, manifest, isActive, isDisabled, isExternal,
                 return '<i class="fa-sm fa-fw fa-solid fa-server" data-i18n="[title]ext_type_global" title="This is a global extension, available for all users."></i>';
             case 'local':
                 return '<i class="fa-sm fa-fw fa-solid fa-user" data-i18n="[title]ext_type_local" title="This is a local extension, available only for you."></i>';
+            case 'core':
+                return '<i class="fa-sm fa-fw fa-solid fa-lock" title="This is a core extension and cannot be disabled."></i>';
+            case 'bundled':
+                return '<i class="fa-sm fa-fw fa-solid fa-box-archive" title="This is a bundled third-party extension and cannot be disabled."></i>';
             case 'system':
-                return '<i class="fa-sm fa-fw fa-solid fa-cog" data-i18n="[title]ext_type_system" title="This is a built-in extension. It cannot be deleted and updates with the app."></i>';
+                return '<i class="fa-sm fa-fw fa-solid fa-cog" data-i18n="[title]ext_type_system" title="This is a built-in extension. It cannot be deleted and can be disabled."></i>';
             default:
                 return '<i class="fa-sm fa-fw fa-solid fa-question" title="Unknown extension type."></i>';
         }
@@ -1366,9 +1311,11 @@ function generateExtensionHtml(name, manifest, isActive, isDisabled, isExternal,
             : '<a>';
     }
 
-    let toggleElement = isActive || isDisabled ?
-        '<input type="checkbox" title="' + t`Click to toggle` + `" data-name="${name}" class="${isActive ? 'toggle_disable' : 'toggle_enable'} ${checkboxClass}" ${isActive ? 'checked' : ''}>` :
-        `<input type="checkbox" title="Cannot enable extension" data-name="${name}" class="extension_missing ${checkboxClass}" disabled>`;
+    const isAlwaysEnabled = isAlwaysEnabledExtension(name);
+    let toggleElement = isAlwaysEnabled ?
+        `<input type="checkbox" title="This extension is required" data-name="${name}" class="${checkboxClass}" checked disabled>` : isActive || isDisabled ?
+            '<input type="checkbox" title="' + t`Click to toggle` + `" data-name="${name}" class="${isActive ? 'toggle_disable' : 'toggle_enable'} ${checkboxClass}" ${isActive ? 'checked' : ''}>` :
+            `<input type="checkbox" title="Cannot enable extension" data-name="${name}" class="extension_missing ${checkboxClass}" disabled>`;
 
     let deleteButton = isExternal ? `<button class="btn_delete menu_button" data-name="${externalId}" data-i18n="[title]Delete" title="Delete"><i class="fa-fw fa-solid fa-trash-can"></i></button>` : '';
     let cleanButton = isExternal && hasExtensionHook(externalId, 'clean') ? `<button class="btn_clean menu_button" data-name="${externalId}" data-i18n="[title]Clean extension data" title="Clean extension data"><i class="fa-fw fa-solid fa-broom"></i></button>` : '';
@@ -1376,6 +1323,7 @@ function generateExtensionHtml(name, manifest, isActive, isDisabled, isExternal,
     let updateButton = isExternal ? `<button class="btn_update menu_button displayNone" data-name="${externalId}" title="Update available"><i class="fa-solid fa-download fa-fw"></i></button>` : '';
     let moveButton = isExternal && isUserAdmin ? `<button class="btn_move menu_button" data-name="${externalId}" data-i18n="[title]Move" title="Move"><i class="fa-solid fa-folder-tree fa-fw"></i></button>` : '';
     let branchButton = isExternal && isUserAdmin ? `<button class="btn_branch menu_button" data-name="${externalId}" data-i18n="[title]Switch branch" title="Switch branch"><i class="fa-solid fa-code-branch fa-fw"></i></button>` : '';
+    let syncButton = manifest.auto_update === true && !isExternal && isUserAdmin ? `<button class="btn_sync menu_button" data-name="${externalId}" title="Sync from upstream"><i class="fa-solid fa-arrows-rotate fa-fw"></i></button>` : '';
     let modulesInfo = '';
 
     if (isActive && Array.isArray(manifest.optional)) {
@@ -1416,6 +1364,7 @@ function generateExtensionHtml(name, manifest, isActive, isDisabled, isExternal,
 
             <div class="extension_actions flex-container alignItemsCenter">
                 ${updateButton}
+                ${syncButton}
                 ${branchButton}
                 ${moveButton}
                 ${cleanButton}
@@ -1444,7 +1393,7 @@ function getExtensionData(extension) {
     const name = extension[0];
     const manifest = extension[1];
     const isActive = activeExtensions.has(name);
-    const isDisabled = extension_settings.disabledExtensions.includes(name);
+    const isDisabled = isExtensionDisabled(name);
     const isExternal = isExternalExtension(name);
 
     const checkboxClass = isDisabled ? 'checkbox_disabled' : '';
@@ -1600,7 +1549,7 @@ async function showExtensionsDetails() {
             restoreBulkToggledExtensionsButton.addEventListener('click', () => {
                 for (const extension of extensionsToToggle) {
                     const { name } = extension;
-                    const isDisabled = extension_settings.disabledExtensions.includes(name);
+                    const isDisabled = isExtensionDisabled(name);
 
                     htmlExternal
                         .find(`.extension_block[data-name="${name.replace('third-party', '')}"] .extension_toggle input`)
@@ -1646,7 +1595,7 @@ async function showExtensionsDetails() {
 
                 for (const extension of extensionsToToggle) {
                     const { name, toggleHandler, enable } = extension;
-                    const isDisabled = extension_settings.disabledExtensions.includes(name);
+                    const isDisabled = isExtensionDisabled(name);
 
                     try {
                         if (isDisabled && !enable) continue;
@@ -1709,6 +1658,38 @@ async function onUpdateClick() {
     await updateExtension(extensionName, false);
     // updateExtension eats the error, but we can at least stop the spinner
     icon.removeClass('fa-spin');
+}
+
+async function onSyncClick() {
+    const extensionName = $(this).data('name');
+    const icon = $(this).find('i');
+    icon.addClass('fa-spin');
+
+    try {
+        const response = await fetch('/api/extensions/sync', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            body: JSON.stringify({ extensionName }),
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            toastr.error(text || response.statusText, t`Extension sync failed`, { timeOut: 5000 });
+            return;
+        }
+
+        const data = await response.json();
+        const versionText = data.version ? ` v${data.version}` : '';
+        const commitText = data.shortCommitHash ? ` (${data.shortCommitHash})` : '';
+        toastr.success(t`Extension ${extensionName} synced${versionText}${commitText}.`, t`Reload the page to apply updates`);
+        requiresReload = true;
+        await showExtensionsDetails();
+    } catch (error) {
+        console.error('Extension sync error:', error);
+        toastr.error(t`Extension sync failed. See browser console for details.`);
+    } finally {
+        icon.removeClass('fa-spin');
+    }
 }
 
 /**
@@ -2235,8 +2216,6 @@ export async function loadExtensionSettings(settings, versionChanged, enableAuto
     scheduleExtensionAssetPrefetch();
 
     maybeShowMoonlitEchoesMovedNotice();
-    void maybeShowGuidedGenerationsForkNotice();
-
     if (versionChanged && enableAutoUpdate) {
         await autoUpdateExtensions(false);
     }
@@ -2362,7 +2341,7 @@ async function checkForExtensionUpdates(force) {
     const promises = [];
 
     for (const [id, manifest] of Object.entries(manifests)) {
-        const isDisabled = extension_settings.disabledExtensions.includes(id);
+        const isDisabled = isExtensionDisabled(id);
         if (isDisabled) {
             console.debug(`Skipping extension: ${manifest.display_name} (${id}) for non-admin user`);
             continue;
@@ -2410,7 +2389,7 @@ async function autoUpdateExtensions(forceAll) {
     const promises = [];
     const autoUpdateTimeout = 60 * 1000;
     for (const [id, manifest] of Object.entries(manifests)) {
-        const isDisabled = extension_settings.disabledExtensions.includes(id);
+        const isDisabled = isExtensionDisabled(id);
         if (!forceAll && isDisabled) {
             console.debug(`Skipping extension: ${manifest.display_name} (${id}) for non-admin user`);
             continue;
@@ -2668,6 +2647,7 @@ export async function initExtensions() {
     $(document).on('click', '.extensions_info .extension_block .toggle_disable', onDisableExtensionClick);
     $(document).on('click', '.extensions_info .extension_block .toggle_enable', onEnableExtensionClick);
     $(document).on('click', '.extensions_info .extension_block .btn_update', onUpdateClick);
+    $(document).on('click', '.extensions_info .extension_block .btn_sync', onSyncClick);
     $(document).on('click', '.extensions_info .extension_block .btn_delete', onDeleteClick);
     $(document).on('click', '.extensions_info .extension_block .btn_clean', onCleanClick);
     $(document).on('click', '.extensions_info .extension_block .btn_reinstall', onReinstallClick);

@@ -6,7 +6,7 @@
     position: absolute;
     width: 100%;
     height: 100%;
-    transition: background-image var(--animation-duration-3x) ease-in-out;
+    transition: background-image var(--sb-transition-slow);
     z-index: -1;
 }
 
@@ -284,7 +284,7 @@
     visibility: hidden;
     transform: scale(0.9);
     transform-origin: center;
-    transition: opacity var(--animation-duration) ease-out, visibility var(--animation-duration) ease-out, transform var(--animation-duration) ease-out;
+    transition: opacity var(--sb-transition), visibility var(--sb-transition), transform var(--sb-transition);
 }
 
 .bg_example:hover .jg-menu,
@@ -304,7 +304,7 @@
     padding: 5px;
     font-size: 1.1em;
     border-radius: 5px;
-    transition: background-color var(--animation-duration) ease;
+    transition: background-color var(--sb-transition);
 }
 
 .bg_example .jg-button:hover {
@@ -323,13 +323,13 @@
     border: 1px solid var(--SmartThemeBorderColor);
     border-radius: 50%;
     cursor: pointer;
-    z-index: 10;
+    z-index: var(--sb-z-raised);
     font-size: 18px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     opacity: 0;
-    transition: opacity var(--animation-duration) ease;
+    transition: opacity var(--sb-transition);
     pointer-events: none;
 }
 
@@ -386,7 +386,7 @@
     -webkit-line-clamp: 2;
     line-clamp: 2;
     opacity: 0;
-    transition: opacity var(--animation-duration) ease-in-out;
+    transition: opacity var(--sb-transition);
     pointer-events: none;
     border-radius: 0 0 8px 8px;
 }
@@ -500,7 +500,7 @@
     align-items: center;
     justify-content: center;
     background-color: var(--SmartThemeBlurTintColor);
-    transition: filter var(--animation-duration) ease;
+    transition: filter var(--sb-transition);
 }
 
 .bg_folder_tile:hover {
@@ -568,7 +568,7 @@
     visibility: hidden;
     transform: scale(0.9);
     transform-origin: center;
-    transition: opacity var(--animation-duration) ease-out, visibility var(--animation-duration) ease-out, transform var(--animation-duration) ease-out;
+    transition: opacity var(--sb-transition), visibility var(--sb-transition), transform var(--sb-transition);
 }
 
 .bg_folder_tile:hover .bg_folder_tile_menu,
@@ -588,7 +588,7 @@
     padding: 5px;
     font-size: 1.1em;
     border-radius: 5px;
-    transition: background-color var(--animation-duration) ease;
+    transition: background-color var(--sb-transition);
 }
 
 .bg_folder_tile .jg-button:hover {

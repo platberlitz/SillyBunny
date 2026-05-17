@@ -338,6 +338,7 @@ export const OLLAMA_KEYS = [
     'seed',
     'repeat_last_n',
     'min_p',
+    'cache_prompt',
 ];
 
 // https://platform.openai.com/docs/api-reference/completions
@@ -429,6 +430,7 @@ export const VLLM_KEYS = [
     'skip_special_tokens',
     'spaces_between_special_tokens',
     'truncate_prompt_tokens',
+    'cache_prompt',
 
     'include_stop_str_in_output',
     'response_format',

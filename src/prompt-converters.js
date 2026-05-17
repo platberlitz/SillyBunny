@@ -4,12 +4,15 @@ import { getConfigValue, tryParse } from './util.js';
 const PROMPT_PLACEHOLDER = getConfigValue('promptPlaceholder', 'Let\'s get started.');
 
 const REASONING_EFFORT = {
+    // 'auto' kept for backward-compat: backend may receive it from non-migrated external callers
     auto: 'auto',
+    none: 'none',
     low: 'low',
     medium: 'medium',
     high: 'high',
     min: 'min',
     max: 'max',
+    xhigh: 'xhigh',
 };
 
 export const PROMPT_PROCESSING_TYPE = {
@@ -1131,6 +1134,7 @@ export function calculateClaudeBudgetTokens(maxTokens, reasoningEffort, stream, 
     if (isAdaptiveModel) {
         switch (reasoningEffort) {
             case REASONING_EFFORT.auto:
+            case REASONING_EFFORT.none:
                 return null;
             case REASONING_EFFORT.min:
                 return 'low';
@@ -1141,6 +1145,7 @@ export function calculateClaudeBudgetTokens(maxTokens, reasoningEffort, stream, 
             case REASONING_EFFORT.high:
                 return 'high';
             case REASONING_EFFORT.max:
+            case REASONING_EFFORT.xhigh:
                 return 'max';
         }
         return null;
@@ -1150,6 +1155,7 @@ export function calculateClaudeBudgetTokens(maxTokens, reasoningEffort, stream, 
 
     switch (reasoningEffort) {
         case REASONING_EFFORT.auto:
+        case REASONING_EFFORT.none:
             return null;
         case REASONING_EFFORT.min:
             budgetTokens = 1024;
@@ -1164,6 +1170,7 @@ export function calculateClaudeBudgetTokens(maxTokens, reasoningEffort, stream, 
             budgetTokens = Math.floor(maxTokens * 0.5);
             break;
         case REASONING_EFFORT.max:
+        case REASONING_EFFORT.xhigh:
             budgetTokens = Math.floor(maxTokens * 0.95);
             break;
     }
@@ -1190,6 +1197,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
 
         switch (reasoningEffort) {
             case REASONING_EFFORT.auto:
+            case REASONING_EFFORT.none:
                 return -1;
             case REASONING_EFFORT.min:
                 return 0;
@@ -1203,6 +1211,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
                 budgetTokens = Math.floor(maxTokens * 0.5);
                 break;
             case REASONING_EFFORT.max:
+            case REASONING_EFFORT.xhigh:
                 budgetTokens = maxTokens;
                 break;
         }
@@ -1217,6 +1226,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
 
         switch (reasoningEffort) {
             case REASONING_EFFORT.auto:
+            case REASONING_EFFORT.none:
                 return -1;
             case REASONING_EFFORT.min:
                 return 0;
@@ -1230,6 +1240,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
                 budgetTokens = Math.floor(maxTokens * 0.5);
                 break;
             case REASONING_EFFORT.max:
+            case REASONING_EFFORT.xhigh:
                 budgetTokens = maxTokens;
                 break;
         }
@@ -1244,6 +1255,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
 
         switch (reasoningEffort) {
             case REASONING_EFFORT.auto:
+            case REASONING_EFFORT.none:
                 return -1;
             case REASONING_EFFORT.min:
                 budgetTokens = 128;
@@ -1258,6 +1270,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
                 budgetTokens = Math.floor(maxTokens * 0.5);
                 break;
             case REASONING_EFFORT.max:
+            case REASONING_EFFORT.xhigh:
                 budgetTokens = maxTokens;
                 break;
         }
@@ -1270,6 +1283,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
     function getGemini3FlashBudget() {
         switch (reasoningEffort) {
             case REASONING_EFFORT.auto:
+            case REASONING_EFFORT.none:
                 return null;
             case REASONING_EFFORT.min:
                 return 'minimal';
@@ -1280,6 +1294,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
             case REASONING_EFFORT.high:
                 return 'high';
             case REASONING_EFFORT.max:
+            case REASONING_EFFORT.xhigh:
                 return 'high';
         }
 
@@ -1289,6 +1304,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
     function getGemini3ProBudget() {
         switch (reasoningEffort) {
             case REASONING_EFFORT.auto:
+            case REASONING_EFFORT.none:
                 return null;
             case REASONING_EFFORT.min:
                 return 'low';
@@ -1299,6 +1315,7 @@ export function calculateGoogleBudgetTokens(maxTokens, reasoningEffort, model) {
             case REASONING_EFFORT.high:
                 return 'high';
             case REASONING_EFFORT.max:
+            case REASONING_EFFORT.xhigh:
                 return 'high';
         }
 

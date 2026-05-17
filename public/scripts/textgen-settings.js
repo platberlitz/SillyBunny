@@ -23,6 +23,7 @@ import { power_user, registerDebugFunction } from './power-user.js';
 import { getActiveManualApiSamplers, loadApiSelectedSamplers, isSamplerManualPriorityEnabled } from './samplerSelect.js';
 import { SECRET_KEYS, writeSecret } from './secrets.js';
 import { getEventSourceStream } from './sse-stream.js';
+import { isLikelyLocalServerUrl } from './local-url-utils.js';
 import { getCurrentDreamGenModelTokenizer, getCurrentOpenRouterModelTokenizer, loadAphroditeModels, loadDreamGenModels, loadFeatherlessModels, loadGenericModels, loadInfermaticAIModels, loadLlamaCppModels, loadMancerModels, loadOllamaModels, loadOpenRouterModels, loadTabbyModels, loadTogetherAIModels, loadVllmModels, updateOpenRouterProvidersWarning } from './textgen-models.js';
 import { ENCODE_TOKENIZERS, TEXTGEN_TOKENIZERS, TOKENIZER_SUPPORTED_KEY, getTextTokens, getTokenizerBestMatch, tokenizers } from './tokenizers.js';
 import { AbortReason } from './util/AbortReason.js';
@@ -141,6 +142,14 @@ export const SERVER_INPUTS = {
 };
 
 const KOBOLDCPP_ORDER = [6, 0, 1, 3, 4, 2, 5];
+
+function shouldUseLocalPromptCache(settings) {
+    const serverUrl = getTextGenServer(settings?.type);
+    // SillyBunny: only keep prompt cache hot for local backends; remote servers
+    // should not inherit the helper-generation cache lane.
+    return isLikelyLocalServerUrl(serverUrl, window.location.href);
+}
+
 export const textgenerationwebui_settings = {
     temp: 0.7,
     temperature_last: true,
@@ -1586,13 +1595,14 @@ export function replaceMacrosInList(str) {
  * @param {string} type Request type (impersonate, quiet, continue, etc)
  * @returns {object} Final generation parameters object appropriate for the text completion source
  */
-export function createTextGenGenerationData(settings, model, finalPrompt = null, maxTokens = null, isImpersonate = false, isContinue = false, cfgValues = null, type = 'quiet') {
+export function createTextGenGenerationData(settings, model, finalPrompt = null, maxTokens = null, isImpersonate = false, isContinue = false, cfgValues = null, type = 'quiet', generationOptions = {}) {
     settings = settings ?? textgenerationwebui_settings;
     model = model ?? getTextGenModel(settings);
 
     const canMultiSwipe = !isContinue && !isImpersonate && type !== 'quiet';
     const dynatemp = isDynamicTemperatureSupported(settings);
     const { banned_tokens, banned_strings } = getCustomTokenBans(settings);
+    const cacheScope = String(generationOptions?.cacheScope ?? 'auxiliary');
     const jsonSchema = isObject(settings.json_schema)
         ? settings.json_schema_allow_empty
             ? settings.json_schema
@@ -1820,12 +1830,21 @@ export function createTextGenGenerationData(settings, model, finalPrompt = null,
             'logit_bias': logitBiasArray,
             // Conflicts with ooba's grammar_string
             'grammar': settings.grammar_string,
-            'cache_prompt': true,
             'dry_sequence_breakers': sequenceBreakers,
         };
         params = Object.assign(params, llamaCppParams);
         if (!Array.isArray(sequenceBreakers) || sequenceBreakers.length === 0) {
             delete params.dry_sequence_breakers;
+        }
+    }
+
+    if (shouldUseLocalPromptCache(settings)) {
+        // SillyBunny: helper generations use the auxiliary cache lane unless the
+        // caller explicitly requests the main chat lane.
+        if (cacheScope === 'main') {
+            params.cache_prompt = true;
+        } else {
+            delete params.cache_prompt;
         }
     }
 
@@ -2052,9 +2071,9 @@ function groupTextGenSettingsIntoDrawers() {
     $settingsBlock.data('sb-grouped', true);
 }
 
-export async function getTextGenGenerationData(finalPrompt, maxTokens, isImpersonate, isContinue, cfgValues, type) {
+export async function getTextGenGenerationData(finalPrompt, maxTokens, isImpersonate, isContinue, cfgValues, type, generationOptions = {}) {
     const model = getTextGenModel(textgenerationwebui_settings);
-    const params = createTextGenGenerationData(textgenerationwebui_settings, model, finalPrompt, maxTokens, isImpersonate, isContinue, cfgValues, type);
+    const params = createTextGenGenerationData(textgenerationwebui_settings, model, finalPrompt, maxTokens, isImpersonate, isContinue, cfgValues, type, generationOptions);
     await eventSource.emit(event_types.TEXT_COMPLETION_SETTINGS_READY, params);
     return params;
 }

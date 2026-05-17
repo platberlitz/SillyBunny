@@ -379,8 +379,12 @@ class PromptManager {
         // Currently selected prompt shown in the editor pane.
         this.selectedPromptId = null;
 
-        // Active editor pane area (`edit` / `inspect`) when visible.
+        // Active editor pane area (`edit` / `inspect` / `preview`) when visible.
         this.activePopupArea = '';
+
+        // Prompt preview update state.
+        this.previewUpdateDebounced = null;
+        this.previewTokenCountRequest = 0;
 
         // Original popup position before the desktop editor host moves it inline.
         this.popupOriginalParent = null;
@@ -411,6 +415,9 @@ class PromptManager {
 
         /** Prompt row click */
         this.handlePromptRowClick = () => { };
+
+        /** Prompt editor tab click */
+        this.handlePromptEditorTabClick = () => { };
 
         /** Detach prompt button click */
         this.handleDetach = () => { };
@@ -697,6 +704,16 @@ class PromptManager {
                 event.preventDefault();
                 event.stopPropagation();
             }
+        };
+
+        // SillyBunny: the prompt editor now exposes a preview tab that needs its own
+        // click handler and state sync separate from upstream edit/inspect flows.
+        this.handlePromptEditorTabClick = (event) => {
+            const tabName = event.currentTarget?.dataset?.tab;
+            if (!['edit', 'preview'].includes(tabName)) return;
+
+            event.preventDefault();
+            this.showPopup(tabName);
         };
 
         // Open edit form and load selected prompt
@@ -1084,6 +1101,12 @@ class PromptManager {
         // Clear forms on closing the popup
         document.getElementById(this.configuration.prefix + 'prompt_manager_popup_entry_form_close').addEventListener('click', closeAndClearPopup);
         document.getElementById(this.configuration.prefix + 'prompt_manager_popup_close_button').addEventListener('click', closeAndClearPopup);
+        // SillyBunny: preview mode has its own close button and field listeners.
+        document.getElementById(this.configuration.prefix + 'prompt_manager_popup_preview_close_button').addEventListener('click', closeAndClearPopup);
+        document.querySelectorAll('.' + this.configuration.prefix + 'prompt_manager_tab_button').forEach(button => {
+            button.addEventListener('click', this.handlePromptEditorTabClick);
+        });
+        this.setupPreviewListeners();
         closeAndClearPopup();
 
         // Re-render prompt manager on openai preset change
@@ -1750,6 +1773,61 @@ class PromptManager {
         });
     }
 
+    syncPreviewTabState(activeArea) {
+        document.querySelectorAll('.' + this.configuration.prefix + 'prompt_manager_tab_button').forEach(button => {
+            button.classList.toggle('active', button.dataset.tab === activeArea);
+        });
+    }
+
+    setupPreviewListeners() {
+        this.previewUpdateDebounced = debounce(() => this.updatePromptPreview(), 300);
+
+        [
+            'prompt_manager_popup_entry_form_name',
+            'prompt_manager_popup_entry_form_role',
+            'prompt_manager_popup_entry_form_prompt',
+        ].forEach(idSuffix => {
+            const field = document.getElementById(this.configuration.prefix + idSuffix);
+            field?.addEventListener('input', this.previewUpdateDebounced);
+            field?.addEventListener('change', this.previewUpdateDebounced);
+        });
+    }
+
+    async updatePromptPreview() {
+        if (this.activePopupArea !== 'preview') return;
+
+        const roleField = /** @type {HTMLSelectElement} */(document.getElementById(this.configuration.prefix + 'prompt_manager_popup_entry_form_role'));
+        const promptField = /** @type {HTMLTextAreaElement} */(document.getElementById(this.configuration.prefix + 'prompt_manager_popup_entry_form_prompt'));
+        const roleValue = document.getElementById(this.configuration.prefix + 'prompt_manager_preview_role_value');
+        const tokenCount = document.getElementById(this.configuration.prefix + 'prompt_manager_preview_token_count');
+        const previewText = document.getElementById(this.configuration.prefix + 'prompt_manager_preview_text');
+
+        if (!roleField || !promptField || !roleValue || !tokenCount || !previewText) return;
+
+        const previewRequest = ++this.previewTokenCountRequest;
+        const preparedPrompt = this.preparePrompt({
+            role: roleField.value || 'system',
+            content: promptField.value || '',
+        });
+        const previewContent = preparedPrompt.content || '';
+
+        roleValue.textContent = preparedPrompt.role || 'system';
+        previewText.textContent = previewContent || t`(Empty prompt)`;
+        tokenCount.textContent = t`Calculating...`;
+
+        try {
+            const message = await Message.fromPromptAsync(preparedPrompt);
+            if (previewRequest === this.previewTokenCountRequest) {
+                tokenCount.textContent = String(message.getTokens());
+            }
+        } catch (error) {
+            if (previewRequest === this.previewTokenCountRequest) {
+                tokenCount.textContent = '?';
+            }
+            this.log('Prompt preview token counting failed: ' + error.message);
+        }
+    }
+
     /**
      * Clears all input fields in the edit form.
      */
@@ -2005,7 +2083,7 @@ class PromptManager {
                     <span title="Remove" class="prompt-manager-detach-action caution fa-solid fa-chain-broken fa-xs"></span>
                 `;
             } else {
-                detachSpanHtml = '<span class="fa-solid"></span>';
+                detachSpanHtml = '<span class="prompt-manager-control-placeholder" aria-hidden="true"></span>';
             }
 
             let editSpanHtml = '';
@@ -2020,7 +2098,7 @@ class PromptManager {
                     <span title="edit" class="prompt-manager-edit-action fa-solid fa-pencil fa-xs"></span>
                 `;
             } else {
-                editSpanHtml = '<span class="fa-solid"></span>';
+                editSpanHtml = '<span class="prompt-manager-control-placeholder" aria-hidden="true"></span>';
             }
 
             let toggleSpanHtml = '';
@@ -2029,7 +2107,7 @@ class PromptManager {
                     <span class="prompt-manager-toggle-action ${listEntry.enabled ? 'fa-solid fa-toggle-on' : 'fa-solid fa-toggle-off'}"></span>
                 `;
             } else {
-                toggleSpanHtml = '<span class="fa-solid"></span>';
+                toggleSpanHtml = '<span class="prompt-manager-control-placeholder" aria-hidden="true"></span>';
             }
 
             const encodedName = escapeHtml(prompt.name);
@@ -2277,6 +2355,18 @@ class PromptManager {
             return;
         }
 
+        ['edit', 'inspect', 'preview'].forEach(areaName => {
+            const element = document.getElementById(this.configuration.prefix + 'prompt_manager_popup_' + areaName);
+            if (element instanceof HTMLElement) {
+                element.style.display = 'none';
+            }
+        });
+
+        const tabsElement = document.getElementById(this.configuration.prefix + 'prompt_manager_popup_tabs');
+        if (tabsElement instanceof HTMLElement) {
+            tabsElement.style.display = ['edit', 'preview'].includes(area) ? 'flex' : 'none';
+        }
+
         areaElement.style.display = 'flex';
 
         if (this.isDesktopSplitLayout()) {
@@ -2290,11 +2380,17 @@ class PromptManager {
 
         this.syncEditorPaneState();
         this.syncListSelection();
+        this.syncPreviewTabState(area);
+
+        if (area === 'preview') {
+            this.updatePromptPreview();
+        }
 
         window.setTimeout(() => {
             const focusTarget = area === 'edit'
                 ? document.getElementById(this.configuration.prefix + 'prompt_manager_popup_entry_form_prompt')
-                : document.getElementById(this.configuration.prefix + 'prompt_manager_popup_close_button');
+                : document.getElementById(this.configuration.prefix + 'prompt_manager_popup_' + area + '_close_button')
+                    || document.getElementById(this.configuration.prefix + 'prompt_manager_popup_close_button');
 
             if (focusTarget instanceof HTMLElement) {
                 focusTarget.focus({ preventScroll: true });
@@ -2310,12 +2406,12 @@ class PromptManager {
         if (!this.isDesktopSplitLayout() && window.matchMedia('(max-width: 768px)').matches) {
             setTimeout(() => {
                 if (popup) {
-                    popup.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    // Also scroll the parent container to top
+                    popup.scrollTop = 0;
                     const shellScroller = popup.closest('.sb-shell-scroller');
                     if (shellScroller) {
                         shellScroller.scrollTop = 0;
                     }
+                    window.dispatchEvent(new CustomEvent('sb-mobile-viewport-reset'));
                 }
             }, 250); // Wait for slideDown animation
         }
@@ -2341,7 +2437,7 @@ class PromptManager {
         }
 
         $('#' + this.configuration.prefix + 'prompt_manager_popup').first()
-            .slideUp(200, 'swing')
+            .slideUp(200, 'swing', () => window.dispatchEvent(new CustomEvent('sb-mobile-viewport-reset')))
             .removeClass('openDrawer');
         this.syncEditorPaneState();
         this.syncListSelection();

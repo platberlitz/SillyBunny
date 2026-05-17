@@ -1,6 +1,148 @@
 /* SillyBunny mobile shell foundation: final sheet contract for modal drawers.
  * Keep this at the end of the shell sheet so it beats older mobile drawer rules. */
 @media screen and (max-width: 1000px) {
+    #form_sheld {
+        width: 100%;
+        max-width: 100%;
+        left: 0;
+        right: 0;
+        transform: none;
+        box-sizing: border-box;
+        margin: var(--sb-chat-composer-gap) auto 0;
+    }
+
+    #send_form {
+        margin-bottom: 0;
+        border-width: 1px 0 0;
+        border-radius: 10px 10px 0 0;
+        border-color: color-mix(in srgb, var(--SmartThemeBodyColor) 18%, transparent);
+        box-shadow: 0 -10px 28px color-mix(in srgb, var(--SmartThemeShadowColor) 16%, transparent);
+    }
+
+    #send_form:focus-within {
+        border-top-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 56%, transparent);
+        box-shadow:
+            0 -10px 28px color-mix(in srgb, var(--SmartThemeShadowColor) 16%, transparent),
+            inset 0 1px 0 color-mix(in srgb, var(--color-primary, var(--sb-accent)) 34%, transparent);
+    }
+
+    body:has([data-slide-toggle="shown"]) #send_form {
+        border-radius: 0 !important;
+    }
+
+    #send_textarea::placeholder {
+        font-size: 14px;
+    }
+
+    #nonQRFormItems {
+        --sb-mobile-composer-input-height: clamp(34px, calc(42px * var(--sb-bottom-bar-scale, 1)), 56px);
+        --sb-composer-action-size: clamp(20px, calc(26px * var(--sb-bottom-bar-scale, 1)), 36px);
+        --sb-composer-send-width: calc(var(--sb-composer-action-size) * 1.45);
+        --sb-composer-action-icon-size: clamp(10px, calc(13px * var(--sb-bottom-bar-scale, 1)), 18px);
+        --sb-composer-left-rail-width: min(28vw, calc(var(--sb-composer-action-size) * 2 + 3px));
+        --sb-composer-right-rail-width: calc(var(--sb-composer-action-size) + var(--sb-composer-send-width) + 3px);
+        display: grid !important;
+        grid-template-columns: var(--sb-composer-left-rail-width) minmax(0, 1fr) var(--sb-composer-right-rail-width) !important;
+        grid-template-rows: minmax(var(--sb-mobile-composer-input-height), auto) !important;
+        grid-template-areas: 'tools input action' !important;
+        align-items: center !important;
+        gap: 0 4px !important;
+        min-height: calc(var(--sb-mobile-composer-input-height) + 4px) !important;
+        padding: 2px 4px !important;
+        box-sizing: border-box !important;
+        overflow: visible !important;
+    }
+
+    :root[data-sb-compact-mode='true'] #nonQRFormItems {
+        --sb-mobile-composer-input-height: clamp(30px, calc(34px * var(--sb-bottom-bar-scale, 1)), 48px);
+        --sb-composer-action-size: clamp(18px, calc(22px * var(--sb-bottom-bar-scale, 1)), 32px);
+        --sb-composer-send-width: calc(var(--sb-composer-action-size) * 1.42);
+        --sb-composer-action-icon-size: clamp(9px, calc(11px * var(--sb-bottom-bar-scale, 1)), 16px);
+        --sb-composer-left-rail-width: min(26vw, calc(var(--sb-composer-action-size) * 2 + 2px));
+        --sb-composer-right-rail-width: calc(var(--sb-composer-action-size) + var(--sb-composer-send-width) + 2px);
+        gap: 0 3px !important;
+    }
+
+    #leftSendForm {
+        grid-area: tools !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: var(--sb-composer-action-size) !important;
+        min-height: var(--sb-composer-action-size) !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scrollbar-width: none !important;
+        gap: 3px !important;
+    }
+
+    #rightSendForm {
+        grid-area: action !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: var(--sb-composer-action-size) !important;
+        min-height: var(--sb-composer-action-size) !important;
+        overflow: visible !important;
+        justify-content: flex-end !important;
+        gap: 3px !important;
+    }
+
+    #rightSendForm > div:not(#send_but):not(#mes_stop):not(#qig-input-btn):not(.stscript_btn) {
+        display: none !important;
+    }
+
+    #leftSendForm > div,
+    #rightSendForm > div:not(.stscript_btn),
+    #send_but,
+    #send_form .mes_stop,
+    #send_form.sb-generating-controls #mes_stop {
+        width: var(--sb-composer-action-size) !important;
+        min-width: var(--sb-composer-action-size) !important;
+        max-width: var(--sb-composer-action-size) !important;
+        height: var(--sb-composer-action-size) !important;
+        min-height: var(--sb-composer-action-size) !important;
+        max-height: var(--sb-composer-action-size) !important;
+        flex: 0 0 var(--sb-composer-action-size) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        font-size: var(--sb-composer-action-icon-size) !important;
+        line-height: 1 !important;
+    }
+
+    #send_textarea {
+        grid-area: input !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        min-height: var(--sb-mobile-composer-input-height) !important;
+        max-height: 42dvh !important;
+        field-sizing: content !important;
+        resize: none !important;
+        overflow-y: auto !important;
+        box-sizing: border-box !important;
+        padding: 5px 7px !important;
+        line-height: 1.18 !important;
+        align-self: stretch !important;
+        justify-self: stretch !important;
+    }
+
+    #send_but {
+        width: var(--sb-composer-send-width) !important;
+        min-width: var(--sb-composer-send-width) !important;
+        max-width: var(--sb-composer-send-width) !important;
+        flex: 0 0 var(--sb-composer-send-width) !important;
+    }
+
+    #send_form .mes_stop,
+    #send_form.sb-generating-controls #mes_stop {
+        width: var(--sb-composer-send-width) !important;
+        min-width: var(--sb-composer-send-width) !important;
+        max-width: var(--sb-composer-send-width) !important;
+        flex: 0 0 var(--sb-composer-send-width) !important;
+    }
+
     body.sb-mobile-modal-open {
         overflow: hidden !important;
     }
@@ -43,6 +185,208 @@
     #right-nav-panel.openDrawer {
         display: flex !important;
         flex-direction: column !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-shell-nav {
+        justify-content: flex-start !important;
+        padding: 4px 50px 4px 8px !important;
+        gap: 4px !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-shell-nav .sb-shell-tab {
+        flex-basis: auto !important;
+        min-width: max-content !important;
+        min-height: 40px !important;
+        padding: 5px 9px !important;
+        border-radius: 9px !important;
+    }
+
+    #right-nav-panel.openDrawer > .sb-character-shell-header {
+        min-height: 0 !important;
+        padding: 0 !important;
+    }
+
+    #right-nav-panel.openDrawer > .sb-character-shell-header .sb-shell-title {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        margin: -1px !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        clip: rect(0 0 0 0) !important;
+        clip-path: inset(50%) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+    }
+
+    #right-nav-panel.openDrawer > .sb-character-shell-header .sb-shell-subtitle {
+        display: none !important;
+    }
+
+    #right-nav-panel.openDrawer > .sb-character-shell-header .sb-shell-close {
+        top: -42px !important;
+        right: 8px !important;
+        width: 36px !important;
+        min-width: 36px !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        border-radius: 999px !important;
+    }
+
+    #right-nav-panel.openDrawer > #CharListButtonAndHotSwaps {
+        min-height: 34px !important;
+        max-height: 34px !important;
+        padding: 3px 10px !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-favorites-label {
+        font-size: calc(var(--mainFontSize) * 0.66) !important;
+        letter-spacing: 0.12em !important;
+    }
+
+    #right-nav-panel.openDrawer #HotSwapWrapper .hotswap {
+        max-height: 28px !important;
+    }
+
+    #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > small {
+        font-size: calc(var(--mainFontSize) * 0.72) !important;
+        line-height: 1.1 !important;
+    }
+
+    #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > .avatar,
+    body.big-avatars #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > .avatar,
+    body.charListGrid #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > .avatar,
+    body #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > :is(.avatar, .character_select, .group_select) {
+        flex: 0 0 28px !important;
+    }
+
+    #right-nav-panel.openDrawer #HotSwapWrapper .hotswap .avatar,
+    #right-nav-panel.openDrawer #HotSwapWrapper .hotswap .avatar img,
+    body.big-avatars #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > .avatar,
+    body.charListGrid #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > .avatar,
+    body #right-nav-panel.openDrawer #HotSwapWrapper .hotswap > :is(.avatar, .character_select, .group_select) {
+        width: 28px !important;
+        min-width: 28px !important;
+        max-width: 28px !important;
+        height: 28px !important;
+        min-height: 28px !important;
+        max-height: 28px !important;
+    }
+
+    #right-nav-panel.openDrawer #charListFixedTop {
+        padding: 0 0 3px !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar {
+        align-items: center !important;
+        gap: 6px !important;
+        margin: 3px 0 5px !important;
+        padding: 4px !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        overscroll-behavior-x: contain !important;
+        scroll-padding-inline: 4px !important;
+        touch-action: pan-x !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        border-radius: 12px !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar > * {
+        flex: 0 0 auto !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_bar {
+        gap: 6px !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar :is(#character_sort_order, #rm_button_create, #rm_button_group_chats),
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_print_characters_pagination .paginationjs-size-changer select,
+    #right-nav-panel.openDrawer #character_search_bar {
+        height: 38px !important;
+        min-height: 38px !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #character_sort_order {
+        min-width: 7.5em !important;
+        max-width: 9em !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar :is(#rm_button_search, #rm_print_characters_pagination .menu_button, #rm_print_characters_pagination .paginationjs-pages ul li a) {
+        width: 38px !important;
+        min-width: 38px !important;
+        max-width: 38px !important;
+        height: 38px !important;
+        min-height: 38px !important;
+        max-height: 38px !important;
+        padding: 0 !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_print_characters_pagination,
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_print_characters_pagination .paginationjs {
+        display: inline-flex !important;
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        min-width: max-content !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_print_characters_pagination .paginationjs-pages ul {
+        flex-wrap: nowrap !important;
+        gap: 4px !important;
+        margin: 0 !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_print_characters_pagination .paginationjs-size-changer select {
+        width: auto !important;
+        min-width: 6.8em !important;
+        margin: 0 !important;
+        font-size: max(16px, calc(var(--mainFontSize) * 0.84)) !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_print_characters_pagination .paginationjs-nav {
+        min-height: 38px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        padding-inline: 4px !important;
+        white-space: nowrap !important;
+    }
+
+    #right-nav-panel.openDrawer #form_character_search_form {
+        margin-top: 4px !important;
+    }
+
+    #right-nav-panel.openDrawer #character_search_bar {
+        padding-block: 0 !important;
+        font-size: max(16px, calc(var(--mainFontSize) * 0.9)) !important;
+    }
+
+    #right-nav-panel.openDrawer .rm_tag_controls {
+        gap: 4px !important;
+        margin-top: 4px !important;
+    }
+
+    #right-nav-panel.openDrawer .rm_tag_controls :is(.tag.actionable, .tags_view, .right_menu_button) {
+        width: 34px !important;
+        min-width: 34px !important;
+        height: 34px !important;
+        min-height: 34px !important;
+        font-size: calc(var(--mainFontSize) * 0.9) !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_create::after {
+        content: 'Create' !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_group_chats::after {
+        content: 'Group' !important;
     }
 
     #left-nav-panel.openDrawer .sb-shell-frame,
@@ -131,6 +475,55 @@
         overflow-y: auto !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch !important;
+    }
+
+    #left-nav-panel .toggle-description {
+        width: auto !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+
+    #left-nav-panel.openDrawer,
+    #user-settings-block.openDrawer,
+    .sb-shell-root.openDrawer,
+    #right-nav-panel.openDrawer {
+        padding-bottom: env(keyboard-inset-height, 0px) !important;
+    }
+}
+
+@supports (-webkit-overflow-scrolling: touch) {
+    @media screen and (max-width: 1000px) {
+        #form_sheld {
+            width: 100%;
+            min-width: 100%;
+            max-width: 100%;
+            left: 0;
+            right: 0;
+        }
+    }
+}
+
+@media screen and (min-width: 769px) and (max-width: 1180px) {
+    /* SillyBunny: keep tablet full-screen shells edge-to-edge without overriding MovingUI resizing. */
+    body:not(.movingUI) #sheld {
+        width: 100vw !important;
+        width: 100dvw !important;
+        max-width: 100dvw !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        transform: none !important;
+        box-sizing: border-box !important;
+    }
+
+    #chat {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
     }
 }
 

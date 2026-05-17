@@ -670,8 +670,11 @@ export class ReasoningHandler {
         setDatasetProperty(this.messageReasoningDetailsDom, 'type', this.type);
 
         const now = Date.now();
+        const shouldReduceReasoningDomWork = shouldReduceStreamingDomWork(globalThis.navigator, {
+            enabled: power_user.ios_webkit_conservative_streaming,
+        });
         const shouldRenderReasoning = shouldRenderLiveReasoningContent({
-            isReducedDomWork: shouldReduceStreamingDomWork(),
+            isReducedDomWork: shouldReduceReasoningDomWork,
             state: this.state,
             detailsOpen: Boolean(this.messageReasoningDetailsDom.open),
             hasRenderedContent: Boolean(this.messageReasoningContentDom.childNodes.length),
@@ -682,11 +685,17 @@ export class ReasoningHandler {
         // SillyBunny: iOS WebKit can force-reload under reasoning-heavy streams if we
         // format and morph a growing hidden reasoning block on every live tick.
         if (shouldRenderReasoning) {
+            // SillyBunny: throttle live reasoning DOM work on iOS WebKit so large
+            // hidden reasoning blocks do not cause aggressive repaint or reload loops.
             const reasoning = trimSpaces(this.reasoningDisplayText ?? this.reasoning);
             const displayReasoning = messageFormatting(reasoning, '', false, false, messageId, {}, true);
 
             if (power_user.stream_fade_in) {
-                applyStreamFadeIn(this.messageReasoningContentDom, displayReasoning);
+                applyStreamFadeIn(this.messageReasoningContentDom, displayReasoning, {
+                    bypassFadeIn: shouldReduceStreamingDomWork(globalThis.navigator, {
+                        enabled: power_user.ios_webkit_disable_stream_fade_in,
+                    }),
+                });
             } else {
                 applyStreamDomPatch(this.messageReasoningContentDom, displayReasoning);
             }
@@ -1449,6 +1458,13 @@ function setReasoningEventHandlers() {
             return;
         }
         updateReasoningFromValue(message, newReasoning);
+        // SillyBunny: keep edited reasoning blocks counted the same way as the
+        // fork's live reasoning parse path so token totals stay consistent.
+        await updateMessageTokenAccounting(message, {
+            reasoning: message.extra.reasoning,
+            reasoningTokens: 0,
+            countReasoning: power_user.message_token_count_enabled,
+        });
         await saveChatConditional();
         updateMessageBlock(messageId, message);
 
@@ -1511,6 +1527,12 @@ function setReasoningEventHandlers() {
         message.extra.reasoning = '';
         delete message.extra.reasoning_type;
         delete message.extra.reasoning_duration;
+        // SillyBunny: clearing reasoning must also clear its token accounting.
+        await updateMessageTokenAccounting(message, {
+            reasoning: '',
+            reasoningTokens: 0,
+            countReasoning: false,
+        });
         await saveChatConditional();
         updateMessageBlock(messageId, message);
         const textarea = messageBlock.find('.reasoning_edit_textarea');

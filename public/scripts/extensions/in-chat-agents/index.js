@@ -7,6 +7,7 @@ import { eventSource, event_types } from '../../events.js';
 import {
     areAgentsGloballyEnabled,
     getAgents,
+    getEnabledAgents,
     getAgentById,
     getAgentRegexScripts,
     loadAgents,
@@ -17,6 +18,7 @@ import {
     exportAllAgents,
     exportAgent,
     AGENT_CATEGORIES,
+    AGENT_SUBCATEGORIES,
     DEFAULT_AGENT_MAX_TOKENS,
     getGlobalSettings,
     initializeScopedAgentEnableState,
@@ -45,6 +47,7 @@ import {
     initAgentRunner,
     isAgentGenerationActive,
     onAgentGenerationStateChanged,
+    getPreGenerationInterceptHistoryForMessage,
     getPromptTransformHistoryForMessage,
     runAgentOnMessage,
     syncToolAgentRegistrations,
@@ -59,6 +62,7 @@ import {
 } from './regex-scripts.js';
 import { initPathfinder } from './pathfinder-init.js';
 import { openPathfinderSettings, isPathfinderAgent } from './pathfinder-settings-ui.js';
+import { getPathfinderToolDefinitions } from './pathfinder/tool-definitions.js';
 import { buildFallbackPromptText, extractProfileResponseText } from './llm-utils.js';
 import {
     buildConnectionProfileNameMap,
@@ -67,8 +71,10 @@ import {
 } from './profile-utils.js';
 
 const MODULE_NAME = 'in-chat-agents';
+const PATHFINDER_EXTENSIONS_HOST_ID = 'extension_settings_in_chat_agents_pathfinder';
 
 let collapsedCategories = new Set();
+let templateBrowserSearchValue = '';
 
 /** Built-in templates loaded from JSON files. */
 let templates = [];
@@ -77,7 +83,6 @@ let autoSeededTemplateIds = new Set();
 
 const DEFAULT_BUNDLED_TEMPLATE_IDS = new Set([
     'tpl-prose-polisher',
-    'tpl-pathfinder',
 ]);
 
 /** Whether the agent list is in multi-select mode. */
@@ -85,17 +90,20 @@ let selectModeActive = false;
 /** Set of agent IDs currently selected in select mode. */
 const selectedAgentIds = new Set();
 let suppressCardClickUntil = 0;
+let pathfinderExtensionsMountPromise = null;
 
 const REMOVED_BUNDLED_TEMPLATE_IDS = new Set([
     'tpl-anti-slop-regex',
     'tpl-director-core',
     'tpl-nsfw-mode',
+    'tpl-pathfinder',
 ]);
 
 const REMOVED_BUNDLED_AGENT_NAMES = new Set([
     'anti-slop regex',
     'director core',
     'nsfw mode',
+    'pathfinder',
 ]);
 
 const REMOVED_BUNDLED_GROUP_IDS = new Set([
@@ -121,6 +129,16 @@ const AGENT_PHASE_LABELS = {
     pre: 'pre',
     post: 'post',
     both: 'pre + post',
+};
+const DEFAULT_PRE_PROCESS = {
+    mode: 'inject',
+    applyMode: 'replace',
+    wrapPosition: 'after',
+    wrapPrefix: '',
+    wrapSuffix: '',
+    patchStartTag: '<context_patch>',
+    patchEndTag: '</context_patch>',
+    maxTokens: DEFAULT_AGENT_MAX_TOKENS,
 };
 
 function getTemplateAssetUrl(filename) {
@@ -198,6 +216,42 @@ function findTemplateById(templateId) {
 
 function findTemplateForAgent(agent) {
     return findTemplateForAgentSnapshot(agent, templates);
+}
+
+function findSourceTemplateForAgent(agent) {
+    const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+    return sourceTemplateId ? findTemplateById(sourceTemplateId) : null;
+}
+
+function getAgentOrderValue(agent) {
+    const order = Number(agent?.injection?.order ?? 0);
+    return Number.isFinite(order) ? order : 0;
+}
+
+function getAgentVersionValue(agent) {
+    const version = Number(agent?.version ?? 1);
+    return Number.isFinite(version) ? version : 1;
+}
+
+function getTemplateVersionValue(template) {
+    const version = Number(template?.version ?? 1);
+    return Number.isFinite(version) ? version : 1;
+}
+
+function buildAgentOrderPill(agent) {
+    return `<span class="ica--card-pill ica--card-pill--order" title="Lower numbers run earlier when Append Agents Execution is set to Sequential."><i class="fa-solid fa-sort-numeric-down fa-xs"></i> Order ${escapeHtml(getAgentOrderValue(agent))}</span>`;
+}
+
+function buildAgentVersionPill(agent) {
+    const sourceTemplate = findSourceTemplateForAgent(agent);
+    const agentVersion = getAgentVersionValue(agent);
+    const templateVersion = getTemplateVersionValue(sourceTemplate);
+
+    if (sourceTemplate && templateVersion > agentVersion) {
+        return `<button type="button" class="ica--card-pill ica--card-pill--version ica--card-pill--version-update" title="A newer template is available.">v${escapeHtml(agentVersion)} &rarr; v${escapeHtml(templateVersion)}</button>`;
+    }
+
+    return `<span class="ica--card-pill ica--card-pill--version">v${escapeHtml(agentVersion)}</span>`;
 }
 
 function getBundledRegexScriptsForTemplate(templateId) {
@@ -314,6 +368,73 @@ function getTemplateRegexCount(template) {
     return Array.isArray(template?.regexScripts) ? template.regexScripts.length : 0;
 }
 
+const TEMPLATE_BROWSER_CATEGORY_LABELS = {
+    tracker: 'Trackers',
+    randomizer: 'Randomizers',
+    content: 'Content',
+    tool: 'Tools',
+};
+
+function getTemplateBrowserCategoryOrder(templateList = templates) {
+    return Object.keys(AGENT_CATEGORIES)
+        .filter(category => category !== 'custom')
+        .filter(category => templateList.some(template => template.category === category));
+}
+
+function getTemplateCategoryLabel(category) {
+    return TEMPLATE_BROWSER_CATEGORY_LABELS[category] ?? AGENT_CATEGORIES[category]?.label ?? 'Custom';
+}
+
+function getTemplateSubcategoryInfo(subcategory) {
+    const normalizedSubcategory = String(subcategory ?? '').trim();
+    return normalizedSubcategory ? AGENT_SUBCATEGORIES[normalizedSubcategory] ?? null : null;
+}
+
+function getTemplateSubcategoryLabel(template) {
+    const subcategoryInfo = getTemplateSubcategoryInfo(template?.subcategory);
+    return subcategoryInfo?.label ?? String(template?.subcategory ?? '').trim();
+}
+
+function getTemplateSubcategoriesForCategory(category) {
+    return Object.entries(AGENT_SUBCATEGORIES)
+        .filter(([, subcategory]) => subcategory.category === category);
+}
+
+function sortTemplatesByName(templateList = []) {
+    return [...templateList].sort((a, b) => String(a?.name ?? '').localeCompare(String(b?.name ?? '')));
+}
+
+function getTemplateSearchHaystack(template) {
+    const categoryLabel = getTemplateCategoryLabel(template?.category);
+    const subcategoryLabel = getTemplateSubcategoryLabel(template);
+    const tags = Array.isArray(template?.tags) ? template.tags.join(' ') : '';
+
+    return [
+        template?.name,
+        template?.description,
+        tags,
+        categoryLabel,
+        subcategoryLabel,
+    ].join(' ').toLowerCase();
+}
+
+function filterTemplates(templateList = templates, { searchTerm = '', category = '' } = {}) {
+    const normalizedSearchTerm = String(searchTerm ?? '').trim().toLowerCase();
+    const normalizedCategory = String(category ?? '').trim();
+
+    return templateList.filter(template => {
+        if (normalizedCategory && template.category !== normalizedCategory) {
+            return false;
+        }
+
+        if (!normalizedSearchTerm) {
+            return true;
+        }
+
+        return getTemplateSearchHaystack(template).includes(normalizedSearchTerm);
+    });
+}
+
 function describeRegexPlacements(regexScript) {
     return (regexScript.placement || [])
         .map(placement => REGEX_PLACEMENT_LABELS[placement] || `Placement ${placement}`)
@@ -349,6 +470,20 @@ function hasPromptTransform(agent) {
     );
 }
 
+function getAgentPreProcess(agent) {
+    return {
+        ...DEFAULT_PRE_PROCESS,
+        ...(agent?.preProcess ?? {}),
+    };
+}
+
+function isPreGenerationInterceptAgent(agent) {
+    return Boolean(
+        ['pre', 'both'].includes(String(agent?.phase ?? '')) &&
+        getAgentPreProcess(agent).mode === 'intercept',
+    );
+}
+
 function canPreviewPreGenerationPrompt(agent) {
     return Boolean(
         !isPathfinderAgent(agent) &&
@@ -371,9 +506,12 @@ async function previewPreGenerationPrompt(agent, promptOverride = null) {
     const previewText = substituteParams(prompt, {
         dynamicMacros: buildPromptDynamicMacros('', null, agent, 'normal'),
     });
+    const previewNote = isPreGenerationInterceptAgent(agent)
+        ? 'Preview shows the agent instruction after macro substitution. At runtime, intercept mode also receives the assembled outgoing context and can rewrite it before the main model sees it.'
+        : 'Preview uses the current chat context with no generated assistant message yet. Random macros are evaluated now and may differ when the agent runs.';
     const previewHtml = $(
         `<div class="ica--prompt-preview">
-            <div class="ica--regex-note">Preview uses the current chat context with no generated assistant message yet. Random macros are evaluated now and may differ when the agent runs.</div>
+            <div class="ica--regex-note">${escapeHtml(previewNote)}</div>
             <pre>${escapeHtml(previewText || '(empty after macro substitution)')}</pre>
         </div>`,
     );
@@ -387,13 +525,52 @@ async function previewPreGenerationPrompt(agent, promptOverride = null) {
 }
 
 function buildAgentFromTemplate(template) {
-    return {
+    const agent = {
         ...createDefaultAgent(),
         ...structuredClone(mergeTemplateDefaults(template)),
         id: uuidv4(),
         sourceTemplateId: template.id,
         enabled: false,
     };
+    delete agent.subcategory;
+    return agent;
+}
+
+function buildUpdatedAgentFromTemplate(agent, template) {
+    const updatedAgent = buildAgentFromTemplate(template);
+    updatedAgent.id = agent.id;
+    updatedAgent.enabled = Boolean(agent.enabled);
+    updatedAgent.favorite = Boolean(agent.favorite);
+    updatedAgent.connectionProfile = typeof agent.connectionProfile === 'string' ? agent.connectionProfile : '';
+    updatedAgent.modelOverride = typeof agent.modelOverride === 'string' ? agent.modelOverride : '';
+    updatedAgent.injection = {
+        ...updatedAgent.injection,
+        order: getAgentOrderValue(agent),
+    };
+    updatedAgent.phaseLocked = false;
+    return updatedAgent;
+}
+
+async function updateAgentFromSourceTemplate(agent) {
+    const template = findSourceTemplateForAgent(agent);
+    if (!template) {
+        return;
+    }
+
+    const agentVersion = getAgentVersionValue(agent);
+    const templateVersion = getTemplateVersionValue(template);
+    const result = await new Popup(
+        `Update "${escapeHtml(agent.name || template.name)}" from template v${escapeHtml(agentVersion)} to v${escapeHtml(templateVersion)}? Enabled state, quick toggle pin, order, and profile overrides will be kept.`,
+        POPUP_TYPE.CONFIRM,
+    ).show();
+
+    if (result !== POPUP_RESULT.AFFIRMATIVE) {
+        return;
+    }
+
+    await saveAgent(buildUpdatedAgentFromTemplate(agent, template));
+    renderAgentList();
+    toastr.success(`Updated "${template.name}" to v${templateVersion}.`);
 }
 
 function buildAgentFromSnapshot(snapshot) {
@@ -405,8 +582,87 @@ function buildAgentFromSnapshot(snapshot) {
     };
 }
 
+globalThis.SillyBunnyAgents = Object.assign(globalThis.SillyBunnyAgents || {}, {
+    getEnabledAgents,
+});
+
+function getComparableAgentSnapshot(agent) {
+    const snapshot = structuredClone(agent || {});
+    delete snapshot.id;
+    delete snapshot.enabled;
+    delete snapshot.favorite;
+    return snapshot;
+}
+
+function stableAgentComparableValue(value) {
+    if (Array.isArray(value)) {
+        return value.map(stableAgentComparableValue);
+    }
+
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(
+            Object.entries(value)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([key, entryValue]) => [key, stableAgentComparableValue(entryValue)]),
+        );
+    }
+
+    return value;
+}
+
+function getComparableAgentKey(agent) {
+    return JSON.stringify(stableAgentComparableValue(getComparableAgentSnapshot(agent)));
+}
+
+function hasIdenticalAgent(agent, existingAgents = getAgents()) {
+    const candidateKey = getComparableAgentKey(agent);
+    const candidateName = String(agent?.name ?? '').trim();
+
+    return existingAgents.some(existingAgent =>
+        String(existingAgent?.name ?? '').trim() === candidateName &&
+        getComparableAgentKey(existingAgent) === candidateKey,
+    );
+}
+
+async function confirmDuplicateAgentAddition(agent, existingAgents = getAgents()) {
+    if (hasIdenticalAgent(agent, existingAgents)) {
+        const result = await new Popup(
+            'An identical agent is already active. Add anyway?',
+            POPUP_TYPE.CONFIRM,
+            'Duplicate agent',
+            {
+                okButton: 'Add Agent',
+                cancelButton: 'Cancel',
+            },
+        ).show();
+
+        return result === POPUP_RESULT.AFFIRMATIVE;
+    }
+
+    const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+    const hasSameTemplateAgent = sourceTemplateId && existingAgents.some(existingAgent =>
+        String(existingAgent?.sourceTemplateId ?? '').trim() === sourceTemplateId,
+    );
+    if (!hasSameTemplateAgent) {
+        return true;
+    }
+
+    const agentName = String(agent?.name ?? 'this template').trim() || 'this template';
+    const result = await new Popup(
+        `You already have a "${escapeHtml(agentName)}" agent installed. Add another copy?`,
+        POPUP_TYPE.CONFIRM,
+        'Duplicate agent',
+        {
+            okButton: 'Add Another',
+            cancelButton: 'Cancel',
+        },
+    ).show();
+
+    return result === POPUP_RESULT.AFFIRMATIVE;
+}
+
 function shouldMigratePathfinderAgentTools(agent, template) {
-    if (!template || shouldSkipBundledTemplateMigrations(agent)) {
+    if (!template) {
         return false;
     }
 
@@ -416,7 +672,24 @@ function shouldMigratePathfinderAgentTools(agent, template) {
 
     const templateTools = Array.isArray(template?.tools) ? template.tools : [];
     const agentTools = Array.isArray(agent?.tools) ? agent.tools : [];
-    return templateTools.length > 0 && agentTools.length === 0;
+    const agentToolNames = new Set(agentTools.map(tool => tool?.name).filter(Boolean));
+    const expectedToolNames = new Set([...templateTools, ...getPathfinderToolDefinitions()].map(tool => tool?.name).filter(Boolean));
+    const toolStates = agent?.settings?.toolStates;
+    const hasAllToolStates = toolStates && typeof toolStates === 'object' && [...expectedToolNames].every(name => Object.hasOwn(toolStates, name));
+
+    return expectedToolNames.size > 0 && ([...expectedToolNames].some(name => !agentToolNames.has(name)) || !hasAllToolStates);
+}
+
+function getDefaultPathfinderTools(template) {
+    const toolsByName = new Map();
+    const templateTools = Array.isArray(template?.tools) ? template.tools : [];
+    for (const tool of [...templateTools, ...getPathfinderToolDefinitions()]) {
+        if (tool?.name && !toolsByName.has(tool.name)) {
+            toolsByName.set(tool.name, tool);
+        }
+    }
+
+    return [...toolsByName.values()];
 }
 
 async function migratePathfinderAgentToolsFromTemplate() {
@@ -428,7 +701,25 @@ async function migratePathfinderAgentToolsFromTemplate() {
             continue;
         }
 
-        agent.tools = structuredClone(template.tools);
+        const existingTools = Array.isArray(agent.tools) ? agent.tools : [];
+        const existingToolNames = new Set(existingTools.map(tool => tool?.name).filter(Boolean));
+        const defaultTools = getDefaultPathfinderTools(template);
+        const missingTools = defaultTools
+            .filter(tool => tool?.name && !existingToolNames.has(tool.name))
+            .map(tool => structuredClone(tool));
+        const toolStates = { ...(agent.settings?.toolStates || {}) };
+        for (const tool of [...existingTools, ...missingTools]) {
+            if (!tool?.name || Object.hasOwn(toolStates, tool.name)) {
+                continue;
+            }
+            toolStates[tool.name] = tool.enabled !== false;
+        }
+
+        agent.tools = [...existingTools, ...missingTools];
+        agent.settings = {
+            ...(agent.settings || {}),
+            toolStates,
+        };
         agent.sourceTemplateId = agent.sourceTemplateId || template.id;
         await saveAgent(agent);
         migratedCount++;
@@ -1187,6 +1478,7 @@ function renderAgentList() {
                 const enabledClass = agentEnabled ? 'is-enabled' : '';
                 const categoryLabel = AGENT_CATEGORIES[agent.category]?.label ?? 'Custom';
                 const phaseLabel = AGENT_PHASE_LABELS[agent.phase] || agent.phase;
+                const orderLabel = `Order ${getAgentOrderValue(agent)}`;
                 const canApplyToLastReply = !isPathfinderAgent(agent);
                 const quickItem = $(`
                     <div class="ica--quick-chip ${enabledClass}">
@@ -1196,7 +1488,7 @@ function renderAgentList() {
                             </span>
                             <span class="ica--quick-chip-copy">
                                 <span class="ica--quick-chip-name">${escapeHtml(agent.name || 'Untitled Agent')}</span>
-                                <span class="ica--quick-chip-meta">${escapeHtml(categoryLabel)} • ${escapeHtml(phaseLabel)}</span>
+                                <span class="ica--quick-chip-meta">${escapeHtml(categoryLabel)} • ${escapeHtml(phaseLabel)} • ${escapeHtml(orderLabel)}</span>
                             </span>
                         </button>
                         <div class="ica--quick-chip-actions">
@@ -1288,8 +1580,9 @@ function renderAgentList() {
             const regexCount = getAgentRegexScripts(agent).length;
             const promptTransformEnabled = hasPromptTransform(agent);
             const promptTransformLabel = getPromptTransformLabel(agent);
+            const preInterceptEnabled = isPreGenerationInterceptAgent(agent);
             const previewPromptButton = canPreviewPreGenerationPrompt(agent)
-                ? '<button type="button" class="ica--card-btn ica--btn-preview-prompt" title="Preview this pre-generation prompt after macro substitution"><i class="fa-solid fa-eye"></i> Preview Prompt</button>'
+                ? `<button type="button" class="ica--card-btn ica--btn-preview-prompt" title="Preview this pre-generation prompt after macro substitution"><i class="fa-solid fa-eye"></i> ${preInterceptEnabled ? 'Preview Instruction' : 'Preview Prompt'}</button>`
                 : '';
             const connectionProfileLabel = agent.connectionProfile
                 ? profileNames.get(agent.connectionProfile) || `Missing profile (${agent.connectionProfile})`
@@ -1316,11 +1609,14 @@ function renderAgentList() {
                     <div class="ica--card-desc">${escapeHtml(desc)}</div>
                     <div class="ica--card-meta">
                         ${agent.conditions.triggerProbability < 100 ? `<span class="ica--card-pill"><i class="fa-solid fa-dice fa-xs"></i> ${agent.conditions.triggerProbability}%</span>` : ''}
-                        ${agent.injection.position === 1 ? `<span class="ica--card-pill">depth ${agent.injection.depth}</span>` : ''}
+                        ${preInterceptEnabled ? '<span class="ica--card-pill"><i class="fa-solid fa-shuffle fa-xs"></i> pre intercept</span>' : ''}
+                        ${!preInterceptEnabled && agent.injection.position === 1 ? `<span class="ica--card-pill">depth ${agent.injection.depth}</span>` : ''}
                         ${promptTransformEnabled ? `<span class="ica--card-pill"><i class="fa-solid fa-robot fa-xs"></i> ${promptTransformLabel}</span>` : ''}
                         ${regexCount > 0 ? `<span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${regexCount} regex</span>` : ''}
                         ${connectionProfileLabel ? `<span class="ica--card-pill"><i class="fa-solid fa-plug fa-xs"></i> ${escapeHtml(connectionProfileLabel)}</span>` : ''}
                         ${modelOverrideLabel ? `<span class="ica--card-pill"><i class="fa-solid fa-microchip fa-xs"></i> ${escapeHtml(modelOverrideLabel)}</span>` : ''}
+                        ${buildAgentOrderPill(agent)}
+                        ${buildAgentVersionPill(agent)}
                     </div>
                     <div class="ica--card-actions">
                         ${previewPromptButton}
@@ -1371,6 +1667,11 @@ function renderAgentList() {
             card.find('.ica--card-favorite').on('click', async function (event) {
                 stopEvent(event);
                 await toggleAgentFavorite(agent);
+            });
+
+            card.find('.ica--card-pill--version-update').on('click', async event => {
+                stopEvent(event);
+                await updateAgentFromSourceTemplate(agent);
             });
 
             card.find('.ica--btn-edit').on('click', event => {
@@ -1576,6 +1877,15 @@ async function openEditor(agentId = null) {
     editorEl.find('#ica--editor-role').val(agent.injection.role);
     editorEl.find('#ica--editor-order').val(agent.injection.order);
     editorEl.find('#ica--editor-scan').prop('checked', agent.injection.scan);
+    const preProcess = getAgentPreProcess(agent);
+    editorEl.find('#ica--editor-pre-mode').val(preProcess.mode);
+    editorEl.find('#ica--editor-pre-applyMode').val(preProcess.applyMode);
+    editorEl.find('#ica--editor-pre-wrapPosition').val(preProcess.wrapPosition);
+    editorEl.find('#ica--editor-pre-wrapPrefix').val(preProcess.wrapPrefix);
+    editorEl.find('#ica--editor-pre-wrapSuffix').val(preProcess.wrapSuffix);
+    editorEl.find('#ica--editor-pre-patchStartTag').val(preProcess.patchStartTag);
+    editorEl.find('#ica--editor-pre-patchEndTag').val(preProcess.patchEndTag);
+    editorEl.find('#ica--editor-pre-maxTokens').val(preProcess.maxTokens ?? DEFAULT_AGENT_MAX_TOKENS);
 
     // Post-process
     const postProcessType = agent.postProcess.type === 'append' ? 'append' : 'extract';
@@ -1611,8 +1921,24 @@ async function openEditor(agentId = null) {
         const phase = editorEl.find('#ica--editor-phase').val();
         editorEl.find('#ica--injection-section').toggle(phase === 'pre' || phase === 'both');
         editorEl.find('#ica--postprocess-section').toggle(phase === 'post' || phase === 'both');
+        updatePreProcessVisibility();
     }
     editorEl.find('#ica--editor-phase').on('change', updatePhaseVisibility);
+
+    function updatePreProcessVisibility() {
+        const phase = editorEl.find('#ica--editor-phase').val();
+        const preGenerationVisible = phase === 'pre' || phase === 'both';
+        const preMode = editorEl.find('#ica--editor-pre-mode').val()?.toString() || 'inject';
+        const applyMode = editorEl.find('#ica--editor-pre-applyMode').val()?.toString() || 'replace';
+        const interceptVisible = preGenerationVisible && preMode === 'intercept';
+
+        editorEl.find('#ica--pre-intercept-options').toggle(interceptVisible);
+        editorEl.find('#ica--pre-injection-note').toggle(preGenerationVisible && preMode !== 'intercept');
+        editorEl.find('#ica--pre-wrap-position-row').toggle(interceptVisible && (applyMode === 'wrap' || applyMode === 'patch'));
+        editorEl.find('#ica--pre-wrap-options').toggle(interceptVisible && applyMode === 'wrap');
+        editorEl.find('#ica--pre-patch-options').toggle(interceptVisible && applyMode === 'patch');
+    }
+    editorEl.find('#ica--editor-pre-mode, #ica--editor-pre-applyMode').on('change', updatePreProcessVisibility);
     updatePhaseVisibility();
 
     // Show/hide post-process options
@@ -1822,6 +2148,10 @@ async function openEditor(agentId = null) {
             ...agent,
             name: editorEl.find('#ica--editor-name').val()?.toString().trim() || agent.name,
             phase: editorEl.find('#ica--editor-phase').val()?.toString() || agent.phase,
+            preProcess: {
+                ...getAgentPreProcess(agent),
+                mode: editorEl.find('#ica--editor-pre-mode').val()?.toString() || 'inject',
+            },
         };
         await previewPreGenerationPrompt(previewAgent, editorEl.find('#ica--editor-prompt').val()?.toString() || '');
     });
@@ -1851,6 +2181,24 @@ async function openEditor(agentId = null) {
     agent.injection.role = Number(editorEl.find('#ica--editor-role').val());
     agent.injection.order = Number(editorEl.find('#ica--editor-order').val());
     agent.injection.scan = editorEl.find('#ica--editor-scan').prop('checked');
+    agent.preProcess = {
+        ...getAgentPreProcess(agent),
+        mode: editorEl.find('#ica--editor-pre-mode').val()?.toString() === 'intercept' ? 'intercept' : 'inject',
+        applyMode: ['replace', 'wrap', 'patch'].includes(editorEl.find('#ica--editor-pre-applyMode').val()?.toString())
+            ? editorEl.find('#ica--editor-pre-applyMode').val().toString()
+            : 'replace',
+        wrapPosition: editorEl.find('#ica--editor-pre-wrapPosition').val()?.toString() === 'before' ? 'before' : 'after',
+        wrapPrefix: editorEl.find('#ica--editor-pre-wrapPrefix').val()?.toString() ?? '',
+        wrapSuffix: editorEl.find('#ica--editor-pre-wrapSuffix').val()?.toString() ?? '',
+        patchStartTag: editorEl.find('#ica--editor-pre-patchStartTag').val()?.toString() || DEFAULT_PRE_PROCESS.patchStartTag,
+        patchEndTag: editorEl.find('#ica--editor-pre-patchEndTag').val()?.toString() || DEFAULT_PRE_PROCESS.patchEndTag,
+        maxTokens: Number(editorEl.find('#ica--editor-pre-maxTokens').val()) || DEFAULT_AGENT_MAX_TOKENS,
+    };
+
+    if (['pre', 'both'].includes(agent.phase) && agent.preProcess.mode === 'intercept' && !agent.prompt.trim()) {
+        toastr.warning('Pre-generation intercept mode needs an agent prompt.');
+        return;
+    }
 
     if (editorEl.find('#ica--editor-pp-promptEnabled').prop('checked') && !agent.prompt.trim()) {
         toastr.warning('Prompt-based post-generation passes need an agent prompt.');
@@ -2014,43 +2362,181 @@ async function openTemplateBrowser() {
     tplSection.append('<div class="ica--template-section-title"><i class="fa-solid fa-puzzle-piece"></i> Individual Templates</div>');
     tplSection.append('<p class="ica--template-section-desc">Bundled trackers and helpers live here. Click any card to install it into your agent list.</p>');
 
-    const grid = $('<div class="ica--template-grid"></div>');
+    let selectedCategory = '';
+    const categoryOrder = getTemplateBrowserCategoryOrder(templates);
+    const filterBar = $(`
+        <div class="ica--template-filter-bar">
+            <input type="text" class="text_pole ica--template-search" placeholder="Search templates…" value="${escapeHtml(templateBrowserSearchValue)}" />
+            <div class="ica--template-pill-row"></div>
+        </div>
+    `);
+    const pillRow = filterBar.find('.ica--template-pill-row');
+    const templateResults = $('<div class="ica--template-results"></div>');
+    const existingAgents = getAgents();
+    const allPill = $(`
+        <button type="button" class="ica--template-pill is-active" data-category="">
+            <span>All</span>
+            <span class="ica--template-pill-count">0</span>
+        </button>
+    `);
+    pillRow.append(allPill);
 
-    for (const tpl of templates) {
+    for (const category of categoryOrder) {
+        const catInfo = AGENT_CATEGORIES[category] || AGENT_CATEGORIES.custom;
+        pillRow.append(`
+            <button type="button" class="ica--template-pill" data-category="${escapeHtml(category)}">
+                <i class="fa-solid ${catInfo.icon}"></i>
+                <span>${escapeHtml(getTemplateCategoryLabel(category))}</span>
+                <span class="ica--template-pill-count">0</span>
+            </button>
+        `);
+    }
+
+    function buildTemplateCard(tpl) {
         const catInfo = AGENT_CATEGORIES[tpl.category] || AGENT_CATEGORIES.custom;
         const regexCount = getTemplateRegexCount(tpl);
+        const alreadyAdded = hasMatchingAgentSnapshot(buildAgentFromTemplate(tpl), existingAgents);
         const trackerBadge = tpl.category === 'tracker'
             ? '<span class="ica--card-pill"><i class="fa-solid fa-chart-line fa-xs"></i> Bundled tracker</span>'
             : '';
+        const addedBadge = alreadyAdded
+            ? '<span class="ica--card-pill"><i class="fa-solid fa-check fa-xs"></i> Added</span>'
+            : '';
         const card = $(`
-            <div class="ica--template-card" data-id="${tpl.id}">
+            <div class="ica--template-card${alreadyAdded ? ' ica--template-card--added' : ''}" data-id="${tpl.id}">
                 <div class="ica--template-card-header">
                     <span class="ica--template-card-name">${escapeHtml(tpl.name)}</span>
-                    <span class="ica--template-card-category"><i class="fa-solid ${catInfo.icon}"></i> ${catInfo.label}</span>
+                    <span class="ica--template-card-category"><i class="fa-solid ${catInfo.icon}"></i> ${escapeHtml(catInfo.label)}</span>
                 </div>
                 <div class="ica--template-card-description">${escapeHtml(tpl.description)}</div>
-                ${(trackerBadge || regexCount > 0) ? `
-                    <div class="ica--template-card-badges">
-                        ${trackerBadge}
-                        ${regexCount > 0 ? `<span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${buildRegexTemplateLabel(regexCount)}</span>` : ''}
-                    </div>
-                ` : ''}
+                <div class="ica--template-card-badges">
+                    <span class="ica--card-pill ica--card-pill--version">v${escapeHtml(getTemplateVersionValue(tpl))}</span>
+                    ${addedBadge}
+                    ${trackerBadge}
+                    ${regexCount > 0 ? `<span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${buildRegexTemplateLabel(regexCount)}</span>` : ''}
+                </div>
                 <div class="ica--template-card-prompt">${escapeHtml((tpl.prompt || '').substring(0, 200))}</div>
             </div>
         `);
 
         card.on('click', async () => {
             const newAgent = buildAgentFromTemplate(tpl);
+            if (!await confirmDuplicateAgentAddition(newAgent, existingAgents)) {
+                toastr.info('Duplicate agent not added.');
+                return;
+            }
+
             await saveAgent(newAgent);
             renderAgentList();
             toastr.success(`Added "${tpl.name}" to your agents.`);
         });
 
-        grid.append(card);
+        return card;
     }
 
-    tplSection.append(grid);
+    function appendTemplateGrid(parent, templateList) {
+        const grid = $('<div class="ica--template-grid"></div>');
+        for (const tpl of templateList) {
+            grid.append(buildTemplateCard(tpl));
+        }
+        parent.append(grid);
+    }
+
+    function updateTemplatePills(searchTerm) {
+        const searchedTemplates = filterTemplates(templates, { searchTerm });
+        const countsByCategory = new Map();
+        for (const template of searchedTemplates) {
+            countsByCategory.set(template.category, (countsByCategory.get(template.category) ?? 0) + 1);
+        }
+
+        pillRow.find('.ica--template-pill').each(function () {
+            const category = $(this).attr('data-category') || '';
+            const count = category ? countsByCategory.get(category) ?? 0 : searchedTemplates.length;
+            $(this).toggleClass('is-active', category === selectedCategory);
+            $(this).find('.ica--template-pill-count').text(count);
+        });
+    }
+
+    function renderTemplateCategorySection(category, categoryTemplates, searchActive) {
+        const catInfo = AGENT_CATEGORIES[category] || AGENT_CATEGORIES.custom;
+        const categorySection = $(`
+            <div class="ica--template-category-section">
+                <div class="ica--template-category-title">
+                    <i class="fa-solid ${catInfo.icon}"></i>
+                    <span>${escapeHtml(getTemplateCategoryLabel(category))}</span>
+                    <span class="ica--template-category-count">${categoryTemplates.length}</span>
+                </div>
+            </div>
+        `);
+
+        if (searchActive || !['tracker', 'content'].includes(category)) {
+            appendTemplateGrid(categorySection, searchActive ? sortTemplatesByName(categoryTemplates) : categoryTemplates);
+            return categorySection;
+        }
+
+        const subcategories = getTemplateSubcategoriesForCategory(category);
+        const knownSubcategoryIds = new Set(subcategories.map(([subcategoryId]) => subcategoryId));
+        const directTemplates = categoryTemplates.filter(template => !knownSubcategoryIds.has(String(template.subcategory ?? '').trim()));
+        if (directTemplates.length > 0) {
+            appendTemplateGrid(categorySection, directTemplates);
+        }
+
+        for (const [subcategoryId, subcategory] of subcategories) {
+            const subgroupTemplates = categoryTemplates.filter(template => String(template.subcategory ?? '').trim() === subcategoryId);
+            if (subgroupTemplates.length === 0) {
+                continue;
+            }
+
+            categorySection.append(`
+                <div class="ica--template-subgroup-title">
+                    <i class="fa-solid ${subcategory.icon}"></i>
+                    <span>${escapeHtml(subcategory.label)}</span>
+                    <span>${subgroupTemplates.length}</span>
+                </div>
+            `);
+            appendTemplateGrid(categorySection, subgroupTemplates);
+        }
+
+        return categorySection;
+    }
+
+    function renderTemplateResults() {
+        const searchTerm = filterBar.find('.ica--template-search').val()?.toString() ?? '';
+        templateBrowserSearchValue = searchTerm;
+        const visibleTemplates = filterTemplates(templates, {
+            searchTerm,
+            category: selectedCategory,
+        });
+        const searchActive = Boolean(searchTerm.trim());
+
+        updateTemplatePills(searchTerm);
+        templateResults.empty();
+
+        if (visibleTemplates.length === 0) {
+            templateResults.append('<div class="ica--template-empty">No templates match your filter.</div>');
+            return;
+        }
+
+        for (const category of categoryOrder) {
+            const categoryTemplates = visibleTemplates.filter(template => template.category === category);
+            if (categoryTemplates.length === 0) {
+                continue;
+            }
+
+            templateResults.append(renderTemplateCategorySection(category, categoryTemplates, searchActive));
+        }
+    }
+
+    filterBar.find('.ica--template-search').on('input', renderTemplateResults);
+    pillRow.on('click', '.ica--template-pill', function () {
+        selectedCategory = $(this).attr('data-category') || '';
+        renderTemplateResults();
+    });
+
+    tplSection.append(filterBar);
+    tplSection.append(templateResults);
     wrapper.append(tplSection);
+    renderTemplateResults();
 
     await new Popup(wrapper, POPUP_TYPE.TEXT, '', { wide: true, large: true }).show();
 }
@@ -2480,23 +2966,257 @@ function buildPromptTransformDiffMarkup(beforeText, afterText) {
     }).join('');
 }
 
+function getPreGenerationInterceptModeLabel(entry) {
+    const mode = String(entry?.applyMode ?? 'replace');
+    if (mode === 'wrap') {
+        return 'wrap';
+    }
+    if (mode === 'patch') {
+        return 'patch';
+    }
+    return 'replace';
+}
+
+function parseChatInterceptSummaryMessages(value) {
+    let parsed;
+    try {
+        parsed = JSON.parse(String(value ?? ''));
+    } catch {
+        return { ok: false, reason: 'parse-error' };
+    }
+
+    if (!Array.isArray(parsed)) {
+        return { ok: false, reason: 'shape-error' };
+    }
+
+    const messages = [];
+    for (const [index, message] of parsed.entries()) {
+        if (!message || typeof message !== 'object' || Array.isArray(message)) {
+            return { ok: false, reason: 'shape-error' };
+        }
+
+        if (typeof message.role !== 'string' || typeof message.content !== 'string') {
+            return { ok: false, reason: 'shape-error' };
+        }
+
+        messages.push({
+            index,
+            role: message.role,
+            content: message.content,
+        });
+    }
+
+    return { ok: true, messages };
+}
+
+export function summarizeChatInterceptChange(beforeText, afterText) {
+    const beforeResult = parseChatInterceptSummaryMessages(beforeText);
+    const afterResult = parseChatInterceptSummaryMessages(afterText);
+
+    if (!beforeResult.ok) {
+        return { ok: false, reason: beforeResult.reason };
+    }
+
+    if (!afterResult.ok) {
+        return { ok: false, reason: afterResult.reason };
+    }
+
+    const beforeMessages = beforeResult.messages;
+    const afterMessages = afterResult.messages;
+    const matchedBefore = new Set();
+    const matchedAfter = new Set();
+
+    for (const beforeMessage of beforeMessages) {
+        const afterMessage = afterMessages.find(candidate =>
+            !matchedAfter.has(candidate.index) &&
+            candidate.role === beforeMessage.role &&
+            candidate.content === beforeMessage.content,
+        );
+
+        if (!afterMessage) {
+            continue;
+        }
+
+        matchedBefore.add(beforeMessage.index);
+        matchedAfter.add(afterMessage.index);
+    }
+
+    const changes = [];
+    for (const beforeMessage of beforeMessages) {
+        if (matchedBefore.has(beforeMessage.index)) {
+            continue;
+        }
+
+        const afterMessage = afterMessages[beforeMessage.index];
+        if (!afterMessage || matchedAfter.has(afterMessage.index)) {
+            continue;
+        }
+
+        matchedBefore.add(beforeMessage.index);
+        matchedAfter.add(afterMessage.index);
+        changes.push({
+            changeKind: 'modified',
+            role: afterMessage.role || beforeMessage.role,
+            beforeIndex: beforeMessage.index,
+            afterIndex: afterMessage.index,
+            beforeContent: beforeMessage.content,
+            afterContent: afterMessage.content,
+        });
+    }
+
+    for (const beforeMessage of beforeMessages) {
+        if (matchedBefore.has(beforeMessage.index)) {
+            continue;
+        }
+
+        changes.push({
+            changeKind: 'removed',
+            role: beforeMessage.role,
+            beforeIndex: beforeMessage.index,
+            afterIndex: null,
+            beforeContent: beforeMessage.content,
+            afterContent: '',
+        });
+    }
+
+    for (const afterMessage of afterMessages) {
+        if (matchedAfter.has(afterMessage.index)) {
+            continue;
+        }
+
+        changes.push({
+            changeKind: 'added',
+            role: afterMessage.role,
+            beforeIndex: null,
+            afterIndex: afterMessage.index,
+            beforeContent: '',
+            afterContent: afterMessage.content,
+        });
+    }
+
+    const changeKindOrder = {
+        removed: 0,
+        modified: 1,
+        added: 2,
+    };
+    changes.sort((left, right) => {
+        const leftIndex = left.afterIndex ?? left.beforeIndex ?? 0;
+        const rightIndex = right.afterIndex ?? right.beforeIndex ?? 0;
+        if (leftIndex !== rightIndex) {
+            return leftIndex - rightIndex;
+        }
+
+        return changeKindOrder[left.changeKind] - changeKindOrder[right.changeKind];
+    });
+
+    return { ok: true, changes };
+}
+
+function buildPreGenerationChatChangeMarkup(change) {
+    let diffMarkup = '';
+    if (change.changeKind === 'added') {
+        diffMarkup = `<span class="ica-transform-diff-part--ins">${escapeHtml(change.afterContent)}</span>`;
+    } else if (change.changeKind === 'removed') {
+        diffMarkup = `<span class="ica-transform-diff-part--del">${escapeHtml(change.beforeContent)}</span>`;
+    } else {
+        diffMarkup = buildPromptTransformDiffMarkup(change.beforeContent, change.afterContent);
+    }
+
+    return `
+        <div class="ica-preintercept-message-change">
+            <div class="ica-preintercept-message-header">
+                <span class="ica-preintercept-role">${escapeHtml(change.role || 'message')}</span>
+                <span class="ica-preintercept-change-kind">${escapeHtml(change.changeKind)}</span>
+            </div>
+            <div class="ica-transform-diff">${diffMarkup}</div>
+        </div>
+    `;
+}
+
+function buildPreGenerationInterceptSummaryMarkup(entry) {
+    const beforeText = entry.beforeText ?? '';
+    const outputText = String(entry.outputText ?? '').trim();
+    const afterText = entry.contextFormat === 'chat' && entry.status === 'error' && outputText
+        ? outputText
+        : entry.afterText ?? '';
+
+    if (entry.contextFormat !== 'chat') {
+        return `
+            <div class="ica-transform-output-title">Prompt diff</div>
+            <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(beforeText, afterText)}</div>
+        `;
+    }
+
+    try {
+        const summary = summarizeChatInterceptChange(beforeText, afterText);
+        if (!summary.ok) {
+            return `
+                <div class="ica-preintercept-fallback-notice">Could not summarize chat messages; showing raw diff.</div>
+                <div class="ica-transform-output-title">Context diff</div>
+                <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(beforeText, afterText)}</div>
+            `;
+        }
+
+        const changesMarkup = summary.changes.length > 0
+            ? summary.changes.map(buildPreGenerationChatChangeMarkup).join('')
+            : '<div class="ica-preintercept-empty">No effective change.</div>';
+
+        return `
+            <div class="ica-transform-output-title">Chat changes</div>
+            ${changesMarkup}
+        `;
+    } catch (error) {
+        console.warn('[InChatAgents] Failed to summarize pre-generation intercept history entry:', error);
+        return `
+            <div class="ica-preintercept-fallback-notice">Could not summarize chat messages; showing raw diff.</div>
+            <div class="ica-transform-output-title">Context diff</div>
+            <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(beforeText, afterText)}</div>
+        `;
+    }
+}
+
+function buildPreGenerationInterceptEntryMarkup(entry, i) {
+    const timestamp = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
+    const status = String(entry.status ?? 'changed');
+    const statusText = status === 'error'
+        ? `Error: ${entry.error || 'unknown error'}`
+        : `${entry.changed ? 'Changed' : 'No visible change'} the ${entry.contextFormat === 'chat' ? 'chat message array' : 'text prompt'}`;
+    const modeLabel = getPreGenerationInterceptModeLabel(entry);
+    const output = String(entry.outputText ?? '').trim();
+
+    return `
+        <div class="ica-transform-history-entry ica-preintercept-history-entry" data-index="${i}">
+            <h5>${escapeHtml(entry.agentName || 'Agent')} <small>(pre-gen ${escapeHtml(modeLabel)})</small></h5>
+            <small>${escapeHtml(timestamp)}${timestamp ? ' · ' : ''}${escapeHtml(statusText)}</small>
+            ${buildPreGenerationInterceptSummaryMarkup(entry)}
+            <details class="ica-preintercept-raw">
+                <summary>Raw agent output</summary>
+                <pre class="ica-transform-diff">${escapeHtml(output)}</pre>
+            </details>
+        </div>
+    `;
+}
+
 async function openPromptTransformHistoryPopup(messageIndex) {
     if (!Number.isInteger(Number(messageIndex)) || !chat[messageIndex]) {
         return;
     }
 
     const message = chat[Number(messageIndex)];
+    const preGenerationHistory = getPreGenerationInterceptHistoryForMessage(message);
     const history = getPromptTransformHistoryForMessage(message);
-    if (!Array.isArray(history) || history.length === 0) {
-        toastr.info('No transform history available.');
+    if ((!Array.isArray(preGenerationHistory) || preGenerationHistory.length === 0) && (!Array.isArray(history) || history.length === 0)) {
+        toastr.info('No agent document history available.');
         return;
     }
 
-    const entries = history.map((entry, i) => {
+    const preGenerationEntries = preGenerationHistory.map(buildPreGenerationInterceptEntryMarkup).join('');
+    const postGenerationEntries = history.map((entry, i) => {
         const timestamp = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
         return `
             <div class="ica-transform-history-entry" data-index="${i}">
                 <h5>${escapeHtml(entry.agentName || 'Agent')} <small>(${escapeHtml(entry.mode || 'replace')})</small></h5>
+                <small>${escapeHtml(`Order ${entry.order ?? 'n/a'} | Model: ${entry.modelLabel || entry.profileLabel || 'Current model'}`)}</small>
                 <small>${timestamp}</small>
                 <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(entry.beforeText ?? '', entry.afterText ?? '')}</div>
                 <div class="ica-transform-actions">
@@ -2507,20 +3227,23 @@ async function openPromptTransformHistoryPopup(messageIndex) {
         `;
     }).join('');
 
-    const html = $(`<div class="ica-transform-history">${entries}</div>`);
+    const html = $(`<div class="ica-transform-history">
+        ${preGenerationEntries ? `<section class="ica-transform-history-section"><h4>Pre-Generation Intercepts</h4>${preGenerationEntries}</section>` : ''}
+        ${postGenerationEntries ? `<section class="ica-transform-history-section"><h4>Post-Generation Changes</h4>${postGenerationEntries}</section>` : ''}
+    </div>`);
 
-    html.find('.ica-undo-btn').on('click', function () {
+    html.find('.ica-undo-btn').on('click', async function () {
         const idx = Number($(this).data('mesid'));
-        if (undoPromptTransform(idx)) {
+        if (await undoPromptTransform(idx)) {
             toastr.success('Transform undone.');
         } else {
             toastr.warning('Could not undo transform.');
         }
     });
 
-    html.find('.ica-redo-btn').on('click', function () {
+    html.find('.ica-redo-btn').on('click', async function () {
         const idx = Number($(this).data('mesid'));
-        if (redoPromptTransform(idx)) {
+        if (await redoPromptTransform(idx)) {
             toastr.success('Transform redone.');
         } else {
             toastr.warning('Could not redo transform.');
@@ -2537,11 +3260,113 @@ async function openPromptTransformHistoryPopup(messageIndex) {
 
 // ===================== Pathfinder Editor =====================
 
+function getPathfinderSettingsAgent() {
+    return getAgents().find(isPathfinderAgent) ?? null;
+}
+
+function ensurePathfinderExtensionsHost() {
+    const parent = document.getElementById('extensions_settings2') ?? document.getElementById('extensions_settings');
+    if (!parent) {
+        return null;
+    }
+
+    let host = document.getElementById(PATHFINDER_EXTENSIONS_HOST_ID);
+    if (!host) {
+        host = document.createElement('div');
+        host.id = PATHFINDER_EXTENSIONS_HOST_ID;
+        host.className = 'extension_container pf--extensions-host';
+        host.innerHTML = `
+            <div class="inline-drawer">
+                <div class="inline-drawer-toggle inline-drawer-header">
+                    <b><i class="fa-solid fa-route"></i> Pathfinder</b>
+                    <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+                </div>
+                <div class="inline-drawer-content pf--extensions-body" style="display:none"></div>
+            </div>
+        `;
+        parent.append(host);
+    }
+
+    return host;
+}
+
+async function mountPathfinderSettingsInExtensions() {
+    const host = ensurePathfinderExtensionsHost();
+    if (!host) {
+        console.warn('[Pathfinder] Could not mount settings in Extensions drawer because #extensions_settings was not found.');
+        return null;
+    }
+
+    const body = host.querySelector('.pf--extensions-body');
+    if (!body) {
+        return null;
+    }
+
+    const agent = getPathfinderSettingsAgent();
+    body.innerHTML = '';
+
+    if (!agent) {
+        body.innerHTML = '<div class="pf--extensions-empty">Pathfinder agent is not available. Reload In-Chat Agents or restore the bundled Pathfinder template.</div>';
+        return host;
+    }
+
+    const settingsPanel = await openPathfinderSettings(agent);
+    if (!settingsPanel) {
+        body.innerHTML = '<div class="pf--extensions-empty">Could not load Pathfinder settings.</div>';
+        return host;
+    }
+
+    settingsPanel.filter('#pf--settings').addClass('pf--settings-embedded');
+    for (const node of settingsPanel.toArray()) {
+        body.append(node);
+    }
+    return host;
+}
+
+function schedulePathfinderExtensionsMount() {
+    pathfinderExtensionsMountPromise = mountPathfinderSettingsInExtensions()
+        .catch(error => {
+            console.warn('[Pathfinder] Failed to mount settings in Extensions drawer:', error);
+            return null;
+        });
+
+    return pathfinderExtensionsMountPromise;
+}
+
+function openPathfinderExtensionsDrawer(host) {
+    const clickEvent = () => new (globalThis.MouseEvent ?? Event)('click', { bubbles: true });
+    const drawer = document.getElementById('extensions-settings-button');
+    const drawerContent = drawer?.querySelector(':scope > .drawer-content');
+    if (drawer && drawerContent?.classList.contains('closedDrawer')) {
+        drawer.querySelector(':scope > .drawer-toggle')?.dispatchEvent(clickEvent());
+    }
+
+    const inlineDrawer = host?.querySelector('.inline-drawer');
+    const inlineContent = inlineDrawer?.querySelector(':scope > .inline-drawer-content');
+    const inlineIcon = inlineDrawer?.querySelector(':scope > .inline-drawer-header .inline-drawer-icon');
+    if (inlineDrawer && inlineContent && inlineIcon?.classList.contains('down')) {
+        inlineDrawer.querySelector(':scope > .inline-drawer-toggle')?.dispatchEvent(clickEvent());
+    }
+
+    globalThis.setTimeout(() => {
+        host?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        host?.querySelector('input, button, select, textarea')?.focus?.({ preventScroll: true });
+    }, 100);
+}
+
 /**
  * Opens the Pathfinder-specific settings editor
  * @param {Object} agent - The Pathfinder agent
  */
 async function openPathfinderEditor(agent) {
+    const existingHost = document.getElementById(PATHFINDER_EXTENSIONS_HOST_ID);
+    if (existingHost) {
+        const host = await (pathfinderExtensionsMountPromise ?? schedulePathfinderExtensionsMount());
+        openPathfinderExtensionsDrawer(host ?? existingHost);
+        toastr.info('Pathfinder settings are in the Extensions drawer.');
+        return;
+    }
+
     const originalAgentState = JSON.stringify(agent);
     const template = findTemplateForAgent(agent);
     const settingsPanel = await openPathfinderSettings(agent, async (updatedAgent) => {
@@ -2892,6 +3717,9 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
             setGlobalSettings(savedState.globalSettings);
         }
         restoreAutoSeededTemplateIds(savedState);
+        if (savedState.dismissedTemplatesCallout === true) {
+            $('.ica--templates-callout').hide();
+        }
     }
 
     const initResults = await Promise.allSettled([
@@ -3014,6 +3842,7 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
 
     // Render the panel
     renderAgentList();
+    schedulePathfinderExtensionsMount();
 
     // Wire up toolbar
     $('#ica--globalEnabled').on('click', () => {
@@ -3030,6 +3859,16 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     $('#ica--exportAll').on('click', handleExportAll);
     $('#ica--templates').on('click', openTemplateBrowser);
     $('#ica--templatesCallout').on('click', openTemplateBrowser);
+    $('#ica--templatesCalloutDismiss').on('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        $('.ica--templates-callout').hide();
+        extension_settings.inChatAgents = {
+            ...(extension_settings.inChatAgents ?? {}),
+            dismissedTemplatesCallout: true,
+        };
+        saveSettingsDebounced();
+    });
     $('#ica--cancelGeneration').on('click', () => {
         cancelAgentGeneration();
         updateCancelGenerationButton();

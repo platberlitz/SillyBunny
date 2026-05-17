@@ -15,6 +15,7 @@ import { decodeTextTokens, getTokenizerBestMatch } from './tokenizers.js';
 import { power_user } from './power-user.js';
 import { callGenericPopup, POPUP_TYPE } from './popup.js';
 import { t } from './i18n.js';
+import { isSmoothStreamingEffectivelyEnabled } from './mobile-streaming.js';
 
 const TINTS = 4;
 const MAX_MESSAGE_LOGPROBS = 100;
@@ -81,7 +82,12 @@ function renderAlternativeTokensView() {
     renderTopLogprobs();
 
     const { messageLogprobs, continueFrom } = getActiveMessageLogprobData() || {};
-    const usingSmoothStreaming = isStreamingEnabled() && power_user.smooth_streaming;
+    // SillyBunny: honor the iOS WebKit smooth-streaming bypass so token
+    // probability UI state matches the stream renderer's effective mode.
+    const usingSmoothStreaming = isStreamingEnabled() && isSmoothStreamingEffectivelyEnabled({
+        smoothStreaming: power_user.smooth_streaming,
+        iosWebKitDisableSmoothStreaming: power_user.ios_webkit_disable_smooth_streaming,
+    });
     if (!messageLogprobs?.length || usingSmoothStreaming) {
         const emptyState = $('<div></div>');
         const noTokensMsg = !power_user.request_token_probabilities

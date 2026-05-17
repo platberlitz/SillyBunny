@@ -1,3 +1,4 @@
+/* eslint-disable playwright/no-duplicate-hooks */
 /* global globalThis */
 import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
 
@@ -9,6 +10,7 @@ await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/path
     isLorebookEnabled: jest.fn(bookName => mockSettings.enabledLorebooks.includes(bookName)),
     canReadBook: jest.fn(() => true),
     canWriteBook: jest.fn(() => true),
+    canDeleteBook: jest.fn(() => true),
 }));
 
 const {

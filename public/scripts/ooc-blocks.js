@@ -3,6 +3,40 @@ const OOC_BLOCK_PLACEHOLDER_PREFIX = '\uE000SB_OOC_BLOCK_';
 const OOC_BLOCK_PLACEHOLDER_SUFFIX = '_\uE001';
 
 /**
+ * Normalizes prompt-context retention settings.
+ * -1 preserves every context message, 0 strips every context message, N preserves the last N messages.
+ * @param {number|string} value Retention setting value.
+ * @returns {number} Normalized context depth.
+ */
+export function normalizeContextRetentionDepth(value) {
+    if (value === null || value === undefined || value === '') {
+        return -1;
+    }
+
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+        return -1;
+    }
+
+    return Math.max(-1, Math.floor(numericValue));
+}
+
+/**
+ * Checks whether OOC or HTML tags should be retained for a prompt-context message.
+ * @param {number} messageDepth Zero-based distance from the latest context message.
+ * @param {number|string} retentionDepth Retention setting value.
+ * @returns {boolean} True when the message should keep the relevant content.
+ */
+export function shouldRetainContextAtDepth(messageDepth, retentionDepth) {
+    const normalizedDepth = normalizeContextRetentionDepth(retentionDepth);
+    if (normalizedDepth < 0) {
+        return true;
+    }
+
+    return Math.max(0, Number(messageDepth) || 0) < normalizedDepth;
+}
+
+/**
  * Replaces balanced OOC blocks with the supplied replacement.
  * @param {string} value Source text.
  * @param {(content: string, index: number) => string} replacer Replacement callback.
@@ -75,10 +109,35 @@ function escapeHtml(value) {
 /**
  * Removes user-visible out-of-character blocks from text before prompt assembly.
  * @param {string} text Source text.
+ * @param {boolean} [preserve=false] Whether to keep OOC blocks in this context message.
  * @returns {string} Text without balanced ((...)) blocks.
  */
-export function stripOocBlocksFromContext(text) {
+export function stripOocBlocksFromContext(text, preserve = false) {
+    if (preserve) {
+        return String(text ?? '');
+    }
+
     return replaceBalancedOocBlocks(text, () => '')
+        .replace(/[ \t]{2,}/g, ' ')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+/**
+ * Strips raw HTML tags from older prompt-context messages.
+ * @param {string} text Source text.
+ * @param {boolean} [preserve=false] Whether to keep HTML tags in this context message.
+ * @returns {string} Text with HTML tags removed unless preserved.
+ */
+export function stripHtmlTagsFromContext(text, preserve = false) {
+    const source = String(text ?? '');
+    if (preserve) {
+        return source;
+    }
+
+    return source
+        .replace(/<\/?[a-z][a-z0-9:-]*(?:\s[^>]*)?>/gi, ' ')
         .replace(/[ \t]{2,}/g, ' ')
         .replace(/[ \t]+\n/g, '\n')
         .replace(/\n{3,}/g, '\n\n')

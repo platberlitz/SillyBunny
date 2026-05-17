@@ -15,7 +15,7 @@ export const testSetup = {
      */
     awaitST: async ({ page }) => {
         await page.goto('/');
-        await page.click('#userList .userSelect:last-child');
+        await page.locator('#userList .userSelect').last().click();
         await page.waitForURL('http://127.0.0.1:4444');
         await page.waitForFunction('document.getElementById("preloader") === null', { timeout: 0 });
     },

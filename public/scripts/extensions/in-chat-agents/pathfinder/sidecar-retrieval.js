@@ -1,3 +1,5 @@
+import { chat, substituteParams } from '../../../../script.js';
+import { parseRegexFromString, world_info_logic, world_info_match_whole_words } from '../../../world-info.js';
 import { getTree, findNodeById, getAllEntryUids, getSettings } from './tree-store.js';
 import { getReadableBooks, getEntryContent } from './pathfinder-tool-bridge.js';
 import { sidecarGenerate } from './llm-sidecar.js';
@@ -12,6 +14,118 @@ export const PATHFINDER_RETRIEVAL_PROMPT_KEYS = Object.freeze([
     RETRIEVAL_PROMPT_KEY,
     PIPELINE_RETRIEVAL_KEY,
 ]);
+
+function clearRetrievalPrompt(setExtensionPrompt, key, extensionPromptTypes, extensionPromptRoles) {
+    setExtensionPrompt(
+        key,
+        '',
+        extensionPromptTypes?.IN_PROMPT ?? 0,
+        4,
+        false,
+        extensionPromptRoles?.SYSTEM ?? 0,
+    );
+}
+
+function getRecentChatText(limit = 10) {
+    const ctx = globalThis.window?.SillyTavern?.getContext?.();
+    const messages = Array.isArray(ctx?.chat) ? ctx.chat : chat;
+    return messages
+        .slice(-limit)
+        .map(message => String(message?.mes ?? message?.content ?? message ?? ''))
+        .join('\n');
+}
+
+function transformForEntry(value, entry) {
+    return entry?.caseSensitive ? String(value ?? '') : String(value ?? '').toLowerCase();
+}
+
+function escapeRegexLiteral(value) {
+    return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function matchesWorldInfoKey(haystack, key, entry) {
+    const substituted = substituteParams(String(key ?? '')).trim();
+    if (!substituted) {
+        return false;
+    }
+
+    const keyRegex = parseRegexFromString(substituted);
+    if (keyRegex) {
+        return keyRegex.test(haystack);
+    }
+
+    const transformedHaystack = transformForEntry(haystack, entry);
+    const transformedKey = transformForEntry(substituted, entry);
+    const matchWholeWords = entry?.matchWholeWords ?? world_info_match_whole_words;
+
+    if (!matchWholeWords) {
+        return transformedHaystack.includes(transformedKey);
+    }
+
+    const keyWords = transformedKey.split(/\s+/);
+    if (keyWords.length > 1) {
+        return transformedHaystack.includes(transformedKey);
+    }
+
+    return new RegExp(`(?:^|\\W)(${escapeRegexLiteral(transformedKey)})(?:$|\\W)`).test(transformedHaystack);
+}
+
+function hasSecondaryActivationMatch(textToScan, entry) {
+    if (!entry?.selective || !Array.isArray(entry.keysecondary) || entry.keysecondary.length === 0) {
+        return true;
+    }
+
+    const selectiveLogic = entry.selectiveLogic ?? world_info_logic.AND_ANY;
+    let hasAnyMatch = false;
+    let hasAllMatch = true;
+
+    for (const key of entry.keysecondary) {
+        const matched = matchesWorldInfoKey(textToScan, key, entry);
+        if (matched) hasAnyMatch = true;
+        if (!matched) hasAllMatch = false;
+
+        if (selectiveLogic === world_info_logic.AND_ANY && matched) return true;
+        if (selectiveLogic === world_info_logic.NOT_ALL && !matched) return true;
+    }
+
+    if (selectiveLogic === world_info_logic.NOT_ANY && !hasAnyMatch) return true;
+    if (selectiveLogic === world_info_logic.AND_ALL && hasAllMatch) return true;
+    return false;
+}
+
+function getNaturalActivationReason(entry, textToScan = getRecentChatText()) {
+    if (!entry || entry.disable) {
+        return '';
+    }
+
+    if (entry.decorators?.includes?.('@@activate')) {
+        return '@@activate decorator';
+    }
+
+    if (entry.constant) {
+        return 'constant entry';
+    }
+
+    const primaryKeyMatch = Array.isArray(entry.key)
+        ? entry.key.find(key => matchesWorldInfoKey(textToScan, key, entry))
+        : null;
+    if (!primaryKeyMatch) {
+        return '';
+    }
+
+    return hasSecondaryActivationMatch(textToScan, entry)
+        ? `keyword match: ${primaryKeyMatch}`
+        : '';
+}
+
+function shouldSkipNaturalActivation(entry, textToScan) {
+    const settings = getSettings();
+    if (settings.dedupeNaturalActivation === false) {
+        return '';
+    }
+
+    return getNaturalActivationReason(entry, textToScan);
+}
 
 function getRetrievalStatusTimeoutMs() {
     const seconds = Number(getSettings().retrievalTimeoutSeconds ?? 8);
@@ -123,6 +237,7 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
     const chatMessages = ctx?.chat ?? [];
 
     if (books.length === 0) {
+        clearRetrievalPrompt(setExtensionPrompt, PIPELINE_RETRIEVAL_KEY, extensionPromptTypes, extensionPromptRoles);
         console.log('[Pathfinder] No readable lorebooks with built trees for pipeline retrieval');
         logPathfinderRetrievalDetail({
             mode: 'pipeline',
@@ -136,6 +251,7 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
     }
 
     if (chatMessages.length === 0) {
+        clearRetrievalPrompt(setExtensionPrompt, PIPELINE_RETRIEVAL_KEY, extensionPromptTypes, extensionPromptRoles);
         console.log('[Pathfinder] No chat messages for pipeline retrieval');
         logPathfinderRetrievalDetail({
             mode: 'pipeline',
@@ -155,6 +271,7 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
     logPipelineComplete(pipelineId, result.selectedEntries?.length ?? 0, result.stageResults);
 
     if (!result.success) {
+        clearRetrievalPrompt(setExtensionPrompt, PIPELINE_RETRIEVAL_KEY, extensionPromptTypes, extensionPromptRoles);
         console.warn('[Pathfinder] Pipeline retrieval failed:', result.error);
         logPathfinderRetrievalDetail({
             mode: 'pipeline',
@@ -168,6 +285,7 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
     }
 
     if (result.selectedEntries.length === 0) {
+        clearRetrievalPrompt(setExtensionPrompt, PIPELINE_RETRIEVAL_KEY, extensionPromptTypes, extensionPromptRoles);
         console.log('[Pathfinder] Pipeline returned no entries');
         logPathfinderRetrievalDetail({
             mode: 'pipeline',
@@ -182,6 +300,8 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
 
     // Build content for injection - fetch actual entry content
     const entryContents = [];
+    const skippedNaturalEntries = [];
+    const textToScan = getRecentChatText();
 
     for (const entryName of result.selectedEntries) {
         for (const bookName of books) {
@@ -192,6 +312,17 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
             for (const uid of uids) {
                 const entry = await getEntryContent(bookName, uid);
                 if (entry && entry.comment === entryName) {
+                    const naturalActivationReason = shouldSkipNaturalActivation(entry, textToScan);
+                    if (naturalActivationReason) {
+                        skippedNaturalEntries.push({
+                            name: entry.comment,
+                            bookName,
+                            uid,
+                            reason: naturalActivationReason,
+                        });
+                        break;
+                    }
+
                     entryContents.push({
                         name: entry.comment,
                         bookName,
@@ -229,6 +360,8 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
                 pipelineId,
                 selectedEntryCount: entryContents.length,
                 candidateCount: result.selectedEntries?.length ?? 0,
+                skippedNaturalActivationCount: skippedNaturalEntries.length,
+                skippedNaturalEntries,
             },
         });
         setExtensionPrompt(
@@ -242,6 +375,7 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
 
         console.log(`[Pathfinder] Pipeline injected ${entryContents.length} entries`);
     } else {
+        clearRetrievalPrompt(setExtensionPrompt, PIPELINE_RETRIEVAL_KEY, extensionPromptTypes, extensionPromptRoles);
         logPathfinderRetrievalDetail({
             mode: 'pipeline',
             books,
@@ -252,6 +386,8 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
                 pipelineId,
                 selectedEntryCount: 0,
                 candidateCount: result.selectedEntries?.length ?? 0,
+                skippedNaturalActivationCount: skippedNaturalEntries.length,
+                skippedNaturalEntries,
             },
         });
     }

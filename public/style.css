@@ -9,7 +9,7 @@
 @import url(css/logprobs.css);
 @import url(css/accounts.css);
 @import url(css/tags.css);
-@import url(css/scrollable-button.css);
+@import url(css/scrollable-button.css?v=20260517a);
 @import url(css/welcome.css?v=20260425a);
 @import url(css/data-maid.css);
 @import url(css/secrets.css);
@@ -99,6 +99,10 @@
     --color-warning: #facc15;
     --color-shadow: var(--SmartThemeShadowColor);
     --color-focus-ring: color-mix(in srgb, var(--color-primary) 72%, transparent);
+    --sb-scrollbar-track: color-mix(in srgb, var(--color-background, var(--SmartThemeBlurTintColor)) 86%, transparent);
+    --sb-scrollbar-track-hover: color-mix(in srgb, var(--color-background, var(--SmartThemeBlurTintColor)) 70%, transparent);
+    --sb-scrollbar-thumb: color-mix(in srgb, var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) 34%, transparent);
+    --sb-scrollbar-thumb-hover: color-mix(in srgb, var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) 50%, transparent);
     --color-user-message-bg: var(--SmartThemeUserMesBlurTintColor);
     --color-bot-message-bg: var(--SmartThemeBotMesBlurTintColor);
     --SmartThemeCheckboxTickColorValue: calc(((((var(--SmartThemeCheckboxBgColorR) * 299) + (var(--SmartThemeCheckboxBgColorG) * 587) + (var(--SmartThemeCheckboxBgColorB) * 114)) / 1000) - 128) * -1000);
@@ -204,6 +208,12 @@ body {
     color-scheme: only light;
 }
 
+/* SillyBunny: Firefox ignores WebKit scrollbar pseudo-elements. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sb-scrollbar-thumb) var(--sb-scrollbar-track);
+}
+
 ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -212,23 +222,23 @@ body {
 
 ::-webkit-scrollbar-track {
     cursor: default;
-    background: color-mix(in srgb, var(--color-background, var(--SmartThemeBlurTintColor)) 86%, transparent);
+    background: var(--sb-scrollbar-track);
 }
 
 ::-webkit-scrollbar-track:hover {
-    background-color: color-mix(in srgb, var(--color-background, var(--SmartThemeBlurTintColor)) 70%, transparent);
+    background-color: var(--sb-scrollbar-track-hover);
 }
 
 ::-webkit-scrollbar-thumb {
     cursor: grab;
-    background: color-mix(in srgb, var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) 34%, transparent);
+    background: var(--sb-scrollbar-thumb);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) 50%, transparent);
+    background: var(--sb-scrollbar-thumb-hover);
     background-clip: content-box;
 }
 
@@ -935,6 +945,11 @@ body .panelControlBar {
     flex-grow: 1;
 }
 
+/* macOS browser scroll anchoring fights chat scroll preservation during message loads. */
+body.is-macos #chat {
+    overflow-anchor: none;
+}
+
 #form_sheld {
     white-space: nowrap;
     width: 100%;
@@ -1559,7 +1574,7 @@ body.hideAllSwipeButtons :is(.swipe_left, .swipe_right),
     height: var(--avatar-base-height);
     object-fit: cover;
     object-position: center center;
-    border-radius: var(--avatar-base-border-radius-round);
+    border-radius: inherit;
     border: 1px solid var(--SmartThemeBorderColor);
     /*--black30a*/
     box-shadow: 0 0 5px var(--black50a);
@@ -2943,7 +2958,6 @@ input[type="file"] {
 
 #rm_button_characters,
 #rm_button_panel_pin_div,
-#lm_button_panel_pin_div,
 #WI_button_panel_pin_div {
     font-size: 24px;
     display: inline;
@@ -2951,7 +2965,6 @@ input[type="file"] {
 }
 
 #rm_button_panel_pin_div,
-#lm_button_panel_pin_div,
 #WI_button_panel_pin_div {
     opacity: 0.5;
     transition: var(--animation-duration-2x);
@@ -2959,49 +2972,37 @@ input[type="file"] {
 
 #rm_button_panel_pin_div:hover,
 #rm_button_panel_pin_div:has(:focus-visible),
-#lm_button_panel_pin_div:hover,
-#lm_button_panel_pin_div:has(:focus-visible),
 #WI_button_panel_pin_div:hover,
 #WI_button_panel_pin_div:has(:focus-visible) {
     opacity: 1;
 }
 
-#lm_button_panel_pin_div {
-    text-align: start;
-}
-
 #rm_button_panel_pin,
-#lm_button_panel_pin,
 #WI_panel_pin {
     display: none;
 }
 
 #rm_button_panel_pin:checked+label,
-#lm_button_panel_pin:checked+label,
 #WI_panel_pin:checked+label {
     display: inline;
 }
 
 #rm_button_panel_pin:checked+label .checked,
-#lm_button_panel_pin:checked+label .checked,
 #WI_panel_pin:checked+label .checked {
     display: inline;
 }
 
 #rm_button_panel_pin:checked+label .unchecked,
-#lm_button_panel_pin:checked+label .unchecked,
 #WI_panel_pin:checked+label .unchecked {
     display: none;
 }
 
 #rm_button_panel_pin:not(:checked)+label .checked,
-#lm_button_panel_pin:not(:checked)+label .checked,
 #WI_panel_pin:not(:checked)+label .checked {
     display: none;
 }
 
 #rm_button_panel_pin:not(:checked)+label .unchecked,
-#lm_button_panel_pin:not(:checked)+label .unchecked,
 #WI_panel_pin:not(:checked)+label .unchecked {
     display: inline;
 }
@@ -7393,6 +7394,18 @@ body:not(.movingUI) .drawer-content.maximized {
     gap: 12px;
 }
 
+.ica-transform-history-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ica-transform-history-section h4 {
+    margin: 0;
+    font-size: calc(var(--mainFontSize) * 0.95);
+    letter-spacing: 0.02em;
+}
+
 .ica-transform-history-entry {
     padding: 12px;
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 55%, transparent);
@@ -7408,6 +7421,15 @@ body:not(.movingUI) .drawer-content.maximized {
     display: block;
     margin-bottom: 8px;
     opacity: 0.72;
+}
+
+.ica-transform-output-title {
+    margin: 10px 0 5px;
+    font-size: calc(var(--mainFontSize) * 0.72);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.68;
 }
 
 .ica-transform-diff {
@@ -7447,6 +7469,54 @@ body:not(.movingUI) .drawer-content.maximized {
     gap: 6px;
     margin-top: 10px;
     flex-wrap: wrap;
+}
+
+.ica-preintercept-message-change {
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 38%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #222) 14%, transparent);
+}
+
+.ica-preintercept-message-change + .ica-preintercept-message-change {
+    margin-top: 8px;
+}
+
+.ica-preintercept-message-header {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.ica-preintercept-role {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ica-preintercept-change-kind {
+    font-size: 0.78em;
+    padding: 1px 6px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 45%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #ddd) 10%, transparent);
+}
+
+.ica-preintercept-empty,
+.ica-preintercept-fallback-notice {
+    font-style: italic;
+    opacity: 0.72;
+}
+
+.ica-preintercept-raw {
+    margin-top: 10px;
+}
+
+.ica-preintercept-raw > summary {
+    cursor: pointer;
+    opacity: 0.78;
 }
 
 

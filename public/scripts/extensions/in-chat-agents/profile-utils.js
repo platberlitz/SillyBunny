@@ -68,6 +68,24 @@ export function getConnectionProfileDisplayName(profileId = '') {
     return normalizedProfileId;
 }
 
+export function getConnectionProfileModelName(profileId = '') {
+    const normalizedProfileId = String(profileId ?? '').trim();
+    if (!normalizedProfileId) {
+        return '';
+    }
+
+    const CMRS = getConnectionManagerRequestService();
+    if (!CMRS || typeof CMRS.getProfile !== 'function') {
+        return '';
+    }
+
+    try {
+        return String(CMRS.getProfile(normalizedProfileId)?.model ?? '').trim();
+    } catch {
+        return '';
+    }
+}
+
 export function populateConnectionProfileSelect(select, { emptyLabel = 'Use default profile', selectedValue = '' } = {}) {
     if (!(select instanceof HTMLSelectElement)) {
         return;
