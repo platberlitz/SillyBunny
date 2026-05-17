@@ -195,6 +195,12 @@ export default function getPublicLibConfig({ forceDist = false, pruneCache = fal
         },
         devtool: false,
         watch: false,
+        resolve: {
+            alias: {
+                // Use Chevrotain's bundled ESM build to avoid Windows + Bun walking lodash-es source files.
+                chevrotain$: path.resolve(serverDirectory, 'node_modules/chevrotain/lib/chevrotain.mjs'),
+            },
+        },
         module: {},
         stats: {
             preset: 'minimal',
