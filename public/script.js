@@ -6419,74 +6419,84 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         console.debug(`pushed prompt bits to itemizedPrompts array. Length is now: ${itemizedPrompts.length}`);
 
         if (isStreamingEnabled() && type !== 'quiet') {
-            continue_mag = promptReasoning.removePrefix(continue_mag);
-            const activeStreamingProcessor = streamingProcessor = new StreamingProcessor(type, force_name2, generation_started, continue_mag, promptReasoning);
-            if (isContinue) {
-                // Save reply does add cycle text to the prompt, so it's not needed here
-                activeStreamingProcessor.firstMessageText = '';
-            }
-
-            activeStreamingProcessor.generator = await sendStreamingRequest(type, generate_data, { jsonSchema, cacheScope: generate_data.cacheScope });
-
-            hideSwipeButtons();
-            let getMessage = await activeStreamingProcessor.generate();
-            let messageChunk = cleanUpMessage({
-                getMessage: getMessage,
-                isImpersonate: isImpersonate,
-                isContinue: isContinue,
-                displayIncompleteSentences: false,
-            });
-
-            if (isContinue) {
-                getMessage = continue_mag + getMessage;
-            }
-
-            const isStreamCancelled = activeStreamingProcessor.isStopped
-                || activeStreamingProcessor.isCancelled
-                || activeStreamingProcessor.abortController.signal.aborted;
-            const isStreamFinished = !isStreamCancelled && activeStreamingProcessor.isFinished;
-            const isStreamWithToolCalls = Array.isArray(activeStreamingProcessor.toolCalls) && activeStreamingProcessor.toolCalls.length;
-            if (canPerformToolCalls && isStreamFinished && isStreamWithToolCalls) {
-                const lastMessage = chat[chat.length - 1];
-                const hasToolCalls = ToolManager.hasToolCalls(activeStreamingProcessor.toolCalls);
-                const shouldDeleteMessage = type !== 'swipe' && ['', '...'].includes(lastMessage?.mes) && !lastMessage?.extra?.reasoning && ['', '...'].includes(activeStreamingProcessor.result);
-                hasToolCalls && shouldDeleteMessage && await deleteLastMessage();
-                if (hasToolCalls && !shouldDeleteMessage) {
-                    await activeStreamingProcessor.finalizeIntermediaryMessage(activeStreamingProcessor.messageId, getMessage, { unlockUI: false });
+            let startedSuccessorGeneration = false;
+            try {
+                continue_mag = promptReasoning.removePrefix(continue_mag);
+                const activeStreamingProcessor = streamingProcessor = new StreamingProcessor(type, force_name2, generation_started, continue_mag, promptReasoning);
+                if (isContinue) {
+                    // Save reply does add cycle text to the prompt, so it's not needed here
+                    activeStreamingProcessor.firstMessageText = '';
                 }
-                const invocationResult = await ToolManager.invokeFunctionTools(activeStreamingProcessor.toolCalls, {
-                    reasoningText: activeStreamingProcessor.reasoningHandler.reasoning,
+
+                activeStreamingProcessor.generator = await sendStreamingRequest(type, generate_data, { jsonSchema, cacheScope: generate_data.cacheScope });
+
+                hideSwipeButtons();
+                let getMessage = await activeStreamingProcessor.generate();
+                let messageChunk = cleanUpMessage({
+                    getMessage: getMessage,
+                    isImpersonate: isImpersonate,
+                    isContinue: isContinue,
+                    displayIncompleteSentences: false,
                 });
-                const shouldStopGeneration = (!invocationResult.invocations.length && shouldDeleteMessage) || invocationResult.stealthCalls.length;
-                if (hasToolCalls) {
-                    if (shouldStopGeneration) {
-                        if (Array.isArray(invocationResult.errors) && invocationResult.errors.length) {
-                            ToolManager.showToolCallError(invocationResult.errors);
-                        }
-                        unblockGeneration(type);
-                        clearStreamingProcessorIfCurrent(activeStreamingProcessor);
-                        return;
+
+                if (isContinue) {
+                    getMessage = continue_mag + getMessage;
+                }
+
+                const isStreamCancelled = activeStreamingProcessor.isStopped
+                    || activeStreamingProcessor.isCancelled
+                    || activeStreamingProcessor.abortController.signal.aborted;
+                const isStreamFinished = !isStreamCancelled && activeStreamingProcessor.isFinished;
+                const isStreamWithToolCalls = Array.isArray(activeStreamingProcessor.toolCalls) && activeStreamingProcessor.toolCalls.length;
+                if (canPerformToolCalls && isStreamFinished && isStreamWithToolCalls) {
+                    const lastMessage = chat[chat.length - 1];
+                    const hasToolCalls = ToolManager.hasToolCalls(activeStreamingProcessor.toolCalls);
+                    const shouldDeleteMessage = type !== 'swipe' && ['', '...'].includes(lastMessage?.mes) && !lastMessage?.extra?.reasoning && ['', '...'].includes(activeStreamingProcessor.result);
+                    hasToolCalls && shouldDeleteMessage && await deleteLastMessage();
+                    if (hasToolCalls && !shouldDeleteMessage) {
+                        await activeStreamingProcessor.finalizeIntermediaryMessage(activeStreamingProcessor.messageId, getMessage, { unlockUI: false });
                     }
+                    const invocationResult = await ToolManager.invokeFunctionTools(activeStreamingProcessor.toolCalls, {
+                        reasoningText: activeStreamingProcessor.reasoningHandler.reasoning,
+                    });
+                    const shouldStopGeneration = (!invocationResult.invocations.length && shouldDeleteMessage) || invocationResult.stealthCalls.length;
+                    if (hasToolCalls) {
+                        if (shouldStopGeneration) {
+                            if (Array.isArray(invocationResult.errors) && invocationResult.errors.length) {
+                                ToolManager.showToolCallError(invocationResult.errors);
+                            }
+                            unblockGeneration(type);
+                            clearStreamingProcessorIfCurrent(activeStreamingProcessor);
+                            return;
+                        }
 
+                        clearStreamingProcessorIfCurrent(activeStreamingProcessor);
+                        depth = depth + 1;
+                        await ToolManager.saveFunctionToolInvocations(invocationResult.invocations);
+                        startedSuccessorGeneration = true;
+                        return Generate('normal', { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, quietName, depth, suppressUserMessage }, dryRun);
+                    }
+                }
+
+                if (isStreamFinished) {
+                    await activeStreamingProcessor.onFinishStreaming(activeStreamingProcessor.messageId, getMessage);
                     clearStreamingProcessorIfCurrent(activeStreamingProcessor);
-                    depth = depth + 1;
-                    await ToolManager.saveFunctionToolInvocations(invocationResult.invocations);
-                    return Generate('normal', { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, quietName, depth, suppressUserMessage }, dryRun);
+                    triggerAutoContinue(messageChunk, isImpersonate);
+                    return Object.defineProperties(new String(getMessage), {
+                        'messageChunk': { value: messageChunk },
+                        'fromStream': { value: true },
+                    });
+                }
+
+                clearStreamingProcessorIfCurrent(activeStreamingProcessor);
+                return;
+            } finally {
+                // SillyBunny: Safety net - every streaming exit path must leave the UI idle.
+                // Cancelled streams used to skip unblockGeneration(), leaving is_send_press stuck.
+                if (is_send_press && streamingProcessor === null && !startedSuccessorGeneration) {
+                    unblockGeneration(type);
                 }
             }
-
-            if (isStreamFinished) {
-                await activeStreamingProcessor.onFinishStreaming(activeStreamingProcessor.messageId, getMessage);
-                clearStreamingProcessorIfCurrent(activeStreamingProcessor);
-                triggerAutoContinue(messageChunk, isImpersonate);
-                return Object.defineProperties(new String(getMessage), {
-                    'messageChunk': { value: messageChunk },
-                    'fromStream': { value: true },
-                });
-            }
-
-            clearStreamingProcessorIfCurrent(activeStreamingProcessor);
-            return;
         } else {
             return await sendGenerationRequest(type, generate_data, { jsonSchema, cacheScope: generate_data.cacheScope });
         }
@@ -6832,6 +6842,12 @@ export function shouldAutoContinue(messageChunk, isImpersonate) {
 export function triggerAutoContinue(messageChunk, isImpersonate) {
     if (selected_group) {
         console.debug('Auto-continue is disabled for group chat');
+        return;
+    }
+
+    // SillyBunny: Auto-swipe can take the generation lock before this callback resumes.
+    if (is_send_press || is_group_generating || streamingProcessor) {
+        console.debug('Auto-continue skipped: a generation is already in progress');
         return;
     }
 
