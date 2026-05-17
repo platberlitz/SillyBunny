@@ -145,6 +145,7 @@ This update consolidates the v1.5.4 staging work since v1.5.3: preset and connec
 - PR #119 (2026-05-17) `Fix OpenRouter quantizations on profile requests`
 - PR #120 (2026-05-17) `fix: refresh topbar tokens after hiding messages`
 - PR #121 (2026-05-17) `Fix Docker startup regressions`
+- PR #123 (2026-05-17) `fix(quick-replies): dedupe and force-update bundled Memory Sharding preset`
 - PR #124 (2026-05-17) `feat: add native Prompt Inspector extension`
 - PR #125 (2026-05-17) `fix(agents): prevent duplicate Prose Polisher after template prompt update`
 - PR #126 (2026-05-17) `feat: categorise templates browser, retire Pathfinder agent`
