@@ -80,6 +80,10 @@ const OBSOLETE_CONTENT_ITEMS = Object.freeze([
     { filename: 'presets/sysprompt/Geechan - Universal Roleplay (NSFW Simplified) (V5.0).json', type: CONTENT_TYPES.SYSPROMPT },
 ]);
 
+const MANAGED_BUNDLED_PRESETS = Object.freeze([
+    { filename: 'presets/quick-replies/Memory Sharding.json', type: CONTENT_TYPES.QUICK_REPLIES },
+]);
+
 function isPresetContentType(type) {
     return PRESET_CONTENT_TYPES.includes(type);
 }
@@ -431,6 +435,99 @@ function removeObsoleteContent(contentLog, directories) {
 }
 
 /**
+ * Syncs managed bundled presets when users already have a copy installed.
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ */
+function syncManagedBundledPresets(directories) {
+    try {
+        for (const contentItem of MANAGED_BUNDLED_PRESETS) {
+            const bundledPath = path.join(contentDirectory, contentItem.filename);
+
+            if (!fs.existsSync(bundledPath)) {
+                continue;
+            }
+
+            let bundledRawContent;
+            let bundledContent;
+
+            try {
+                bundledRawContent = fs.readFileSync(bundledPath, 'utf8');
+                bundledContent = JSON.parse(bundledRawContent);
+            } catch {
+                continue;
+            }
+
+            const bundledName = typeof bundledContent.name === 'string' ? bundledContent.name.trim() : '';
+
+            if (!bundledName) {
+                continue;
+            }
+
+            const contentTarget = getUserTargetByType(contentItem.type, directories);
+
+            if (!contentTarget || !fs.existsSync(contentTarget)) {
+                continue;
+            }
+
+            /** @type {{ path: string, content: string }[]} */
+            const matches = [];
+            const pendingDirectories = [contentTarget];
+
+            while (pendingDirectories.length > 0) {
+                const currentDirectory = pendingDirectories.pop();
+
+                if (!currentDirectory) {
+                    continue;
+                }
+
+                for (const entry of fs.readdirSync(currentDirectory, { withFileTypes: true })) {
+                    const entryPath = path.join(currentDirectory, entry.name);
+
+                    if (entry.isDirectory()) {
+                        pendingDirectories.push(entryPath);
+                        continue;
+                    }
+
+                    if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== '.json') {
+                        continue;
+                    }
+
+                    try {
+                        const userRawContent = fs.readFileSync(entryPath, 'utf8');
+                        const userContent = JSON.parse(userRawContent);
+                        const userName = typeof userContent.name === 'string' ? userContent.name.trim() : '';
+
+                        if (userName === bundledName) {
+                            matches.push({ path: entryPath, content: userRawContent });
+                        }
+                    } catch {
+                        // Ignore unreadable or invalid JSON quick reply files.
+                    }
+                }
+            }
+
+            if (matches.length === 0) {
+                continue;
+            }
+
+            if (matches.length === 1 && matches[0].content === bundledRawContent) {
+                continue;
+            }
+
+            for (const match of matches) {
+                fs.rmSync(match.path, { recursive: true, force: true });
+            }
+
+            const targetPath = path.join(contentTarget, `${sanitize(bundledName)}.json`);
+            writeFileAtomicSync(targetPath, bundledRawContent, 'utf8');
+            setPermissionsSync(targetPath);
+        }
+    } catch (err) {
+        console.warn('Managed preset sync failed', err);
+    }
+}
+
+/**
  * Seeds content for a user.
  * @param {ContentItem[]} contentIndex Content index
  * @param {import('../users.js').UserDirectoryList} directories User directories
@@ -446,6 +543,7 @@ async function seedContentForUser(contentIndex, directories, forceCategories) {
     const contentLog = getContentLog(contentLogPath);
     removeObsoleteContent(contentLog, directories);
     writeFileAtomicSync(contentLogPath, contentLog.join('\n'));
+    syncManagedBundledPresets(directories);
     const filteredContentIndex = contentIndex.filter(contentItem => {
         if (!isPresetContentType(contentItem.type)) {
             return true;
