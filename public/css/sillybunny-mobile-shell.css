@@ -249,6 +249,59 @@
         border-radius: 999px !important;
     }
 
+    :root[data-sb-shell-header-mode='show'] #right-nav-panel.openDrawer > .sb-character-shell-header,
+    :root[data-sb-shell-header-mode='auto'] #right-nav-panel.openDrawer > .sb-character-shell-header:not(.sb-shell-header-collapsed) {
+        min-height: 0 !important;
+        padding: 14px 56px 10px 16px !important;
+    }
+
+    :root[data-sb-shell-header-mode='show'] #right-nav-panel.openDrawer > .sb-character-shell-header .sb-shell-title,
+    :root[data-sb-shell-header-mode='auto'] #right-nav-panel.openDrawer > .sb-character-shell-header:not(.sb-shell-header-collapsed) .sb-shell-title,
+    #right-nav-panel.openDrawer > .sb-character-shell-header.sb-shell-header-collapsed .sb-shell-title {
+        position: static !important;
+        width: auto !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        clip: auto !important;
+        clip-path: none !important;
+        white-space: normal !important;
+        border: 0 !important;
+    }
+
+    :root[data-sb-shell-header-mode='show'] #right-nav-panel.openDrawer > .sb-character-shell-header .sb-shell-subtitle,
+    :root[data-sb-shell-header-mode='auto'] #right-nav-panel.openDrawer > .sb-character-shell-header:not(.sb-shell-header-collapsed) .sb-shell-subtitle {
+        display: block !important;
+    }
+
+    :root[data-sb-shell-header-mode='show'] #right-nav-panel.openDrawer > .sb-character-shell-header .sb-shell-close,
+    :root[data-sb-shell-header-mode='auto'] #right-nav-panel.openDrawer > .sb-character-shell-header:not(.sb-shell-header-collapsed) .sb-shell-close {
+        top: 14px !important;
+        right: 14px !important;
+        width: 42px !important;
+        min-width: 42px !important;
+        height: 42px !important;
+        min-height: 42px !important;
+    }
+
+    #right-nav-panel.openDrawer > .sb-character-shell-header.sb-shell-header-collapsed {
+        min-height: 52px !important;
+        padding: 8px 56px 8px 14px !important;
+    }
+
+    #right-nav-panel.openDrawer > .sb-character-shell-header.sb-shell-header-collapsed .sb-shell-title {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    #right-nav-panel.openDrawer > .sb-character-shell-header.sb-shell-header-collapsed .sb-shell-close {
+        top: 50% !important;
+        right: 14px !important;
+        transform: translateY(-50%) !important;
+    }
+
     #right-nav-panel.openDrawer > #CharListButtonAndHotSwaps {
         min-height: 34px !important;
         max-height: 34px !important;
@@ -483,7 +536,17 @@
         overflow-x: hidden !important;
         overscroll-behavior: contain !important;
         -webkit-overflow-scrolling: touch !important;
+        box-sizing: border-box !important;
+        scrollbar-gutter: stable !important;
+        padding-inline-end: var(--sb-character-scroll-gutter, 8px) !important;
         padding-bottom: max(24px, var(--sb-mobile-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+    }
+
+    #right-nav-panel.openDrawer #rm_print_characters_block,
+    #right-nav-panel.openDrawer #rm_ch_create_block {
+        box-sizing: border-box !important;
+        scrollbar-gutter: stable !important;
+        padding-inline-end: var(--sb-character-scroll-gutter, 8px) !important;
     }
 
     #right-nav-panel.openDrawer .sb-shell-panel-scroller {

@@ -1349,6 +1349,7 @@ body:not(.movingUI) .drawer-content.maximized {
 }
 
 #right-nav-panel.openDrawer {
+    --sb-character-scroll-gutter: 8px;
     display: flex;
     width: min(100vw, clamp(600px, 55vw, 760px)) !important;
     max-width: calc(100vw - 28px) !important;
@@ -1405,7 +1406,17 @@ body.movingUI #right-nav-panel.openDrawer > .sb-shell-resize-handle {
     min-height: 0;
     overflow-y: auto !important;
     overflow-x: hidden !important;
+    box-sizing: border-box;
+    scrollbar-gutter: stable;
+    padding-inline-end: var(--sb-character-scroll-gutter, 8px);
     -webkit-overflow-scrolling: touch;
+}
+
+#right-nav-panel.openDrawer #rm_print_characters_block,
+#right-nav-panel.openDrawer #rm_ch_create_block {
+    box-sizing: border-box;
+    scrollbar-gutter: stable;
+    padding-inline-end: var(--sb-character-scroll-gutter, 8px);
 }
 
 .sb-shell-frame {
@@ -1732,6 +1743,7 @@ body.sb-shell-resizing * {
     border-bottom: 1px solid color-mix(in srgb, var(--sb-shell-border) 80%, transparent);
     background: transparent;
     text-align: left;
+    transition: padding var(--sb-transition-fast), gap var(--sb-transition-fast);
 }
 
 .sb-shell-header::before {
@@ -1749,6 +1761,40 @@ body.sb-shell-resizing * {
 .sb-character-shell-header {
     position: relative;
     flex: 0 0 auto;
+}
+
+.sb-shell-header.sb-shell-header-collapsed {
+    gap: 0;
+    min-height: 52px;
+    padding: var(--sb-shell-space-sm) calc(var(--sb-shell-panel-padding-inline) + 56px) var(--sb-shell-space-sm) var(--sb-shell-panel-padding-inline);
+    justify-content: center;
+}
+
+.sb-shell-header.sb-shell-header-collapsed .sb-shell-close {
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.sb-shell-header.sb-shell-header-collapsed .sb-shell-close:hover {
+    transform: translateY(calc(-50% - 1px));
+}
+
+.sb-shell-header:not(.sb-shell-header-collapsed) .sb-shell-close:hover {
+    transform: translateY(-1px);
+}
+
+.sb-shell-header.sb-shell-header-collapsed .sb-shell-kicker,
+.sb-shell-header.sb-shell-header-collapsed .sb-shell-subtitle,
+.sb-shell-header.sb-shell-header-collapsed .sb-shell-description {
+    display: none;
+}
+
+.sb-shell-header.sb-shell-header-collapsed .sb-shell-title {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--sb-type-control);
 }
 
 .sb-character-shell-nav-wrapper {
@@ -3436,7 +3482,8 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 }
 
 .sb-frontend-icon-header,
-.sb-frontend-icon-copy {
+.sb-frontend-icon-copy,
+.sb-shell-header-mode-header {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -6554,6 +6601,16 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         padding: 14px 56px 10px 16px;
     }
 
+    .sb-shell-header.sb-shell-header-collapsed {
+        gap: 0;
+        min-height: 52px;
+        padding: 8px 56px 8px 14px;
+    }
+
+    .sb-shell-header.sb-shell-header-collapsed .sb-shell-title {
+        font-size: calc(var(--mainFontSize) * 0.94);
+    }
+
     .sb-shell-kicker {
         font-size: calc(var(--mainFontSize) * 0.6);
         letter-spacing: 0.12em;
@@ -7367,6 +7424,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         width: 100%;
         min-width: 0;
         padding: 0 8px var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px)));
+        padding-inline-end: calc(8px + var(--sb-character-scroll-gutter, 8px));
         overflow-y: auto !important;
         overflow-x: hidden !important;
         box-sizing: border-box;
@@ -7455,6 +7513,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         width: 100%;
         min-width: 0;
         padding: 0 0 10px;
+        padding-inline-end: var(--sb-character-scroll-gutter, 8px);
     }
 
     #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) {
@@ -7750,8 +7809,16 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     flex: 0 0 auto !important;
 }
 
+/* Keep shell card avatars inside their cards even when custom themes scale global .avatar nodes. */
+body.charListGrid #right-nav-panel.openDrawer #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select, .bogus_folder_select):not(.inline_avatar) > :is(.avatar, .missing-avatar) {
+    scale: 1 !important;
+    transform: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .sb-proxy-button,
+    .sb-shell-header,
+    .sb-shell-close,
     .sb-shell-tab,
     .sb-search-result,
     .sb-theme-option,
