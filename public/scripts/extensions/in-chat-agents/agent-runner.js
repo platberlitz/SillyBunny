@@ -122,6 +122,7 @@ let toolRecursionDepth = 0;
 /** Tracks automatic post-processing per generated message revision so fallback events cannot double-apply agents. */
 const processedPostProcessingRuns = new WeakMap();
 const processedPostProcessingRunsByIndex = new Map();
+const postProcessingInFlightKeys = new Set();
 
 function escapeToastHtml(value) {
     return String(value ?? '')
@@ -665,6 +666,24 @@ function clearMissedGenerationEndRecoveryCheck() {
     missedGenerationEndRecoveryTimeout = null;
 }
 
+function clearPostGenerationStateAfterCompletion() {
+    if (
+        isGenerationInProgress ||
+        internalPromptTransformDepth > 0 ||
+        postProcessingInFlightKeys.size > 0 ||
+        deferredPostProcessingQueue.size > 0 ||
+        generationStopRequested ||
+        postProcessingInvalidatedByChatChange
+    ) {
+        return;
+    }
+
+    pendingGenerationSnapshot = null;
+    clearLatestAssistantPostProcessingFallback();
+    clearPostGenerationRecoveryCheck();
+    clearMissedGenerationEndRecoveryCheck();
+}
+
 function normalizeSnapshotChatId(chatId) {
     return chatId === null || chatId === undefined ? '' : String(chatId);
 }
@@ -1056,6 +1075,8 @@ function scheduleDeferredPostProcessingFlush(delayMs = 0) {
                 return;
             }
         }
+
+        clearPostGenerationStateAfterCompletion();
 
         if (deferredPostProcessingQueue.size > 0) {
             scheduleDeferredPostProcessingFlush();
@@ -2879,168 +2900,179 @@ async function processReceivedMessage(messageIndex, generationType, activationSn
         return;
     }
 
-    syncAssistantMessageTextToSwipe(message);
-
-    const resolvedActivationSnapshot = activationSnapshot
-        ? cloneActivationSnapshot(activationSnapshot, generationType)
-        : cloneActivationSnapshot(pendingGenerationSnapshot ?? buildActivationSnapshot(generationType), generationType);
-    const runKey = getPostProcessingRunKey(message, generationType, resolvedActivationSnapshot);
-    const indexRunKey = getPostProcessingIndexRunKey(message, messageIndex, generationType, resolvedActivationSnapshot);
-    if (hasProcessedPostProcessingRun(message, runKey, messageIndex, indexRunKey)) {
+    const swipeId = Number(message?.swipe_id);
+    const inFlightKey = `${messageIndex}:${Number.isInteger(swipeId) ? swipeId : 0}`;
+    if (postProcessingInFlightKeys.has(inFlightKey)) {
         return;
     }
-    markPostProcessingRunProcessed(message, runKey, messageIndex, indexRunKey);
 
-    const activeAgents = getActiveAgentsForMessage(generationType, resolvedActivationSnapshot);
-    const promptTransformAgents = getPromptTransformAgentsForMessage(activeAgents, generationType);
-    const utilityAgents = isImpersonateGenerationType(generationType)
-        ? []
-        : activeAgents.filter(agent =>
-            agent.postProcess?.enabled &&
-            agent.postProcess.type !== 'regex' &&
-            (
-                agent.phase === 'post' ||
-                agent.phase === 'both' ||
-                agent.postProcess.type === 'extract'
-            ),
-        );
+    postProcessingInFlightKeys.add(inFlightKey);
+    try {
+        syncAssistantMessageTextToSwipe(message);
 
-    let chatStateChanged = false;
-    let messageDisplayChanged = false;
-    if (storePreGenerationInterceptHistory(message, takePendingPreGenerationInterceptRuns())) {
-        chatStateChanged = true;
-        messageDisplayChanged = true;
-    }
-
-    const promptRuns = [];
-    let currentPromptTransformText = unwrapAssistantResponseWrapper(message.mes);
-    if (currentPromptTransformText !== normalizeContentText(message.mes)) {
-        message.mes = currentPromptTransformText;
-        await syncPromptTransformMessageStateAsync(message, messageIndex);
-        chatStateChanged = true;
-        messageDisplayChanged = true;
-    }
-    let appendBatch = [];
-    const flushAppendBatch = async () => {
-        if (appendBatch.length === 0) {
+        const resolvedActivationSnapshot = activationSnapshot
+            ? cloneActivationSnapshot(activationSnapshot, generationType)
+            : cloneActivationSnapshot(pendingGenerationSnapshot ?? buildActivationSnapshot(generationType), generationType);
+        const runKey = getPostProcessingRunKey(message, generationType, resolvedActivationSnapshot);
+        const indexRunKey = getPostProcessingIndexRunKey(message, messageIndex, generationType, resolvedActivationSnapshot);
+        if (hasProcessedPostProcessingRun(message, runKey, messageIndex, indexRunKey)) {
             return;
         }
+        markPostProcessingRunProcessed(message, runKey, messageIndex, indexRunKey);
 
-        const batchAgents = appendBatch;
-        appendBatch = [];
+        const activeAgents = getActiveAgentsForMessage(generationType, resolvedActivationSnapshot);
+        const promptTransformAgents = getPromptTransformAgentsForMessage(activeAgents, generationType);
+        const utilityAgents = isImpersonateGenerationType(generationType)
+            ? []
+            : activeAgents.filter(agent =>
+                agent.postProcess?.enabled &&
+                agent.postProcess.type !== 'regex' &&
+                (
+                    agent.phase === 'post' ||
+                    agent.phase === 'both' ||
+                    agent.postProcess.type === 'extract'
+                ),
+            );
 
-        const batchResult = await runPromptTransformAppendBatch(
-            batchAgents,
-            message,
-            generationType,
-            currentPromptTransformText,
-            messageIndex,
-        );
-        promptRuns.push(...batchResult.results);
-        currentPromptTransformText = batchResult.nextMessageText;
-
-        if (batchResult.changed) {
+        let chatStateChanged = false;
+        let messageDisplayChanged = false;
+        if (storePreGenerationInterceptHistory(message, takePendingPreGenerationInterceptRuns())) {
             chatStateChanged = true;
             messageDisplayChanged = true;
         }
-    };
 
-    for (const agent of promptTransformAgents) {
-        if (getPromptTransformMode(agent) === 'append') {
-            appendBatch.push(agent);
-            continue;
+        const promptRuns = [];
+        let currentPromptTransformText = unwrapAssistantResponseWrapper(message.mes);
+        if (currentPromptTransformText !== normalizeContentText(message.mes)) {
+            message.mes = currentPromptTransformText;
+            await syncPromptTransformMessageStateAsync(message, messageIndex);
+            chatStateChanged = true;
+            messageDisplayChanged = true;
+        }
+        let appendBatch = [];
+        const flushAppendBatch = async () => {
+            if (appendBatch.length === 0) {
+                return;
+            }
+
+            const batchAgents = appendBatch;
+            appendBatch = [];
+
+            const batchResult = await runPromptTransformAppendBatch(
+                batchAgents,
+                message,
+                generationType,
+                currentPromptTransformText,
+                messageIndex,
+            );
+            promptRuns.push(...batchResult.results);
+            currentPromptTransformText = batchResult.nextMessageText;
+
+            if (batchResult.changed) {
+                chatStateChanged = true;
+                messageDisplayChanged = true;
+            }
+        };
+
+        for (const agent of promptTransformAgents) {
+            if (getPromptTransformMode(agent) === 'append') {
+                appendBatch.push(agent);
+                continue;
+            }
+
+            await flushAppendBatch();
+
+            try {
+                const result = await runPromptTransformAgent(agent, message, generationType, currentPromptTransformText, messageIndex);
+                promptRuns.push(result);
+                currentPromptTransformText = result.nextMessageText;
+
+                if (result.changed) {
+                    chatStateChanged = true;
+                    messageDisplayChanged = true;
+                }
+            } catch (error) {
+                promptRuns.push({
+                    agentId: agent.id,
+                    agentName: agent.name,
+                    changed: false,
+                    status: 'error',
+                    mode: getPromptTransformMode(agent),
+                    error: error instanceof Error ? error.message : String(error),
+                    runner: 'error',
+                    timestamp: new Date().toISOString(),
+                });
+            }
         }
 
         await flushAppendBatch();
 
-        try {
-            const result = await runPromptTransformAgent(agent, message, generationType, currentPromptTransformText, messageIndex);
-            promptRuns.push(result);
-            currentPromptTransformText = result.nextMessageText;
-
-            if (result.changed) {
-                chatStateChanged = true;
-                messageDisplayChanged = true;
-            }
-        } catch (error) {
-            promptRuns.push({
-                agentId: agent.id,
-                agentName: agent.name,
-                changed: false,
-                status: 'error',
-                mode: getPromptTransformMode(agent),
-                error: error instanceof Error ? error.message : String(error),
-                runner: 'error',
-                timestamp: new Date().toISOString(),
-            });
+        if (updatePromptTransformRuns(message, promptRuns)) {
+            chatStateChanged = true;
         }
-    }
 
-    await flushAppendBatch();
+        let promptHistoryChanged = false;
+        for (const run of promptRuns) {
+            promptHistoryChanged = updatePromptTransformHistory(message, run) || promptHistoryChanged;
+        }
 
-    if (updatePromptTransformRuns(message, promptRuns)) {
-        chatStateChanged = true;
-    }
+        if (promptHistoryChanged) {
+            chatStateChanged = true;
+        }
 
-    let promptHistoryChanged = false;
-    for (const run of promptRuns) {
-        promptHistoryChanged = updatePromptTransformHistory(message, run) || promptHistoryChanged;
-    }
+        for (const agent of utilityAgents) {
+            const postProcess = agent.postProcess;
 
-    if (promptHistoryChanged) {
-        chatStateChanged = true;
-    }
-
-    for (const agent of utilityAgents) {
-        const postProcess = agent.postProcess;
-
-        switch (postProcess.type) {
-            case 'extract': {
-                if (!postProcess.extractPattern || !postProcess.extractVariable) {
-                    break;
-                }
-
-                try {
-                    const regex = new RegExp(postProcess.extractPattern, 'g');
-                    const matches = message.mes.match(regex);
-                    if (matches) {
-                        chat_metadata[`agent_${postProcess.extractVariable}`] = matches.join('\n');
-                        chatStateChanged = true;
+            switch (postProcess.type) {
+                case 'extract': {
+                    if (!postProcess.extractPattern || !postProcess.extractVariable) {
+                        break;
                     }
-                } catch (error) {
-                    console.warn(`[InChatAgents] Extract error in agent "${agent.name}":`, error);
-                }
-                break;
-            }
 
-            case 'append': {
-                if (!postProcess.appendText) {
+                    try {
+                        const regex = new RegExp(postProcess.extractPattern, 'g');
+                        const matches = message.mes.match(regex);
+                        if (matches) {
+                            chat_metadata[`agent_${postProcess.extractVariable}`] = matches.join('\n');
+                            chatStateChanged = true;
+                        }
+                    } catch (error) {
+                        console.warn(`[InChatAgents] Extract error in agent "${agent.name}":`, error);
+                    }
                     break;
                 }
 
-                const appendedText = substituteParams(postProcess.appendText);
-                if (appendedText.trim()) {
-                    message.mes += appendedText;
-                    chatStateChanged = true;
-                    messageDisplayChanged = true;
+                case 'append': {
+                    if (!postProcess.appendText) {
+                        break;
+                    }
+
+                    const appendedText = substituteParams(postProcess.appendText);
+                    if (appendedText.trim()) {
+                        message.mes += appendedText;
+                        chatStateChanged = true;
+                        messageDisplayChanged = true;
+                    }
+                    break;
                 }
-                break;
             }
         }
-    }
 
-    if (updateMessageRegexSnapshot(message, activeAgents, generationType)) {
-        chatStateChanged = true;
-        messageDisplayChanged = true;
-    }
+        if (updateMessageRegexSnapshot(message, activeAgents, generationType)) {
+            chatStateChanged = true;
+            messageDisplayChanged = true;
+        }
 
-    if (chatStateChanged) {
-        syncAssistantMessageStateToSwipe(message, messageIndex);
-        saveChatDebounced();
-    }
+        if (chatStateChanged) {
+            syncAssistantMessageStateToSwipe(message, messageIndex);
+            saveChatDebounced();
+        }
 
-    if (messageDisplayChanged) {
-        scheduleMessageRefresh(messageIndex, message);
+        if (messageDisplayChanged) {
+            scheduleMessageRefresh(messageIndex, message);
+        }
+    } finally {
+        postProcessingInFlightKeys.delete(inFlightKey);
     }
 }
 
@@ -3095,6 +3127,7 @@ async function onMessageReceived(messageIndex, generationType) {
     clearDeferredPostProcessing(numericMessageIndex);
 
     await processReceivedMessage(numericMessageIndex, generationType);
+    clearPostGenerationStateAfterCompletion();
 }
 
 function onStreamTokenReceived() {
