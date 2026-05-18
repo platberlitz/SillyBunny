@@ -588,9 +588,26 @@ body.sb-topbar-compact #sb-chatbar-layer {
     transform: translateY(-1px);
 }
 
-.sb-chatbar-button.is-active {
+.sb-chatbar-button:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-pressed='true'], [aria-selected='true'], [aria-current]):not(:disabled):not(.is-disabled) {
+    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 13%, transparent);
     border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 42%, var(--sb-shell-border) 58%);
-    box-shadow: 0 8px 16px color-mix(in srgb, var(--SmartThemeShadowColor) 14%, transparent);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 24%, transparent),
+        inset 0 -2px 0 color-mix(in srgb, var(--color-primary, var(--sb-accent)) 46%, transparent),
+        0 8px 16px color-mix(in srgb, var(--SmartThemeShadowColor) 14%, transparent);
+}
+
+.sb-chatbar-button:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-pressed='true'], [aria-selected='true'], [aria-current]):not(:disabled):not(.is-disabled)::after {
+    content: '';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    inline-size: 5px;
+    block-size: 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 84%, var(--SmartThemeBodyColor));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--sb-shell-main-bg) 82%, transparent);
+    pointer-events: none;
 }
 
 .sb-chatbar-button:focus-visible,
@@ -614,9 +631,9 @@ body.sb-topbar-compact #sb-chatbar-layer {
 
 #sb-chatbar-visibility-toggle:hover,
 #sb-chatbar-visibility-toggle.is-active {
-    border-color: transparent;
-    background: transparent;
-    box-shadow: none;
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 34%, transparent);
+    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 10%, transparent);
+    box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--color-primary, var(--sb-accent)) 42%, transparent);
 }
 
 #sb-chatbar-visibility-toggle.is-active > i {
@@ -628,6 +645,25 @@ body.sb-topbar-compact #sb-chatbar-layer {
     opacity: 0.46;
     cursor: default;
     transform: none;
+}
+
+.sb-chatbar-button:is(.is-busy, [aria-busy='true']) {
+    opacity: 0.78;
+    background: color-mix(in srgb, var(--sb-color-warning, var(--SmartThemeQuoteColor)) 12%, transparent);
+    border-color: color-mix(in srgb, var(--sb-color-warning, var(--SmartThemeQuoteColor)) 46%, var(--sb-shell-border) 54%);
+    box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--sb-color-warning, var(--SmartThemeQuoteColor)) 48%, transparent);
+}
+
+.sb-chatbar-button:is(.is-busy, [aria-busy='true'])::after {
+    content: '';
+    position: absolute;
+    right: 6px;
+    bottom: 5px;
+    left: 6px;
+    block-size: 2px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--sb-color-warning, var(--SmartThemeQuoteColor)) 82%, var(--SmartThemeBodyColor));
+    pointer-events: none;
 }
 
 .sb-chatbar-field {
@@ -1654,7 +1690,7 @@ body.sb-shell-resizing * {
     display: none;
 }
 
-.sb-shell-tab.is-active {
+.sb-shell-tab:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-selected='true'], [aria-current]) {
     background: var(--sb-shell-tab-active-bg);
     border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 30%, var(--sb-shell-border) 70%);
     box-shadow:
@@ -1663,7 +1699,7 @@ body.sb-shell-resizing * {
     transform: none;
 }
 
-.sb-shell-tab.is-active i {
+.sb-shell-tab:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-selected='true'], [aria-current]) i {
     color: var(--color-primary, var(--sb-accent));
     opacity: 1;
 }
@@ -3923,6 +3959,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 
 .sb-bottom-chat-btn {
     appearance: none;
+    position: relative;
     border: none;
     background: transparent;
     color: var(--SmartThemeBodyColor);
@@ -3946,10 +3983,25 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent);
 }
 
-.sb-bottom-chat-btn.is-active {
+.sb-bottom-chat-btn:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-pressed='true'], [aria-selected='true'], [aria-current]):not(:disabled):not(.is-disabled) {
     opacity: 1;
     color: var(--color-primary, var(--sb-accent));
     background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 14%, transparent);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 26%, transparent),
+        inset 0 -2px 0 color-mix(in srgb, var(--color-primary, var(--sb-accent)) 48%, transparent);
+}
+
+.sb-bottom-chat-btn:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-pressed='true'], [aria-selected='true'], [aria-current]):not(:disabled):not(.is-disabled)::after {
+    content: '';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    inline-size: 5px;
+    block-size: 5px;
+    border-radius: 999px;
+    background: currentColor;
+    pointer-events: none;
 }
 
 .sb-bottom-chat-collapse-toggle,
@@ -3958,10 +4010,27 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 }
 
 .sb-bottom-chat-btn:disabled,
-.sb-bottom-chat-btn.is-disabled,
-.sb-bottom-chat-btn.is-busy {
+.sb-bottom-chat-btn.is-disabled {
     opacity: 0.38;
     cursor: default;
+    pointer-events: none;
+}
+
+.sb-bottom-chat-btn:is(.is-busy, [aria-busy='true']) {
+    opacity: 0.72;
+    background: color-mix(in srgb, var(--sb-color-warning, var(--SmartThemeQuoteColor)) 13%, transparent);
+    box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--sb-color-warning, var(--SmartThemeQuoteColor)) 50%, transparent);
+}
+
+.sb-bottom-chat-btn:is(.is-busy, [aria-busy='true'])::after {
+    content: '';
+    position: absolute;
+    right: 6px;
+    bottom: 4px;
+    left: 6px;
+    block-size: 2px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--sb-color-warning, var(--SmartThemeQuoteColor)) 82%, var(--SmartThemeBodyColor));
     pointer-events: none;
 }
 
