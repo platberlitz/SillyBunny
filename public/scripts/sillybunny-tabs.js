@@ -1,3 +1,5 @@
+import { DEFAULT_SCROLL_EDGE_SETTLE_DELAYS, jumpScrollElementToEdge } from './chat-scroll-edges.js';
+
 const SB_STORAGE_KEYS = Object.freeze({
     leftTab: 'sb-left-tab',
     rightTab: 'sb-right-tab',
@@ -95,6 +97,7 @@ let sbComposerControlsSyncQueued = false;
 let sbStorageFlushTimer = 0;
 let sbStorageFlushEventsBound = false;
 let sbMessageActionEventsBound = false;
+let sbPendingBottomChatScrollCancel = null;
 const sbStorageCache = new Map();
 const sbStoragePendingWrites = new Map();
 const SB_EXTENSION_ALIASES = {
@@ -4116,7 +4119,16 @@ function getReducedMotionScrollBehavior() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
 }
 
+function cancelPendingBottomChatScroll() {
+    if (typeof sbPendingBottomChatScrollCancel === 'function') {
+        sbPendingBottomChatScrollCancel();
+        sbPendingBottomChatScrollCancel = null;
+    }
+}
+
 function scrollCurrentChatToTop() {
+    cancelPendingBottomChatScroll();
+
     const chatRoot = getChatScrollElement();
     if (!(chatRoot instanceof HTMLElement)) {
         return;
@@ -4129,21 +4141,18 @@ function scrollCurrentChatToTop() {
 }
 
 function scrollCurrentChatToBottom() {
+    cancelPendingBottomChatScroll();
+
     const context = getSillyTavernContext();
 
     if (typeof context?.scrollChatToBottom === 'function') {
         context.scrollChatToBottom({ force: true });
-        context.scrollChatToBottom({ waitForFrame: true, force: true });
-        return;
     }
 
     const chatRoot = getChatScrollElement();
-    if (chatRoot instanceof HTMLElement) {
-        chatRoot.scrollTo({
-            top: chatRoot.scrollHeight,
-            behavior: getReducedMotionScrollBehavior(),
-        });
-    }
+    sbPendingBottomChatScrollCancel = jumpScrollElementToEdge(chatRoot, 'bottom', {
+        settleDelays: DEFAULT_SCROLL_EDGE_SETTLE_DELAYS,
+    });
 }
 
 function countRegexMatches(value, regex) {
