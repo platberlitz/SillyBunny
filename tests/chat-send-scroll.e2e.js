@@ -44,6 +44,7 @@ test.describe('chat send scroll', () => {
         await page.evaluate(async () => {
             const context = window.SillyTavern.getContext();
             const chatElement = document.querySelector('#chat');
+            context.powerUserSettings.auto_scroll_chat_to_bottom = true;
 
             for (let index = 0; index < 12; index++) {
                 const message = {
