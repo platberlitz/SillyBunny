@@ -34,6 +34,7 @@ describe('in-chat agent post-processing runner', () => {
     let saveChatDebounced;
     let saveChat;
     let generateQuietPrompt;
+    let generateRaw;
     let runSidecarRetrieval;
     let streamingProcessor;
     let updateMessageTokenAccounting;
@@ -41,6 +42,7 @@ describe('in-chat agent post-processing runner', () => {
     let connectionManagerRequestService;
     let globalSettings;
     let currentChatId;
+    let mainApi;
     let documentListeners;
     let windowListeners;
 
@@ -75,6 +77,7 @@ describe('in-chat agent post-processing runner', () => {
         saveChatDebounced = jest.fn();
         saveChat = jest.fn();
         generateQuietPrompt = jest.fn(async () => 'quiet result');
+        generateRaw = jest.fn(async () => 'raw result');
         runSidecarRetrieval = jest.fn();
         streamingProcessor = {
             messageId: -1,
@@ -106,6 +109,7 @@ describe('in-chat agent post-processing runner', () => {
             appendAgentsExecutionMode: 'parallel',
         };
         currentChatId = 'chat-a';
+        mainApi = 'kobold';
         documentListeners = new Map();
         windowListeners = new Map();
 
@@ -197,6 +201,8 @@ describe('in-chat agent post-processing runner', () => {
                 saveChat,
                 updateMessageMetaBadges,
                 ConnectionManagerRequestService: connectionManagerRequestService,
+                generateRaw,
+                mainApi,
             })),
         }));
 
@@ -1541,6 +1547,48 @@ describe('in-chat agent post-processing runner', () => {
         expect(textarea.value).toBe('Polished impersonation');
         expect(textarea.dispatchEvent).toHaveBeenCalledTimes(1);
         expect(textarea.dispatchEvent.mock.calls[0][0].type).toBe('input');
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+    });
+
+    test('uses direct user-final chat helper for no-profile impersonation prompt transforms', async () => {
+        useImpersonateTransformAgent({ runOnImpersonate: true });
+        mainApi = 'openai';
+        generateRaw.mockResolvedValue('<assistant_response>Polished impersonation</assistant_response>');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        const textarea = {
+            value: 'Draft impersonation',
+            dispatchEvent: jest.fn(),
+        };
+        document.querySelector = jest.fn(selector => selector === '#send_textarea' ? textarea : null);
+        connectionManagerRequestService = null;
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'impersonate', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'impersonate', {}, false);
+        await eventSource.emit(eventTypes.IMPERSONATE_READY, 'Draft impersonation');
+
+        expect(generateQuietPrompt).not.toHaveBeenCalled();
+        expect(generateRaw).toHaveBeenCalledTimes(1);
+        expect(generateRaw).toHaveBeenCalledWith(expect.objectContaining({
+            api: 'openai',
+            instructOverride: true,
+            responseLength: 8192,
+            trimNames: false,
+            cacheScope: 'auxiliary',
+        }));
+
+        const sentPrompt = generateRaw.mock.calls[0][0].prompt;
+        expect(sentPrompt).toEqual([
+            expect.objectContaining({ role: 'system' }),
+            expect.objectContaining({ role: 'user' }),
+        ]);
+        expect(sentPrompt.at(-1).role).toBe('user');
+        expect(sentPrompt[0].content).toContain('generated impersonation text');
+        expect(sentPrompt[1].content).toContain('Draft impersonation');
+        expect(textarea.value).toBe('Polished impersonation');
+        expect(textarea.dispatchEvent).toHaveBeenCalledTimes(1);
         expect(saveChatDebounced).not.toHaveBeenCalled();
     });
 
