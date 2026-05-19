@@ -150,6 +150,42 @@
     z-index: calc(var(--sb-z-modal-content) + 5) !important;
 }
 
+.zoomed_avatar > :is(.zoomed_avatar_container, .avatar_zoom_container) {
+    position: relative;
+    z-index: 0 !important;
+}
+
+.zoomed_avatar > .panelControlBar {
+    z-index: calc(var(--sb-z-modal-content) + 6) !important;
+    pointer-events: auto;
+}
+
+.zoomed_avatar > .panelControlBar .dragClose {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor) 20%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 82%, transparent);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--SmartThemeShadowColor) 28%, transparent);
+    opacity: 0.88;
+}
+
+.zoomed_avatar > .panelControlBar .dragClose:hover,
+.zoomed_avatar > .panelControlBar .dragClose:focus-visible {
+    opacity: 1;
+    transform: translateY(-1px);
+}
+
+@media (pointer: coarse), (hover: none) {
+    .zoomed_avatar > .panelControlBar {
+        opacity: 1;
+    }
+}
+
 :root[data-sb-compact-mode='true'] {
     --sb-control-min-height: 32px;
     --sb-control-icon-physical-size: max(var(--sb-icon-control-size), var(--sb-control-min-height));
