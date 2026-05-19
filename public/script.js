@@ -3673,13 +3673,14 @@ export function scrollChatToBottom({ waitForFrame, force = false } = {}) {
     requestId = requestAnimationFrame(() => doScroll());
 }
 
-function keepMobileSendScrollAnchored({ settle = false } = {}) {
-    if (!shouldBatchMobileChatRendering()) {
-        return;
+function keepSendScrollAnchored({ settle = false } = {}) {
+    const shouldApplyMobileScrollGuards = shouldBatchMobileChatRendering();
+
+    if (shouldApplyMobileScrollGuards) {
+        scrollLock = false;
+        scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
     }
 
-    scrollLock = false;
-    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
     scrollChatToBottom({ waitForFrame: true });
 
     if (!settle) {
@@ -3687,11 +3688,14 @@ function keepMobileSendScrollAnchored({ settle = false } = {}) {
     }
 
     setTimeout(() => {
-        if (Date.now() >= scrollLockImmunityUntil) {
+        if (shouldApplyMobileScrollGuards && Date.now() >= scrollLockImmunityUntil) {
             return;
         }
 
-        scrollLock = false;
+        if (shouldApplyMobileScrollGuards) {
+            scrollLock = false;
+        }
+
         scrollChatToBottom({ waitForFrame: true });
     }, MOBILE_SEND_SCROLL_SETTLE_MS);
 }
@@ -6985,10 +6989,10 @@ export async function sendMessageAsUser(messageText, messageBias, insertAt = nul
         await eventSource.emit(event_types.USER_MESSAGE_RENDERED, insertAt);
     } else {
         chat.push(message);
-        await saveChatConditional();
         const chat_id = (chat.length - 1);
         addOneMessage(message, { scroll: false });
-        keepMobileSendScrollAnchored({ settle: true });
+        keepSendScrollAnchored({ settle: true });
+        await saveChatConditional();
         await eventSource.emit(event_types.MESSAGE_SENT, chat_id);
         await eventSource.emit(event_types.USER_MESSAGE_RENDERED, chat_id);
     }
