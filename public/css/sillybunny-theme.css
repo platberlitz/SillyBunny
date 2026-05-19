@@ -112,6 +112,14 @@
     --sb-state-attention: color-mix(in srgb, var(--color-danger, var(--sb-color-danger)) 86%, var(--SmartThemeBodyColor) 14%);
     --sb-state-attention-bg: color-mix(in srgb, var(--sb-state-attention) 18%, transparent);
     --sb-state-attention-border: color-mix(in srgb, var(--sb-state-attention) 44%, transparent);
+    --sb-state-active-bg: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 16%, var(--sb-button-bg));
+    --sb-state-active-border: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 50%, var(--sb-shell-border));
+    --sb-state-active-shadow: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 34%, transparent);
+    --sb-state-busy-bg: color-mix(in srgb, var(--sb-color-warning) 14%, var(--sb-button-bg));
+    --sb-state-busy-border: color-mix(in srgb, var(--sb-color-warning) 48%, var(--sb-shell-border));
+    --sb-editing-bg: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 7%, transparent);
+    --sb-editing-border: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 48%, var(--sb-shell-border));
+    --sb-editing-chip-bg: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 22%, var(--SmartThemeBlurTintColor));
     --sb-on-accent: rgb(0, 0, 0);
     --sb-on-solid-accent: var(--sb-on-accent);
     --sb-warning-fg: color-mix(in srgb, var(--color-danger, var(--sb-color-error)) 72%, var(--SmartThemeBodyColor) 28%);
@@ -611,6 +619,68 @@ h3:not(.popup h3):not(#chat h3) {
     transition: transform 100ms var(--sb-ease-out);
 }
 
+:is(.menu_button, .menu_button_icon, .right_menu_button):is(.is-active, .active, .selected, .is-selected, .is-current, [aria-pressed='true'], [aria-selected='true'], [aria-current]):not(.disabled):not(.is-disabled):not([disabled]) {
+    position: relative;
+    background: var(--sb-state-active-bg);
+    border-color: var(--sb-state-active-border);
+    color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 82%, var(--SmartThemeBodyColor));
+    box-shadow:
+        inset 0 0 0 1px var(--sb-state-active-shadow),
+        inset 0 -2px 0 color-mix(in srgb, var(--color-primary, var(--sb-accent)) 44%, transparent),
+        0 8px 16px color-mix(in srgb, var(--SmartThemeShadowColor) 12%, transparent);
+}
+
+.menu_button_icon:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-pressed='true'], [aria-selected='true'], [aria-current]):not(.disabled):not(.is-disabled):not([disabled])::after,
+.right_menu_button:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-pressed='true'], [aria-selected='true'], [aria-current]):not(.disabled):not(.is-disabled):not([disabled])::after,
+.menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-pressed='true'], [aria-selected='true'], [aria-current]):not(.disabled):not(.is-disabled):not([disabled])::after,
+.menu_button:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child):is(.is-active, .active, .selected, .is-selected, .is-current, [aria-pressed='true'], [aria-selected='true'], [aria-current]):not(.disabled):not(.is-disabled):not([disabled])::after {
+    content: '';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    inline-size: 5px;
+    block-size: 5px;
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--sb-state-active-bg) 86%, transparent);
+    pointer-events: none;
+}
+
+:is(.menu_button, .menu_button_icon, .right_menu_button):is(.is-busy, [aria-busy='true']) {
+    position: relative;
+    opacity: 0.82;
+    background: var(--sb-state-busy-bg);
+    border-color: var(--sb-state-busy-border);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--sb-color-warning) 28%, transparent),
+        inset 0 -2px 0 color-mix(in srgb, var(--sb-color-warning) 42%, transparent);
+}
+
+:is(.menu_button, .menu_button_icon, .right_menu_button):is(.is-busy, [aria-busy='true'])::after {
+    content: '';
+    position: absolute;
+    right: 7px;
+    bottom: 5px;
+    left: 7px;
+    block-size: 2px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--sb-color-warning) 82%, var(--SmartThemeBodyColor));
+    pointer-events: none;
+}
+
+:is(.menu_button, .menu_button_icon, .right_menu_button):focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--sb-focus-ring) 88%, transparent);
+    outline-offset: 2px;
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 52%, var(--sb-shell-border));
+    box-shadow:
+        inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 60%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--SmartThemeShadowColor) 20%, transparent);
+}
+
+:is(.menu_button, .menu_button_icon, .right_menu_button):is(.disabled, .is-disabled, [disabled]):not(.is-busy):not([aria-busy='true'])::after {
+    display: none;
+}
+
 .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
 .menu_button_icon:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
 .right_menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
@@ -738,7 +808,10 @@ textarea.text_pole:focus,
 select.text_pole:focus,
 input.text_pole:focus {
     border-color: color-mix(in srgb, var(--sb-focus-ring) 85%, transparent);
-    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 35%, transparent);
+    background-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 7%, var(--sb-input-bg));
+    box-shadow:
+        inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 35%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--SmartThemeShadowColor) 16%, transparent);
     outline: none;
 }
 
@@ -778,8 +851,26 @@ select:where(:not([multiple]):not([size]):not(.select2-hidden-accessible)) {
 
 select:where(:not([multiple]):not([size]):not(.select2-hidden-accessible)):focus {
     border-color: color-mix(in srgb, var(--sb-focus-ring) 85%, transparent);
-    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 35%, transparent);
+    background-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 7%, var(--sb-input-bg));
+    box-shadow:
+        inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 35%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--SmartThemeShadowColor) 16%, transparent);
     outline: none;
+}
+
+:is(textarea, input:not([type]), input:is([type='text'], [type='search'], [type='number'], [type='password'], [type='email'], [type='url'], [type='tel']), select):focus:not([disabled]):not([readonly]) {
+    border-color: color-mix(in srgb, var(--sb-focus-ring) 88%, transparent);
+    box-shadow:
+        inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 34%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--SmartThemeShadowColor) 14%, transparent);
+}
+
+.select2-container--default.select2-container--focus .select2-selection--single,
+.select2-container--default.select2-container--focus .select2-selection--multiple,
+.select2-container--default.select2-container--open .select2-selection--single,
+.select2-container--default.select2-container--open .select2-selection--multiple {
+    border-color: color-mix(in srgb, var(--sb-focus-ring) 82%, var(--SmartThemeBorderColor));
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 30%, transparent);
 }
 
 select.margin0:where(:not([multiple]):not([size]):not(.select2-hidden-accessible)) {
@@ -1138,6 +1229,55 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     color: color-mix(in srgb, var(--SmartThemeBodyColor) 54%, transparent);
 }
 
+#send_form:focus-within {
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 56%, var(--sb-shell-border));
+    box-shadow:
+        0 -10px 40px color-mix(in srgb, var(--SmartThemeShadowColor) 14%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 28%, transparent),
+        inset 0 0 0 1px color-mix(in srgb, var(--sb-focus-ring) 32%, transparent);
+}
+
+#send_form:focus-within #nonQRFormItems {
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 42%, var(--sb-shell-border));
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--color-primary, var(--sb-accent)) 8%, transparent), transparent 82%),
+        color-mix(in srgb, var(--SmartThemeBodyColor) 5%, var(--sb-composer-surface-base, transparent));
+}
+
+#send_form:focus-within #send_textarea {
+    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 8%, var(--sb-composer-input-bg));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sb-focus-ring) 32%, transparent);
+}
+
+#send_form.sb-generating-controls {
+    border-color: color-mix(in srgb, var(--sb-color-warning) 58%, var(--sb-shell-border));
+    box-shadow:
+        0 -10px 40px color-mix(in srgb, var(--SmartThemeShadowColor) 14%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--sb-color-warning) 32%, transparent),
+        inset 0 0 0 1px color-mix(in srgb, var(--sb-color-warning) 24%, transparent);
+}
+
+#send_form.sb-generating-controls::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    z-index: 1;
+    inline-size: min(72px, 34%);
+    block-size: 3px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--sb-color-warning) 78%, var(--SmartThemeBodyColor));
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+#send_form.sb-generating-controls #nonQRFormItems {
+    border-color: color-mix(in srgb, var(--sb-color-warning) 44%, var(--sb-shell-border));
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--sb-color-warning) 9%, transparent), transparent 82%),
+        color-mix(in srgb, var(--SmartThemeBodyColor) 5%, var(--sb-composer-surface-base, transparent));
+}
+
 #leftSendForm > div i,
 #rightSendForm > div i,
 #options_button i {
@@ -1424,6 +1564,142 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 #chat .mes .mes_view_agent_changes[style*="display: none"],
 #chat .mes .mes_view_agent_changes[style*="display:none"] {
     display: none !important;
+}
+
+#chat .mes:has(.edit_textarea),
+#chat .mes:has(.reasoning_edit_textarea) {
+    background: var(--sb-editing-bg);
+    box-shadow:
+        inset 0 0 0 1px var(--sb-editing-border),
+        0 12px 24px color-mix(in srgb, var(--SmartThemeShadowColor) 10%, transparent);
+}
+
+body.bubblechat #chat .mes:has(.edit_textarea)::before,
+body.bubblechat #chat .mes:has(.reasoning_edit_textarea)::before {
+    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 10%, var(--SmartThemeBotMesBlurTintColor));
+}
+
+body.bubblechat #chat .mes[is_user='true']:has(.edit_textarea)::before,
+body.bubblechat #chat .mes[is_user='true']:has(.reasoning_edit_textarea)::before {
+    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 10%, var(--SmartThemeUserMesBlurTintColor));
+}
+
+#chat .mes:has(.edit_textarea) .mes_block,
+#chat .mes:has(.reasoning_edit_textarea) .mes_block {
+    position: relative;
+    overflow: visible;
+}
+
+#chat .mes:has(.edit_textarea) .mes_block::before,
+#chat .mes:has(.reasoning_edit_textarea) .mes_block::before {
+    content: '';
+    position: absolute;
+    top: 7px;
+    right: max(8px, var(--mes-right-spacing, 0px));
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    inline-size: 34px;
+    block-size: 6px;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--color-primary, var(--sb-accent)) 44%, var(--sb-shell-border));
+    border-radius: 999px;
+    background: var(--sb-editing-chip-bg);
+    box-shadow: 0 8px 16px color-mix(in srgb, var(--SmartThemeShadowColor) 12%, transparent);
+    pointer-events: none;
+}
+
+#chat .mes:has(.edit_textarea) .mes_text,
+#chat .mes:has(.reasoning_edit_textarea) .mes_reasoning_details {
+    padding-top: 22px;
+}
+
+#chat .edit_textarea,
+#chat .reasoning_edit_textarea {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--sb-editing-border);
+    border-radius: var(--sb-radius-button);
+    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 8%, var(--sb-input-bg));
+    color: var(--SmartThemeBodyColor);
+    caret-color: var(--color-primary, var(--sb-accent));
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 18%, transparent),
+        0 10px 24px color-mix(in srgb, var(--SmartThemeShadowColor) 10%, transparent);
+    line-height: calc(var(--mainFontSize) + 0.35rem);
+}
+
+#chat .edit_textarea:focus,
+#chat .reasoning_edit_textarea:focus {
+    border-color: color-mix(in srgb, var(--sb-focus-ring) 88%, var(--SmartThemeBorderColor));
+    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 12%, var(--sb-input-bg));
+    box-shadow:
+        inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 36%, transparent),
+        0 12px 26px color-mix(in srgb, var(--SmartThemeShadowColor) 12%, transparent);
+}
+
+#chat .mes_edit_buttons,
+#chat .mes_reasoning_actions {
+    align-items: center;
+    gap: 5px;
+}
+
+#chat .mes_edit_buttons .menu_button,
+#chat .mes_reasoning_actions .edit_button {
+    --sb-edit-action-color: var(--color-primary, var(--sb-accent));
+    position: relative;
+    opacity: 0.92;
+    color: color-mix(in srgb, var(--sb-edit-action-color) 80%, var(--SmartThemeBodyColor));
+    border: 1px solid color-mix(in srgb, var(--sb-edit-action-color) 36%, transparent);
+    background: color-mix(in srgb, var(--sb-edit-action-color) 12%, var(--sb-button-bg));
+    box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--sb-edit-action-color) 28%, transparent);
+    filter: none;
+}
+
+#chat :is(.mes_edit_done, .mes_reasoning_edit_done).menu_button {
+    --sb-edit-action-color: var(--sb-color-success);
+}
+
+#chat :is(.mes_edit_cancel, .mes_reasoning_edit_cancel).menu_button {
+    --sb-edit-action-color: var(--sb-color-warning);
+}
+
+#chat :is(.mes_edit_delete, .mes_reasoning_delete).menu_button {
+    --sb-edit-action-color: var(--sb-color-danger);
+}
+
+#chat .mes_edit_add_reasoning.menu_button {
+    --sb-edit-action-color: var(--sb-accent-soft);
+}
+
+#chat :is(.mes_edit_copy, .mes_reasoning_copy).menu_button,
+#chat .mes_reasoning_copy.mes_button {
+    --sb-edit-action-color: var(--color-primary, var(--sb-accent));
+}
+
+#chat :is(.mes_edit_up, .mes_edit_down).menu_button {
+    --sb-edit-action-color: color-mix(in srgb, var(--SmartThemeBodyColor) 70%, var(--color-primary, var(--sb-accent)));
+}
+
+#chat .mes_edit_buttons .menu_button:not(.disabled):not([disabled]):hover,
+#chat .mes_reasoning_actions .edit_button:not(.disabled):not([disabled]):hover {
+    opacity: 1;
+    background: color-mix(in srgb, var(--sb-edit-action-color) 18%, var(--sb-button-bg));
+    border-color: color-mix(in srgb, var(--sb-edit-action-color) 48%, transparent);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--sb-edit-action-color) 24%, transparent),
+        inset 0 -2px 0 color-mix(in srgb, var(--sb-edit-action-color) 36%, transparent);
+}
+
+#chat .mes_edit_buttons .menu_button:is(.disabled, .is-disabled, [disabled]),
+#chat .mes_reasoning_actions .edit_button:is(.disabled, .is-disabled, [disabled]) {
+    opacity: 0.42;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor) 52%, transparent);
+    border-color: color-mix(in srgb, var(--sb-shell-border) 62%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 5%, transparent);
+    box-shadow: none;
 }
 
 #chat .mes .swipeRightBlock {
