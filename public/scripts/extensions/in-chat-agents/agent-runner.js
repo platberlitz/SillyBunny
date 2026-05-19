@@ -2268,6 +2268,54 @@ function consolidateAppendPromptTransformOutputs(baseText, agents, results) {
     };
 }
 
+function getUserFinalPromptTransformMessages(promptMessages) {
+    const messages = (Array.isArray(promptMessages) ? promptMessages : [])
+        .filter(message => message && typeof message === 'object')
+        .map(message => ({
+            ...message,
+            role: String(message.role ?? 'user').trim().toLowerCase() || 'user',
+        }));
+
+    if (messages.length === 0) {
+        return [{ role: 'user', content: 'Return only the requested transformed text.' }];
+    }
+
+    const hasToolCallContext = messages.some(message => message.role === 'tool' || Array.isArray(message.tool_calls));
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage.role === 'user' || hasToolCallContext) {
+        return messages;
+    }
+
+    // Prompt-transform helper prompts are synthetic requests, not real chat/tool-call tails.
+    // Keep providers that reject assistant-prefill tails happy by appending a tiny user turn
+    // instead of role-flipping any existing assistant content.
+    return [
+        ...messages,
+        { role: 'user', content: 'Return only the requested transformed text.' },
+    ];
+}
+
+function canUseMainChatCompletionHelper(context) {
+    return context?.mainApi === 'openai' && typeof context?.generateRaw === 'function';
+}
+
+async function requestMainChatCompletionPromptTransform(context, promptMessages, maxTokens) {
+    const output = await context.generateRaw({
+        prompt: getUserFinalPromptTransformMessages(promptMessages),
+        api: 'openai',
+        instructOverride: true,
+        responseLength: maxTokens,
+        trimNames: false,
+        cacheScope: 'auxiliary',
+    });
+
+    return {
+        output: extractProfileResponseText({ content: output }),
+        runner: 'main',
+        profileId: '',
+    };
+}
+
 async function requestProfilePromptTransform(CMRS, profileId, promptMessages, maxTokens, modelOverride = '') {
     const requestOptions = {
         extractData: true,
@@ -2351,6 +2399,12 @@ async function requestPromptTransform(agent, promptMessages, maxTokens) {
 
         return await runAsInternalPromptTransform(async () =>
             await requestProfilePromptTransform(CMRS, profileId, promptMessages, maxTokens, modelOverride),
+        );
+    }
+
+    if (canUseMainChatCompletionHelper(context)) {
+        return await runAsInternalPromptTransform(async () =>
+            await requestMainChatCompletionPromptTransform(context, promptMessages, maxTokens),
         );
     }
 
