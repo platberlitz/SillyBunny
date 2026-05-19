@@ -6169,6 +6169,16 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     }
 }
 
+/* Expansion of PR #145: Add compact mode scaling for laptop viewport panels */
+@media screen and (min-width: 1001px) and (max-width: 1440px) {
+    :root[data-sb-compact-mode='true'] #left-nav-panel.openDrawer,
+    :root[data-sb-compact-mode='true'] #user-settings-block.openDrawer {
+        width: min(100vw, clamp(600px, 58vw, 810px)) !important;
+        max-width: calc(100vw - 24px) !important;
+        min-width: min(510px, calc(100vw - 24px)) !important;
+    }
+}
+
 @media screen and (max-width: 768px) {
     :root {
         --sb-topbar-scale-active: var(--sb-topbar-scale-mobile);

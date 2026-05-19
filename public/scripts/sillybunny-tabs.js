@@ -402,7 +402,7 @@ const SB_SHELLS = Object.freeze({
         proxyIcon: 'fa-bars',
         proxyLabel: 'Workspace',
         title: 'Workspace',
-        subtitle: 'Set up models, prompts, lore, and helpers, then get back to the scene.',
+        subtitle: '', // Removed redundant workspace subtext (PR #145 expansion)
         searchPlaceholder: 'Find presets, samplers, lore, or tools...',
         storageKey: SB_STORAGE_KEYS.leftTab,
         defaultTabId: 'presets',
