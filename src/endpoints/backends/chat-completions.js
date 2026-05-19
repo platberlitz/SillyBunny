@@ -66,7 +66,7 @@ import {
     webTokenizers,
     getWebTokenizer,
 } from '../tokenizers.js';
-import { getVertexAIAuth, getProjectIdFromServiceAccount } from '../google.js';
+import { getVertexAIAuth, getProjectIdFromServiceAccount, getGoogleApiBaseUrl } from '../google.js';
 
 const API_OPENAI = 'https://api.openai.com/v1';
 const API_CLAUDE = 'https://api.anthropic.com/v1';
@@ -766,11 +766,13 @@ async function sendMakerSuiteRequest(request, response) {
                 headers['Authorization'] = authHeader;
             } else {
                 // For proxy mode, use the original URL with Authorization header
-                url = `${apiUrl.toString().replace(/\/$/, '')}/v1/publishers/google/models/${model}:${responseType}${stream ? '?alt=sse' : ''}`;
+                const baseUrl = getGoogleApiBaseUrl(apiUrl.toString(), 'v1');
+                url = `${baseUrl}/publishers/google/models/${model}:${responseType}${stream ? '?alt=sse' : ''}`;
                 headers['Authorization'] = authHeader;
             }
         } else {
-            url = `${apiUrl.toString().replace(/\/$/, '')}/${apiVersion}/models/${model}:${responseType}?key=${apiKey}${stream ? '&alt=sse' : ''}`;
+            const baseUrl = getGoogleApiBaseUrl(apiUrl.toString(), apiVersion);
+            url = `${baseUrl}/models/${model}:${responseType}?key=${apiKey}${stream ? '&alt=sse' : ''}`;
         }
 
         const generateResponse = await fetch(url, {
@@ -1879,9 +1881,10 @@ router.post('/status', async function (request, statusResponse) {
             apiKey = request.body.reverse_proxy ? request.body.proxy_password : readSecret(request.user.directories, SECRET_KEYS.MAKERSUITE);
             apiUrl = trimTrailingSlash(request.body.reverse_proxy || API_MAKERSUITE);
             const apiVersion = getConfigValue('gemini.apiVersion', 'v1beta');
+            const baseUrl = getGoogleApiBaseUrl(apiUrl, apiVersion);
             const modelsUrl = !apiKey && request.body.reverse_proxy
-                ? `${apiUrl}/${apiVersion}/models`
-                : `${apiUrl}/${apiVersion}/models?key=${apiKey}`;
+                ? `${baseUrl}/models`
+                : `${baseUrl}/models?key=${apiKey}`;
 
             if (!apiKey && !request.body.reverse_proxy) {
                 console.warn('Google AI Studio API key is missing.');
