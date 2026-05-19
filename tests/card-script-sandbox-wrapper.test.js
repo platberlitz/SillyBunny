@@ -10,9 +10,11 @@ describe('card script sandbox wrapper', () => {
         expect(srcdoc).toContain('<html>');
         expect(srcdoc).toContain('<meta charset="utf-8">');
         expect(srcdoc).toContain(`<meta http-equiv="Content-Security-Policy" content="${CARD_SCRIPT_SANDBOX_CSP}">`);
-        expect(CARD_SCRIPT_SANDBOX_CSP).toContain('img-src data: blob: https:');
-        expect(CARD_SCRIPT_SANDBOX_CSP).toContain('media-src data: blob: https:');
-        expect(CARD_SCRIPT_SANDBOX_CSP).toContain('font-src data: https:');
+        expect(CARD_SCRIPT_SANDBOX_CSP).toContain('img-src data: blob:');
+        expect(CARD_SCRIPT_SANDBOX_CSP).toContain('media-src data: blob:');
+        expect(CARD_SCRIPT_SANDBOX_CSP).toContain('font-src data:');
+        expect(CARD_SCRIPT_SANDBOX_CSP).not.toContain('https:');
+        expect(CARD_SCRIPT_SANDBOX_CSP).not.toContain('http:');
         expect(CARD_SCRIPT_SANDBOX_CSP).not.toContain('frame-ancestors');
         expect(CARD_SCRIPT_SANDBOX_CSP).not.toContain('files.catbox.moe');
         expect(srcdoc).toContain('<p>Hello</p>');
