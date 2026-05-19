@@ -2528,7 +2528,8 @@ function setSurfaceTransparency(value, { persist = true } = {}) {
     const overlayOpacity = Math.min(1, surfaceOpacity + 0.08);
     sbState.surfaceTransparency = nextTransparency;
 
-    document.documentElement.style.setProperty('--sb-shell-surface-opacity', '1');
+    document.documentElement.style.setProperty('--sb-shell-surface-opacity', surfaceOpacity.toFixed(2));
+    document.documentElement.style.setProperty('--sb-shell-surface-opacity-percent', `${(surfaceOpacity * 100).toFixed(0)}%`);
     document.documentElement.style.setProperty('--sb-shell-card-opacity', '1');
     document.documentElement.style.setProperty('--sb-shell-control-opacity', '1');
     document.documentElement.style.setProperty('--sb-shell-overlay-opacity', '1');
@@ -3114,6 +3115,7 @@ function bindTopBarBrand() {
         eventTypes.GROUP_CHAT_CREATED,
         eventTypes.MESSAGE_EDITED,
         eventTypes.MESSAGE_DELETED,
+        eventTypes.MESSAGE_UPDATED,
         eventTypes.CHARACTER_EDITED,
         eventTypes.CHARACTER_RENAMED,
         eventTypes.CHARACTER_DELETED,
@@ -12396,7 +12398,7 @@ function initAll() {
     // Group Advanced Formatting sections into collapsible drawers
     groupAdvancedFormattingIntoDrawers();
 
-    window.SillyBunnyShell = Object.assign(window.SillyBunnyShell || {}, {
+    globalThis.SillyBunnyShell = Object.assign(globalThis.SillyBunnyShell || {}, {
         openTab(shellKey, tabId) {
             if (shellKey === 'characters') {
                 openCharacterPanelTab(tabId);

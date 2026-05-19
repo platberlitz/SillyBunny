@@ -533,6 +533,18 @@ function choosePathfinderAgentToKeep(agents) {
     return [...agents].sort((a, b) => getPathfinderKeepRank(a) - getPathfinderKeepRank(b))[0] ?? null;
 }
 
+function chooseSameTemplateAgentToKeep(agents, template) {
+    const templatePrompt = template ? String(template?.prompt ?? '').trim() : null;
+    if (templatePrompt !== null) {
+        const currentTemplatePromptAgent = agents.find(agent => String(agent?.prompt ?? '').trim() === templatePrompt);
+        if (currentTemplatePromptAgent) {
+            return currentTemplatePromptAgent;
+        }
+    }
+
+    return agents.find(agent => agent?.enabled) ?? agents[0] ?? null;
+}
+
 export function getRedundantBundledAgentDuplicateIds(agentList = [], templateList = []) {
     const groupedAgents = new Map();
 
@@ -581,6 +593,34 @@ export function getRedundantBundledAgentDuplicateIds(agentList = [], templateLis
 
         for (const agent of unsourced) {
             if (agent?.id && !agent.phaseLocked) {
+                redundantIds.add(agent.id);
+            }
+        }
+    }
+
+    const agentsByTemplateId = new Map();
+    for (const agent of agentList) {
+        const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+        if (!sourceTemplateId) {
+            continue;
+        }
+
+        if (!agentsByTemplateId.has(sourceTemplateId)) {
+            agentsByTemplateId.set(sourceTemplateId, []);
+        }
+
+        agentsByTemplateId.get(sourceTemplateId).push(agent);
+    }
+
+    for (const grouped of agentsByTemplateId.values()) {
+        if (grouped.length < 2) {
+            continue;
+        }
+
+        const template = findTemplateForAgentSnapshot(grouped[0], templateList);
+        const keepAgent = chooseSameTemplateAgentToKeep(grouped, template);
+        for (const agent of grouped) {
+            if (agent?.id && agent.id !== keepAgent?.id && !agent.phaseLocked) {
                 redundantIds.add(agent.id);
             }
         }
@@ -647,6 +687,19 @@ export const AGENT_CATEGORIES = {
     content: { label: 'Content', icon: 'fa-film' },
     tool: { label: 'Tool', icon: 'fa-screwdriver-wrench' },
     custom: { label: 'Custom', icon: 'fa-puzzle-piece' },
+};
+
+/**
+ * Modal-only template subgroup labels.
+ */
+export const AGENT_SUBCATEGORIES = {
+    world: { category: 'tracker', label: 'World & Scene', icon: 'fa-map' },
+    characters: { category: 'tracker', label: 'Character State', icon: 'fa-users' },
+    progress: { category: 'tracker', label: 'Player Progress', icon: 'fa-trophy' },
+    'player-choices': { category: 'tracker', label: 'Player Choices', icon: 'fa-list-check' },
+    'prose-quality': { category: 'content', label: 'Prose Quality', icon: 'fa-feather' },
+    pov: { category: 'content', label: 'Point of View', icon: 'fa-user-pen' },
+    behaviour: { category: 'content', label: 'Behaviour & Tone', icon: 'fa-masks-theater' },
 };
 
 function escapeRegexLiteral(value) {
@@ -792,13 +845,16 @@ export function normalizeToolDef(raw = {}) {
  */
 export function normalizeAgent(rawAgent = {}) {
     const defaults = createDefaultAgent();
+    const rawAgentWithoutModalMetadata = { ...rawAgent };
+    delete rawAgentWithoutModalMetadata.subcategory;
+
     const rawPreProcess = rawAgent.preProcess && typeof rawAgent.preProcess === 'object' ? rawAgent.preProcess : {};
     const rawPostProcess = rawAgent.postProcess && typeof rawAgent.postProcess === 'object' ? rawAgent.postProcess : {};
     const conditions = rawAgent.conditions && typeof rawAgent.conditions === 'object' ? rawAgent.conditions : {};
 
     return {
         ...defaults,
-        ...rawAgent,
+        ...rawAgentWithoutModalMetadata,
         id: typeof rawAgent.id === 'string' && rawAgent.id.trim() ? rawAgent.id.trim() : defaults.id,
         name: typeof rawAgent.name === 'string' ? rawAgent.name : defaults.name,
         description: typeof rawAgent.description === 'string' ? rawAgent.description : defaults.description,

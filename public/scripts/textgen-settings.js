@@ -145,6 +145,8 @@ const KOBOLDCPP_ORDER = [6, 0, 1, 3, 4, 2, 5];
 
 function shouldUseLocalPromptCache(settings) {
     const serverUrl = getTextGenServer(settings?.type);
+    // SillyBunny: only keep prompt cache hot for local backends; remote servers
+    // should not inherit the helper-generation cache lane.
     return isLikelyLocalServerUrl(serverUrl, window.location.href);
 }
 
@@ -1837,6 +1839,8 @@ export function createTextGenGenerationData(settings, model, finalPrompt = null,
     }
 
     if (shouldUseLocalPromptCache(settings)) {
+        // SillyBunny: helper generations use the auxiliary cache lane unless the
+        // caller explicitly requests the main chat lane.
         if (cacheScope === 'main') {
             params.cache_prompt = true;
         } else {

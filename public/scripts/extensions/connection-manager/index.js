@@ -348,6 +348,8 @@ function getWorldInfoActiveCount() {
 }
 
 function enrichProfileSnapshot(profile) {
+    // SillyBunny: include fork-only connection summary fields so exported profile
+    // snapshots still reflect the active shell state when reopened later.
     profile['active-agents'] = getActiveAgentsSummary();
     profile.samplers = getSamplerSummary();
     profile['instruct-template'] = readInputDisplayValue('#instruct_presets') || profile.instruct || NONE;
@@ -972,7 +974,7 @@ export async function init() {
         const profile = extension_settings.connectionManager.profiles.find(p => p.id === profileId);
 
         if (!profile) {
-            console.log(`Profile not found: ${profileId}`);
+            console.debug(`Profile not found: ${profileId}`);
             return;
         }
 
@@ -1002,7 +1004,7 @@ export async function init() {
         const selectedProfile = extension_settings.connectionManager.selectedProfile;
         const profile = extension_settings.connectionManager.profiles.find(p => p.id === selectedProfile);
         if (!profile) {
-            console.log('No profile selected');
+            console.debug('No profile selected');
             return;
         }
         ++profileApplySequence;
@@ -1045,7 +1047,7 @@ export async function init() {
         const selectedProfile = extension_settings.connectionManager.selectedProfile;
         const profile = extension_settings.connectionManager.profiles.find(p => p.id === selectedProfile);
         if (!profile) {
-            console.log('No profile selected');
+            console.debug('No profile selected');
             return;
         }
         const oldProfile = structuredClone(profile);
@@ -1088,7 +1090,7 @@ export async function init() {
         const selectedProfile = extension_settings.connectionManager.selectedProfile;
         const profile = extension_settings.connectionManager.profiles.find(p => p.id === selectedProfile);
         if (!profile) {
-            console.log('No profile selected');
+            console.debug('No profile selected');
             return;
         }
         if (!Array.isArray(profile.exclude)) {

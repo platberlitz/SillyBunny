@@ -162,6 +162,8 @@ async function captionExistingMessage(message, mediaIndex) {
         message.mes = wrappedCaption;
         mediaAttachment.title = wrappedCaption;
         mediaAttachment.captioned = true;
+        // SillyBunny: caption-only messages need their token counts refreshed after
+        // the synthetic caption text replaces the empty user body.
         await updateMessageTokenAccounting(message);
     } else {
         message.extra.inline_image = true;

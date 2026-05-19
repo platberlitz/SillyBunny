@@ -18,6 +18,7 @@ import {
     exportAllAgents,
     exportAgent,
     AGENT_CATEGORIES,
+    AGENT_SUBCATEGORIES,
     DEFAULT_AGENT_MAX_TOKENS,
     getGlobalSettings,
     initializeScopedAgentEnableState,
@@ -73,6 +74,7 @@ const MODULE_NAME = 'in-chat-agents';
 const PATHFINDER_EXTENSIONS_HOST_ID = 'extension_settings_in_chat_agents_pathfinder';
 
 let collapsedCategories = new Set();
+let templateBrowserSearchValue = '';
 
 /** Built-in templates loaded from JSON files. */
 let templates = [];
@@ -81,6 +83,15 @@ let autoSeededTemplateIds = new Set();
 
 const DEFAULT_BUNDLED_TEMPLATE_IDS = new Set([
     'tpl-prose-polisher',
+]);
+
+// Internal bundled templates stay available for migrations/settings even when
+// their agent card is hidden from the In-Chat Agents management UI.
+const INTERNAL_BUNDLED_TEMPLATE_IDS = new Set([
+    'tpl-pathfinder',
+]);
+
+const HIDDEN_TEMPLATE_BROWSER_IDS = new Set([
     'tpl-pathfinder',
 ]);
 
@@ -215,6 +226,42 @@ function findTemplateForAgent(agent) {
     return findTemplateForAgentSnapshot(agent, templates);
 }
 
+function findSourceTemplateForAgent(agent) {
+    const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+    return sourceTemplateId ? findTemplateById(sourceTemplateId) : null;
+}
+
+function getAgentOrderValue(agent) {
+    const order = Number(agent?.injection?.order ?? 0);
+    return Number.isFinite(order) ? order : 0;
+}
+
+function getAgentVersionValue(agent) {
+    const version = Number(agent?.version ?? 1);
+    return Number.isFinite(version) ? version : 1;
+}
+
+function getTemplateVersionValue(template) {
+    const version = Number(template?.version ?? 1);
+    return Number.isFinite(version) ? version : 1;
+}
+
+function buildAgentOrderPill(agent) {
+    return `<span class="ica--card-pill ica--card-pill--order" title="Lower numbers run earlier when Append Agents Execution is set to Sequential."><i class="fa-solid fa-sort-numeric-down fa-xs"></i> Order ${escapeHtml(getAgentOrderValue(agent))}</span>`;
+}
+
+function buildAgentVersionPill(agent) {
+    const sourceTemplate = findSourceTemplateForAgent(agent);
+    const agentVersion = getAgentVersionValue(agent);
+    const templateVersion = getTemplateVersionValue(sourceTemplate);
+
+    if (sourceTemplate && templateVersion > agentVersion) {
+        return `<button type="button" class="ica--card-pill ica--card-pill--version ica--card-pill--version-update" title="A newer template is available.">v${escapeHtml(agentVersion)} &rarr; v${escapeHtml(templateVersion)}</button>`;
+    }
+
+    return `<span class="ica--card-pill ica--card-pill--version">v${escapeHtml(agentVersion)}</span>`;
+}
+
 function getBundledRegexScriptsForTemplate(templateId) {
     const bundledScripts = templateRegexBundles[String(templateId ?? '').trim()];
     return Array.isArray(bundledScripts)
@@ -322,11 +369,89 @@ function mergeTemplateDefaults(template) {
 }
 
 function getDefaultBundledTemplates() {
-    return templates.filter(template => DEFAULT_BUNDLED_TEMPLATE_IDS.has(String(template?.id ?? '').trim()));
+    return templates.filter(template => {
+        const templateId = String(template?.id ?? '').trim();
+        return DEFAULT_BUNDLED_TEMPLATE_IDS.has(templateId) || INTERNAL_BUNDLED_TEMPLATE_IDS.has(templateId);
+    });
+}
+
+function getVisibleTemplateBrowserTemplates() {
+    return templates.filter(template => !HIDDEN_TEMPLATE_BROWSER_IDS.has(String(template?.id ?? '').trim()));
+}
+
+function getVisibleInChatAgents(agentList = getAgents()) {
+    return agentList.filter(agent => !isPathfinderAgent(agent));
 }
 
 function getTemplateRegexCount(template) {
     return Array.isArray(template?.regexScripts) ? template.regexScripts.length : 0;
+}
+
+const TEMPLATE_BROWSER_CATEGORY_LABELS = {
+    tracker: 'Trackers',
+    randomizer: 'Randomizers',
+    content: 'Content',
+    tool: 'Tools',
+};
+
+function getTemplateBrowserCategoryOrder(templateList = templates) {
+    return Object.keys(AGENT_CATEGORIES)
+        .filter(category => category !== 'custom')
+        .filter(category => templateList.some(template => template.category === category));
+}
+
+function getTemplateCategoryLabel(category) {
+    return TEMPLATE_BROWSER_CATEGORY_LABELS[category] ?? AGENT_CATEGORIES[category]?.label ?? 'Custom';
+}
+
+function getTemplateSubcategoryInfo(subcategory) {
+    const normalizedSubcategory = String(subcategory ?? '').trim();
+    return normalizedSubcategory ? AGENT_SUBCATEGORIES[normalizedSubcategory] ?? null : null;
+}
+
+function getTemplateSubcategoryLabel(template) {
+    const subcategoryInfo = getTemplateSubcategoryInfo(template?.subcategory);
+    return subcategoryInfo?.label ?? String(template?.subcategory ?? '').trim();
+}
+
+function getTemplateSubcategoriesForCategory(category) {
+    return Object.entries(AGENT_SUBCATEGORIES)
+        .filter(([, subcategory]) => subcategory.category === category);
+}
+
+function sortTemplatesByName(templateList = []) {
+    return [...templateList].sort((a, b) => String(a?.name ?? '').localeCompare(String(b?.name ?? '')));
+}
+
+function getTemplateSearchHaystack(template) {
+    const categoryLabel = getTemplateCategoryLabel(template?.category);
+    const subcategoryLabel = getTemplateSubcategoryLabel(template);
+    const tags = Array.isArray(template?.tags) ? template.tags.join(' ') : '';
+
+    return [
+        template?.name,
+        template?.description,
+        tags,
+        categoryLabel,
+        subcategoryLabel,
+    ].join(' ').toLowerCase();
+}
+
+function filterTemplates(templateList = templates, { searchTerm = '', category = '' } = {}) {
+    const normalizedSearchTerm = String(searchTerm ?? '').trim().toLowerCase();
+    const normalizedCategory = String(category ?? '').trim();
+
+    return templateList.filter(template => {
+        if (normalizedCategory && template.category !== normalizedCategory) {
+            return false;
+        }
+
+        if (!normalizedSearchTerm) {
+            return true;
+        }
+
+        return getTemplateSearchHaystack(template).includes(normalizedSearchTerm);
+    });
 }
 
 function describeRegexPlacements(regexScript) {
@@ -419,13 +544,52 @@ async function previewPreGenerationPrompt(agent, promptOverride = null) {
 }
 
 function buildAgentFromTemplate(template) {
-    return {
+    const agent = {
         ...createDefaultAgent(),
         ...structuredClone(mergeTemplateDefaults(template)),
         id: uuidv4(),
         sourceTemplateId: template.id,
         enabled: false,
     };
+    delete agent.subcategory;
+    return agent;
+}
+
+function buildUpdatedAgentFromTemplate(agent, template) {
+    const updatedAgent = buildAgentFromTemplate(template);
+    updatedAgent.id = agent.id;
+    updatedAgent.enabled = Boolean(agent.enabled);
+    updatedAgent.favorite = Boolean(agent.favorite);
+    updatedAgent.connectionProfile = typeof agent.connectionProfile === 'string' ? agent.connectionProfile : '';
+    updatedAgent.modelOverride = typeof agent.modelOverride === 'string' ? agent.modelOverride : '';
+    updatedAgent.injection = {
+        ...updatedAgent.injection,
+        order: getAgentOrderValue(agent),
+    };
+    updatedAgent.phaseLocked = false;
+    return updatedAgent;
+}
+
+async function updateAgentFromSourceTemplate(agent) {
+    const template = findSourceTemplateForAgent(agent);
+    if (!template) {
+        return;
+    }
+
+    const agentVersion = getAgentVersionValue(agent);
+    const templateVersion = getTemplateVersionValue(template);
+    const result = await new Popup(
+        `Update "${escapeHtml(agent.name || template.name)}" from template v${escapeHtml(agentVersion)} to v${escapeHtml(templateVersion)}? Enabled state, quick toggle pin, order, and profile overrides will be kept.`,
+        POPUP_TYPE.CONFIRM,
+    ).show();
+
+    if (result !== POPUP_RESULT.AFFIRMATIVE) {
+        return;
+    }
+
+    await saveAgent(buildUpdatedAgentFromTemplate(agent, template));
+    renderAgentList();
+    toastr.success(`Updated "${template.name}" to v${templateVersion}.`);
 }
 
 function buildAgentFromSnapshot(snapshot) {
@@ -479,17 +643,36 @@ function hasIdenticalAgent(agent, existingAgents = getAgents()) {
     );
 }
 
-async function confirmDuplicateAgentAddition(agent) {
-    if (!hasIdenticalAgent(agent)) {
+async function confirmDuplicateAgentAddition(agent, existingAgents = getAgents()) {
+    if (hasIdenticalAgent(agent, existingAgents)) {
+        const result = await new Popup(
+            'An identical agent is already active. Add anyway?',
+            POPUP_TYPE.CONFIRM,
+            'Duplicate agent',
+            {
+                okButton: 'Add Agent',
+                cancelButton: 'Cancel',
+            },
+        ).show();
+
+        return result === POPUP_RESULT.AFFIRMATIVE;
+    }
+
+    const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+    const hasSameTemplateAgent = sourceTemplateId && existingAgents.some(existingAgent =>
+        String(existingAgent?.sourceTemplateId ?? '').trim() === sourceTemplateId,
+    );
+    if (!hasSameTemplateAgent) {
         return true;
     }
 
+    const agentName = String(agent?.name ?? 'this template').trim() || 'this template';
     const result = await new Popup(
-        'An identical agent is already active. Add anyway?',
+        `You already have a "${escapeHtml(agentName)}" agent installed. Add another copy?`,
         POPUP_TYPE.CONFIRM,
         'Duplicate agent',
         {
-            okButton: 'Add Agent',
+            okButton: 'Add Another',
             cancelButton: 'Cancel',
         },
     ).show();
@@ -922,12 +1105,15 @@ async function ensureDefaultBundledAgents() {
             continue;
         }
 
-        if (!autoSeededTemplateIds.has(templateId)) {
+        const shouldEnsureTemplate = INTERNAL_BUNDLED_TEMPLATE_IDS.has(templateId) || !autoSeededTemplateIds.has(templateId);
+        if (shouldEnsureTemplate) {
             const seededAgent = buildAgentFromTemplate(template);
             if (!hasMatchingAgentSnapshot(seededAgent)) {
                 await saveAgent(seededAgent);
             }
+        }
 
+        if (!autoSeededTemplateIds.has(templateId)) {
             autoSeededTemplateIds.add(templateId);
             touchedSeedState = true;
         }
@@ -1271,7 +1457,7 @@ function renderAgentList() {
     container.empty();
     updateCancelGenerationButton();
     const profileNames = buildConnectionProfileNameMap();
-    const allAgents = sortAgentsByOrder(getAgents());
+    const allAgents = sortAgentsByOrder(getVisibleInChatAgents());
 
     const searchTerm = ($('#ica--search').val() || '').toString().toLowerCase();
     const categoryFilter = ($('#ica--categoryFilter').val() || '').toString();
@@ -1314,6 +1500,7 @@ function renderAgentList() {
                 const enabledClass = agentEnabled ? 'is-enabled' : '';
                 const categoryLabel = AGENT_CATEGORIES[agent.category]?.label ?? 'Custom';
                 const phaseLabel = AGENT_PHASE_LABELS[agent.phase] || agent.phase;
+                const orderLabel = `Order ${getAgentOrderValue(agent)}`;
                 const canApplyToLastReply = !isPathfinderAgent(agent);
                 const quickItem = $(`
                     <div class="ica--quick-chip ${enabledClass}">
@@ -1323,7 +1510,7 @@ function renderAgentList() {
                             </span>
                             <span class="ica--quick-chip-copy">
                                 <span class="ica--quick-chip-name">${escapeHtml(agent.name || 'Untitled Agent')}</span>
-                                <span class="ica--quick-chip-meta">${escapeHtml(categoryLabel)} • ${escapeHtml(phaseLabel)}</span>
+                                <span class="ica--quick-chip-meta">${escapeHtml(categoryLabel)} • ${escapeHtml(phaseLabel)} • ${escapeHtml(orderLabel)}</span>
                             </span>
                         </button>
                         <div class="ica--quick-chip-actions">
@@ -1450,6 +1637,8 @@ function renderAgentList() {
                         ${regexCount > 0 ? `<span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${regexCount} regex</span>` : ''}
                         ${connectionProfileLabel ? `<span class="ica--card-pill"><i class="fa-solid fa-plug fa-xs"></i> ${escapeHtml(connectionProfileLabel)}</span>` : ''}
                         ${modelOverrideLabel ? `<span class="ica--card-pill"><i class="fa-solid fa-microchip fa-xs"></i> ${escapeHtml(modelOverrideLabel)}</span>` : ''}
+                        ${buildAgentOrderPill(agent)}
+                        ${buildAgentVersionPill(agent)}
                     </div>
                     <div class="ica--card-actions">
                         ${previewPromptButton}
@@ -1500,6 +1689,11 @@ function renderAgentList() {
             card.find('.ica--card-favorite').on('click', async function (event) {
                 stopEvent(event);
                 await toggleAgentFavorite(agent);
+            });
+
+            card.find('.ica--card-pill--version-update').on('click', async event => {
+                stopEvent(event);
+                await updateAgentFromSourceTemplate(agent);
             });
 
             card.find('.ica--btn-edit').on('click', event => {
@@ -2114,7 +2308,8 @@ async function loadTemplates() {
 async function openTemplateBrowser() {
     await loadTemplates();
 
-    if (templates.length === 0) {
+    const visibleTemplates = getVisibleTemplateBrowserTemplates();
+    if (visibleTemplates.length === 0) {
         toastr.info('No templates available.');
         return;
     }
@@ -2190,34 +2385,66 @@ async function openTemplateBrowser() {
     tplSection.append('<div class="ica--template-section-title"><i class="fa-solid fa-puzzle-piece"></i> Individual Templates</div>');
     tplSection.append('<p class="ica--template-section-desc">Bundled trackers and helpers live here. Click any card to install it into your agent list.</p>');
 
-    const grid = $('<div class="ica--template-grid"></div>');
+    let selectedCategory = '';
+    const categoryOrder = getTemplateBrowserCategoryOrder(visibleTemplates);
+    const filterBar = $(`
+        <div class="ica--template-filter-bar">
+            <input type="text" class="text_pole ica--template-search" placeholder="Search templates…" value="${escapeHtml(templateBrowserSearchValue)}" />
+            <div class="ica--template-pill-row"></div>
+        </div>
+    `);
+    const pillRow = filterBar.find('.ica--template-pill-row');
+    const templateResults = $('<div class="ica--template-results"></div>');
+    const existingAgents = getAgents();
+    const allPill = $(`
+        <button type="button" class="ica--template-pill is-active" data-category="">
+            <span>All</span>
+            <span class="ica--template-pill-count">0</span>
+        </button>
+    `);
+    pillRow.append(allPill);
 
-    for (const tpl of templates) {
+    for (const category of categoryOrder) {
+        const catInfo = AGENT_CATEGORIES[category] || AGENT_CATEGORIES.custom;
+        pillRow.append(`
+            <button type="button" class="ica--template-pill" data-category="${escapeHtml(category)}">
+                <i class="fa-solid ${catInfo.icon}"></i>
+                <span>${escapeHtml(getTemplateCategoryLabel(category))}</span>
+                <span class="ica--template-pill-count">0</span>
+            </button>
+        `);
+    }
+
+    function buildTemplateCard(tpl) {
         const catInfo = AGENT_CATEGORIES[tpl.category] || AGENT_CATEGORIES.custom;
         const regexCount = getTemplateRegexCount(tpl);
+        const alreadyAdded = hasMatchingAgentSnapshot(buildAgentFromTemplate(tpl), existingAgents);
         const trackerBadge = tpl.category === 'tracker'
             ? '<span class="ica--card-pill"><i class="fa-solid fa-chart-line fa-xs"></i> Bundled tracker</span>'
             : '';
+        const addedBadge = alreadyAdded
+            ? '<span class="ica--card-pill"><i class="fa-solid fa-check fa-xs"></i> Added</span>'
+            : '';
         const card = $(`
-            <div class="ica--template-card" data-id="${tpl.id}">
+            <div class="ica--template-card${alreadyAdded ? ' ica--template-card--added' : ''}" data-id="${tpl.id}">
                 <div class="ica--template-card-header">
                     <span class="ica--template-card-name">${escapeHtml(tpl.name)}</span>
-                    <span class="ica--template-card-category"><i class="fa-solid ${catInfo.icon}"></i> ${catInfo.label}</span>
+                    <span class="ica--template-card-category"><i class="fa-solid ${catInfo.icon}"></i> ${escapeHtml(catInfo.label)}</span>
                 </div>
                 <div class="ica--template-card-description">${escapeHtml(tpl.description)}</div>
-                ${(trackerBadge || regexCount > 0) ? `
-                    <div class="ica--template-card-badges">
-                        ${trackerBadge}
-                        ${regexCount > 0 ? `<span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${buildRegexTemplateLabel(regexCount)}</span>` : ''}
-                    </div>
-                ` : ''}
+                <div class="ica--template-card-badges">
+                    <span class="ica--card-pill ica--card-pill--version">v${escapeHtml(getTemplateVersionValue(tpl))}</span>
+                    ${addedBadge}
+                    ${trackerBadge}
+                    ${regexCount > 0 ? `<span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${buildRegexTemplateLabel(regexCount)}</span>` : ''}
+                </div>
                 <div class="ica--template-card-prompt">${escapeHtml((tpl.prompt || '').substring(0, 200))}</div>
             </div>
         `);
 
         card.on('click', async () => {
             const newAgent = buildAgentFromTemplate(tpl);
-            if (!await confirmDuplicateAgentAddition(newAgent)) {
+            if (!await confirmDuplicateAgentAddition(newAgent, existingAgents)) {
                 toastr.info('Duplicate agent not added.');
                 return;
             }
@@ -2227,11 +2454,112 @@ async function openTemplateBrowser() {
             toastr.success(`Added "${tpl.name}" to your agents.`);
         });
 
-        grid.append(card);
+        return card;
     }
 
-    tplSection.append(grid);
+    function appendTemplateGrid(parent, templateList) {
+        const grid = $('<div class="ica--template-grid"></div>');
+        for (const tpl of templateList) {
+            grid.append(buildTemplateCard(tpl));
+        }
+        parent.append(grid);
+    }
+
+    function updateTemplatePills(searchTerm) {
+        const searchedTemplates = filterTemplates(visibleTemplates, { searchTerm });
+        const countsByCategory = new Map();
+        for (const template of searchedTemplates) {
+            countsByCategory.set(template.category, (countsByCategory.get(template.category) ?? 0) + 1);
+        }
+
+        pillRow.find('.ica--template-pill').each(function () {
+            const category = $(this).attr('data-category') || '';
+            const count = category ? countsByCategory.get(category) ?? 0 : searchedTemplates.length;
+            $(this).toggleClass('is-active', category === selectedCategory);
+            $(this).find('.ica--template-pill-count').text(count);
+        });
+    }
+
+    function renderTemplateCategorySection(category, categoryTemplates, searchActive) {
+        const catInfo = AGENT_CATEGORIES[category] || AGENT_CATEGORIES.custom;
+        const categorySection = $(`
+            <div class="ica--template-category-section">
+                <div class="ica--template-category-title">
+                    <i class="fa-solid ${catInfo.icon}"></i>
+                    <span>${escapeHtml(getTemplateCategoryLabel(category))}</span>
+                    <span class="ica--template-category-count">${categoryTemplates.length}</span>
+                </div>
+            </div>
+        `);
+
+        if (searchActive || !['tracker', 'content'].includes(category)) {
+            appendTemplateGrid(categorySection, searchActive ? sortTemplatesByName(categoryTemplates) : categoryTemplates);
+            return categorySection;
+        }
+
+        const subcategories = getTemplateSubcategoriesForCategory(category);
+        const knownSubcategoryIds = new Set(subcategories.map(([subcategoryId]) => subcategoryId));
+        const directTemplates = categoryTemplates.filter(template => !knownSubcategoryIds.has(String(template.subcategory ?? '').trim()));
+        if (directTemplates.length > 0) {
+            appendTemplateGrid(categorySection, directTemplates);
+        }
+
+        for (const [subcategoryId, subcategory] of subcategories) {
+            const subgroupTemplates = categoryTemplates.filter(template => String(template.subcategory ?? '').trim() === subcategoryId);
+            if (subgroupTemplates.length === 0) {
+                continue;
+            }
+
+            categorySection.append(`
+                <div class="ica--template-subgroup-title">
+                    <i class="fa-solid ${subcategory.icon}"></i>
+                    <span>${escapeHtml(subcategory.label)}</span>
+                    <span>${subgroupTemplates.length}</span>
+                </div>
+            `);
+            appendTemplateGrid(categorySection, subgroupTemplates);
+        }
+
+        return categorySection;
+    }
+
+    function renderTemplateResults() {
+        const searchTerm = filterBar.find('.ica--template-search').val()?.toString() ?? '';
+        templateBrowserSearchValue = searchTerm;
+        const filteredTemplates = filterTemplates(visibleTemplates, {
+            searchTerm,
+            category: selectedCategory,
+        });
+        const searchActive = Boolean(searchTerm.trim());
+
+        updateTemplatePills(searchTerm);
+        templateResults.empty();
+
+        if (filteredTemplates.length === 0) {
+            templateResults.append('<div class="ica--template-empty">No templates match your filter.</div>');
+            return;
+        }
+
+        for (const category of categoryOrder) {
+            const categoryTemplates = filteredTemplates.filter(template => template.category === category);
+            if (categoryTemplates.length === 0) {
+                continue;
+            }
+
+            templateResults.append(renderTemplateCategorySection(category, categoryTemplates, searchActive));
+        }
+    }
+
+    filterBar.find('.ica--template-search').on('input', renderTemplateResults);
+    pillRow.on('click', '.ica--template-pill', function () {
+        selectedCategory = $(this).attr('data-category') || '';
+        renderTemplateResults();
+    });
+
+    tplSection.append(filterBar);
+    tplSection.append(templateResults);
     wrapper.append(tplSection);
+    renderTemplateResults();
 
     await new Popup(wrapper, POPUP_TYPE.TEXT, '', { wide: true, large: true }).show();
 }
@@ -2290,7 +2618,7 @@ async function applyGroup(group) {
  * Creates a custom group from the user's current agents.
  */
 async function createCustomGroup() {
-    const currentAgents = getAgents();
+    const currentAgents = getVisibleInChatAgents();
     if (currentAgents.length === 0) {
         toastr.info('No agents to group. Add some agents first.');
         return;
@@ -2401,12 +2729,15 @@ async function handleImport(event) {
  * Exports all agents to a JSON file.
  */
 function handleExportAll() {
-    const agents = getAgents();
+    const agents = getVisibleInChatAgents();
     if (agents.length === 0) {
         toastr.info('No agents to export.');
         return;
     }
-    const data = exportAllAgents();
+    const data = {
+        ...exportAllAgents(),
+        agents,
+    };
     download(JSON.stringify(data, null, 2), 'in-chat-agents.json', 'application/json');
 }
 
@@ -2672,11 +3003,209 @@ function getPreGenerationInterceptModeLabel(entry) {
     return 'replace';
 }
 
+function parseChatInterceptSummaryMessages(value) {
+    let parsed;
+    try {
+        parsed = JSON.parse(String(value ?? ''));
+    } catch {
+        return { ok: false, reason: 'parse-error' };
+    }
+
+    if (!Array.isArray(parsed)) {
+        return { ok: false, reason: 'shape-error' };
+    }
+
+    const messages = [];
+    for (const [index, message] of parsed.entries()) {
+        if (!message || typeof message !== 'object' || Array.isArray(message)) {
+            return { ok: false, reason: 'shape-error' };
+        }
+
+        if (typeof message.role !== 'string' || typeof message.content !== 'string') {
+            return { ok: false, reason: 'shape-error' };
+        }
+
+        messages.push({
+            index,
+            role: message.role,
+            content: message.content,
+        });
+    }
+
+    return { ok: true, messages };
+}
+
+export function summarizeChatInterceptChange(beforeText, afterText) {
+    const beforeResult = parseChatInterceptSummaryMessages(beforeText);
+    const afterResult = parseChatInterceptSummaryMessages(afterText);
+
+    if (!beforeResult.ok) {
+        return { ok: false, reason: beforeResult.reason };
+    }
+
+    if (!afterResult.ok) {
+        return { ok: false, reason: afterResult.reason };
+    }
+
+    const beforeMessages = beforeResult.messages;
+    const afterMessages = afterResult.messages;
+    const matchedBefore = new Set();
+    const matchedAfter = new Set();
+
+    for (const beforeMessage of beforeMessages) {
+        const afterMessage = afterMessages.find(candidate =>
+            !matchedAfter.has(candidate.index) &&
+            candidate.role === beforeMessage.role &&
+            candidate.content === beforeMessage.content,
+        );
+
+        if (!afterMessage) {
+            continue;
+        }
+
+        matchedBefore.add(beforeMessage.index);
+        matchedAfter.add(afterMessage.index);
+    }
+
+    const changes = [];
+    for (const beforeMessage of beforeMessages) {
+        if (matchedBefore.has(beforeMessage.index)) {
+            continue;
+        }
+
+        const afterMessage = afterMessages[beforeMessage.index];
+        if (!afterMessage || matchedAfter.has(afterMessage.index)) {
+            continue;
+        }
+
+        matchedBefore.add(beforeMessage.index);
+        matchedAfter.add(afterMessage.index);
+        changes.push({
+            changeKind: 'modified',
+            role: afterMessage.role || beforeMessage.role,
+            beforeIndex: beforeMessage.index,
+            afterIndex: afterMessage.index,
+            beforeContent: beforeMessage.content,
+            afterContent: afterMessage.content,
+        });
+    }
+
+    for (const beforeMessage of beforeMessages) {
+        if (matchedBefore.has(beforeMessage.index)) {
+            continue;
+        }
+
+        changes.push({
+            changeKind: 'removed',
+            role: beforeMessage.role,
+            beforeIndex: beforeMessage.index,
+            afterIndex: null,
+            beforeContent: beforeMessage.content,
+            afterContent: '',
+        });
+    }
+
+    for (const afterMessage of afterMessages) {
+        if (matchedAfter.has(afterMessage.index)) {
+            continue;
+        }
+
+        changes.push({
+            changeKind: 'added',
+            role: afterMessage.role,
+            beforeIndex: null,
+            afterIndex: afterMessage.index,
+            beforeContent: '',
+            afterContent: afterMessage.content,
+        });
+    }
+
+    const changeKindOrder = {
+        removed: 0,
+        modified: 1,
+        added: 2,
+    };
+    changes.sort((left, right) => {
+        const leftIndex = left.afterIndex ?? left.beforeIndex ?? 0;
+        const rightIndex = right.afterIndex ?? right.beforeIndex ?? 0;
+        if (leftIndex !== rightIndex) {
+            return leftIndex - rightIndex;
+        }
+
+        return changeKindOrder[left.changeKind] - changeKindOrder[right.changeKind];
+    });
+
+    return { ok: true, changes };
+}
+
+function buildPreGenerationChatChangeMarkup(change) {
+    let diffMarkup = '';
+    if (change.changeKind === 'added') {
+        diffMarkup = `<span class="ica-transform-diff-part--ins">${escapeHtml(change.afterContent)}</span>`;
+    } else if (change.changeKind === 'removed') {
+        diffMarkup = `<span class="ica-transform-diff-part--del">${escapeHtml(change.beforeContent)}</span>`;
+    } else {
+        diffMarkup = buildPromptTransformDiffMarkup(change.beforeContent, change.afterContent);
+    }
+
+    return `
+        <div class="ica-preintercept-message-change">
+            <div class="ica-preintercept-message-header">
+                <span class="ica-preintercept-role">${escapeHtml(change.role || 'message')}</span>
+                <span class="ica-preintercept-change-kind">${escapeHtml(change.changeKind)}</span>
+            </div>
+            <div class="ica-transform-diff">${diffMarkup}</div>
+        </div>
+    `;
+}
+
+function buildPreGenerationInterceptSummaryMarkup(entry) {
+    const beforeText = entry.beforeText ?? '';
+    const outputText = String(entry.outputText ?? '').trim();
+    const afterText = entry.contextFormat === 'chat' && entry.status === 'error' && outputText
+        ? outputText
+        : entry.afterText ?? '';
+
+    if (entry.contextFormat !== 'chat') {
+        return `
+            <div class="ica-transform-output-title">Prompt diff</div>
+            <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(beforeText, afterText)}</div>
+        `;
+    }
+
+    try {
+        const summary = summarizeChatInterceptChange(beforeText, afterText);
+        if (!summary.ok) {
+            return `
+                <div class="ica-preintercept-fallback-notice">Could not summarize chat messages; showing raw diff.</div>
+                <div class="ica-transform-output-title">Context diff</div>
+                <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(beforeText, afterText)}</div>
+            `;
+        }
+
+        const changesMarkup = summary.changes.length > 0
+            ? summary.changes.map(buildPreGenerationChatChangeMarkup).join('')
+            : '<div class="ica-preintercept-empty">No effective change.</div>';
+
+        return `
+            <div class="ica-transform-output-title">Chat changes</div>
+            ${changesMarkup}
+        `;
+    } catch (error) {
+        console.warn('[InChatAgents] Failed to summarize pre-generation intercept history entry:', error);
+        return `
+            <div class="ica-preintercept-fallback-notice">Could not summarize chat messages; showing raw diff.</div>
+            <div class="ica-transform-output-title">Context diff</div>
+            <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(beforeText, afterText)}</div>
+        `;
+    }
+}
+
 function buildPreGenerationInterceptEntryMarkup(entry, i) {
     const timestamp = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
     const status = String(entry.status ?? 'changed');
     const statusText = status === 'error'
-        ? `Error: ${escapeHtml(entry.error || 'unknown error')}`
+        ? `Error: ${entry.error || 'unknown error'}`
         : `${entry.changed ? 'Changed' : 'No visible change'} the ${entry.contextFormat === 'chat' ? 'chat message array' : 'text prompt'}`;
     const modeLabel = getPreGenerationInterceptModeLabel(entry);
     const output = String(entry.outputText ?? '').trim();
@@ -2685,9 +3214,11 @@ function buildPreGenerationInterceptEntryMarkup(entry, i) {
         <div class="ica-transform-history-entry ica-preintercept-history-entry" data-index="${i}">
             <h5>${escapeHtml(entry.agentName || 'Agent')} <small>(pre-gen ${escapeHtml(modeLabel)})</small></h5>
             <small>${escapeHtml(timestamp)}${timestamp ? ' · ' : ''}${escapeHtml(statusText)}</small>
-            ${output ? `<div class="ica-transform-output-title">Agent output</div><div class="ica-transform-diff">${escapeHtml(output)}</div>` : ''}
-            <div class="ica-transform-output-title">Context diff</div>
-            <div class="ica-transform-diff">${buildPromptTransformDiffMarkup(entry.beforeText ?? '', entry.afterText ?? '')}</div>
+            ${buildPreGenerationInterceptSummaryMarkup(entry)}
+            <details class="ica-preintercept-raw">
+                <summary>Raw agent output</summary>
+                <pre class="ica-transform-diff">${escapeHtml(output)}</pre>
+            </details>
         </div>
     `;
 }
@@ -3212,6 +3743,9 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
             setGlobalSettings(savedState.globalSettings);
         }
         restoreAutoSeededTemplateIds(savedState);
+        if (savedState.dismissedTemplatesCallout === true) {
+            $('.ica--templates-callout').hide();
+        }
     }
 
     const initResults = await Promise.allSettled([
@@ -3351,6 +3885,16 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     $('#ica--exportAll').on('click', handleExportAll);
     $('#ica--templates').on('click', openTemplateBrowser);
     $('#ica--templatesCallout').on('click', openTemplateBrowser);
+    $('#ica--templatesCalloutDismiss').on('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        $('.ica--templates-callout').hide();
+        extension_settings.inChatAgents = {
+            ...(extension_settings.inChatAgents ?? {}),
+            dismissedTemplatesCallout: true,
+        };
+        saveSettingsDebounced();
+    });
     $('#ica--cancelGeneration').on('click', () => {
         cancelAgentGeneration();
         updateCancelGenerationButton();
@@ -3365,7 +3909,7 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     });
     $('#ica--bulkCancel').on('click', exitSelectMode);
     $('#ica--bulkSelectAll').on('click', () => {
-        for (const agent of getAgents()) {
+        for (const agent of getVisibleInChatAgents()) {
             selectedAgentIds.add(agent.id);
         }
         updateBulkBar();
@@ -3487,8 +4031,10 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         persistExtensionState();
     });
     $('#ica--resetDefaults').on('click', async () => {
-        const agents = getAgents();
-        const missingDefaultBundledTemplates = getDefaultBundledTemplates()
+        const agents = getVisibleInChatAgents();
+        const visibleDefaultBundledTemplates = getDefaultBundledTemplates()
+            .filter(template => !HIDDEN_TEMPLATE_BROWSER_IDS.has(String(template?.id ?? '').trim()));
+        const missingDefaultBundledTemplates = visibleDefaultBundledTemplates
             .filter(template => !hasMatchingAgentSnapshot(buildAgentFromTemplate(template), agents));
         const bundledCount = agents.filter(a => findTemplateForAgent(a)).length + missingDefaultBundledTemplates.length;
         if (bundledCount === 0) {

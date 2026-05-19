@@ -5,6 +5,7 @@
     "description": "Track notable firsts, milestones, and memorable moments",
     "icon": "",
     "category": "tracker",
+    "subcategory": "progress",
     "tags": [
       "achievements",
       "milestones"
@@ -127,6 +128,7 @@
     "description": "Append 3-5 numbered action choices at the end of every response",
     "icon": "",
     "category": "tracker",
+    "subcategory": "player-choices",
     "tags": [
       "choices",
       "interactive",
@@ -213,6 +215,7 @@
     "description": "Sharply raise difficulty -- characters protect their interests, resist harder",
     "icon": "",
     "category": "content",
+    "subcategory": "behaviour",
     "tags": [
       "difficulty",
       "challenge",
@@ -254,6 +257,7 @@
     "description": "4 plot-direction prompts at the end of every response (2 grounded + 2 wildcard pivots)",
     "icon": "",
     "category": "tracker",
+    "subcategory": "player-choices",
     "tags": [
       "directions",
       "menu",
@@ -300,6 +304,7 @@
     "description": "Never write {{user}}'s actions or dialogue -- only {{char}} and NPCs",
     "icon": "",
     "category": "content",
+    "subcategory": "pov",
     "tags": [
       "pov",
       "user"
@@ -341,6 +346,7 @@
     "description": "Track upcoming events, deadlines, promises, and unresolved threads",
     "icon": "",
     "category": "tracker",
+    "subcategory": "world",
     "tags": [
       "events",
       "deadlines",
@@ -382,6 +388,7 @@
     "description": "Combats positivity bias -- characters resist, protect their pride, and take time to warm up",
     "icon": "",
     "category": "content",
+    "subcategory": "behaviour",
     "tags": [
       "realism",
       "difficulty",
@@ -507,6 +514,7 @@
     "description": "Anti-slop rules: avoid purple prose, cliches, and AI writing tics",
     "icon": "",
     "category": "content",
+    "subcategory": "prose-quality",
     "tags": [
       "anti-slop",
       "quality",
@@ -550,6 +558,7 @@
     "description": "Post-generation prose cleanup that rewrites repetitive tropes and cliched wording. Created by Geechan.",
     "icon": "",
     "category": "content",
+    "subcategory": "prose-quality",
     "tags": [
       "prose",
       "editing",
@@ -588,7 +597,8 @@
         "normal",
         "continue",
         "impersonate"
-      ]
+      ],
+      "runOnImpersonate": true
     }
   },
   {
@@ -597,6 +607,7 @@
     "description": "Use inline HTML for diegetic in-world objects (signs, letters, screens)",
     "icon": "",
     "category": "content",
+    "subcategory": "prose-quality",
     "tags": [
       "html",
       "artifacts",
@@ -680,6 +691,7 @@
     "description": "Track items {{user}} acquires, loses, or uses that have narrative significance",
     "icon": "",
     "category": "tracker",
+    "subcategory": "progress",
     "tags": [
       "inventory",
       "items",
@@ -721,6 +733,7 @@
     "description": "Generate brief profile cards when introducing new named NPCs",
     "icon": "",
     "category": "tracker",
+    "subcategory": "characters",
     "tags": [
       "npc",
       "characters",
@@ -763,6 +776,7 @@
     "description": "Helps NPCs feel less static and gives them more agency to pursue their own goals",
     "icon": "",
     "category": "content",
+    "subcategory": "behaviour",
     "tags": [
       "npc",
       "motivation",
@@ -824,6 +838,7 @@
     "description": "Track what absent characters and the wider world are doing off-screen",
     "icon": "",
     "category": "tracker",
+    "subcategory": "world",
     "tags": [
       "offscreen",
       "npcs",
@@ -865,6 +880,7 @@
     "description": "Track affection and trust for recurring NPCs with meaningful interactions",
     "icon": "",
     "category": "tracker",
+    "subcategory": "characters",
     "tags": [
       "relationship",
       "npc",
@@ -906,6 +922,7 @@
     "description": "Track how {{user}} is perceived by groups and factions",
     "icon": "",
     "category": "tracker",
+    "subcategory": "characters",
     "tags": [
       "reputation",
       "rumors",
@@ -1029,6 +1046,7 @@
     "description": "Mark scene transitions, time shifts, and location changes",
     "icon": "",
     "category": "tracker",
+    "subcategory": "world",
     "tags": [
       "scene",
       "location",
@@ -1071,6 +1089,7 @@
     "description": "Track secrets, lies, and information asymmetry between characters",
     "icon": "",
     "category": "tracker",
+    "subcategory": "characters",
     "tags": [
       "secrets",
       "lies",
@@ -1112,6 +1131,7 @@
     "description": "Track physical, mental, and behavioral states when they change",
     "icon": "",
     "category": "tracker",
+    "subcategory": "characters",
     "tags": [
       "status",
       "conditions",
@@ -1153,6 +1173,7 @@
     "description": "Track in-story time progression with day/period/hour stamps",
     "icon": "",
     "category": "tracker",
+    "subcategory": "world",
     "tags": [
       "time",
       "day",
@@ -1195,6 +1216,7 @@
     "description": "Add 1 small worldbuilding detail per scene that may matter later",
     "icon": "",
     "category": "tracker",
+    "subcategory": "world",
     "tags": [
       "world",
       "lore",
@@ -1236,6 +1258,7 @@
     "description": "Include {{user}} as a fully realized character -- write their actions, dialogue, and reactions",
     "icon": "",
     "category": "content",
+    "subcategory": "pov",
     "tags": [
       "pov",
       "user"

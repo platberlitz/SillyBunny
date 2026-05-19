@@ -1,10 +1,56 @@
 import fs from 'node:fs';
-import { describe, expect, test } from '@jest/globals';
+import { describe, expect, jest, test } from '@jest/globals';
 
 const templateDir = new URL('../public/scripts/extensions/in-chat-agents/templates/', import.meta.url);
+const indexSourceUrl = new URL('../public/scripts/extensions/in-chat-agents/index.js', import.meta.url);
 
 function readTemplate(filename) {
     return JSON.parse(fs.readFileSync(new URL(filename, templateDir), 'utf8'));
+}
+
+function readIndexSetBody(name) {
+    const source = fs.readFileSync(indexSourceUrl, 'utf8');
+    const match = source.match(new RegExp(`${name} = new Set\\(\\[([\\s\\S]*?)\\]\\);`));
+
+    if (!match) {
+        throw new Error(`Missing set definition: ${name}`);
+    }
+
+    return match[1];
+}
+
+async function importAgentStore() {
+    jest.resetModules();
+
+    await jest.unstable_mockModule('../public/script.js', () => ({
+        getRequestHeaders: jest.fn(() => ({})),
+        saveSettingsDebounced: jest.fn(),
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/extensions.js', () => ({
+        extension_settings: {},
+        getContext: jest.fn(() => ({ groupId: null })),
+    }));
+
+    await jest.unstable_mockModule('../public/scripts/utils.js', () => ({
+        regexFromString: jest.fn(value => {
+            const match = String(value ?? '').match(/^\/([\s\S]*)\/([a-z]*)$/i);
+            return match ? new RegExp(match[1], match[2]) : new RegExp(String(value ?? ''));
+        }),
+        uuidv4: jest.fn(() => 'test-uuid'),
+    }));
+
+    return await import('../public/scripts/extensions/in-chat-agents/agent-store.js');
+}
+
+function findCatalogTemplate(catalog, templateId) {
+    const template = catalog.find(template => template.id === templateId);
+
+    if (!template) {
+        throw new Error(`Missing catalog template: ${templateId}`);
+    }
+
+    return template;
 }
 
 describe('in-chat agent bundled templates', () => {
@@ -41,5 +87,61 @@ describe('in-chat agent bundled templates', () => {
             maxTokens: 4096,
         }));
         expect(template.conditions.generationTypes).toEqual(['normal', 'continue', 'impersonate']);
+    });
+
+    test('keeps Prose Polisher enabled for impersonation prompt rewrites in the catalog', () => {
+        const catalog = readTemplate('index.json');
+        const template = findCatalogTemplate(catalog, 'tpl-prose-polisher');
+
+        expect(template.postProcess).toEqual(expect.objectContaining({
+            promptTransformEnabled: true,
+            promptTransformMode: 'rewrite',
+        }));
+        expect(template.conditions).toEqual(expect.objectContaining({
+            runOnImpersonate: true,
+        }));
+    });
+
+    test('uses only known modal subcategories in the catalog', async () => {
+        const { AGENT_SUBCATEGORIES } = await importAgentStore();
+        const knownSubcategories = new Set(Object.keys(AGENT_SUBCATEGORIES));
+        const catalog = readTemplate('index.json');
+        const unknownSubcategories = catalog
+            .map(template => template.subcategory)
+            .filter(subcategory => subcategory !== undefined && subcategory !== null)
+            .filter(subcategory => !knownSubcategories.has(subcategory));
+
+        expect(unknownSubcategories).toEqual([]);
+    });
+
+    test('assigns tracker and content templates to modal subcategories', () => {
+        const catalog = readTemplate('index.json');
+
+        for (const template of catalog.filter(template => ['tracker', 'content'].includes(template.category))) {
+            expect(typeof template.subcategory).toBe('string');
+            expect(template.subcategory.trim()).not.toBe('');
+        }
+    });
+
+    test('does not keep modal subcategory metadata on saved agent shapes', async () => {
+        const { normalizeAgent } = await importAgentStore();
+        const agent = normalizeAgent({
+            id: 'saved-scene-tracker',
+            name: 'Scene Tracker',
+            category: 'tracker',
+            subcategory: 'world',
+            sourceTemplateId: 'tpl-scene-tracker',
+        });
+
+        expect(agent).not.toHaveProperty('subcategory');
+    });
+
+    test('hides Pathfinder from the in-chat template browser without purging the internal agent', () => {
+        const pathfinderTemplateId = '\'tpl-pathfinder\'';
+
+        expect(readIndexSetBody('HIDDEN_TEMPLATE_BROWSER_IDS')).toContain(pathfinderTemplateId);
+        expect(readIndexSetBody('INTERNAL_BUNDLED_TEMPLATE_IDS')).toContain(pathfinderTemplateId);
+        expect(readIndexSetBody('REMOVED_BUNDLED_TEMPLATE_IDS')).not.toContain(pathfinderTemplateId);
+        expect(readIndexSetBody('DEFAULT_BUNDLED_TEMPLATE_IDS')).not.toContain(pathfinderTemplateId);
     });
 });

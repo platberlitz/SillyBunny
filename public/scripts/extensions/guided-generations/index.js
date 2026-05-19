@@ -1,6 +1,7 @@
 import { saveSettingsDebounced } from '../../../script.js';
 import { extensionNames, extension_settings, renderExtensionTemplateAsync } from '../../extensions.js';
 import { extensionName, getPresetsForApiType, getProfileApiType, getProfileList } from './scripts/shared.js';
+import { guidedCorrection } from './scripts/guidedCorrection.js';
 import { guidedImpersonate } from './scripts/guidedImpersonate.js';
 import { guidedResponse } from './scripts/guidedResponse.js';
 import { guidedSwipe } from './scripts/guidedSwipe.js';
@@ -16,6 +17,7 @@ const oldExtensionName = 'third-party/GuidedGenerations-Extension';
 const defaultSettings = {
     showGuidedResponse: true,
     showGuidedSwipe: true,
+    showGuidedCorrection: true,
     showImpersonate1stPerson: true,
     showSimpleSendButton: true,
     integrateQrBar: true,
@@ -23,9 +25,11 @@ const defaultSettings = {
     debugMode: false,
     promptGuidedResponse: '[Take the following into special consideration for your next message: {{input}}]',
     promptGuidedSwipe: '[Take the following into special consideration for your next message: {{input}}]',
+    promptGuidedCorrection: '[Apply the following correction to your previous message: {{input}}]',
     promptImpersonate1st: 'Write in first Person perspective from {{user}}. {{input}}',
     depthPromptGuidedResponse: 0,
     depthPromptGuidedSwipe: 0,
+    depthPromptGuidedCorrection: 0,
     profileImpersonate1st: '',
     presetImpersonate1st: '',
     profileImpersonate1stApiType: '',
@@ -296,6 +300,7 @@ function updateExtensionButtons() {
         settings.showSimpleSendButton && createActionButton('gg_simple_send_button', 'Simple Send', 'fa-solid fa-paper-plane', simpleSend),
         settings.showImpersonate1stPerson && createActionButton('gg_impersonate_button', 'Guided Impersonate', 'fa-solid fa-user', guidedImpersonate),
         settings.showGuidedSwipe && createActionButton('gg_swipe_button', 'Guided Swipe', 'fa-solid fa-forward', guidedSwipe),
+        settings.showGuidedCorrection && createActionButton('gg_correction_button', 'Guided Correction', 'fa-solid fa-pen-to-square', guidedCorrection),
         settings.showGuidedResponse && createActionButton('gg_response_button', 'Guided Response', 'fa-solid fa-compass', guidedResponse),
     ].filter(Boolean);
 

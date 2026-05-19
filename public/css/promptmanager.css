@@ -168,7 +168,8 @@
 #completion_prompt_manager_popup #completion_prompt_manager_popup_edit,
 #completion_prompt_manager_popup #completion_prompt_manager_popup_chathistory_edit,
 #completion_prompt_manager_popup #completion_prompt_manager_popup_dialogueexamples_edit,
-#completion_prompt_manager_popup #completion_prompt_manager_popup_inspect {
+#completion_prompt_manager_popup #completion_prompt_manager_popup_inspect,
+#completion_prompt_manager_popup #completion_prompt_manager_popup_preview {
     display: none;
     padding: 0.5em;
     height: 100%;
@@ -226,6 +227,80 @@
 #completion_prompt_manager_popup #completion_prompt_manager_popup_close_button {
     font-size: 1em;
     padding: 0.5em;
+}
+
+#completion_prompt_manager_popup .completion_prompt_manager_popup_tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 1em;
+    padding: 0 0.5em 0.5em;
+    border-bottom: 1px solid var(--SmartThemeBorderColor);
+}
+
+#completion_prompt_manager_popup .completion_prompt_manager_tab_button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 8px 16px;
+    border: 1px solid transparent;
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--SmartThemeEmColor);
+    font-size: calc(var(--mainFontSize) * 0.9);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 200ms ease;
+}
+
+#completion_prompt_manager_popup .completion_prompt_manager_tab_button:hover {
+    background-color: color-mix(in srgb, var(--SmartThemeBlurTintColor) 84%, var(--SmartThemeBodyColor) 16%);
+    color: var(--SmartThemeBodyColor);
+}
+
+#completion_prompt_manager_popup .completion_prompt_manager_tab_button.active {
+    border-color: var(--SmartThemeBorderColor);
+    background-color: var(--SmartThemeBlurTintColor);
+    color: var(--SmartThemeBodyColor);
+}
+
+#completion_prompt_manager_popup .completion_prompt_manager_preview_content {
+    margin-top: 1em;
+    padding: 1em;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 20%, transparent);
+}
+
+#completion_prompt_manager_popup .completion_prompt_manager_preview_meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    margin-bottom: 0.75em;
+    padding-bottom: 0.75em;
+    border-bottom: 1px solid var(--SmartThemeBorderColor);
+    font-size: calc(var(--mainFontSize) * 0.9);
+}
+
+#completion_prompt_manager_popup .completion_prompt_manager_preview_role,
+#completion_prompt_manager_popup .completion_prompt_manager_preview_tokens {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+#completion_prompt_manager_popup .completion_prompt_manager_preview_text {
+    min-height: 100px;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--SmartThemeBodyColor);
+    font-family: var(--monoFontFamily, 'Courier New', monospace);
+    font-size: calc(var(--mainFontSize) * 0.95);
+    line-height: 1.5;
 }
 
 .completion_prompt_manager_popup_entry_form_control {
@@ -540,6 +615,21 @@
         padding-top: 0;
     }
 
+    #completion_prompt_manager_popup .completion_prompt_manager_popup_tabs {
+        padding: 0.5em;
+    }
+
+    #completion_prompt_manager_popup .completion_prompt_manager_tab_button {
+        min-height: var(--sb-mobile-touch-target, 44px);
+        flex: 1 1 0;
+    }
+
+    #completion_prompt_manager_popup .completion_prompt_manager_preview_meta {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.5em;
+    }
+
     #completion_prompt_manager #completion_prompt_manager_list li {
         grid-template-columns: minmax(0, 1fr) minmax(42px, auto);
         grid-template-areas:
@@ -733,7 +823,8 @@
     }
 
     #completion_prompt_manager .completion_prompt_manager_editor_host #completion_prompt_manager_popup_edit,
-    #completion_prompt_manager .completion_prompt_manager_editor_host #completion_prompt_manager_popup_inspect {
+    #completion_prompt_manager .completion_prompt_manager_editor_host #completion_prompt_manager_popup_inspect,
+    #completion_prompt_manager .completion_prompt_manager_editor_host #completion_prompt_manager_popup_preview {
         display: flex;
         flex-direction: column;
         justify-content: flex-start;

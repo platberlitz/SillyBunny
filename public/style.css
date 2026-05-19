@@ -9,7 +9,7 @@
 @import url(css/logprobs.css);
 @import url(css/accounts.css);
 @import url(css/tags.css);
-@import url(css/scrollable-button.css);
+@import url(css/scrollable-button.css?v=20260517a);
 @import url(css/welcome.css?v=20260425a);
 @import url(css/data-maid.css);
 @import url(css/secrets.css);
@@ -99,6 +99,10 @@
     --color-warning: #facc15;
     --color-shadow: var(--SmartThemeShadowColor);
     --color-focus-ring: color-mix(in srgb, var(--color-primary) 72%, transparent);
+    --sb-scrollbar-track: color-mix(in srgb, var(--color-background, var(--SmartThemeBlurTintColor)) 86%, transparent);
+    --sb-scrollbar-track-hover: color-mix(in srgb, var(--color-background, var(--SmartThemeBlurTintColor)) 70%, transparent);
+    --sb-scrollbar-thumb: color-mix(in srgb, var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) 34%, transparent);
+    --sb-scrollbar-thumb-hover: color-mix(in srgb, var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) 50%, transparent);
     --color-user-message-bg: var(--SmartThemeUserMesBlurTintColor);
     --color-bot-message-bg: var(--SmartThemeBotMesBlurTintColor);
     --SmartThemeCheckboxTickColorValue: calc(((((var(--SmartThemeCheckboxBgColorR) * 299) + (var(--SmartThemeCheckboxBgColorG) * 587) + (var(--SmartThemeCheckboxBgColorB) * 114)) / 1000) - 128) * -1000);
@@ -204,6 +208,12 @@ body {
     color-scheme: only light;
 }
 
+/* SillyBunny: Firefox ignores WebKit scrollbar pseudo-elements. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sb-scrollbar-thumb) var(--sb-scrollbar-track);
+}
+
 ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -212,23 +222,23 @@ body {
 
 ::-webkit-scrollbar-track {
     cursor: default;
-    background: color-mix(in srgb, var(--color-background, var(--SmartThemeBlurTintColor)) 86%, transparent);
+    background: var(--sb-scrollbar-track);
 }
 
 ::-webkit-scrollbar-track:hover {
-    background-color: color-mix(in srgb, var(--color-background, var(--SmartThemeBlurTintColor)) 70%, transparent);
+    background-color: var(--sb-scrollbar-track-hover);
 }
 
 ::-webkit-scrollbar-thumb {
     cursor: grab;
-    background: color-mix(in srgb, var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) 34%, transparent);
+    background: var(--sb-scrollbar-thumb);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) 50%, transparent);
+    background: var(--sb-scrollbar-thumb-hover);
     background-clip: content-box;
 }
 
@@ -7459,6 +7469,54 @@ body:not(.movingUI) .drawer-content.maximized {
     gap: 6px;
     margin-top: 10px;
     flex-wrap: wrap;
+}
+
+.ica-preintercept-message-change {
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 38%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #222) 14%, transparent);
+}
+
+.ica-preintercept-message-change + .ica-preintercept-message-change {
+    margin-top: 8px;
+}
+
+.ica-preintercept-message-header {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.ica-preintercept-role {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ica-preintercept-change-kind {
+    font-size: 0.78em;
+    padding: 1px 6px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 45%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #ddd) 10%, transparent);
+}
+
+.ica-preintercept-empty,
+.ica-preintercept-fallback-notice {
+    font-style: italic;
+    opacity: 0.72;
+}
+
+.ica-preintercept-raw {
+    margin-top: 10px;
+}
+
+.ica-preintercept-raw > summary {
+    cursor: pointer;
+    opacity: 0.78;
 }
 
 

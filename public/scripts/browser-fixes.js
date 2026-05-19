@@ -162,6 +162,8 @@ function applyBrowserFixes() {
         const applyPositionFix = ({ force = false } = {}) => {
             updateViewportBaseline();
 
+            // SillyBunny: do not force the viewport fix while the mobile shell is
+            // actively editing an input; that can disrupt IME composition and text fixes.
             // Avoid force-pinning the root while Android IMEs are actively
             // editing text. That can break replacement/correction targets and
             // make accepted suggestions append at the end of the field instead.

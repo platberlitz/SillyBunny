@@ -1,3 +1,4 @@
+/* eslint-disable playwright/no-duplicate-hooks */
 /* global globalThis */
 import { fileURLToPath } from 'node:url';
 import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';

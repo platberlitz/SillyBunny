@@ -1,3 +1,4 @@
+/* eslint-disable playwright/no-duplicate-hooks */
 /* global document, globalThis */
 import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
 
@@ -202,6 +203,10 @@ describe('in-chat agent post-processing runner', () => {
         await jest.unstable_mockModule('../public/scripts/events.js', () => ({
             eventSource,
             event_types: eventTypes,
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/reasoning.js', () => ({
+            removeReasoningFromString: jest.fn(value => String(value ?? '')),
         }));
 
         await jest.unstable_mockModule('../public/scripts/tool-calling.js', () => ({
@@ -752,7 +757,8 @@ describe('in-chat agent post-processing runner', () => {
             initAgentRunner();
 
             for (const [caseName, replacementChat] of invalidReplacementChats) {
-                generateQuietPrompt.mockResolvedValueOnce(JSON.stringify(replacementChat));
+                const invalidOutputText = JSON.stringify(replacementChat);
+                generateQuietPrompt.mockResolvedValueOnce(invalidOutputText);
 
                 await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
                 const originalMessage = { role: 'user', content: `original user prompt for ${caseName}` };
@@ -784,6 +790,7 @@ describe('in-chat agent post-processing runner', () => {
                     changed: false,
                     beforeText: JSON.stringify(originalChat, null, 2),
                     afterText: JSON.stringify(originalChat, null, 2),
+                    outputText: invalidOutputText,
                 })]);
             }
         } finally {

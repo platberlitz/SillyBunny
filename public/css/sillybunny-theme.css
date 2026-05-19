@@ -123,6 +123,7 @@
     --sb-ambient-a: color-mix(in srgb, var(--SmartThemeQuoteColor) 12%, transparent);
     --sb-ambient-b: color-mix(in srgb, var(--SmartThemeUnderlineColor) 9%, transparent);
     --sb-shell-surface-opacity: 1;
+    --sb-shell-surface-opacity-percent: 100%;
     --sb-shell-card-opacity: 1;
     --sb-shell-control-opacity: 1;
     --sb-shell-overlay-opacity: 1;
@@ -1603,7 +1604,8 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     }
 
     #completion_prompt_manager_popup #completion_prompt_manager_popup_edit,
-    #completion_prompt_manager_popup #completion_prompt_manager_popup_inspect {
+    #completion_prompt_manager_popup #completion_prompt_manager_popup_inspect,
+    #completion_prompt_manager_popup #completion_prompt_manager_popup_preview {
         gap: 10px;
         padding: 0;
         min-width: 0;
@@ -2381,6 +2383,20 @@ input[type='range']::-moz-range-thumb {
 .sb-sampling-priority-after .toggle-description {
     margin: 4px 0;
     font-size: 0.86rem;
+}
+
+/* Mobile/touch: keep slider thumbs away from card edges and let vertical drags scroll. */
+@media (pointer: coarse) {
+    .sb-sampling-control-card input[type='range'].neo-range-slider {
+        display: block;
+        max-width: min(420px, calc(100% - 48px));
+        margin-inline: auto;
+        touch-action: pan-y;
+    }
+
+    .sb-sampling-grid {
+        row-gap: 14px;
+    }
 }
 
 .sb-presets-advanced-formatting {
@@ -4865,6 +4881,15 @@ input[type='range']::-moz-range-thumb {
     #AdvancedFormatting .sb-reasoning-max-field input {
         width: 68px;
         min-width: 68px;
+    }
+
+    #AdvancedFormatting > .flex-container.alignItemsBaseline {
+        gap: 8px;
+    }
+
+    #af_master_import > span,
+    #af_master_export > span {
+        display: none;
     }
 
     #PersonaManagement .persona-management-actions {

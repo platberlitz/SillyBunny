@@ -1,7 +1,8 @@
 import { normalizeContentText } from '../../../script.js';
+import { removeReasoningFromString } from '../../reasoning.js';
 
 export function extractProfileResponseText(response) {
-    return normalizeContentText(response?.content)
+    const text = normalizeContentText(response?.content)
         || normalizeContentText(response?.choices?.[0]?.message?.content)
         || normalizeContentText(response?.candidates?.[0]?.content?.parts)
         || normalizeContentText(response?.candidates?.[0]?.output?.parts)
@@ -11,6 +12,7 @@ export function extractProfileResponseText(response) {
         || normalizeContentText(response?.message?.tool_plan)
         || normalizeContentText(response?.message)
         || '';
+    return removeReasoningFromString(text);
 }
 
 export function buildFallbackPromptText(promptMessages) {
