@@ -6160,6 +6160,15 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     }
 }
 
+@media screen and (min-width: 1001px) and (max-width: 1440px) {
+    #left-nav-panel.openDrawer,
+    #user-settings-block.openDrawer {
+        width: min(100vw, clamp(680px, 60vw, 920px)) !important;
+        max-width: calc(100vw - 28px) !important;
+        min-width: min(580px, calc(100vw - 28px)) !important;
+    }
+}
+
 @media screen and (max-width: 768px) {
     :root {
         --sb-topbar-scale-active: var(--sb-topbar-scale-mobile);
