@@ -22,7 +22,7 @@ const CHAT_COMPLETION_PROFILE_REQUEST_FIELDS = {
     'custom-reasoning-disabled-value': ['custom_reasoning_disabled_value', value => String(value ?? '')],
 };
 
-function getChatCompletionProfileRequestOverrides(profile, overridePayload) {
+export function getChatCompletionProfileRequestOverrides(profile, overridePayload) {
     const overrides = {};
     const profileFieldNames = [];
 
