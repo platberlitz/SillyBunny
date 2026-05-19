@@ -8,6 +8,7 @@ This update consolidates the v1.6.0 staging work since v1.5.3: preset and connec
 
 ### Character Cards
 - fix(cards): warn when card HTML contains stripped `<script>`/`<iframe>` blocks (#94).
+- feat(cards): add opt-in sandboxed execution for supported card scripts (#94).
 
 ### Presets And Connection Profiles
 - Connection profile changes now serialize in order, abort superseded applications cleanly, save only after the latest selected profile finishes applying, and expose expanded summaries for easier review.
