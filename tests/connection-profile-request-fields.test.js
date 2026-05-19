@@ -1,0 +1,160 @@
+import { describe, expect, jest, test } from '@jest/globals';
+
+await jest.unstable_mockModule('../public/script.js', () => ({
+    CONNECT_API_MAP: {},
+    createModelIcon: jest.fn(),
+    getRequestHeaders: jest.fn(() => ({})),
+}));
+
+await jest.unstable_mockModule('../public/scripts/extensions.js', () => ({
+    extension_settings: {
+        caption: {},
+    },
+    openThirdPartyExtensionMenu: jest.fn(),
+}));
+
+await jest.unstable_mockModule('../public/scripts/i18n.js', () => ({
+    t: (strings, ...values) => strings.reduce((text, part, index) => `${text}${part}${values[index] ?? ''}`, ''),
+}));
+
+await jest.unstable_mockModule('../public/scripts/openai.js', () => ({
+    oai_settings: {},
+    proxies: [],
+    ZAI_ENDPOINT: {
+        COMMON: 'common',
+    },
+}));
+
+await jest.unstable_mockModule('../public/scripts/secrets.js', () => ({
+    SECRET_KEYS: {},
+    secret_state: {},
+}));
+
+await jest.unstable_mockModule('../public/scripts/textgen-settings.js', () => ({
+    textgen_types: {},
+    textgenerationwebui_settings: {},
+}));
+
+await jest.unstable_mockModule('../public/scripts/tokenizers.js', () => ({
+    getTokenCountAsync: jest.fn(async () => 0),
+}));
+
+await jest.unstable_mockModule('../public/scripts/utils.js', () => ({
+    createThumbnail: jest.fn(async value => value),
+    isTrueBoolean: value => ['on', 'true', '1'].includes(String(value ?? '').trim().toLowerCase()),
+    isValidUrl: jest.fn(() => true),
+}));
+
+const { getChatCompletionProfileRequestOverrides } = await import('../public/scripts/extensions/shared.js');
+
+const mappedRequestFieldNames = [
+    'include_reasoning',
+    'reasoning_effort',
+    'verbosity',
+    'enable_web_search',
+    'request_images',
+    'request_image_resolution',
+    'request_image_aspect_ratio',
+    'custom_reasoning_preset',
+    'custom_reasoning_param_format',
+    'custom_reasoning_param_name',
+    'custom_reasoning_enabled_value',
+    'custom_reasoning_disabled_value',
+];
+
+function createReasoningProfile(overrides = {}) {
+    return {
+        id: 'profile-reasoning',
+        mode: 'cc',
+        name: 'Reasoning Profile',
+        api: 'openai',
+        model: 'gpt-5.2',
+        'request-reasoning': 'true',
+        'reasoning-effort': 'high',
+        'verbosity': 'low',
+        'enable-web-search': '1',
+        'request-images': 'off',
+        'request-image-resolution': '2K',
+        'request-image-aspect-ratio': '16:9',
+        'custom-reasoning-preset': 'custom',
+        'custom-reasoning-param-format': 'thinking_object',
+        'custom-reasoning-param-name': 'thinking',
+        'custom-reasoning-enabled-value': 'enabled',
+        'custom-reasoning-disabled-value': 'disabled',
+        ...overrides,
+    };
+}
+
+describe('Connection Profile chat-completion request field mapping', () => {
+    test('leaves existing profiles without reasoning request keys unchanged', () => {
+        const legacyProfile = {
+            id: 'profile-legacy',
+            mode: 'cc',
+            name: 'Legacy Profile',
+            api: 'openai',
+            model: 'gpt-4o-mini',
+            preset: 'Default',
+        };
+
+        const result = getChatCompletionProfileRequestOverrides(legacyProfile, {});
+
+        expect(result).toEqual({
+            overrides: {},
+            profileFieldNames: [],
+        });
+        expect(legacyProfile).toEqual({
+            id: 'profile-legacy',
+            mode: 'cc',
+            name: 'Legacy Profile',
+            api: 'openai',
+            model: 'gpt-4o-mini',
+            preset: 'Default',
+        });
+    });
+
+    test('maps reasoning, web search, image, and custom reasoning profile keys to request fields', () => {
+        const result = getChatCompletionProfileRequestOverrides(createReasoningProfile(), {});
+
+        expect(result).toEqual({
+            overrides: {
+                include_reasoning: true,
+                reasoning_effort: 'high',
+                verbosity: 'low',
+                enable_web_search: true,
+                request_images: false,
+                request_image_resolution: '2K',
+                request_image_aspect_ratio: '16:9',
+                custom_reasoning_preset: 'custom',
+                custom_reasoning_param_format: 'thinking_object',
+                custom_reasoning_param_name: 'thinking',
+                custom_reasoning_enabled_value: 'enabled',
+                custom_reasoning_disabled_value: 'disabled',
+            },
+            profileFieldNames: mappedRequestFieldNames,
+        });
+    });
+
+    test('lets explicit caller overrides beat profile values', () => {
+        const overridePayload = {
+            include_reasoning: false,
+            reasoning_effort: 'low',
+            enable_web_search: false,
+            request_image_resolution: '1K',
+            custom_reasoning_param_name: 'caller_reasoning',
+        };
+
+        const result = getChatCompletionProfileRequestOverrides(createReasoningProfile(), overridePayload);
+
+        expect(result.overrides).toEqual({
+            verbosity: 'low',
+            request_images: false,
+            request_image_aspect_ratio: '16:9',
+            custom_reasoning_preset: 'custom',
+            custom_reasoning_param_format: 'thinking_object',
+            custom_reasoning_enabled_value: 'enabled',
+            custom_reasoning_disabled_value: 'disabled',
+        });
+        expect(result.profileFieldNames).toEqual(mappedRequestFieldNames.filter(field => !Object.hasOwn(overridePayload, field)));
+        expect({ ...result.overrides, ...overridePayload }).toEqual(expect.objectContaining(overridePayload));
+    });
+});

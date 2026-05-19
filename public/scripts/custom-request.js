@@ -6,6 +6,42 @@ import { formatInstructModeChat, formatInstructModePrompt, getInstructStoppingSe
 import { chat_completion_sources, getStreamingReply, tryParseStreamingError, createGenerationParameters, settingsToUpdate, oai_settings } from './openai.js';
 import EventSourceStream from './sse-stream.js';
 
+const BOOLEAN_CHAT_COMPLETION_FIELDS = [
+    'include_reasoning',
+    'enable_web_search',
+    'request_images',
+];
+
+function coerceRequestBoolean(value) {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (['true', 'on', '1'].includes(normalized)) {
+            return true;
+        }
+        if (['false', 'off', '0'].includes(normalized)) {
+            return false;
+        }
+    }
+
+    return Boolean(value);
+}
+
+function normalizeChatCompletionBooleanFields(payload) {
+    if (!payload || typeof payload !== 'object') {
+        return;
+    }
+
+    for (const field of BOOLEAN_CHAT_COMPLETION_FIELDS) {
+        if (payload[field] !== undefined) {
+            payload[field] = coerceRequestBoolean(payload[field]);
+        }
+    }
+}
+
 // #region Type Definitions
 /**
  * @typedef {Object} TextCompletionRequestBase
@@ -464,6 +500,8 @@ export class ChatCompletionService {
             ...props,
         };
 
+        normalizeChatCompletionBooleanFields(payload);
+
         // Remove undefined values to avoid API errors
         Object.keys(payload).forEach(key => {
             if (payload[key] === undefined) {
@@ -483,6 +521,8 @@ export class ChatCompletionService {
      * @throws {Error}
      */
     static async sendRequest(data, extractData = true, signal = null) {
+        delete data.__connectionProfileRequestFields;
+        delete data.modelOverride;
         const response = await fetch('/api/backends/chat-completions/generate', {
             method: 'POST',
             headers: getRequestHeaders(),
@@ -677,10 +717,68 @@ export class ChatCompletionService {
         if (overridePayload.custom_include_headers !== undefined) {
             settings.custom_include_headers = overridePayload.custom_include_headers;
         }
+        const connectionProfileRequestFields = Array.isArray(overridePayload.__connectionProfileRequestFields)
+            ? overridePayload.__connectionProfileRequestFields
+            : [];
+        const shouldUseConnectionProfileField = (field) => connectionProfileRequestFields.includes(field);
+        normalizeChatCompletionBooleanFields(overridePayload);
+
+        // SillyBunny: Connection Profile requests can carry reasoning/image behavior without mutating global UI settings.
+        if (overridePayload.include_reasoning !== undefined) {
+            settings.show_thoughts = coerceRequestBoolean(overridePayload.include_reasoning);
+            if (!settings.show_thoughts) {
+                settings.auto_append_reasoning_tags = false;
+            }
+        }
+        if (overridePayload.reasoning_effort !== undefined) {
+            settings.reasoning_effort = overridePayload.reasoning_effort;
+        }
+        if (overridePayload.verbosity !== undefined) {
+            settings.verbosity = overridePayload.verbosity;
+        }
+        if (overridePayload.enable_web_search !== undefined) {
+            settings.enable_web_search = coerceRequestBoolean(overridePayload.enable_web_search);
+        }
+        if (overridePayload.request_images !== undefined) {
+            settings.request_images = coerceRequestBoolean(overridePayload.request_images);
+        }
+        if (overridePayload.request_image_resolution !== undefined) {
+            settings.request_image_resolution = overridePayload.request_image_resolution;
+        }
+        if (overridePayload.request_image_aspect_ratio !== undefined) {
+            settings.request_image_aspect_ratio = overridePayload.request_image_aspect_ratio;
+        }
+        if (overridePayload.custom_reasoning_preset !== undefined) {
+            settings.custom_reasoning_preset = overridePayload.custom_reasoning_preset;
+        }
+        if (overridePayload.custom_reasoning_param_name !== undefined) {
+            settings.custom_reasoning_param_name = overridePayload.custom_reasoning_param_name;
+        }
+        if (overridePayload.custom_reasoning_param_format !== undefined) {
+            settings.custom_reasoning_param_format = overridePayload.custom_reasoning_param_format;
+        }
+        if (overridePayload.custom_reasoning_enabled_value !== undefined) {
+            settings.custom_reasoning_enabled_value = overridePayload.custom_reasoning_enabled_value;
+        }
+        if (overridePayload.custom_reasoning_disabled_value !== undefined) {
+            settings.custom_reasoning_disabled_value = overridePayload.custom_reasoning_disabled_value;
+        }
 
         // Convert from settings to generation payload
         const data = await createGenerationParameters(settings, overridePayload.model, 'quiet', overridePayload.messages);
         const payload = data.generate_data;
+
+        if (shouldUseConnectionProfileField('include_reasoning')) {
+            overridePayload.include_reasoning = payload.include_reasoning;
+        }
+        if (shouldUseConnectionProfileField('reasoning_effort')) {
+            overridePayload.reasoning_effort = payload.reasoning_effort;
+        }
+        if (shouldUseConnectionProfileField('verbosity')) {
+            overridePayload.verbosity = payload.verbosity;
+        }
+        delete overridePayload.__connectionProfileRequestFields;
+        delete overridePayload.modelOverride;
 
         // apply overrides
         return this.createRequestData({ ...payload, ...overridePayload });

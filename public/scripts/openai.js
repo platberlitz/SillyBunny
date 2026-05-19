@@ -59,6 +59,8 @@ import {
     getStringHash,
     getVideoDurationFromDataURL,
     isDataURL,
+    isFalseBoolean,
+    isTrueBoolean,
     isUuid,
     isValidUrl,
     parseJsonFile,
@@ -72,7 +74,7 @@ import { isMobile } from './RossAscends-mods.js';
 import { saveLogprobsForActiveMessage } from './logprobs.js';
 import { SlashCommandParser } from './slash-commands/SlashCommandParser.js';
 import { SlashCommand } from './slash-commands/SlashCommand.js';
-import { ARGUMENT_TYPE, SlashCommandArgument } from './slash-commands/SlashCommandArgument.js';
+import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from './slash-commands/SlashCommandArgument.js';
 import { renderTemplateAsync } from './templates.js';
 import { SlashCommandEnumValue } from './slash-commands/SlashCommandEnumValue.js';
 import { callGenericPopup, Popup, POPUP_RESULT, POPUP_TYPE } from './popup.js';
@@ -8002,18 +8004,7 @@ async function onCustomizeParametersClick() {
     };
 
     const applyCustomReasoningPreset = (preset, { preserveValues = false } = {}) => {
-        oai_settings.custom_reasoning_preset = preset;
-
-        if (preset !== custom_reasoning_preset_types.CUSTOM) {
-            const presetConfig = getCustomReasoningPresetConfig(preset);
-            oai_settings.custom_reasoning_param_name = presetConfig.paramName;
-            oai_settings.custom_reasoning_param_format = presetConfig.format;
-            if (!preserveValues) {
-                oai_settings.custom_reasoning_enabled_value = presetConfig.enabledValue;
-                oai_settings.custom_reasoning_disabled_value = presetConfig.disabledValue;
-            }
-        }
-
+        setCustomReasoningPreset(preset, { preserveValues });
         syncCustomReasoningPopup();
         saveSettingsDebounced();
     };
@@ -8427,6 +8418,230 @@ function runProxyCallback(_, value) {
     return foundName;
 }
 
+function getSlashCommandStringValue(value) {
+    return String(value ?? '');
+}
+
+function getSlashCommandBooleanValue(value, commandName) {
+    if (isTrueBoolean(value)) {
+        return true;
+    }
+
+    if (isFalseBoolean(value)) {
+        return false;
+    }
+
+    throw new Error(t`Invalid value "${value}" for /${commandName}. Use true or false.`);
+}
+
+function getSlashCommandEnumValue(value, validValues, commandName) {
+    if (!validValues.includes(value)) {
+        throw new Error(t`Invalid value "${value}" for /${commandName}. Valid values are: ${validValues.join(', ')}`);
+    }
+
+    return value;
+}
+
+function hasSlashCommandValue(args, value) {
+    return isTrueBoolean(String(args?.force ?? 'false'))
+        || args?._hasUnnamedArgument
+        || String(value ?? '').trim().length > 0;
+}
+
+function syncCustomReasoningSettingControls() {
+    $('#custom_reasoning_preset').val(oai_settings.custom_reasoning_preset);
+    $('#custom_reasoning_param_name').val(oai_settings.custom_reasoning_param_name);
+    $('#custom_reasoning_param_format').val(oai_settings.custom_reasoning_param_format);
+    $('#custom_reasoning_enabled_value').val(oai_settings.custom_reasoning_enabled_value);
+    $('#custom_reasoning_disabled_value').val(oai_settings.custom_reasoning_disabled_value);
+
+    const format = String(oai_settings.custom_reasoning_param_format ?? custom_reasoning_param_formats.OPENAI);
+    const showToggleValues = [custom_reasoning_param_formats.STRING, custom_reasoning_param_formats.THINKING_OBJECT].includes(format);
+    $('.sb-custom-reasoning-toggle-values').toggle(showToggleValues);
+}
+
+function setCustomReasoningPreset(preset, { preserveValues = false } = {}) {
+    oai_settings.custom_reasoning_preset = preset;
+
+    if (preset !== custom_reasoning_preset_types.CUSTOM) {
+        const presetConfig = getCustomReasoningPresetConfig(preset);
+        oai_settings.custom_reasoning_param_name = presetConfig.paramName;
+        oai_settings.custom_reasoning_param_format = presetConfig.format;
+        if (!preserveValues) {
+            oai_settings.custom_reasoning_enabled_value = presetConfig.enabledValue;
+            oai_settings.custom_reasoning_disabled_value = presetConfig.disabledValue;
+        }
+    }
+
+    syncCustomReasoningSettingControls();
+}
+
+function markCustomReasoningPreset() {
+    oai_settings.custom_reasoning_preset = custom_reasoning_preset_types.CUSTOM;
+    syncCustomReasoningSettingControls();
+}
+
+function markCustomReasoningPresetForManualCommand(args) {
+    if (!isTrueBoolean(String(args?.quiet ?? 'false'))) {
+        markCustomReasoningPreset();
+    }
+}
+
+function runBooleanChatCompletionSettingCallback(commandName, settingName, selector, onChange = null) {
+    return (args, value) => {
+        const stringValue = getSlashCommandStringValue(value).trim();
+        if (!hasSlashCommandValue(args, value)) {
+            return String(Boolean(oai_settings[settingName]));
+        }
+
+        oai_settings[settingName] = getSlashCommandBooleanValue(stringValue, commandName);
+        $(selector).prop('checked', oai_settings[settingName]);
+        onChange?.();
+        saveSettingsDebounced();
+        return String(oai_settings[settingName]);
+    };
+}
+
+function runEnumChatCompletionSettingCallback(commandName, settingName, selector, validValues, onChange = null) {
+    return (args, value) => {
+        const stringValue = getSlashCommandStringValue(value).trim();
+        if (!hasSlashCommandValue(args, value)) {
+            return getSlashCommandStringValue(oai_settings[settingName]);
+        }
+
+        oai_settings[settingName] = getSlashCommandEnumValue(stringValue, validValues, commandName);
+        $(selector).val(oai_settings[settingName]);
+        onChange?.(args);
+        saveSettingsDebounced();
+        return getSlashCommandStringValue(oai_settings[settingName]);
+    };
+}
+
+function runStringChatCompletionSettingCallback(commandName, settingName, selector, onChange = null, validValues = null, normalizeValue = value => value) {
+    return (args, value) => {
+        if (!hasSlashCommandValue(args, value)) {
+            return getSlashCommandStringValue(oai_settings[settingName]);
+        }
+
+        const stringValue = normalizeValue(getSlashCommandStringValue(value).trim());
+        if (Array.isArray(validValues) && stringValue) {
+            getSlashCommandEnumValue(stringValue, validValues, commandName);
+        }
+
+        oai_settings[settingName] = stringValue;
+        $(selector).val(oai_settings[settingName]);
+        onChange?.(args);
+        saveSettingsDebounced();
+        return getSlashCommandStringValue(oai_settings[settingName]);
+    };
+}
+
+const REQUEST_IMAGE_RESOLUTION_VALUES = ['', '1K', '2K', '4K'];
+const REQUEST_IMAGE_ASPECT_RATIO_VALUES = ['', '1:1', '9:16', '16:9', '3:4', '4:3', '3:2', '2:3', '5:4', '4:5', '21:9'];
+
+function registerChatCompletionProfileSlashCommand({ name, callback, description, typeList = [ARGUMENT_TYPE.STRING], enumList = [], forceEnum = false }) {
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name,
+        callback,
+        returns: t`current value`,
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'quiet',
+                description: t`suppress UI side effects where supported`,
+                typeList: [ARGUMENT_TYPE.BOOLEAN],
+                defaultValue: 'false',
+            }),
+        ],
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description,
+                typeList,
+                enumList,
+                forceEnum,
+            }),
+        ],
+        helpString: `Sets the Chat Completion ${description}. Gets the current value if no argument is provided.`,
+    }));
+}
+
+function registerChatCompletionProfileSlashCommands() {
+    registerChatCompletionProfileSlashCommand({
+        name: 'request-reasoning',
+        callback: runBooleanChatCompletionSettingCallback('request-reasoning', 'show_thoughts', '#openai_show_thoughts', setToolReasoningControls),
+        description: 'request model reasoning setting',
+        typeList: [ARGUMENT_TYPE.BOOLEAN],
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'reasoning-effort',
+        callback: runEnumChatCompletionSettingCallback('reasoning-effort', 'reasoning_effort', '#openai_reasoning_effort', Object.values(reasoning_effort_types)),
+        description: 'reasoning effort',
+        enumList: Object.values(reasoning_effort_types),
+        forceEnum: true,
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'verbosity',
+        callback: runEnumChatCompletionSettingCallback('verbosity', 'verbosity', '#openai_verbosity', Object.values(verbosity_levels)),
+        description: 'verbosity',
+        enumList: Object.values(verbosity_levels),
+        forceEnum: true,
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'enable-web-search',
+        callback: runBooleanChatCompletionSettingCallback('enable-web-search', 'enable_web_search', '#openai_enable_web_search', calculateOpenRouterCost),
+        description: 'web search request setting',
+        typeList: [ARGUMENT_TYPE.BOOLEAN],
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'request-images',
+        callback: runBooleanChatCompletionSettingCallback('request-images', 'request_images', '#openai_request_images'),
+        description: 'inline image request setting',
+        typeList: [ARGUMENT_TYPE.BOOLEAN],
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'request-image-resolution',
+        callback: runStringChatCompletionSettingCallback('request-image-resolution', 'request_image_resolution', '#request_image_resolution', null, REQUEST_IMAGE_RESOLUTION_VALUES, value => value.toLowerCase() === 'auto' ? '' : value),
+        description: 'requested image resolution',
+        enumList: ['auto', ...REQUEST_IMAGE_RESOLUTION_VALUES.filter(Boolean)],
+        forceEnum: true,
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'request-image-aspect-ratio',
+        callback: runStringChatCompletionSettingCallback('request-image-aspect-ratio', 'request_image_aspect_ratio', '#request_image_aspect_ratio', null, REQUEST_IMAGE_ASPECT_RATIO_VALUES, value => value.toLowerCase() === 'auto' ? '' : value),
+        description: 'requested image aspect ratio',
+        enumList: ['auto', ...REQUEST_IMAGE_ASPECT_RATIO_VALUES.filter(Boolean)],
+        forceEnum: true,
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'custom-reasoning-preset',
+        callback: runEnumChatCompletionSettingCallback('custom-reasoning-preset', 'custom_reasoning_preset', '#custom_reasoning_preset', Object.values(custom_reasoning_preset_types), () => setCustomReasoningPreset(oai_settings.custom_reasoning_preset)),
+        description: 'custom reasoning preset',
+        enumList: Object.values(custom_reasoning_preset_types),
+        forceEnum: true,
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'custom-reasoning-param-format',
+        callback: runEnumChatCompletionSettingCallback('custom-reasoning-param-format', 'custom_reasoning_param_format', '#custom_reasoning_param_format', Object.values(custom_reasoning_param_formats), markCustomReasoningPresetForManualCommand),
+        description: 'custom reasoning parameter format',
+        enumList: Object.values(custom_reasoning_param_formats),
+        forceEnum: true,
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'custom-reasoning-param-name',
+        callback: runStringChatCompletionSettingCallback('custom-reasoning-param-name', 'custom_reasoning_param_name', '#custom_reasoning_param_name', markCustomReasoningPresetForManualCommand),
+        description: 'custom reasoning parameter name',
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'custom-reasoning-enabled-value',
+        callback: runStringChatCompletionSettingCallback('custom-reasoning-enabled-value', 'custom_reasoning_enabled_value', '#custom_reasoning_enabled_value', markCustomReasoningPresetForManualCommand),
+        description: 'custom reasoning enabled value',
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'custom-reasoning-disabled-value',
+        callback: runStringChatCompletionSettingCallback('custom-reasoning-disabled-value', 'custom_reasoning_disabled_value', '#custom_reasoning_disabled_value', markCustomReasoningPresetForManualCommand),
+        description: 'custom reasoning disabled value',
+    });
+}
+
 /**
  * Handle Vertex AI authentication mode change
  */
@@ -8593,6 +8808,8 @@ export function initOpenAI() {
         ],
         helpString: 'Sets a proxy preset by name.',
     }));
+    // SillyBunny: Connection Manager snapshots Chat Completion request behavior via slash commands.
+    registerChatCompletionProfileSlashCommands();
 
     $('#test_api_button').on('click', testApiConnection);
 
