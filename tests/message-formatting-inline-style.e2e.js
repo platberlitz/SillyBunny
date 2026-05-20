@@ -9,7 +9,10 @@ test.describe('message formatting inline styles', () => {
         const result = await page.evaluate(async () => {
             const mod = await import('/script.js');
             const html = mod.messageFormatting(
-                '<span id="safe" style="display:inline-block;transform:rotate(2deg);opacity:0.7;text-shadow:2px 2px red;background:url(javascript:alert(1));">styled</span>',
+                [
+                    '<span id="scale-stretch" style="display:inline-block;transform:scaleX(1.2);transform-origin:left center;opacity:0.7;text-shadow:2px 2px red;background:url(javascript:alert(1));">scaled</span>',
+                    '<span id="font-stretch" style="display:inline-block;font-stretch:expanded;opacity:0.7;text-shadow:2px 2px red;background:url(javascript:alert(1));">stretched</span>',
+                ].join(' '),
                 'Bob',
                 false,
                 false,
@@ -24,30 +27,50 @@ test.describe('message formatting inline styles', () => {
             host.style.top = '0';
             host.innerHTML = html;
             document.body.appendChild(host);
-            const safe = host.querySelector('#safe');
-            const style = safe?.getAttribute('style') ?? '';
-            const computed = safe ? getComputedStyle(safe) : null;
+            const scaleStretch = host.querySelector('#scale-stretch');
+            const fontStretch = host.querySelector('#font-stretch');
+            const scaleStyle = scaleStretch?.getAttribute('style') ?? '';
+            const fontStretchStyle = fontStretch?.getAttribute('style') ?? '';
+            const scaleComputed = scaleStretch ? getComputedStyle(scaleStretch) : null;
+            const fontStretchComputed = fontStretch ? getComputedStyle(fontStretch) : null;
 
             return {
                 html,
-                style,
-                display: computed?.display ?? null,
-                transform: computed?.transform ?? null,
-                opacity: computed?.opacity ?? null,
-                textShadow: computed?.textShadow ?? null,
-                backgroundImage: computed?.backgroundImage ?? null,
+                scaleStyle,
+                scaleDisplay: scaleComputed?.display ?? null,
+                scaleTransform: scaleComputed?.transform ?? null,
+                scaleOpacity: scaleComputed?.opacity ?? null,
+                scaleTextShadow: scaleComputed?.textShadow ?? null,
+                scaleBackgroundImage: scaleComputed?.backgroundImage ?? null,
+                fontStretchStyle,
+                fontStretchDisplay: fontStretchComputed?.display ?? null,
+                fontStretchValue: fontStretchComputed?.fontStretch ?? null,
+                fontStretchOpacity: fontStretchComputed?.opacity ?? null,
+                fontStretchTextShadow: fontStretchComputed?.textShadow ?? null,
+                fontStretchBackgroundImage: fontStretchComputed?.backgroundImage ?? null,
             };
         });
 
         expect(result.html).toContain('style="');
-        expect(result.style).toContain('display:inline-block');
-        expect(result.style).toContain('transform:rotate(2deg)');
-        expect(result.style).toContain('opacity:0.7');
-        expect(result.style).toContain('text-shadow:2px 2px red');
-        expect(result.display).toBe('inline-block');
-        expect(result.transform).not.toBe('none');
-        expect(result.opacity).toBe('0.7');
-        expect(result.textShadow).not.toBe('none');
-        expect(result.backgroundImage).toBe('none');
+        expect(result.scaleStyle).toContain('display:inline-block');
+        expect(result.scaleStyle).toContain('transform:scaleX(1.2)');
+        expect(result.scaleStyle).toContain('transform-origin:left center');
+        expect(result.scaleStyle).toContain('opacity:0.7');
+        expect(result.scaleStyle).toContain('text-shadow:2px 2px red');
+        expect(result.scaleDisplay).toBe('inline-block');
+        expect(result.scaleTransform).not.toBe('none');
+        expect(result.scaleOpacity).toBe('0.7');
+        expect(result.scaleTextShadow).not.toBe('none');
+        expect(result.scaleBackgroundImage).toBe('none');
+
+        expect(result.fontStretchStyle).toContain('display:inline-block');
+        expect(result.fontStretchStyle).toContain('font-stretch:expanded');
+        expect(result.fontStretchStyle).toContain('opacity:0.7');
+        expect(result.fontStretchStyle).toContain('text-shadow:2px 2px red');
+        expect(result.fontStretchDisplay).toBe('inline-block');
+        expect(result.fontStretchValue).toBe('125%');
+        expect(result.fontStretchOpacity).toBe('0.7');
+        expect(result.fontStretchTextShadow).not.toBe('none');
+        expect(result.fontStretchBackgroundImage).toBe('none');
     });
 });
