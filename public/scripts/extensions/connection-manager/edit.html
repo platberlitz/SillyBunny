@@ -1,4 +1,11 @@
 <div>
+    <h3 data-i18n="Folder:">Folder:</h3>
+    <select id="profile_folder_select" class="text_pole wide100p">
+        <option value="" data-i18n="Root (No Folder)">Root (No Folder)</option>
+        {{#each folders}}
+        <option value="{{id}}"{{#if selected}} selected{{/if}}>{{name}}</option>
+        {{/each}}
+    </select>
     <h3 data-i18n="Included settings:">Included settings:</h3>
     <div class="justifyLeft flex-container flexFlowColumn flexNoGap">
         {{#each settings}}

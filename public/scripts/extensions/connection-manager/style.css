@@ -52,3 +52,85 @@
     user-select: none;
     -webkit-user-select: none;
 }
+
+#toggle_profile_favorite.is_fav {
+    color: var(--SmartThemeQuoteColor, gold);
+    opacity: 1;
+}
+
+#toggle_profile_favorite:not(.is_fav) {
+    opacity: 0.55;
+}
+
+.connection-profile-folder-manager {
+    min-width: min(420px, 90vw);
+}
+
+.connection-profile-folder-manager .folder-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.connection-profile-folder-manager .folder-item,
+.connection-profile-folder-manager .folder-add-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.connection-profile-folder-manager .folder-item {
+    padding: 8px;
+    background: var(--black30a);
+    border-radius: 4px;
+}
+
+.connection-profile-folder-manager .folder-name-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.connection-profile-folder-manager .folder-profile-count {
+    color: var(--grey70);
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.connection-profile-folder-manager .folder-delete-btn {
+    cursor: pointer;
+    padding: 4px 8px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.connection-profile-folder-manager .folder-delete-btn:hover {
+    color: var(--crimson70a);
+    opacity: 1;
+}
+
+.connection-profile-folder-manager .folder-empty-message {
+    opacity: 0.75;
+}
+
+#connection_profiles optgroup {
+    font-style: normal;
+    font-weight: bold;
+}
+
+#connection_profiles optgroup option {
+    padding-left: 20px;
+}
+
+@media screen and (max-width: 700px) {
+    .connection-profile-folder-manager .folder-add-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .connection-profile-folder-manager .folder-add-row .menu_button {
+        width: 100%;
+    }
+}
