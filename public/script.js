@@ -2518,6 +2518,7 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
         RETURN_TRUSTED_TYPE: false,
         MESSAGE_SANITIZE: true,
         ADD_TAGS: ['custom-style', CARD_SCRIPT_MARKER_TAG],
+        ADD_ATTR: ['style'], // Allow inline CSS effects from model-generated message spans.
         ...sanitizerOverrides,
     };
     mes = restoreOocBlocksForDisplay(mes, oocBlocks);
