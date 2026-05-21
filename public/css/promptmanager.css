@@ -430,6 +430,31 @@
     gap: 12px;
 }
 
+.prompt_manager_header_controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 0 0 auto;
+    gap: 6px;
+}
+
+#completion_prompt_manager .prompt_manager_drag_lock_button.menu_button {
+    width: var(--sb-control-min-height, 30px);
+    padding: 0;
+}
+
+#completion_prompt_manager .prompt_manager_drag_lock_button.menu_button.toggleable {
+    padding-left: 0;
+}
+
+#completion_prompt_manager .prompt_manager_drag_lock_button.menu_button.toggleable::before {
+    content: none;
+}
+
+#completion_prompt_manager .prompt_manager_drag_lock_button > i {
+    pointer-events: none;
+}
+
 #completion_prompt_manager .completion_prompt_manager_drawer_content {
     padding-top: 0.35em;
 }
@@ -536,6 +561,21 @@
     padding: 0 5px;
     display: flex;
     align-items: center;
+}
+
+#completion_prompt_manager #completion_prompt_manager_list.prompt-manager-drag-locked .completion_prompt_manager_prompt_draggable {
+    cursor: default;
+}
+
+#completion_prompt_manager #completion_prompt_manager_list.prompt-manager-drag-locked.ui-state-disabled {
+    cursor: default;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+#completion_prompt_manager #completion_prompt_manager_list.prompt-manager-drag-locked .drag-handle {
+    cursor: default;
+    opacity: 0.38;
 }
 
 #completion_prompt_manager_footer_append_prompt {
