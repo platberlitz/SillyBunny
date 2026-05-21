@@ -1,4 +1,3 @@
-import { Readable } from 'node:stream';
 import fetch from 'node-fetch';
 import express from 'express';
 import _ from 'lodash';
@@ -56,7 +55,11 @@ async function parseOllamaStream(jsonStream, request, response) {
                 return;
             }
 
-            if (jsonStream.body instanceof Readable) jsonStream.body.destroy();
+            try {
+                jsonStream.body?.destroy?.();
+            } catch {
+                // Best effort; the client response is already closing.
+            }
             response.end();
         });
 

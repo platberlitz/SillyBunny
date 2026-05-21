@@ -1,7 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import process from 'node:process';
-import { Readable } from 'node:stream';
 import { createRequire } from 'node:module';
 import { Buffer } from 'node:buffer';
 import { promises as dnsPromise } from 'node:dns';
@@ -734,7 +733,11 @@ export async function forwardFetchResponse(from, to) {
                 return;
             }
 
-            if (from.body instanceof Readable) from.body.destroy(); // Close the remote stream
+            try {
+                from.body?.destroy?.(); // Close the remote stream
+            } catch {
+                // Best effort; the client response is already closing.
+            }
 
             to.end(); // End the Express response
         });

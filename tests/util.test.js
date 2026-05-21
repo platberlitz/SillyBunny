@@ -1,5 +1,5 @@
 import { afterEach, describe, test, expect, jest } from '@jest/globals';
-import { once } from 'node:events';
+import { EventEmitter, once } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { Response } from 'node-fetch';
 import { CHAT_COMPLETION_SOURCES } from '../src/constants';
@@ -142,6 +142,25 @@ describe('forwardFetchResponse', () => {
         response.emit('close');
 
         expect(destroySpy).toHaveBeenCalled();
+    });
+
+    test('should destroy upstream streaming bodies that are not Node Readable instances', async () => {
+        const upstreamBody = Object.assign(new EventEmitter(), {
+            pipe: jest.fn(),
+            destroy: jest.fn(),
+        });
+        const response = createMockExpressResponse();
+        response.socket = {};
+
+        await forwardFetchResponse({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            body: upstreamBody,
+        }, response);
+        response.emit('close');
+
+        expect(upstreamBody.destroy).toHaveBeenCalled();
     });
 
     test('should log JSON error bodies and return the original body for non-2xx streaming responses', async () => {
