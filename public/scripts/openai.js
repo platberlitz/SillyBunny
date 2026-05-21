@@ -245,6 +245,7 @@ const MODEL_ID_SEARCH_CONTROLS = [
     { source: chat_completion_sources.AI21, setting: 'ai21_model', input: '#ai21_model_id', select: '#model_ai21_select', dynamicGroupId: 'ai21_other_models' },
     { source: chat_completion_sources.COHERE, setting: 'cohere_model', input: '#cohere_model_id', select: '#model_cohere_select', dynamicGroupId: 'cohere_other_models' },
     { source: chat_completion_sources.PERPLEXITY, setting: 'perplexity_model', input: '#perplexity_model_id', select: '#model_perplexity_select', dynamicGroupId: 'perplexity_other_models' },
+    { source: chat_completion_sources.MAKERSUITE, setting: 'google_model', input: '#makersuite_model_id', select: '#model_google_select', dynamicGroupId: 'google_other_models' },
     { source: chat_completion_sources.VERTEXAI, setting: 'vertexai_model', input: '#vertexai_model_id', select: '#model_vertexai_select', dynamicGroupId: 'vertexai_other_models' },
     { source: chat_completion_sources.CUSTOM, setting: 'custom_model', input: '#custom_model_id', select: '#model_custom_select', datalist: '#model_custom_select_fill', dynamicOnly: true },
     { source: chat_completion_sources.ZAI, setting: 'zai_model', input: '#zai_model_id', select: '#model_zai_select', dynamicGroupId: 'zai_other_models' },
@@ -2110,6 +2111,33 @@ function createOpenAIModelOption(option, { favorite = false } = {}) {
         .attr('data-favorite', favorite ? 'true' : 'false');
 }
 
+function syncOpenAIModelIdInput(modelId = oai_settings.openai_model) {
+    $('#openai_model_id').val(String(modelId || ''));
+}
+
+function ensureOpenAIModelSelectOption(modelId) {
+    const value = String(modelId || '');
+    const $modelSelect = $('#model_openai_select');
+
+    if (!value || $modelSelect.length === 0 || $modelSelect.find(`option[value="${CSS.escape(value)}"]`).length > 0) {
+        return;
+    }
+
+    let $currentGroup = $modelSelect.find('optgroup[data-sb-current-model="true"]');
+    if ($currentGroup.length === 0) {
+        $currentGroup = $('<optgroup>', {
+            label: t`Current`,
+        })
+            .attr('data-sb-generated', 'true')
+            .attr('data-sb-current-model', 'true');
+        $modelSelect.append($currentGroup);
+    } else {
+        $currentGroup.empty();
+    }
+
+    $currentGroup.append(createOpenAIModelOption({ value, text: value }));
+}
+
 function appendOpenAIModelEntry($container, entry, favoriteValues = new Set()) {
     if (entry.type === 'group') {
         const $group = $('<optgroup>', { label: entry.label }).attr('data-sb-generated', 'true');
@@ -2154,7 +2182,7 @@ function updateOpenAIModelFavoriteButton() {
         return;
     }
 
-    const currentModel = String($('#model_openai_select').val() || oai_settings.openai_model || '');
+    const currentModel = String($('#openai_model_id').val() || oai_settings.openai_model || $('#model_openai_select').val() || '');
     const isFavorite = currentModel.length > 0 && getModelFavoritesForSource(chat_completion_sources.OPENAI).includes(currentModel);
     const title = currentModel.length === 0
         ? t`Select a model first`
@@ -2177,10 +2205,10 @@ function rebuildOpenAIModelSelect() {
     }
 
     const optionMap = collectOpenAIOptionMap();
-    const selectedValue = String($modelSelect.val() || oai_settings.openai_model || default_settings.openai_model || '');
+    const selectedValue = String(oai_settings.openai_model || $modelSelect.val() || default_settings.openai_model || '');
     const favoriteOptions = getModelFavoritesForSource(chat_completion_sources.OPENAI)
-        .map(modelId => optionMap.get(modelId))
-        .filter(Boolean);
+        .filter(Boolean)
+        .map(modelId => optionMap.get(modelId) || { value: modelId, text: modelId });
     const favoriteValues = new Set(favoriteOptions.map(option => option.value));
     const externalModels = [chat_completion_sources.OPENAI, chat_completion_sources.OPENAI_RESPONSES].includes(oai_settings.chat_completion_source)
         ? (Array.isArray(model_list) ? model_list : [])
@@ -2222,7 +2250,9 @@ function rebuildOpenAIModelSelect() {
     if (selectedValue && $modelSelect.find(`option[value="${CSS.escape(selectedValue)}"]`).length === 0) {
         const $currentGroup = $('<optgroup>', {
             label: t`Current`,
-        }).attr('data-sb-generated', 'true');
+        })
+            .attr('data-sb-generated', 'true')
+            .attr('data-sb-current-model', 'true');
 
         $currentGroup.append(createOpenAIModelOption({ value: selectedValue, text: selectedValue }));
         $modelSelect.append($currentGroup);
@@ -2241,13 +2271,14 @@ function rebuildOpenAIModelSelect() {
         oai_settings.openai_model = nextValue;
     }
 
+    syncOpenAIModelIdInput(nextValue);
     initOpenAIModelSearch();
     $modelSelect.trigger('change.select2');
     updateOpenAIModelFavoriteButton();
 }
 
 function toggleOpenAIModelFavorite() {
-    const modelId = String($('#model_openai_select').val() || oai_settings.openai_model || '');
+    const modelId = String($('#openai_model_id').val() || oai_settings.openai_model || $('#model_openai_select').val() || '');
     if (!modelId) {
         return;
     }
@@ -2557,6 +2588,10 @@ function rebuildModelIdSearchControl(control, { preserveQuery = false } = {}) {
 
     if (selectedValue && select.querySelector(`option[value="${CSS.escape(selectedValue)}"]`)) {
         select.value = selectedValue;
+    }
+
+    if (!preserveQuery) {
+        input.value = selectedValue;
     }
 
     rebuildModelIdSearchDatalist(control, optionMap, favoriteOptions, query);
@@ -3788,12 +3823,21 @@ function saveModelList(data) {
             }
         });
 
-        const selectedModel = model_list.find(model => model.id === oai_settings.google_model);
-        if (model_list.length > 0 && (!selectedModel || !oai_settings.google_model)) {
+        if (model_list.length > 0 && !oai_settings.google_model) {
             oai_settings.google_model = model_list[0].id;
         }
 
+        if (oai_settings.google_model && $('#model_google_select').find(`option[value="${CSS.escape(oai_settings.google_model)}"]`).length === 0) {
+            $('#google_other_models').append(
+                $('<option>', {
+                    value: oai_settings.google_model,
+                    text: oai_settings.google_model,
+                }),
+            );
+        }
+
         $('#model_google_select').val(oai_settings.google_model).trigger('change');
+        $('#makersuite_model_id').val(oai_settings.google_model);
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.GROQ) {
@@ -7227,6 +7271,7 @@ async function onModelChange() {
     if ($(this).is('#model_openai_select')) {
         console.log('OpenAI model changed to', value);
         oai_settings.openai_model = value;
+        syncOpenAIModelIdInput(value);
     }
 
     if ($(this).is('#model_openrouter_select')) {
@@ -7259,6 +7304,7 @@ async function onModelChange() {
 
         console.log('Google model changed to', value);
         oai_settings.google_model = value;
+        $('#makersuite_model_id').val(value);
     }
 
     if ($(this).is('#model_vertexai_select')) {
@@ -7877,7 +7923,8 @@ function toggleChatCompletionForms() {
             $('#model_openai_select').trigger('change');
         }
     } else if (oai_settings.chat_completion_source == chat_completion_sources.MAKERSUITE) {
-        $('#model_google_select').trigger('change');
+        refreshModelIdSearchControlsForSource(chat_completion_sources.MAKERSUITE);
+        $('#model_google_select').val(oai_settings.google_model).trigger('change');
     } else if (oai_settings.chat_completion_source == chat_completion_sources.VERTEXAI) {
         $('#model_vertexai_select').trigger('change');
         // Update UI based on authentication mode
@@ -9158,6 +9205,19 @@ export function initOpenAI() {
         saveSettingsDebounced();
     });
 
+    $('#openai_model_id').on('input', function () {
+        const value = String($(this).val());
+        oai_settings.openai_model = value;
+
+        if (value) {
+            ensureOpenAIModelSelectOption(value);
+            $('#model_openai_select').val(value).trigger('change');
+        } else {
+            updateOpenAIModelFavoriteButton();
+            saveSettingsDebounced();
+        }
+    });
+
     $('#claude_model_id').on('input', function () {
         oai_settings.claude_model = String($(this).val());
         saveSettingsDebounced();
@@ -9173,6 +9233,18 @@ export function initOpenAI() {
     $('#perplexity_model_id').on('input', function () {
         oai_settings.perplexity_model = String($(this).val());
         saveSettingsDebounced();
+    });
+    $('#makersuite_model_id').on('input', function () {
+        const value = String($(this).val());
+        oai_settings.google_model = value;
+
+        if (value) {
+            refreshModelIdSearchControlsForSource(chat_completion_sources.MAKERSUITE);
+            $('#model_google_select').val(value).trigger('change');
+        } else {
+            updateModelIdSearchFavoriteButtons();
+            saveSettingsDebounced();
+        }
     });
     $('#zai_model_id').on('input', function () {
         oai_settings.zai_model = String($(this).val());
