@@ -2873,7 +2873,7 @@ async function handleClearCookiesAndCacheClick(event) {
         const clearedCookieCount = clearAllBrowserCookies();
         globalThis.toastr?.success?.('Cookies and cache cleared. Reloading SillyBunny...', 'Cookies cleared');
         console.info(`[Cache] Expired ${clearedCookieCount} browser cookies and queued ${serverCookieResult?.expirationAttempts ?? 0} server cookie expirations before reload`);
-        window.setTimeout(() => window.location.reload(), 450);
+        window.setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
         console.error('Failed to clear cookies and cache', error);
         globalThis.toastr?.error?.(String(error?.message || error), 'Clear failed');
