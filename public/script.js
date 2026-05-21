@@ -4426,12 +4426,14 @@ function showStopButton() {
     $('#mes_stop').css({ 'display': 'flex' });
 }
 
-function hideStopButton() {
+function hideStopButton({ emitGenerationEnded = true } = {}) {
     $('#send_form').removeClass('sb-generating-controls');
     // prevent NOOP, because hideStopButton() gets called multiple times
     if ($('#mes_stop').css('display') !== 'none') {
         $('#mes_stop').css({ 'display': 'none' });
-        eventSource.emit(event_types.GENERATION_ENDED, chat.length);
+        if (emitGenerationEnded) {
+            eventSource.emit(event_types.GENERATION_ENDED, chat.length);
+        }
     }
 }
 
@@ -6673,7 +6675,6 @@ export function stopGeneration() {
     let stopped = false;
     if (activeStreamingProcessor) {
         activeStreamingProcessor.onStopStreaming();
-        clearStreamingProcessorIfCurrent(activeStreamingProcessor);
         stopped = true;
     }
     if (shouldAbortRequest && abortController) {
@@ -6681,9 +6682,9 @@ export function stopGeneration() {
         stopped = true;
     }
     if (stopped) {
-        unblockGeneration(activeGenerationType);
-        hideStopButton();
-        eventSource.emit(event_types.GENERATION_STOPPED);
+        eventSource.emitAndWait(event_types.GENERATION_STOPPED);
+        clearStreamingProcessorIfCurrent(activeStreamingProcessor);
+        unblockGeneration(activeGenerationType, { emitGenerationEnded: false });
     }
     return stopped;
 }
@@ -6759,14 +6760,14 @@ function flushWIInjections() {
  * Unblocks the UI after a generation is complete.
  * @param {string} [type] Generation type (optional)
  */
-function unblockGeneration(type) {
+function unblockGeneration(type, { emitGenerationEnded = true } = {}) {
     // Don't unblock if a parallel stream is still running
     if (type === 'quiet' && streamingProcessor && !streamingProcessor.isFinished) {
         return;
     }
 
     is_send_press = false;
-    activateSendButtons();
+    activateSendButtons({ emitGenerationEnded });
     setGenerationProgress(0);
     flushEphemeralStoppingStrings();
     flushWIInjections();
@@ -8254,9 +8255,9 @@ export function getGeneratingModel(mes) {
 /**
  * A function mainly used to switch 'generating' state - setting it to false and activating the buttons again
  */
-export function activateSendButtons() {
+export function activateSendButtons({ emitGenerationEnded = true } = {}) {
     is_send_press = false;
-    hideStopButton();
+    hideStopButton({ emitGenerationEnded });
     showSwipeButtons();
     delete document.body.dataset.generating;
 }

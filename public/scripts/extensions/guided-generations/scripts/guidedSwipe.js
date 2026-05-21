@@ -76,7 +76,18 @@ async function generateNewSwipe() {
         context.swipe.right();
 
         await new Promise(resolve => {
-            eventSource.once(event_types.GENERATION_ENDED, resolve);
+            let resolved = false;
+            const resolveOnce = () => {
+                if (resolved) {
+                    return;
+                }
+                resolved = true;
+                eventSource.removeListener(event_types.GENERATION_ENDED, resolveOnce);
+                eventSource.removeListener(event_types.GENERATION_STOPPED, resolveOnce);
+                resolve();
+            };
+            eventSource.once(event_types.GENERATION_ENDED, resolveOnce);
+            eventSource.once(event_types.GENERATION_STOPPED, resolveOnce);
         });
         await new Promise(resolve => setTimeout(resolve, 200));
         return true;
