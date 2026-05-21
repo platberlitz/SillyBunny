@@ -1029,196 +1029,6 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     margin-left: 0;
 }
 
-#character_popup {
-    align-items: stretch;
-    gap: 6px;
-    padding: 10px 14px 14px;
-    text-align: left;
-}
-
-#character_popup_header {
-    align-items: center;
-    padding-bottom: 4px;
-}
-
-#character_popup > hr {
-    width: 100%;
-    margin: 2px 0;
-}
-
-#character_popup > #character_popup_header + hr {
-    display: none;
-}
-
-#character_popup .inline-drawer,
-#character_popup #personality_div,
-#character_popup #scenario_div,
-#character_popup #depth_prompt_div,
-#character_popup #talkativeness_div,
-#character_popup #mes_example_div {
-    width: 100%;
-    max-width: 100%;
-    align-self: stretch;
-    box-sizing: border-box;
-}
-
-#character_popup .inline-drawer {
-    margin: 0;
-}
-
-#character_popup .inline-drawer-header {
-    width: 100%;
-    min-height: 40px;
-    padding: 8px 14px;
-    justify-content: flex-start;
-    text-align: left;
-}
-
-#character_popup .inline-drawer-header > h4 {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-    min-width: 0;
-    margin: 0;
-    text-align: left;
-}
-
-#character_popup .inline-drawer-content {
-    width: 100%;
-    box-sizing: border-box;
-    margin-top: 8px;
-    padding: 10px 14px 4px;
-    text-align: left;
-}
-
-#character_popup .inline-drawer-content > small {
-    display: block;
-    margin-bottom: 10px;
-}
-
-#character_popup .inline-drawer-content > .flex-container.flexnowrap {
-    align-items: flex-start;
-    gap: 12px;
-}
-
-#character_popup .inline-drawer-content > .flex-container.flexnowrap > .flex1 {
-    min-width: min(100%, 16rem);
-}
-
-#character_popup h4,
-#character_popup h5,
-#character_popup .extension_token_counter {
-    justify-content: flex-start;
-    text-align: left;
-}
-
-#character_popup h4.flex-container,
-#character_popup h5.flex-container {
-    align-items: center;
-    gap: 8px;
-}
-
-#character_popup textarea,
-#character_popup .text_pole {
-    box-sizing: border-box;
-    max-width: 100%;
-}
-
-#character_popup textarea {
-    width: 100%;
-    resize: vertical;
-}
-
-#character_popup textarea.text_pole {
-    min-height: clamp(7rem, 18dvh, 13rem);
-}
-
-#character_popup :is(#creator_textarea, #character_version_textarea) {
-    min-height: 4.75rem;
-}
-
-#character_popup :is(#personality_textarea, #scenario_pole) {
-    min-height: clamp(8rem, 20dvh, 14rem);
-}
-
-#character_popup #depth_prompt_div {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(8rem, 12rem);
-    align-items: start;
-    gap: 12px;
-}
-
-#character_popup #depth_prompt_div > .flex1 {
-    min-width: 0;
-}
-
-#character_popup #depth_prompt_div > :last-child {
-    display: grid;
-    grid-template-columns: 1fr;
-    align-content: start;
-    gap: 6px;
-    min-width: 0;
-}
-
-#character_popup #depth_prompt_prompt {
-    min-height: clamp(8rem, 22dvh, 16rem);
-}
-
-#character_popup :is(#depth_prompt_depth, #depth_prompt_role) {
-    width: 100%;
-    margin: 0;
-}
-
-#character_popup #talkativeness_div {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
-}
-
-#character_popup #mes_example_textarea {
-    min-height: clamp(10rem, 28dvh, 20rem);
-}
-
-@media screen and (max-width: 768px) {
-    #character_popup {
-        gap: 6px;
-        padding: 10px 10px var(--sb-mobile-safe-area-bottom);
-    }
-
-    #character_popup .inline-drawer-header {
-        min-height: 38px;
-        padding: 8px 10px;
-    }
-
-    #character_popup .inline-drawer-content {
-        padding-inline: 10px;
-    }
-
-    #character_popup .inline-drawer-content > .flex-container.flexnowrap {
-        flex-direction: column;
-        flex-wrap: nowrap;
-    }
-
-    #character_popup .inline-drawer-content > .flex-container.flexnowrap > .flex1 {
-        width: 100%;
-        min-width: 0;
-    }
-
-    #character_popup #depth_prompt_div {
-        grid-template-columns: 1fr;
-    }
-
-    #character_popup textarea.text_pole {
-        min-height: 9rem;
-    }
-
-    #character_popup :is(#creator_textarea, #character_version_textarea) {
-        min-height: 5rem;
-    }
-}
-
 #send_textarea {
     min-width: 0;
     width: auto;
@@ -2115,6 +1925,10 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     box-shadow:
         inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 34%, transparent),
         0 12px 22px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 10%, transparent);
+}
+
+#rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select).sb-just-selected:not(.inline_avatar) {
+    animation: sb-entity-select-pulse 640ms var(--sb-ease-out, ease-out);
 }
 
 #rm_print_characters_block:not(.group_overlay_mode_select) > :is(.character_select, .group_select).is-active-entity:not(.inline_avatar) :is(.ch_name, .group_select_counter) {
@@ -5132,6 +4946,29 @@ input[type='range']::-moz-range-thumb {
     }
 }
 
+@keyframes sb-entity-select-pulse {
+    0% {
+        box-shadow:
+            inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 36%, transparent),
+            0 0 0 0 color-mix(in srgb, var(--color-primary, var(--sb-accent)) 48%, transparent);
+        transform: scale(1);
+    }
+
+    42% {
+        box-shadow:
+            inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 54%, transparent),
+            0 0 0 9px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 18%, transparent);
+        transform: scale(1.018);
+    }
+
+    100% {
+        box-shadow:
+            inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 0%, transparent),
+            0 0 0 14px transparent;
+        transform: scale(1);
+    }
+}
+
 :focus-visible {
     outline: none;
     box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 78%, transparent);
@@ -5152,6 +4989,10 @@ input[type='range']::-moz-range-thumb {
     }
 
     body::before {
+        animation: none !important;
+    }
+
+    #rm_print_characters_block > :is(.character_select, .group_select).sb-just-selected {
         animation: none !important;
     }
 }

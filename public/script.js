@@ -572,9 +572,11 @@ const MOBILE_CHAT_BOTTOM_PIN_MS = 1500;
 const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 8;
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 const SHOW_MORE_TOUCH_MOVE_CANCEL_PX = 12;
+const ENTITY_SELECTION_PULSE_CLEANUP_MS = 900;
 let isLoadingMoreMessages = false;
 let lastShowMoreTouchEventAt = 0;
 let showMoreTouchStart = null;
+let entitySelectionPulseId = 0;
 let showMoreTouchMoved = false;
 let pendingMobileMessageUpdateFrame = 0;
 let pendingMobileMessageUpdateTimer = 0;
@@ -614,6 +616,62 @@ export const saveCharacterDebounced = debounce(() => $('#create_button').trigger
  * The printing will also always reprint all filter options of the global list, to keep them up to date.
  */
 export const printCharactersDebounced = debounce(() => { printCharacters(false); }, DEFAULT_PRINT_TIMEOUT);
+
+function pulseSelectedEntityCard(card) {
+    const charactersBlock = card?.closest?.('#rm_print_characters_block');
+    if (!(charactersBlock instanceof HTMLElement) || !(card instanceof HTMLElement)) {
+        return;
+    }
+
+    charactersBlock.querySelectorAll('.sb-just-selected').forEach(element => {
+        element.classList.remove('sb-just-selected');
+        element.removeAttribute('data-sb-selection-pulse');
+    });
+
+    const pulseToken = String(++entitySelectionPulseId);
+    let cleanupTimer = 0;
+    const cleanupPulse = () => {
+        window.clearTimeout(cleanupTimer);
+        card.removeEventListener('animationend', cleanupPulseOnAnimationEnd);
+        if (card.dataset.sbSelectionPulse !== pulseToken) {
+            return;
+        }
+
+        card.classList.remove('sb-just-selected');
+        card.removeAttribute('data-sb-selection-pulse');
+    };
+    const cleanupPulseOnAnimationEnd = (event) => {
+        if (event.target !== card || event.animationName !== 'sb-entity-select-pulse') {
+            return;
+        }
+
+        cleanupPulse();
+    };
+
+    card.dataset.sbSelectionPulse = pulseToken;
+    card.classList.add('sb-just-selected');
+    card.addEventListener('animationend', cleanupPulseOnAnimationEnd, { once: true });
+    cleanupTimer = window.setTimeout(cleanupPulse, ENTITY_SELECTION_PULSE_CLEANUP_MS);
+}
+
+export function syncCharacterMenuActiveEntity() {
+    const charactersBlock = document.getElementById('rm_print_characters_block');
+    if (!(charactersBlock instanceof HTMLElement)) {
+        return;
+    }
+
+    const activeGroupId = selected_group === null || selected_group === undefined ? null : String(selected_group);
+    const activeCharacterId = activeGroupId === null && this_chid !== undefined && this_chid !== null ? String(this_chid) : null;
+
+    for (const card of charactersBlock.querySelectorAll('.character_select, .group_select')) {
+        const characterId = card.getAttribute('data-chid');
+        const groupId = card.getAttribute('data-grid') || card.getAttribute('data-chid');
+        const isActiveCharacter = activeCharacterId !== null && card.classList.contains('character_select') && characterId === activeCharacterId;
+        const isActiveGroup = activeGroupId !== null && card.classList.contains('group_select') && groupId === activeGroupId;
+
+        card.classList.toggle('is-active-entity', isActiveCharacter || isActiveGroup);
+    }
+}
 
 /**
  * @enum {number} Extension prompt types
@@ -683,9 +741,6 @@ export const talkativeness_default = 0.5;
 export const depth_prompt_depth_default = 4;
 export const depth_prompt_role_default = 'system';
 const per_page_default = 50;
-
-var is_advanced_char_open = false;
-let previousAdvancedCharacterFocus = null;
 
 /**
  * The type of the right menu
@@ -1084,42 +1139,50 @@ export function resultCheckStatus() {
  * If the character is different from the currently selected one, it will clear the chat and reset any selected character or group.
  * @param {number} id The ID of the character to switch to.
  * @param {object} [options] Options for the switch.
- * @param {boolean} [options.switchMenu=true] Whether to switch the right menu to the character edit menu if the character is already selected.
- * @returns {Promise<void>} A promise that resolves when the character is switched.
+ * @param {boolean} [options.switchMenu=true] Whether to switch the right menu to the character edit menu.
+ * @returns {Promise<boolean>} A promise that resolves to true when the character was selected.
  */
 export async function selectCharacterById(id, { switchMenu = true } = {}) {
     if (characters[id] === undefined) {
-        return;
+        return false;
     }
 
     if (isChatSaving) {
         toastr.info(t`Please wait until the chat is saved before switching characters.`, t`Your chat is still saving...`);
-        return;
+        return false;
     }
 
     if (selected_group && is_group_generating) {
-        return;
+        return false;
     }
 
     if (selected_group || String(this_chid) !== String(id)) {
         //if clicked on a different character from what was currently selected
-        if (!is_send_press) {
-            setCharacterId(undefined);
-            setCharacterName('');
-            resetSelectedGroup();
-            await clearChat({ clearData: true });
-            cancelTtsPlay();
-            this_edit_mes_id = undefined;
-            selected_button = 'character_edit';
-            setCharacterId(id);
-            chat_metadata = {};
-            await getChat();
+        if (is_send_press) {
+            return false;
         }
+
+        setCharacterId(undefined);
+        setCharacterName('');
+        resetSelectedGroup();
+        await clearChat({ clearData: true });
+        cancelTtsPlay();
+        this_edit_mes_id = undefined;
+        if (switchMenu) {
+            selected_button = 'character_edit';
+        }
+        setCharacterId(id);
+        chat_metadata = {};
+        await getChat({ switchMenu });
+        syncCharacterMenuActiveEntity();
+        return true;
     } else {
         //if clicked on character that was already selected
         switchMenu && (selected_button = 'character_edit');
         await unshallowCharacter(this_chid);
         select_selected_character(this_chid, { switchMenu });
+        syncCharacterMenuActiveEntity();
+        return true;
     }
 }
 
@@ -8288,9 +8351,18 @@ export function resetChatState() {
  * @param {'characters' | 'character_edit' | 'create' | 'group_edit' | 'group_create'} value
  */
 export function setMenuType(value) {
+    const rightNavPanel = document.getElementById('right-nav-panel');
+
+    if (rightNavPanel instanceof HTMLElement && value !== 'character_edit' && value !== 'create') {
+        rightNavPanel.classList.remove('sb-character-editor-fullscreen');
+        rightNavPanel.dataset.sbCharacterEditorFullscreen = 'false';
+    }
+
     menu_type = value;
     // Allow custom CSS to see which menu type is active
-    document.getElementById('right-nav-panel').dataset.menuType = menu_type;
+    if (rightNavPanel instanceof HTMLElement) {
+        rightNavPanel.dataset.menuType = menu_type;
+    }
 }
 
 export function setExternalAbortController(controller) {
@@ -8879,7 +8951,7 @@ export async function unshallowCharacter(characterId) {
     await getOneCharacter(avatar);
 }
 
-export async function getChat({ allowMissingPersisted = false } = {}) {
+export async function getChat({ allowMissingPersisted = false, switchMenu = true } = {}) {
     try {
         await unshallowCharacter(this_chid);
         const resolvedChat = await resolveCharacterChatForLoad(this_chid, { allowCreate: true, allowMissingPersisted });
@@ -8914,7 +8986,7 @@ export async function getChat({ allowMissingPersisted = false } = {}) {
         if (!chat_metadata.integrity) {
             chat_metadata.integrity = uuidv4();
         }
-        await getChatResult({ emitCreated: resolvedChat.created });
+        await getChatResult({ emitCreated: resolvedChat.created, switchMenu });
         eventSource.emit(event_types.CHAT_LOADED, { detail: { id: this_chid, character: characters[this_chid] } });
 
         // Focus on the textarea if not already focused on a visible text input
@@ -8925,12 +8997,12 @@ export async function getChat({ allowMissingPersisted = false } = {}) {
             $('#send_textarea').trigger('click').trigger('focus');
         });
     } catch (error) {
-        await getChatResult();
+        await getChatResult({ switchMenu });
         console.log(error);
     }
 }
 
-async function getChatResult({ emitCreated = false } = {}) {
+async function getChatResult({ emitCreated = false, switchMenu = true } = {}) {
     name2 = characters[this_chid].name;
     let freshChat = false;
     if (chat.length === 0) {
@@ -8944,7 +9016,7 @@ async function getChatResult({ emitCreated = false } = {}) {
     }
     await loadItemizedPrompts(getCurrentChatId());
     await printMessages();
-    select_selected_character(this_chid);
+    select_selected_character(this_chid, { switchMenu });
 
     await eventSource.emit(event_types.CHAT_CHANGED, (getCurrentChatId()));
     if (freshChat && emitCreated) await eventSource.emit(event_types.CHAT_CREATED);
@@ -11345,31 +11417,6 @@ function syncAlternateGreetingsEditor() {
     updateAlternateGreetingsHintVisibility(editor);
 }
 
-function closeAdvancedCharacterPopup({ restoreFocus = true } = {}) {
-    is_advanced_char_open = false;
-
-    const popup = $('#character_popup');
-    popup.stop(true, true);
-    popup.transition({
-        opacity: 0,
-        duration: animation_duration,
-        easing: animation_easing,
-    });
-
-    window.setTimeout(() => {
-        popup.css('display', 'none').removeClass('open');
-    }, animation_duration);
-
-    if (restoreFocus) {
-        const fallbackTarget = previousAdvancedCharacterFocus instanceof HTMLElement && document.body.contains(previousAdvancedCharacterFocus)
-            ? previousAdvancedCharacterFocus
-            : document.getElementById('advanced_div') ?? document.getElementById('right-nav-panel');
-        focusUiSurface(fallbackTarget);
-    }
-
-    previousAdvancedCharacterFocus = null;
-}
-
 export function select_rm_info(type, charId, previousCharId = null) {
     if (!type) {
         toastr.error(t`Invalid process (no 'type')`);
@@ -11513,7 +11560,6 @@ export function select_selected_character(chid, { switchMenu = true } = {}) {
 
     $('#add_avatar_button').val('');
 
-    $('#character_popup-button-h3').text(characters[chid].name);
     $('#character_name_pole').val(characters[chid].name);
     $('#description_textarea').val(characters[chid].description);
     $('#character_world').val(characters[chid].data?.extensions?.world || '');
@@ -11552,8 +11598,8 @@ export function select_selected_character(chid, { switchMenu = true } = {}) {
     syncAlternateGreetingsEditor();
     focusUiSurface(document.getElementById('right-nav-panel'));
 
-    $('#name_div').removeClass('displayBlock');
-    $('#name_div').addClass('displayNone');
+    $('#name_div').removeClass('displayNone');
+    $('#name_div').addClass('displayBlock');
     $('#renameCharButton').css('display', '');
 
     $('#form_create').attr('actiontype', 'editcharacter');
@@ -11601,7 +11647,6 @@ function select_rm_create({ switchMenu = true } = {}) {
     //create text poles
     $('#rm_button_back').css('display', '');
     $('#character_import_button').css('display', '');
-    $('#character_popup-button-h3').text('Create character');
     $('#character_name_pole').val(create_save.name);
     $('#description_textarea').val(create_save.description);
     $('#character_world').val(create_save.world);
@@ -12444,7 +12489,6 @@ export async function createOrEditCharacter(e) {
 
             const avatarId = await fetchResult.text();
 
-            $('#character_cross').trigger('click'); //closes the advanced character editing popup
             const fields = [
                 { id: '#character_name_pole', callback: value => create_save.name = value },
                 { id: '#description_textarea', callback: value => create_save.description = value },
@@ -12482,8 +12526,6 @@ export async function createOrEditCharacter(e) {
                 saveSettingsDebounced();
             }
             create_save.extra_books = [];
-
-            $('#character_popup-button-h3').text('Create character');
 
             create_save.avatar = null;
 
@@ -13544,7 +13586,6 @@ export async function deleteCharacter(characterKey, { deleteChats = true } = {})
 async function removeCharacterFromUI() {
     preserveNeutralChat();
     await clearChat();
-    $('#character_cross').trigger('click');
     resetChatState();
     $(document.getElementById('rm_button_selected_ch')).children('h2').text('');
     restoreNeutralChat();
@@ -13864,9 +13905,15 @@ jQuery(async function () {
     });
 
     $(document).on('click', '.character_select', async function () {
-        const shouldCloseCharacterMenu = $(this).closest('#rm_print_characters_block').length > 0;
+        const isCharactersBlockClick = $(this).closest('#rm_print_characters_block').length > 0;
+        const shouldCloseCharacterMenu = isCharactersBlockClick && (window.SillyBunnyShell?.isMobileViewport?.() ?? true);
         const id = Number($(this).attr('data-chid'));
-        await selectCharacterById(id);
+        // SillyBunny: drawer selection flashes Editor instead of opening it.
+        const didSelectCharacter = await selectCharacterById(id, { switchMenu: false });
+        if (didSelectCharacter && isCharactersBlockClick) {
+            pulseSelectedEntityCard(this);
+            window.SillyBunnyShell?.highlightCharacterEditorTab?.();
+        }
         if (shouldCloseCharacterMenu) {
             window.SillyBunnyShell?.closeCharacters?.();
         }
@@ -14027,35 +14074,6 @@ jQuery(async function () {
         if (result === POPUP_RESULT.AFFIRMATIVE) {
             await handleDeleteChat(deleteFileName, selected_group, false);
         }
-    });
-
-    $('#advanced_div').on('click', function () {
-        if (!is_advanced_char_open) {
-            is_advanced_char_open = true;
-            previousAdvancedCharacterFocus = document.activeElement instanceof HTMLElement && !document.activeElement.closest('#send_form')
-                ? document.activeElement
-                : document.getElementById('advanced_div');
-
-            const popup = $('#character_popup');
-            popup.stop(true, true);
-            popup.css({ 'display': 'flex', 'opacity': 0.0 }).addClass('open');
-            popup.transition({
-                opacity: 1.0,
-                duration: animation_duration,
-                easing: animation_easing,
-            });
-            focusUiSurface(document.getElementById('character_cross') ?? document.getElementById('character_popup'));
-        } else {
-            closeAdvancedCharacterPopup();
-        }
-    });
-
-    $('#character_cross').on('click', function () {
-        closeAdvancedCharacterPopup();
-    });
-
-    $('#character_popup_ok').on('click', function () {
-        closeAdvancedCharacterPopup();
     });
 
     $('#dialogue_popup_ok').on('click', async function (_e) {
@@ -14915,7 +14933,6 @@ jQuery(async function () {
         }
 
         const forbiddenTargets = [
-            '#character_cross',
             '#avatar-and-name-block',
             '#shadow_popup',
             '.popup',
@@ -15086,12 +15103,6 @@ jQuery(async function () {
 
     $(document).on('keydown', function (e) {
         if (e.key === 'Escape' && !e.originalEvent.isComposing) {
-            if (is_advanced_char_open) {
-                e.preventDefault();
-                closeAdvancedCharacterPopup();
-                return;
-            }
-
             const isEditVisible = $('#curEditTextarea').is(':visible') || $('.reasoning_edit_textarea').length > 0;
             if (isEditVisible && power_user.auto_save_msg_edits === false) {
                 closeMessageEditor('all');

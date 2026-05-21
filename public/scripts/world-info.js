@@ -2156,23 +2156,33 @@ function syncWorldInfoDesktopEditorPopout() {
     setWorldInfoDesktopEditorPopout(isWorldInfoEditorPopoutRequested);
 }
 
+function openWorldInfoCharacterPanelTab() {
+    const sillyBunnyShell = /** @type {any} */ (globalThis.SillyBunnyShell);
+    if (sillyBunnyShell?.openTab) {
+        sillyBunnyShell.openTab('characters', 'world-info');
+        return;
+    }
+
+    $('#WIDrawerIcon').trigger('click');
+}
+
 function bindWorldInfoDesktopEditorPopoutShellSync() {
     if (isWorldInfoEditorPopoutShellSyncBound) {
         return;
     }
 
-    const leftShell = document.getElementById('left-nav-panel');
-    if (leftShell instanceof HTMLElement) {
+    const characterShell = document.getElementById('right-nav-panel');
+    if (characterShell instanceof HTMLElement) {
         new MutationObserver(() => {
-            if (!leftShell.classList.contains('openDrawer')) {
+            if (!characterShell.classList.contains('openDrawer')) {
                 setWorldInfoDesktopEditorPopout(false);
             }
-        }).observe(leftShell, { attributes: true, attributeFilter: ['class'] });
+        }).observe(characterShell, { attributes: true, attributeFilter: ['class'] });
     }
 
     document.addEventListener('sb:shell-tab-activated', (event) => {
         if (event instanceof CustomEvent
-            && event.detail?.shellKey === 'left'
+            && event.detail?.shellKey === 'characters'
             && event.detail?.tabId !== 'world-info') {
             setWorldInfoDesktopEditorPopout(false);
         }
@@ -5948,7 +5958,7 @@ export async function importEmbeddedWorldInfo(skipPopup = false) {
     const newIndex = world_names.indexOf(bookName);
     if (newIndex >= 0) {
         //show&draw the WI panel before..
-        $('#WIDrawerIcon').trigger('click');
+        openWorldInfoCharacterPanelTab();
         //..auto-opening the new imported WI
         $('#world_editor_select').val(newIndex).trigger('change');
     }
@@ -6124,7 +6134,7 @@ export async function importWorldInfo(file) {
 export function openWorldInfoEditor(worldName) {
     console.log(`Opening lorebook for ${worldName}`);
     if (!$('#WorldInfo').is(':visible')) {
-        $('#WIDrawerIcon').trigger('click');
+        openWorldInfoCharacterPanelTab();
     }
     const index = world_names.indexOf(worldName);
     $('#world_editor_select').val(index).trigger('change');
@@ -6597,7 +6607,7 @@ export function initWorldInfo() {
         $(this).prop('selectedIndex', 0);
 
         if (target === 'renameGroupButton') {
-            await globalThis.SillyBunnyShell?.renameOpenGroup?.();
+            await /** @type {any} */ (globalThis.SillyBunnyShell)?.renameOpenGroup?.();
             return;
         }
 

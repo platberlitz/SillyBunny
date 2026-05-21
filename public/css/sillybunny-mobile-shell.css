@@ -346,6 +346,24 @@
         padding: 0 0 3px !important;
     }
 
+    #right-nav-panel.openDrawer .sb-character-editor-subtabs-wrapper {
+        margin: 3px 0 5px !important;
+        padding: 4px !important;
+        border-radius: 12px !important;
+    }
+
+    #right-nav-panel.openDrawer.sb-character-editor-fullscreen .sb-character-editor-subtabs-wrapper {
+        margin: 0 0 5px !important;
+        border-radius: 0 !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-editor-subtabs {
+        justify-content: safe center !important;
+        gap: 6px !important;
+    }
+
     #right-nav-panel.openDrawer .sb-character-create-bar {
         align-items: center !important;
         gap: 6px !important;
