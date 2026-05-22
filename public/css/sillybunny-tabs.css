@@ -7747,6 +7747,11 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         white-space: normal;
     }
 
+    :root[data-sb-mobile-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-tab-mobile-rail-hidden,
+    :root[data-sb-mobile-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-tab-mobile-rail-hidden {
+        display: none;
+    }
+
     :root[data-sb-mobile-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-tab:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-selected='true'], [aria-current]),
     :root[data-sb-mobile-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-tab:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-selected='true'], [aria-current]) {
         background: transparent;
