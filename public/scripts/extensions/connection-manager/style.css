@@ -63,7 +63,7 @@
 }
 
 .connection-profile-folder-manager {
-    min-width: min(420px, 90vw);
+    min-width: min(420px, 100%);
 }
 
 .connection-profile-folder-manager .folder-list {
