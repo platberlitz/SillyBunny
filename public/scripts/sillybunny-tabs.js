@@ -27,6 +27,7 @@ const SB_STORAGE_KEYS = Object.freeze({
     mobileNavShowQuickActions: 'sb-mobile-nav-show-quick-actions',
     mobileNavReplaceQuickActions: 'sb-mobile-nav-replace-quick-actions',
     mobileNavReplacementTarget: 'sb-mobile-nav-replacement-target',
+    mobileNavDefaultsVersion: 'sb-mobile-nav-defaults-version',
     mobileQuickActions: 'sb-mobile-quick-actions-v2',
     mobileQuickActionsLegacy: 'sb-mobile-quick-actions',
     settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
@@ -576,13 +577,13 @@ const SB_UNIVERSAL_SEARCH_EMPTY_HINT = 'Could not find query. Try a broader term
 const SB_UNIVERSAL_SEARCH_RESULT_LIMIT = 10;
 const SB_MOBILE_QUICK_ACTION_LIMIT = 12;
 const SB_MOBILE_QUICK_ACTION_LABEL_MAX_LENGTH = 36;
+const SB_MOBILE_NAV_DEFAULTS_VERSION = '20260522d';
 const SB_MOBILE_NAV_LAYOUTS = Object.freeze(['horizontal', 'vertical']);
 const SB_MOBILE_DEFAULT_QUICK_ACTIONS = Object.freeze([
     { type: 'tab', shellKey: 'left', tabId: 'presets', icon: 'fa-sliders', label: 'Presets' },
     { type: 'tab', shellKey: 'left', tabId: 'api', icon: 'fa-plug', label: 'API' },
     { type: 'tab', shellKey: 'left', tabId: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
     { type: 'tab', shellKey: 'left', tabId: 'advanced-formatting', icon: 'fa-text-height', label: 'Formatting' },
-    { type: 'tab', shellKey: 'characters', tabId: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
     { type: 'tab', shellKey: 'left', tabId: 'agents', icon: 'fa-robot', label: 'Agents' },
 ]);
 const SB_MOBILE_NAV_PAGE_TARGET_DEFAULT = 'left:presets';
@@ -1181,7 +1182,28 @@ function seedTopbarScaleDefaults() {
     }
 }
 
+function migrateMobileNavDefaults() {
+    if (safeGetItem(SB_STORAGE_KEYS.mobileNavDefaultsVersion) === SB_MOBILE_NAV_DEFAULTS_VERSION) {
+        return;
+    }
+
+    const storedLayout = safeGetItem(SB_STORAGE_KEYS.mobileNavLayout);
+    const storedIconOnly = safeGetItem(SB_STORAGE_KEYS.mobileNavIconOnly);
+
+    if (storedLayout === null || storedLayout === 'horizontal') {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavLayout, 'vertical');
+    }
+
+    if (storedIconOnly === null || !normalizeStoredBoolean(storedIconOnly, true)) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavIconOnly, 'true');
+    }
+
+    safeSetItem(SB_STORAGE_KEYS.mobileNavDefaultsVersion, SB_MOBILE_NAV_DEFAULTS_VERSION);
+}
+
 function restorePersistedTopbarState() {
+    migrateMobileNavDefaults();
+
     sbState.topbarScale.desktop = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.topbarScaleDesktop));
     sbState.topbarScale.mobile = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.topbarScaleMobile));
     sbState.bottomBarScale = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.bottomBarScale));
@@ -11982,9 +12004,10 @@ function createMobileShellRailButton(item, actionHandler, className = '') {
 
 function syncMobileShellRailActions(shellKey = null) {
     const shellKeys = shellKey ? [shellKey] : ['left', 'right'];
-    const workspaceActions = SB_MOBILE_NAV_PAGE_TARGETS.filter(action => action.shellKey === 'left' || action.shellKey === 'characters');
     const customizeActions = SB_MOBILE_NAV_PAGE_TARGETS.filter(action => action.shellKey === 'right');
-    const worldInfoAction = workspaceActions.find(action => action.shellKey === 'characters' && action.tabId === 'world-info');
+    const workspaceActions = SB_MOBILE_NAV_PAGE_TARGETS.filter(action => action.shellKey === 'left');
+    const builtInRailActionKeys = new Set([...workspaceActions, ...customizeActions].map(getMobileQuickActionKey));
+    const railQuickActions = sbState.mobileQuickActions.filter(action => !builtInRailActionKeys.has(getMobileQuickActionKey(action)));
 
     for (const currentShellKey of shellKeys) {
         const shellState = getShellState(currentShellKey);
@@ -12000,21 +12023,6 @@ function syncMobileShellRailActions(shellKey = null) {
                 'aria-hidden': 'false',
             },
         });
-        const createRailGroup = (className, label, actions) => {
-            const group = createElement('div', {
-                className: `sb-shell-rail-group ${className}`,
-                attrs: {
-                    'aria-label': label,
-                },
-            });
-            for (const action of actions) {
-                const button = createMobileShellRailButton(action, activateMobileNavAction);
-                if (button) {
-                    group.appendChild(button);
-                }
-            }
-            return group;
-        };
         const createQuickActionsGroup = () => {
             const quickActionsGroup = createElement('div', {
                 className: 'sb-shell-rail-group sb-shell-rail-group-quick-actions',
@@ -12023,8 +12031,8 @@ function syncMobileShellRailActions(shellKey = null) {
                 },
             });
 
-            if (sbState.mobileQuickActions.length) {
-                for (const action of sbState.mobileQuickActions) {
+            if (railQuickActions.length) {
+                for (const action of railQuickActions) {
                     const button = createMobileShellRailButton(action, activateMobileNavAction, 'sb-shell-rail-quick-action');
                     if (button) {
                         quickActionsGroup.appendChild(button);
@@ -12040,42 +12048,12 @@ function syncMobileShellRailActions(shellKey = null) {
             return quickActionsGroup;
         };
 
-        if (currentShellKey === 'right') {
-            const beforeBlock = createRailBlock('before');
-            beforeBlock.append(
-                createRailGroup('sb-shell-rail-group-workspace', 'Workspace shortcuts', workspaceActions),
-                createMobileShellRailDivider('Customize shortcuts'),
-            );
-            shellState.nav.prepend(beforeBlock);
-
-            if (sbState.mobileNav.showQuickActions) {
-                const afterBlock = createRailBlock('after');
-                afterBlock.append(
-                    createMobileShellRailDivider('Quick Actions'),
-                    createQuickActionsGroup(),
-                );
-                shellState.nav.appendChild(afterBlock);
-            }
-        } else {
+        if (currentShellKey === 'right' && sbState.mobileNav.showQuickActions && railQuickActions.length) {
             const afterBlock = createRailBlock('after');
-            const workspaceExtras = worldInfoAction ? [worldInfoAction] : [];
-
-            if (workspaceExtras.length) {
-                afterBlock.appendChild(createRailGroup('sb-shell-rail-group-workspace-extra', 'Workspace shortcuts', workspaceExtras));
-            }
-
             afterBlock.append(
-                createMobileShellRailDivider('Customize shortcuts'),
-                createRailGroup('sb-shell-rail-group-customize', 'Customize shortcuts', customizeActions),
+                createMobileShellRailDivider('Quick Actions'),
+                createQuickActionsGroup(),
             );
-
-            if (sbState.mobileNav.showQuickActions) {
-                afterBlock.append(
-                    createMobileShellRailDivider('Quick Actions'),
-                    createQuickActionsGroup(),
-                );
-            }
-
             shellState.nav.appendChild(afterBlock);
         }
 
@@ -12294,16 +12272,11 @@ function refreshMobileNavQuickActions() {
     sbState.mobileNav.quickActionContainer = list;
     list.replaceChildren();
 
-    const shouldShowQuickActions = sbState.mobileNav.showQuickActions;
     if (sbState.mobileNav.quickActionSection instanceof HTMLElement) {
-        sbState.mobileNav.quickActionSection.hidden = !shouldShowQuickActions;
+        sbState.mobileNav.quickActionSection.hidden = false;
     }
     if (sbState.mobileNav.quickActionDivider instanceof HTMLElement) {
-        sbState.mobileNav.quickActionDivider.hidden = !shouldShowQuickActions;
-    }
-
-    if (!shouldShowQuickActions) {
-        return;
+        sbState.mobileNav.quickActionDivider.hidden = false;
     }
 
     if (!sbState.mobileQuickActions.length) {
