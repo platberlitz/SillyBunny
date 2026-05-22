@@ -2629,6 +2629,144 @@ input[type='range']::-moz-range-thumb {
 }
 
 @media screen and (max-width: 1000px) {
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container:is(.flexFlowRow, .flexFlowColumn) {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch;
+        gap: 8px;
+        min-width: 0;
+        width: 100%;
+        margin: 0;
+    }
+
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container:is(.flexFlowRow, .flexFlowColumn) > div {
+        display: grid !important;
+        grid-template-columns: minmax(92px, 0.36fr) minmax(0, 1fr) minmax(48px, auto);
+        grid-template-rows: auto;
+        align-items: center;
+        justify-items: stretch;
+        gap: 8px 10px;
+        min-width: 0;
+        width: 100%;
+        margin: 0;
+    }
+
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container:is(.flexFlowRow, .flexFlowColumn) > div:has(> .checkbox_label) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container:is(.flexFlowRow, .flexFlowColumn) > div > :is(label, small) {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 4px;
+        min-width: 0;
+        min-height: 0;
+        width: 100%;
+        margin: 0;
+        text-align: left;
+        font-size: calc(var(--mainFontSize) * 0.82);
+        font-weight: 700;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container:is(.flexFlowRow, .flexFlowColumn) > div > label > small {
+        min-height: 0;
+        margin: 0;
+        text-align: left;
+        line-height: inherit;
+        overflow-wrap: anywhere;
+    }
+
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container:is(.flexFlowRow, .flexFlowColumn) > div > .checkbox_label {
+        grid-column: 1 / -1;
+    }
+
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container:is(.flexFlowRow, .flexFlowColumn) > div > input[type='range'].neo-range-slider {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        margin-inline: 0;
+    }
+
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container:is(.flexFlowRow, .flexFlowColumn) > div > .neo-range-input {
+        width: 52px;
+        min-width: 52px;
+    }
+
     .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers] {
         display: grid !important;
         grid-template-columns: minmax(92px, 0.36fr) minmax(0, 1fr) minmax(48px, auto);
@@ -2747,6 +2885,35 @@ input[type='range']::-moz-range-thumb {
 }
 
 @media screen and (max-width: 520px) {
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container:is(.flexFlowRow, .flexFlowColumn) > div {
+        grid-template-columns: minmax(76px, 0.34fr) minmax(0, 1fr) minmax(44px, auto);
+        gap: 6px;
+    }
+
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container:is(.flexFlowRow, .flexFlowColumn) > div > .neo-range-input {
+        width: 46px;
+        min-width: 46px;
+        padding-inline: 4px;
+    }
+
     .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers] {
         grid-template-columns: minmax(76px, 0.34fr) minmax(0, 1fr) minmax(44px, auto);
         gap: 6px;
