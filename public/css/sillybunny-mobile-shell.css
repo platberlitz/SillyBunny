@@ -560,6 +560,12 @@
         padding-bottom: max(24px, var(--sb-mobile-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
     }
 
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) > .scrollableInner,
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) > .scrollableInnerFull {
+        padding-inline-start: 20px !important;
+        padding-inline-end: calc(20px + var(--sb-character-scroll-gutter, 8px)) !important;
+    }
+
     #right-nav-panel.openDrawer #rm_print_characters_block,
     #right-nav-panel.openDrawer #rm_ch_create_block {
         box-sizing: border-box !important;
