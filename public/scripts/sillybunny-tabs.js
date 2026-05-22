@@ -1,4 +1,5 @@
 import { DEFAULT_SCROLL_EDGE_SETTLE_DELAYS, jumpScrollElementToEdge } from './chat-scroll-edges.js';
+import { flashHighlight } from './utils.js';
 
 const SB_STORAGE_KEYS = Object.freeze({
     leftTab: 'sb-left-tab',
@@ -26,6 +27,7 @@ const SB_STORAGE_KEYS = Object.freeze({
     settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
     compactMode: 'sb-compact-mode',
     frontendIcon: 'sb-frontend-icon',
+    characterEditorSubTab: 'sb-character-editor-sub-tab',
 });
 
 const SB_SHORTCUT_TARGETS = Object.freeze([
@@ -33,7 +35,7 @@ const SB_SHORTCUT_TARGETS = Object.freeze([
     { value: 'left:api', label: 'API', icon: 'fa-plug' },
     { value: 'left:sampling', label: 'Sampling', icon: 'fa-wave-square' },
     { value: 'left:advanced-formatting', label: 'Formatting', icon: 'fa-text-height' },
-    { value: 'left:world-info', label: 'World Info', icon: 'fa-book-atlas' },
+    { value: 'characters:world-info', label: 'World Info', icon: 'fa-book-atlas' },
     { value: 'left:agents', label: 'Agents', icon: 'fa-robot' },
     { value: 'action:search', label: 'Search', icon: 'fa-magnifying-glass' },
     { value: 'right:settings', label: 'Settings', icon: 'fa-sliders' },
@@ -47,7 +49,7 @@ const SB_SHORTCUT_DEFAULTS = Object.freeze({
     right: 'action:search',
 });
 const SB_PANEL_STYLESHEETS = Object.freeze({
-    'left:world-info': [
+    'characters:world-info': [
         { href: 'css/world-info.css?v=20260425b', id: 'deferred-world-info-css' },
     ],
     'left:advanced-formatting': [
@@ -122,13 +124,19 @@ function debounceAction(callback, wait = SB_MOBILE_ACTION_DEBOUNCE_MS) {
 }
 
 function getShortcutTarget(side) {
-    const stored = safeGetItem(side === 'left' ? SB_STORAGE_KEYS.shortcutLeft : SB_STORAGE_KEYS.shortcutRight);
+    const stored = migrateLegacyWorldInfoRoute(safeGetItem(side === 'left' ? SB_STORAGE_KEYS.shortcutLeft : SB_STORAGE_KEYS.shortcutRight));
     const valid = SB_SHORTCUT_TARGETS.some(t => t.value === stored);
     return valid ? stored : SB_SHORTCUT_DEFAULTS[side];
 }
 
 function getShortcutConfig(target) {
     return SB_SHORTCUT_TARGETS.find(t => t.value === target) || SB_SHORTCUT_TARGETS[0];
+}
+
+function migrateLegacyWorldInfoRoute(target) {
+    // SillyBunny: migrate saved pre-relocation World Info shortcuts to the
+    // Characters panel tab instead of reviving the old left-shell route.
+    return target === 'left:world-info' ? 'characters:world-info' : target;
 }
 
 function isSearchShortcutTarget(target) {
@@ -160,6 +168,7 @@ function activateShortcutTarget(target) {
         if (!tab || tab === 'characters') {
             void setCharacterListEntityView('characters');
         }
+        preloadPanelStylesheets('characters', tab);
         openCharacterPanelTab(tab);
         return;
     }
@@ -378,6 +387,11 @@ const SB_CHARACTER_TAB_COPY = Object.freeze({
         subtitle: 'Edit or make changes to your selected character card or group chat here.',
         description: 'Manage your personal character cards, groups, and personas here.',
     },
+    'world-info': {
+        title: 'World Info',
+        subtitle: 'Manage lorebooks and world details from the character workspace.',
+        description: 'Create, edit, import, and activate World Info entries without leaving the Characters menu.',
+    },
     persona: {
         title: 'Persona',
         subtitle: 'Manage your in-chat persona details and other configuration options.',
@@ -389,6 +403,25 @@ const SB_CHARACTER_TAB_COPY = Object.freeze({
         description: 'Manage your personal character cards, groups, and personas here.',
     },
 });
+
+const SB_CHARACTER_EDITOR_SUB_TABS = Object.freeze([
+    'char-info',
+    'definitions',
+    'greetings',
+    'metadata',
+]);
+const SB_CHARACTER_EDITOR_DEFAULT_SUB_TAB = 'char-info';
+const SB_CHARACTER_EDITOR_SPOILER_FREE_VISIBLE_TABS = Object.freeze(['char-info', 'metadata']);
+
+const SB_CHARACTER_PANEL_TABS = Object.freeze([
+    { id: 'characters', label: 'Characters', icon: 'fa-address-book' },
+    { id: 'groups', label: 'Groups', icon: 'fa-users' },
+    { id: 'editor', label: 'Editor', icon: 'fa-pen-to-square' },
+    { id: 'world-info', label: 'World Info', icon: 'fa-book-atlas' },
+    { id: 'persona', label: 'Persona', icon: 'fa-face-smile' },
+    { id: 'import', label: 'Import', icon: 'fa-file-import' },
+]);
+const SB_CHARACTER_PANEL_DEFAULT_TAB = 'characters';
 
 const SB_PERSONA_HELP_LINK_HTML = '<a class="notes-link sb-character-title-help" href="https://docs.sillytavern.app/usage/core-concepts/personas/" target="_blank"><span class="fa-solid fa-circle-question note-link-span"></span></a>';
 
@@ -426,13 +459,6 @@ const SB_SHELLS = Object.freeze({
                 label: 'Formatting',
                 icon: 'fa-text-height',
                 description: 'Adjust how context, instructions, and reasoning are formatted.',
-            },
-            {
-                id: 'world-info',
-                drawerId: 'WI-SP-button',
-                label: 'World Info',
-                icon: 'fa-book-atlas',
-                description: 'Manage lorebooks and world details for the current story.',
             },
         ],
         customTabs: [
@@ -514,7 +540,7 @@ const SB_DRAWER_ROUTES = Object.freeze({
     'user-settings-button': { shell: 'right', tab: 'settings' },
     'sys-settings-button': { shell: 'left', tab: 'api' },
     'advanced-formatting-button': { shell: 'left', tab: 'advanced-formatting' },
-    'WI-SP-button': { shell: 'left', tab: 'world-info' },
+    'WI-SP-button': { shell: 'characters', tab: 'world-info' },
     'extensions-settings-button': { shell: 'right', tab: 'extensions' },
     'persona-management-button': { shell: 'characters', tab: 'persona' },
     'backgrounds-button': { shell: 'right', tab: 'background' },
@@ -550,7 +576,7 @@ const SB_MOBILE_DEFAULT_QUICK_ACTIONS = Object.freeze([
     { type: 'tab', shellKey: 'left', tabId: 'api', icon: 'fa-plug', label: 'API' },
     { type: 'tab', shellKey: 'left', tabId: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
     { type: 'tab', shellKey: 'left', tabId: 'advanced-formatting', icon: 'fa-text-height', label: 'Formatting' },
-    { type: 'tab', shellKey: 'left', tabId: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
+    { type: 'tab', shellKey: 'characters', tabId: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
     { type: 'tab', shellKey: 'left', tabId: 'agents', icon: 'fa-robot', label: 'Agents' },
 ]);
 
@@ -854,6 +880,10 @@ function normalizeTopbarOffset(value) {
 }
 
 function getMobileQuickActionTabConfig(shellKey, tabId) {
+    if (shellKey === 'characters') {
+        return getCharacterPanelTabConfig(tabId);
+    }
+
     const shellConfig = getShellConfig(shellKey);
     if (!shellConfig || !tabId) {
         return null;
@@ -871,11 +901,14 @@ function normalizeMobileQuickAction(value) {
         return null;
     }
 
-    const shellKey = normalizeText(value.shellKey || value.shell);
-    const tabId = normalizeText(value.tabId || value.tab);
-    const shellConfig = getShellConfig(shellKey);
+    // SillyBunny: parse historical left/world-info quick actions as the
+    // relocated Characters tab before validating the shell/tab pair.
+    const legacyShellKey = normalizeText(value.shellKey || value.shell);
+    const legacyTabId = normalizeText(value.tabId || value.tab);
+    const shellKey = legacyShellKey === 'left' && legacyTabId === 'world-info' ? 'characters' : legacyShellKey;
+    const tabId = legacyShellKey === 'left' && legacyTabId === 'world-info' ? 'world-info' : legacyTabId;
 
-    if (!shellConfig || !tabId) {
+    if (!tabId || (shellKey !== 'characters' && !getShellConfig(shellKey))) {
         return null;
     }
 
@@ -944,6 +977,26 @@ function getDefaultMobileQuickActions() {
     return normalizeMobileQuickActionList(SB_MOBILE_DEFAULT_QUICK_ACTIONS);
 }
 
+function migrateLegacyMobileQuickAction(action) {
+    if (!action || typeof action !== 'object') {
+        return action;
+    }
+
+    // SillyBunny: account storage may still contain the pre-relocation mobile
+    // World Info route; normalize it to the Characters tab on read.
+    const legacyShellKey = normalizeText(action.shellKey || action.shell);
+    const legacyTabId = normalizeText(action.tabId || action.tab);
+    if (legacyShellKey !== 'left' || legacyTabId !== 'world-info') {
+        return action;
+    }
+
+    return {
+        ...action,
+        shellKey: 'characters',
+        tabId: 'world-info',
+    };
+}
+
 function parseMobileQuickActionStorage(storedValue) {
     if (storedValue === null) {
         return null;
@@ -955,7 +1008,7 @@ function parseMobileQuickActionStorage(storedValue) {
             return null;
         }
 
-        return normalizeMobileQuickActionList(parsedValue);
+        return normalizeMobileQuickActionList(parsedValue.map(migrateLegacyMobileQuickAction));
     } catch {
         return null;
     }
@@ -1415,6 +1468,29 @@ function normalizeText(value) {
         .toLowerCase();
 }
 
+function normalizeCharacterEditorSubTab(tabId) {
+    const normalizedTabId = normalizeText(tabId);
+    return SB_CHARACTER_EDITOR_SUB_TABS.includes(normalizedTabId) ? normalizedTabId : SB_CHARACTER_EDITOR_DEFAULT_SUB_TAB;
+}
+
+function isCharacterSpoilerFreeFieldsHidden() {
+    const form = document.getElementById('form_create');
+    return form instanceof HTMLElement && form.dataset.sbSpoilerFreeFieldsHidden === 'true';
+}
+
+function resolveCharacterEditorSubTab(tabId) {
+    const normalizedTabId = normalizeCharacterEditorSubTab(tabId);
+    if (!isCharacterSpoilerFreeFieldsHidden() || SB_CHARACTER_EDITOR_SPOILER_FREE_VISIBLE_TABS.includes(normalizedTabId)) {
+        return normalizedTabId;
+    }
+
+    return 'metadata';
+}
+
+function isCharacterEditorMenuType(menuType) {
+    return ['character_edit', 'create'].includes(menuType ?? '');
+}
+
 function clampText(value, maxLength = 120) {
     const normalizedValue = String(value ?? '').replace(/\s+/g, ' ').trim();
     if (normalizedValue.length <= maxLength) {
@@ -1575,6 +1651,32 @@ function getShellState(shellKey) {
 
 function getShellConfig(shellKey) {
     return SB_SHELLS[shellKey];
+}
+
+function getCharacterPanelTabConfig(tabId) {
+    return SB_CHARACTER_PANEL_TABS.find(tab => tab.id === tabId) ?? null;
+}
+
+function normalizeCharacterPanelTab(tabId) {
+    const normalizedTabId = normalizeText(tabId);
+    return getCharacterPanelTabConfig(normalizedTabId) ? normalizedTabId : SB_CHARACTER_PANEL_DEFAULT_TAB;
+}
+
+function getCharacterPanelSearchEntries() {
+    return SB_CHARACTER_PANEL_TABS.map((tab) => {
+        const button = document.querySelector(`#right-nav-panel [data-sb-character-tab="${CSS.escape(tab.id)}"]`);
+        const searchText = normalizeText([tab.label, tab.id, 'characters'].join(' '));
+
+        return {
+            element: button instanceof HTMLElement ? button : null,
+            searchText,
+            displayText: tab.label,
+            sectionLabel: tab.label,
+            tabId: tab.id,
+            tabLabel: tab.label,
+            dedupeKey: `characters::${tab.id}`,
+        };
+    });
 }
 
 function isMobileViewport() {
@@ -2254,6 +2356,10 @@ function beginShellResize(shellKey, event) {
 }
 
 function ensureShellReady(shellKey) {
+    if (!getShellConfig(shellKey)) {
+        return false;
+    }
+
     if (getShellState(shellKey)) {
         return true;
     }
@@ -5813,13 +5919,12 @@ async function showCharacterListView(view = 'characters') {
     setCharacterEditorEmptyState(false);
     setCharacterPersonaPanelVisible(false);
     setCharacterImportPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
     const panel = document.getElementById('right-nav-panel');
     const normalizedView = view === 'groups' ? 'groups' : 'characters';
     sbState.characterDrawer.lastTab = normalizedView;
 
-    if (panel instanceof HTMLElement) {
-        panel.dataset.menuType = normalizedView;
-    }
+    setCharacterPanelMenuType(panel, normalizedView);
 
     syncCharacterListControls(normalizedView);
     await setCharacterListEntityView(normalizedView);
@@ -5828,18 +5933,14 @@ async function showCharacterListView(view = 'characters') {
 
     if (backButton instanceof HTMLElement) {
         backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        if (panel instanceof HTMLElement) {
-            panel.dataset.menuType = normalizedView;
-        }
+        setCharacterPanelMenuType(panel, normalizedView);
         syncCharacterListControls(normalizedView);
         syncCharacterShellTabs(normalizedView);
         return true;
     }
 
     resetCharacterPanelView();
-    if (panel instanceof HTMLElement) {
-        panel.dataset.menuType = normalizedView;
-    }
+    setCharacterPanelMenuType(panel, normalizedView);
     syncCharacterListControls(normalizedView);
     syncCharacterShellTabs(normalizedView);
     return true;
@@ -5853,9 +5954,10 @@ function showCharacterEditorEmptyState() {
     const groupEditor = document.getElementById('rm_group_chats_block');
     const characterList = document.getElementById('rm_characters_block');
 
-    panel?.setAttribute('data-menu-type', 'editor_empty');
+    setCharacterPanelMenuType(panel, 'editor_empty');
     setCharacterPersonaPanelVisible(false);
     setCharacterImportPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
     syncCharacterListControls('characters');
     setCharacterEditorEmptyState(true);
 
@@ -5909,8 +6011,9 @@ function syncCharacterTitlebarVisibility() {
         return;
     }
 
-    const shouldHide = ['characters', 'groups', 'editor_empty', 'persona', 'import'].includes(panel.dataset.menuType ?? '');
+    const shouldHide = ['characters', 'groups', 'editor_empty', 'world-info', 'persona', 'import'].includes(panel.dataset.menuType ?? '');
     pinAndTabs.style.display = shouldHide ? 'none' : '';
+    syncCharacterEditorFullscreenAvailability();
 }
 
 function ensureCharacterPersonaPanel() {
@@ -5935,11 +6038,42 @@ function ensureCharacterPersonaPanel() {
     return host;
 }
 
+function ensureCharacterWorldInfoPanel() {
+    const host = document.getElementById('sb_character_world_info_panel');
+    const drawer = document.getElementById('WI-SP-button');
+    const content = document.getElementById('WorldInfo');
+
+    if (!(host instanceof HTMLElement) || !(drawer instanceof HTMLElement) || !(content instanceof HTMLElement)) {
+        return null;
+    }
+
+    host.setAttribute('role', 'tabpanel');
+    host.setAttribute('aria-labelledby', 'sb_character_tab_world_info');
+    drawer.classList.add('sb-embedded-drawer');
+    drawer.querySelector(':scope > .drawer-toggle')?.classList.add('sb-hidden-toggle');
+    content.classList.remove('drawer-content', 'openDrawer', 'closedDrawer', 'fillLeft', 'fillRight', 'pinnedOpen');
+    content.classList.add('sb-managed', 'sb-shell-embedded-content');
+    content.removeAttribute('style');
+    content.removeAttribute('data-dragged');
+    content.setAttribute('role', 'tabpanel');
+    content.setAttribute('aria-labelledby', 'sb_character_tab_world_info');
+    content.setAttribute('aria-hidden', String(host.hidden));
+
+    if (drawer.parentElement !== host) {
+        host.appendChild(drawer);
+    }
+
+    drawer.querySelector('#WI_panel_pin_div')?.classList.add('sb-shell-hidden-control');
+    preloadPanelStylesheets('characters', 'world-info');
+    return host;
+}
+
 function setCharacterPersonaPanelVisible(visible) {
     const host = ensureCharacterPersonaPanel() ?? document.getElementById('sb_character_persona_panel');
 
     if (host instanceof HTMLElement) {
         host.hidden = !visible;
+        host.setAttribute('aria-hidden', String(!visible));
     }
 }
 
@@ -5948,7 +6082,249 @@ function setCharacterImportPanelVisible(visible) {
 
     if (host instanceof HTMLElement) {
         host.hidden = !visible;
+        host.setAttribute('aria-hidden', String(!visible));
     }
+}
+
+function setCharacterWorldInfoPanelVisible(visible) {
+    const host = ensureCharacterWorldInfoPanel() ?? document.getElementById('sb_character_world_info_panel');
+    const content = document.getElementById('WorldInfo');
+
+    if (host instanceof HTMLElement) {
+        host.hidden = !visible;
+        host.setAttribute('aria-hidden', String(!visible));
+    }
+
+    if (content instanceof HTMLElement) {
+        content.setAttribute('aria-hidden', String(!visible));
+    }
+}
+
+function getCharacterEditorSubTabState() {
+    const storedTab = safeGetItem(SB_STORAGE_KEYS.characterEditorSubTab);
+    return normalizeCharacterEditorSubTab(storedTab);
+}
+
+function saveCharacterEditorSubTab(tabId) {
+    safeSetItem(SB_STORAGE_KEYS.characterEditorSubTab, normalizeCharacterEditorSubTab(tabId));
+}
+
+function updateCharacterEditorSubTabButtons(activeTabId) {
+    const activeSubTab = resolveCharacterEditorSubTab(activeTabId);
+
+    for (const tabButton of document.querySelectorAll('#sb_character_editor_subtabs [data-sb-character-editor-tab]')) {
+        if (!(tabButton instanceof HTMLElement)) {
+            continue;
+        }
+
+        const isActive = tabButton.dataset.sbCharacterEditorTab === activeSubTab;
+        tabButton.classList.toggle('is-active', isActive);
+        tabButton.setAttribute('aria-selected', String(isActive));
+        tabButton.setAttribute('tabindex', isActive ? '0' : '-1');
+    }
+}
+
+function updateCharacterEditorSubTabPanels(activeTabId) {
+    const activeSubTab = resolveCharacterEditorSubTab(activeTabId);
+
+    for (const panel of document.querySelectorAll('#form_create [data-sb-character-editor-panel]')) {
+        if (!(panel instanceof HTMLElement)) {
+            continue;
+        }
+
+        const isActive = panel.dataset.sbCharacterEditorPanel === activeSubTab;
+        panel.hidden = !isActive;
+        panel.setAttribute('aria-hidden', String(!isActive));
+    }
+}
+
+function syncCharacterEditorSubTabs(activeTabId = getCharacterEditorSubTabState()) {
+    const normalizedTab = resolveCharacterEditorSubTab(activeTabId);
+    saveCharacterEditorSubTab(normalizedTab);
+    updateCharacterEditorSubTabButtons(normalizedTab);
+    updateCharacterEditorSubTabPanels(normalizedTab);
+}
+
+function focusCharacterEditorSubTab(tabId) {
+    const button = document.querySelector(`#sb_character_editor_subtabs [data-sb-character-editor-tab="${tabId}"]`);
+    if (button instanceof HTMLElement) {
+        button.focus({ preventScroll: true });
+    }
+}
+
+function setCharacterEditorSubTab(tabId, { focusButton = false } = {}) {
+    const normalizedTab = normalizeCharacterEditorSubTab(tabId);
+    syncCharacterEditorSubTabs(normalizedTab);
+
+    if (focusButton) {
+        focusCharacterEditorSubTab(normalizedTab);
+    }
+}
+
+function setCharacterEditorFullscreenState(expanded, { focusButton = false } = {}) {
+    const panel = document.getElementById('right-nav-panel');
+    const toggleButton = document.getElementById('sb_character_editor_fullscreen_toggle');
+    const wasExpanded = panel instanceof HTMLElement && panel.classList.contains('sb-character-editor-fullscreen');
+    const canExpand = panel instanceof HTMLElement
+        && panel.classList.contains('openDrawer')
+        && isCharacterEditorMenuType(panel.dataset.menuType);
+    const isExpanded = Boolean(expanded) && canExpand;
+
+    if (panel instanceof HTMLElement) {
+        panel.classList.toggle('sb-character-editor-fullscreen', isExpanded);
+        panel.dataset.sbCharacterEditorFullscreen = String(isExpanded);
+    }
+
+    if (toggleButton instanceof HTMLButtonElement) {
+        setButtonPressed(toggleButton, isExpanded);
+        toggleButton.title = isExpanded ? 'Exit editor fullscreen' : 'Enter editor fullscreen';
+        toggleButton.setAttribute('aria-label', toggleButton.title);
+        toggleButton.setAttribute('aria-expanded', String(isExpanded));
+        toggleButton.dataset.i18n = isExpanded
+            ? '[title]Exit editor fullscreen;[aria-label]Exit editor fullscreen'
+            : '[title]Enter editor fullscreen;[aria-label]Enter editor fullscreen';
+
+        if (focusButton) {
+            toggleButton.focus({ preventScroll: true });
+        }
+    }
+
+    if (isExpanded && !wasExpanded) {
+        document.getElementById('sb_character_editor_subtabs')?.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function setCharacterPanelMenuType(panel, menuType) {
+    if (!(panel instanceof HTMLElement)) {
+        return;
+    }
+
+    if (!isCharacterEditorMenuType(menuType)) {
+        setCharacterEditorFullscreenState(false);
+    }
+
+    panel.dataset.menuType = menuType;
+    if (panel.dataset.menuType !== menuType) {
+        panel.setAttribute('data-menu-type', menuType);
+    }
+}
+
+function toggleCharacterEditorFullscreen() {
+    const panel = document.getElementById('right-nav-panel');
+    if (!(panel instanceof HTMLElement) || !panel.classList.contains('openDrawer') || !isCharacterEditorMenuType(panel.dataset.menuType)) {
+        return;
+    }
+
+    setCharacterEditorFullscreenState(!panel.classList.contains('sb-character-editor-fullscreen'), { focusButton: true });
+}
+
+function syncCharacterEditorFullscreenAvailability() {
+    const panel = document.getElementById('right-nav-panel');
+    const toggleButton = document.getElementById('sb_character_editor_fullscreen_toggle');
+    const canUseFullscreen = panel instanceof HTMLElement
+        && isCharacterEditorMenuType(panel.dataset.menuType)
+        && panel.classList.contains('openDrawer');
+
+    if (toggleButton instanceof HTMLButtonElement) {
+        toggleButton.hidden = !canUseFullscreen;
+    }
+
+    if (!canUseFullscreen) {
+        setCharacterEditorFullscreenState(false);
+    }
+}
+
+function bindCharacterEditorFullscreenToggle() {
+    const toggleButton = document.getElementById('sb_character_editor_fullscreen_toggle');
+    if (!(toggleButton instanceof HTMLButtonElement) || toggleButton.dataset.sbBound === 'true') {
+        return;
+    }
+
+    toggleButton.dataset.sbBound = 'true';
+    toggleButton.addEventListener('click', () => toggleCharacterEditorFullscreen());
+
+    const panel = document.getElementById('right-nav-panel');
+    if (panel instanceof HTMLElement && panel.dataset.sbEditorFullscreenKeyBound !== 'true') {
+        panel.dataset.sbEditorFullscreenKeyBound = 'true';
+        panel.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape' || !panel.classList.contains('sb-character-editor-fullscreen')) {
+                return;
+            }
+
+            setCharacterEditorFullscreenState(false, { focusButton: true });
+            event.preventDefault();
+            event.stopPropagation();
+        });
+    }
+
+    syncCharacterEditorFullscreenAvailability();
+}
+
+function focusCharacterPanelTab(tabId) {
+    const normalizedTabId = normalizeCharacterPanelTab(tabId);
+    const button = document.querySelector(`#right-nav-panel [data-sb-character-tab="${CSS.escape(normalizedTabId)}"]`);
+
+    if (button instanceof HTMLElement) {
+        button.focus({ preventScroll: true });
+    }
+}
+
+function bindCharacterEditorSubTabs() {
+    const tablist = document.getElementById('sb_character_editor_subtabs');
+    if (!(tablist instanceof HTMLElement) || tablist.dataset.sbBound === 'true') {
+        return;
+    }
+
+    tablist.dataset.sbBound = 'true';
+
+    tablist.addEventListener('click', (event) => {
+        const target = event.target instanceof HTMLElement ? event.target.closest('[data-sb-character-editor-tab]') : null;
+        if (!(target instanceof HTMLButtonElement)) {
+            return;
+        }
+
+        setCharacterEditorSubTab(target.dataset.sbCharacterEditorTab, { focusButton: false });
+    });
+
+    tablist.addEventListener('keydown', (event) => {
+        if (!(event.target instanceof HTMLElement)) {
+            return;
+        }
+
+        const targetButton = event.target.closest('[data-sb-character-editor-tab]');
+        if (!(targetButton instanceof HTMLButtonElement)) {
+            return;
+        }
+
+        const buttons = Array.from(tablist.querySelectorAll('[data-sb-character-editor-tab]'));
+        const currentIndex = buttons.indexOf(targetButton);
+        if (currentIndex === -1) {
+            return;
+        }
+
+        const lastIndex = buttons.length - 1;
+        let nextIndex = currentIndex;
+
+        if (event.key === 'ArrowRight') {
+            nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+        } else if (event.key === 'ArrowLeft') {
+            nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+        } else if (event.key === 'Home') {
+            nextIndex = 0;
+        } else if (event.key === 'End') {
+            nextIndex = lastIndex;
+        } else {
+            return;
+        }
+
+        event.preventDefault();
+        const nextButton = buttons[nextIndex];
+        if (nextButton instanceof HTMLButtonElement) {
+            setCharacterEditorSubTab(nextButton.dataset.sbCharacterEditorTab, { focusButton: true });
+        }
+    });
+
+    syncCharacterEditorSubTabs();
 }
 
 function hideCharacterMainPanels() {
@@ -5985,13 +6361,36 @@ function hideCharacterMainPanels() {
     }
 }
 
+function openCharacterWorldInfoTab() {
+    const panel = document.getElementById('right-nav-panel');
+    sbState.characterDrawer.lastTab = 'world-info';
+
+    closeMobileNav();
+    closeShell('left');
+    closeShell('right');
+    setCharacterPanelMenuType(panel, 'world-info');
+    preloadPanelStylesheets('characters', 'world-info');
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    setCharacterImportPanelVisible(false);
+    syncCharacterListControls('characters');
+    setCharacterWorldInfoPanelVisible(true);
+    hideCharacterMainPanels();
+
+    syncDrawerIconState('#WIDrawerIcon', true);
+    syncCharacterShellTabs('world-info');
+    syncCharacterTitlebarVisibility();
+    window.requestAnimationFrame(() => focusCharacterPanelTab('world-info'));
+}
+
 function openCharacterPersonaTab() {
     const panel = document.getElementById('right-nav-panel');
     sbState.characterDrawer.lastTab = 'persona';
 
-    panel?.setAttribute('data-menu-type', 'persona');
+    setCharacterPanelMenuType(panel, 'persona');
     setCharacterEditorEmptyState(false);
     setCharacterImportPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
     syncCharacterListControls('characters');
     setCharacterPersonaPanelVisible(true);
     hideCharacterMainPanels();
@@ -6004,9 +6403,10 @@ function openCharacterImportTab() {
     const panel = document.getElementById('right-nav-panel');
     sbState.characterDrawer.lastTab = 'import';
 
-    panel?.setAttribute('data-menu-type', 'import');
+    setCharacterPanelMenuType(panel, 'import');
     setCharacterEditorEmptyState(false);
     setCharacterPersonaPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
     syncCharacterListControls('characters');
     setCharacterImportPanelVisible(true);
     hideCharacterMainPanels();
@@ -6024,6 +6424,7 @@ function preserveCharacterImportTab() {
 
     setCharacterEditorEmptyState(false);
     setCharacterPersonaPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
     syncCharacterListControls('characters');
     setCharacterImportPanelVisible(true);
     hideCharacterMainPanels();
@@ -6032,26 +6433,44 @@ function preserveCharacterImportTab() {
 }
 
 function openCharacterPanelTab(tabId) {
-    const normalizedTabId = ['persona', 'import', 'groups', 'editor'].includes(tabId) ? tabId : 'characters';
+    const normalizedTabId = normalizeCharacterPanelTab(tabId);
     sbState.characterDrawer.lastTab = normalizedTabId;
+
+    if (normalizedTabId !== 'editor') {
+        setCharacterEditorFullscreenState(false);
+    }
+
+    if (normalizedTabId === 'world-info') {
+        preloadPanelStylesheets('characters', 'world-info');
+    }
 
     if (!isCharacterPanelOpen()) {
         toggleCharacterPanel();
     } else {
+        closeMobileNav();
         closeShell('left');
         closeShell('right');
     }
 
     window.requestAnimationFrame(() => {
-        if (tabId === 'persona') {
+        const panel = document.getElementById('right-nav-panel');
+        if (normalizedTabId === 'persona') {
+            setCharacterPanelMenuType(panel, 'persona');
             openCharacterPersonaTab();
-        } else if (tabId === 'import') {
+        } else if (normalizedTabId === 'import') {
+            setCharacterPanelMenuType(panel, 'import');
             openCharacterImportTab();
-        } else if (tabId === 'groups') {
+        } else if (normalizedTabId === 'groups') {
+            setCharacterPanelMenuType(panel, 'groups');
             void showCharacterListView('groups');
-        } else if (tabId === 'editor') {
+        } else if (normalizedTabId === 'editor') {
+            setCharacterPanelMenuType(panel, 'character_edit');
             openCharacterEditorTab();
+        } else if (normalizedTabId === 'world-info') {
+            setCharacterPanelMenuType(panel, 'world-info');
+            openCharacterWorldInfoTab();
         } else {
+            setCharacterPanelMenuType(panel, 'characters');
             void showCharacterListView();
         }
     });
@@ -6064,6 +6483,8 @@ function restoreLastCharacterPanelView() {
         openCharacterPersonaTab();
     } else if (lastTab === 'import') {
         openCharacterImportTab();
+    } else if (lastTab === 'world-info') {
+        openCharacterWorldInfoTab();
     } else if (lastTab === 'groups') {
         void showCharacterListView('groups');
     } else if (lastTab === 'editor') {
@@ -6078,6 +6499,7 @@ function openCharacterEditorTab() {
     setCharacterEditorEmptyState(false);
     setCharacterPersonaPanelVisible(false);
     setCharacterImportPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
 
     if (showActiveCharacterEditor()) {
         syncCharacterShellTabs('editor');
@@ -6096,9 +6518,13 @@ function syncCharacterShellTabs(activeTab = null) {
             ? 'persona'
             : menuType === 'import'
                 ? 'import'
-                : menuType === 'groups'
-                    ? 'groups'
-                    : ['character_edit', 'group_edit', 'create', 'group_create', 'editor_empty'].includes(menuType) ? 'editor' : 'characters');
+                : menuType === 'world-info'
+                    ? 'world-info'
+                    : menuType === 'groups'
+                        ? 'groups'
+                        : ['character_edit', 'group_edit', 'create', 'group_create', 'editor_empty'].includes(menuType) ? 'editor' : 'characters');
+
+    sbState.characterDrawer.lastTab = normalizedTab;
 
     if (menuType === 'characters' || menuType === 'groups') {
         syncCharacterListControls(menuType);
@@ -6114,7 +6540,19 @@ function syncCharacterShellTabs(activeTab = null) {
         const isActive = tab.dataset.sbCharacterTab === normalizedTab;
         tab.classList.toggle('is-active', isActive);
         tab.setAttribute('aria-selected', String(isActive));
+        tab.setAttribute('tabindex', isActive ? '0' : '-1');
     });
+
+    if (panel instanceof HTMLElement && panel.classList.contains('openDrawer')) {
+        const tabConfig = getCharacterPanelTabConfig(normalizedTab);
+        document.dispatchEvent(new CustomEvent('sb:shell-tab-activated', {
+            detail: {
+                shellKey: 'characters',
+                tabId: normalizedTab,
+                label: tabConfig?.label || normalizedTab,
+            },
+        }));
+    }
 }
 
 function syncCharacterHeaderCopy(activeTab = 'characters') {
@@ -6154,6 +6592,7 @@ function showActiveCharacterEditor() {
     setCharacterEditorEmptyState(false);
     setCharacterPersonaPanelVisible(false);
     setCharacterImportPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
     syncCharacterShellTabs('editor');
     return true;
 }
@@ -6170,20 +6609,17 @@ function resetCharacterPanelView() {
     setCharacterEditorEmptyState(false);
     setCharacterPersonaPanelVisible(false);
     setCharacterImportPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
 
     if (listButton instanceof HTMLElement) {
         listButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        if (panel instanceof HTMLElement) {
-            panel.dataset.menuType = 'characters';
-        }
+        setCharacterPanelMenuType(panel, 'characters');
         syncCharacterListControls('characters');
         syncCharacterShellTabs('characters');
         return;
     }
 
-    if (panel instanceof HTMLElement) {
-        panel.dataset.menuType = 'characters';
-    }
+    setCharacterPanelMenuType(panel, 'characters');
 
     const infoPanel = document.getElementById('result_info');
     const characterEditor = document.getElementById('rm_ch_create_block');
@@ -6231,6 +6667,8 @@ function syncCharacterDrawerStateFromDom({ force = false } = {}) {
     sbState.characterDrawer.observedOpen = isOpen;
     setCharacterDrawerHostOverflow(isOpen);
     syncDrawerIconState('#rightNavDrawerIcon', isOpen);
+    syncDrawerIconState('#WIDrawerIcon', isOpen && panel.dataset.menuType === 'world-info');
+    syncCharacterEditorFullscreenAvailability();
 
     if (!isOpen && document.activeElement instanceof HTMLElement && panel.contains(document.activeElement)) {
         document.activeElement.blur();
@@ -6255,6 +6693,8 @@ function bindCharacterDrawerStateObserver() {
             setCharacterEditorEmptyState(panel.dataset.menuType === 'editor_empty');
             setCharacterPersonaPanelVisible(panel.dataset.menuType === 'persona');
             setCharacterImportPanelVisible(panel.dataset.menuType === 'import');
+            setCharacterWorldInfoPanelVisible(panel.dataset.menuType === 'world-info');
+            syncCharacterEditorFullscreenAvailability();
             syncCharacterTitlebarVisibility();
             syncCharacterShellTabs();
         }
@@ -6269,12 +6709,15 @@ function bindCharacterDrawerStateObserver() {
 function closeCharacterPanel() {
     const panel = document.getElementById('right-nav-panel');
 
+    setCharacterEditorFullscreenState(false);
+
     if (panel instanceof HTMLElement && panel.classList.contains('openDrawer')) {
         forceDrawerState(panel, false, '#rightNavDrawerIcon');
     } else if (panel instanceof HTMLElement && document.activeElement instanceof HTMLElement && panel.contains(document.activeElement)) {
         document.activeElement.blur();
     }
 
+    syncDrawerIconState('#WIDrawerIcon', false);
     setCharacterDrawerHostOverflow(false);
     syncChatbarVisibilityState();
     queueMobileModalStateSync();
@@ -6352,6 +6795,18 @@ function closeAllDropdowns({ except = '' } = {}) {
 }
 
 function toggleShellPanel(shellKey, tabId = null) {
+    if (shellKey === 'characters') {
+        openCharacterPanelTab(tabId);
+        return;
+    }
+
+    if (shellKey === 'left' && tabId === 'world-info') {
+        // SillyBunny: final guard for old code paths that still ask for the
+        // removed left-shell World Info route.
+        openCharacterPanelTab('world-info');
+        return;
+    }
+
     if (!ensureShellReady(shellKey)) {
         return;
     }
@@ -6373,8 +6828,13 @@ function toggleShellPanel(shellKey, tabId = null) {
 }
 
 function preloadPanelStylesheets(shellKey, tabId = null) {
+    // SillyBunny: old saved/configured left-shell World Info routes should only
+    // preload assets for the relocated Characters tab, never recreate a left tab.
+    const normalizedTabId = shellKey === 'left' && tabId === 'world-info' ? 'world-info' : tabId;
+    const normalizedShellKey = shellKey === 'left' && tabId === 'world-info' ? 'characters' : shellKey;
     const key = `${shellKey}:${tabId || ''}`;
-    const stylesheets = SB_PANEL_STYLESHEETS[key];
+    const normalizedKey = `${normalizedShellKey}:${normalizedTabId || ''}`;
+    const stylesheets = SB_PANEL_STYLESHEETS[normalizedKey] ?? SB_PANEL_STYLESHEETS[key];
 
     if (!stylesheets || !window.SillyBunnyAssets?.loadStylesheetAsync) {
         return;
@@ -6763,6 +7223,12 @@ function hideHostToggles() {
     const characterDrawer = document.getElementById('rightNavHolder');
     characterDrawer?.classList.add('sb-drawer-host');
     characterDrawer?.querySelector(':scope > .drawer-toggle')?.classList.add('sb-hidden-toggle');
+
+    // SillyBunny: World Info is no longer a left/top-level drawer, but keeping
+    // the upstream drawer ID preserves legacy selectors until runtime reparents it.
+    const worldInfoDrawer = document.getElementById('WI-SP-button');
+    worldInfoDrawer?.classList.add('sb-drawer-host');
+    worldInfoDrawer?.querySelector(':scope > .drawer-toggle')?.classList.add('sb-hidden-toggle');
 }
 
 function createShellPanel(tabConfig) {
@@ -9491,8 +9957,12 @@ function getMobileQuickActionContextLabel(action) {
         return '';
     }
 
-    const shellLabel = getShellConfig(normalizedAction.shellKey)?.title || normalizedAction.shellKey;
-    const tabLabel = getShellState(normalizedAction.shellKey)?.tabs?.get(normalizedAction.tabId)?.label
+    const shellLabel = normalizedAction.shellKey === 'characters'
+        ? 'Characters'
+        : getShellConfig(normalizedAction.shellKey)?.title || normalizedAction.shellKey;
+    const tabLabel = normalizedAction.shellKey === 'characters'
+        ? getCharacterPanelTabConfig(normalizedAction.tabId)?.label || normalizedAction.tabId
+        : getShellState(normalizedAction.shellKey)?.tabs?.get(normalizedAction.tabId)?.label
         || getMobileQuickActionTabConfig(normalizedAction.shellKey, normalizedAction.tabId)?.label
         || normalizedAction.tabId;
     const labels = [shellLabel, tabLabel];
@@ -9509,7 +9979,7 @@ function getMobileQuickActionContextLabel(action) {
 function updateMobileQuickActionSettingsStatus() {
     const status = document.getElementById('sb-mobile-quick-action-status');
     if (status instanceof HTMLElement) {
-        status.textContent = `${sbState.mobileQuickActions.length}/${SB_MOBILE_QUICK_ACTION_LIMIT} selected. This list replaces the Workspace drawer shortcuts.`;
+        status.textContent = `${sbState.mobileQuickActions.length}/${SB_MOBILE_QUICK_ACTION_LIMIT} selected. This list replaces the mobile quick shortcuts.`;
     }
 
     const resetButton = document.getElementById('sb-mobile-quick-action-reset');
@@ -9642,7 +10112,7 @@ function createMobileQuickActionSettingsGroup() {
     const title = createElement('strong', { text: 'Mobile Quick Actions' });
     const description = createElement('p', {
         className: 'sb-theme-slider-caption',
-        text: 'Choose the shortcuts shown in the mobile Workspace drawer. Defaults can be removed or restored.',
+        text: 'Choose the shortcuts shown in the mobile quick drawer. Defaults can be removed or restored.',
     });
     const resetButton = createElement('button', {
         id: 'sb-mobile-quick-action-reset',
@@ -10197,7 +10667,11 @@ function collectGlobalSearchMatches(query) {
                 tabState.searchIndex = createSearchIndex(tabState);
             }
 
-            const extraEntries = tabState.id === 'persona' ? getPersonaSearchEntries(tabState) : [];
+            const extraEntries = tabState.id === 'persona'
+                ? getPersonaSearchEntries(tabState)
+                : tabState.id === 'characters'
+                    ? getCharacterPanelSearchEntries()
+                    : [];
 
             for (const entry of [...tabState.searchIndex, ...extraEntries]) {
                 if (!searchTerms.every(term => entry.searchText.includes(term))) {
@@ -10248,7 +10722,11 @@ function getTabSearchEntries(tabState, { includeThemeCard = false } = {}) {
 
     return [
         ...(searchIndex || tabState.searchIndex),
-        ...(tabState.id === 'persona' ? getPersonaSearchEntries(tabState) : []),
+        ...(tabState.id === 'persona'
+            ? getPersonaSearchEntries(tabState)
+            : tabState.id === 'characters'
+                ? getCharacterPanelSearchEntries()
+                : []),
     ];
 }
 
@@ -10321,14 +10799,26 @@ function findMobileQuickActionMatch(action) {
     return {
         ...fallbackMatch,
         shellKey: normalizedAction.shellKey,
-        shellLabel: getShellConfig(normalizedAction.shellKey)?.title || normalizedAction.shellKey,
+        shellLabel: normalizedAction.shellKey === 'characters'
+            ? 'Characters'
+            : getShellConfig(normalizedAction.shellKey)?.title || normalizedAction.shellKey,
     };
 }
 
 function activateMobileQuickAction(action) {
     const match = findMobileQuickActionMatch(action);
     if (!match) {
+        if (action.shellKey === 'characters') {
+            openCharacterPanelTab(action.tabId);
+            return;
+        }
+
         openShell(action.shellKey, action.tabId);
+        return;
+    }
+
+    if (action.shellKey === 'characters') {
+        revealSearchMatch(action.shellKey, match);
         return;
     }
 
@@ -10503,6 +10993,23 @@ function revealSearchMatch(shellKey, match) {
         return;
     }
 
+    if (shellKey === 'characters') {
+        openCharacterPanelTab(match.tabId);
+
+        if (match.element instanceof HTMLElement) {
+            window.setTimeout(() => {
+                expandHiddenAccordions(match.element);
+                match.element.scrollIntoView({
+                    block: 'center',
+                    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                });
+                pulseSearchTarget(match.element);
+            }, 40);
+        }
+
+        return;
+    }
+
     openShell(shellKey, match.tabId);
 
     window.setTimeout(() => {
@@ -10518,6 +11025,13 @@ function revealSearchMatch(shellKey, match) {
 function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
     const shellState = getShellState(shellKey);
     const shellConfig = getShellConfig(shellKey);
+
+    if (shellKey === 'left' && tabId === 'world-info') {
+        // SillyBunny: final guard for old code paths that still ask for the
+        // removed left-shell World Info route.
+        openCharacterPanelTab('world-info');
+        return;
+    }
 
     if (!shellState || !shellState.tabs.has(tabId)) {
         return;
@@ -10564,6 +11078,13 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
 }
 
 function openShell(shellKey, tabId = null) {
+    if (shellKey === 'left' && tabId === 'world-info') {
+        // SillyBunny: final guard for old code paths that still ask for the
+        // removed left-shell World Info route.
+        openCharacterPanelTab('world-info');
+        return;
+    }
+
     const shellConfig = getShellConfig(shellKey);
     const shellState = getShellState(shellKey);
     const shellRoot = document.getElementById(shellConfig.rootPanelId);
@@ -10923,7 +11444,7 @@ function buildShell(shellKey) {
 
     panelBody.append(...Array.from(shellState.tabs.values()).map(tabState => tabState.panel));
 
-    const storedTabId = safeGetItem(shellConfig.storageKey);
+    const storedTabId = migrateLegacyWorldInfoRoute(safeGetItem(shellConfig.storageKey));
     const nextActiveTab = shellState.tabs.has(storedTabId) ? storedTabId : shellConfig.defaultTabId;
     setActiveTab(shellKey, nextActiveTab);
 
@@ -11015,19 +11536,11 @@ function routeDrawerTarget(targetId) {
     }
 
     if (route.shell === 'characters') {
-        if (!isCharacterPanelOpen()) {
-            toggleCharacterPanel();
-        } else {
-            closeShell('left');
-            closeShell('right');
-        }
-
-        if (route.tab === 'persona') {
-            openCharacterPersonaTab();
-        }
+        openCharacterPanelTab(route.tab);
         return true;
     }
 
+    preloadPanelStylesheets(route.shell, route.tab);
     openShell(route.shell, route.tab);
     return true;
 }
@@ -11122,30 +11635,25 @@ function bindWorldInfoRoute() {
         return;
     }
 
-    window.jQuery('#WIDrawerIcon').on('click.sbShellRoute', function (event) {
-        const leftShell = getShellState('left');
-        const leftRoot = document.getElementById(getShellConfig('left').rootPanelId);
-        const worldInfoPanel = document.getElementById('WorldInfo');
+    window.jQuery('#WIDrawerIcon, #WI-SP-button > .drawer-toggle')
+        .off('click.sbShellRoute')
+        .on('click.sbShellRoute', function (event) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
 
-        if (!leftShell || !(leftRoot instanceof HTMLElement)) {
-            return;
-        }
+            const characterPanel = document.getElementById('right-nav-panel');
+            const worldInfoVisible = characterPanel instanceof HTMLElement
+                && characterPanel.classList.contains('openDrawer')
+                && characterPanel.dataset.menuType === 'world-info';
 
-        event.preventDefault();
-        event.stopImmediatePropagation();
+            if (worldInfoVisible) {
+                closeCharacterPanel();
+            } else {
+                openCharacterPanelTab('world-info');
+            }
 
-        const worldInfoVisible = leftRoot.classList.contains('openDrawer')
-            && leftShell.activeTabId === 'world-info'
-            && isActuallyVisible(worldInfoPanel);
-
-        if (worldInfoVisible) {
-            closeShell('left');
-        } else {
-            openShell('left', 'world-info');
-        }
-
-        return false;
-    });
+            return false;
+        });
 }
 
 function createMobileQuickActionButton(item) {
@@ -11174,6 +11682,8 @@ function createMobileQuickActionButton(item) {
 
         if (action.type === 'custom') {
             activateMobileQuickAction(action);
+        } else if (action.shellKey === 'characters') {
+            openCharacterPanelTab(action.tabId);
         } else {
             toggleShellPanel(action.shellKey, action.tabId);
         }
@@ -11387,6 +11897,7 @@ function closeMobileNav() {
 function injectCharacterDrawerControls() {
     document.getElementById('right-nav-panel')?.classList.add('sb-character-drawer-root');
     ensureCharacterListToolbarLayout();
+    bindCharacterEditorFullscreenToggle();
 
     const shellCloseButton = document.getElementById('sb_character_shell_close');
     if (shellCloseButton instanceof HTMLButtonElement && shellCloseButton.dataset.sbBound !== 'true') {
@@ -11416,6 +11927,12 @@ function injectCharacterDrawerControls() {
     if (personaTab instanceof HTMLButtonElement && personaTab.dataset.sbBound !== 'true') {
         personaTab.dataset.sbBound = 'true';
         personaTab.addEventListener('click', () => openCharacterPersonaTab());
+    }
+
+    const worldInfoTab = document.getElementById('sb_character_tab_world_info');
+    if (worldInfoTab instanceof HTMLButtonElement && worldInfoTab.dataset.sbBound !== 'true') {
+        worldInfoTab.dataset.sbBound = 'true';
+        worldInfoTab.addEventListener('click', () => openCharacterWorldInfoTab());
     }
 
     const importTab = document.getElementById('sb_character_tab_import');
@@ -11460,12 +11977,14 @@ function injectCharacterDrawerControls() {
             setCharacterEditorEmptyState(false);
             setCharacterPersonaPanelVisible(false);
             setCharacterImportPanelVisible(false);
+            setCharacterWorldInfoPanelVisible(false);
             document.getElementById('rm_button_create')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             syncCharacterShellTabs('editor');
         });
     }
 
     ensureCharacterPersonaPanel();
+    ensureCharacterWorldInfoPanel();
 
     const target = document.getElementById('CharListButtonAndHotSwaps');
     if (!(target instanceof HTMLElement)) {
@@ -11483,6 +12002,7 @@ function bindCharacterEditorExitButton() {
 
     button.dataset.sbBound = 'true';
     button.addEventListener('click', () => {
+        setCharacterEditorFullscreenState(false);
         closeCharacterPanel();
     });
 }
@@ -12412,6 +12932,7 @@ function initAll() {
     scheduleChatbarRefresh(0);
     interceptDrawerOpeners();
     bindWorldInfoRoute();
+    bindCharacterEditorSubTabs();
     applyDefaultDrawerStates();
     bindInlineDrawerAutoCloseToggle();
     syncMobileViewportState();
@@ -12432,7 +12953,8 @@ function initAll() {
     // Group Advanced Formatting sections into collapsible drawers
     groupAdvancedFormattingIntoDrawers();
 
-    globalThis.SillyBunnyShell = Object.assign(globalThis.SillyBunnyShell || {}, {
+    const sillyBunnyShell = /** @type {any} */ (globalThis.SillyBunnyShell || {});
+    globalThis.SillyBunnyShell = Object.assign(sillyBunnyShell, {
         openTab(shellKey, tabId) {
             if (shellKey === 'characters') {
                 openCharacterPanelTab(tabId);
@@ -12448,6 +12970,13 @@ function initAll() {
         },
         closeCharacters() {
             closeCharacterPanel();
+        },
+        isMobileViewport,
+        highlightCharacterEditorTab() {
+            const editorTab = document.querySelector('[data-sb-character-tab="editor"]');
+            if (editorTab instanceof HTMLElement) {
+                flashHighlight($(editorTab), 1000);
+            }
         },
         openGlobalSearch({ focusInput = true } = {}) {
             closeAllDropdowns({ except: 'search' });

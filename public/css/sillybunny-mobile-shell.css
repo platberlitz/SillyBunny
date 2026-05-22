@@ -346,6 +346,24 @@
         padding: 0 0 3px !important;
     }
 
+    #right-nav-panel.openDrawer .sb-character-editor-subtabs-wrapper {
+        margin: 3px 0 5px !important;
+        padding: 4px !important;
+        border-radius: 12px !important;
+    }
+
+    #right-nav-panel.openDrawer.sb-character-editor-fullscreen .sb-character-editor-subtabs-wrapper {
+        margin: 0 0 5px !important;
+        border-radius: 0 !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+    }
+
+    #right-nav-panel.openDrawer .sb-character-editor-subtabs {
+        justify-content: safe center !important;
+        gap: 6px !important;
+    }
+
     #right-nav-panel.openDrawer .sb-character-create-bar {
         align-items: center !important;
         gap: 6px !important;
@@ -542,6 +560,12 @@
         padding-bottom: max(24px, var(--sb-mobile-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
     }
 
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) > .scrollableInner,
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) > .scrollableInnerFull {
+        padding-inline-start: 20px !important;
+        padding-inline-end: calc(20px + var(--sb-character-scroll-gutter, 8px)) !important;
+    }
+
     #right-nav-panel.openDrawer #rm_print_characters_block,
     #right-nav-panel.openDrawer #rm_ch_create_block {
         box-sizing: border-box !important;
@@ -620,5 +644,69 @@
             padding-bottom: 0 !important;
             -webkit-overflow-scrolling: auto !important;
         }
+    }
+}
+
+/* =========================================================================
+   Mobile fixes for the new character editor (PR #153)
+   ========================================================================= */
+@media screen and (max-width: 1000px) {
+    /* Metadata tab - single-line creator/version, taller notes/tags */
+    #right-nav-panel #creator_textarea,
+    #right-nav-panel #character_version_textarea {
+        min-height: 34px !important;
+        height: 34px !important;
+        max-height: 34px !important;
+        line-height: 1.25 !important;
+        padding-block: 6px !important;
+        resize: none !important;
+        overflow: hidden !important;
+        white-space: nowrap !important;
+    }
+
+    #right-nav-panel :is(#creator_notes_textarea, #tags_textarea) {
+        min-height: 9rem !important;
+        max-height: 16rem !important;
+        resize: vertical !important;
+    }
+
+    /* Character's Note row - align the right column (@ Depth / Role / Tokens)
+       with the Character's Note header and textarea on the left. */
+    #right-nav-panel #depth_prompt_div {
+        align-items: start !important;
+        gap: 8px 10px !important;
+    }
+
+    #right-nav-panel #depth_prompt_div > .flex1 > h4,
+    #right-nav-panel #depth_prompt_div > :not(.flex1) > h4 {
+        margin: 0 0 4px !important;
+        min-height: 1.5rem !important;
+        line-height: 1.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    #right-nav-panel #depth_prompt_div > :not(.flex1) {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 4px !important;
+        min-width: 7rem !important;
+    }
+
+    #right-nav-panel #depth_prompt_div > :not(.flex1) > .extension_token_counter {
+        margin: 0 !important;
+        text-align: left !important;
+        font-size: calc(var(--mainFontSize) * 0.78) !important;
+    }
+
+    /* Alternate Greetings - icon-only Delete button */
+    #right-nav-panel .delete_alternate_greeting > span,
+    #right-nav-panel .delete_alternate_greeting [data-i18n="Delete"] {
+        display: none !important;
+    }
+
+    #right-nav-panel .delete_alternate_greeting {
+        padding-inline: 8px !important;
     }
 }

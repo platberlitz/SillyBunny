@@ -107,14 +107,21 @@ var WIPanelPin = document.getElementById('WI_panel_pin');
 
 var RightNavPanel = document.getElementById('right-nav-panel');
 var RightNavDrawerIcon = document.getElementById('rightNavDrawerIcon');
-var WorldInfo = document.getElementById('WorldInfo');
-var WIDrawerIcon = document.getElementById('WIDrawerIcon');
 
 var SelectedCharacterTab = document.getElementById('rm_button_selected_ch');
 
 var connection_made = false;
 var retry_delay = 500;
 let counterNonce = Date.now();
+
+function openWorldInfoCharacterTab() {
+    if (globalThis.SillyBunnyShell?.openTab) {
+        globalThis.SillyBunnyShell.openTab('characters', 'world-info');
+        return;
+    }
+
+    $('#WIDrawerIcon').trigger('click');
+}
 
 const observerConfig = { childList: true, subtree: true };
 const countTokensDebounced = debounce(RA_CountCharTokens, debounce_timeout.relaxed);
@@ -256,8 +263,6 @@ $('#rm_button_create').on('click', function () {                 //when "+New Ch
 });
 //when any input is made to the create/edit character form textareas
 $('#rm_ch_create_block').on('input', function () { countTokensDebounced(); });
-//when any input is made to the advanced editing popup textareas
-$('#character_popup').on('input', function () { countTokensDebounced(); });
 //function:
 export async function RA_CountCharTokens() {
     counterNonce = Date.now();
@@ -490,8 +495,7 @@ function OpenNavPanels() {
 
         //auto-open WI if locked and previously open
         if (accountStorage.getItem('WINavLockOn') == 'true' && accountStorage.getItem('WINavOpened') == 'true') {
-            console.debug('RA -- clicking WI to open');
-            $('#WIDrawerIcon').trigger('click');
+            openWorldInfoCharacterTab();
         }
     }
 }
@@ -722,7 +726,9 @@ export async function initMovingUI() {
         dragElement($('#sheld'));
         dragElement($('#left-nav-panel'));
         dragElement($('#right-nav-panel'));
-        dragElement($('#WorldInfo'));
+        // SillyBunny: World Info is embedded in the Characters panel now; the
+        // panel itself handles moving/resizing, so do not persist a separate
+        // draggable #WorldInfo state that would fight the tab layout.
         dragElement($('#floatingPrompt'));
         dragElement($('#logprobsViewer'));
         dragElement($('#cfgConfig'));
@@ -789,23 +795,10 @@ export function initRossMods() {
             }
         }
     });
+    // SillyBunny: World Info now lives inside the right Characters panel, so the
+    // legacy WI pin only preserves auto-open preference instead of pinning a left drawer.
     $(WIPanelPin).on('click', async function () {
         accountStorage.setItem('WINavLockOn', $(WIPanelPin).prop('checked'));
-        if ($(WIPanelPin).prop('checked') == true) {
-            console.debug('adding pin class to WI');
-            $(WorldInfo).addClass('pinnedOpen');
-            $(WIDrawerIcon).addClass('drawerPinnedOpen');
-        } else {
-            console.debug('removing pin class from WI');
-            $(WorldInfo).removeClass('pinnedOpen');
-            $(WIDrawerIcon).removeClass('drawerPinnedOpen');
-
-            if ($(WorldInfo).hasClass('openDrawer') && $('.openDrawer').length > 1) {
-                console.debug('closing WI after lock removal');
-                const toggle = $('#WI-SP-button>.drawer-toggle');
-                doNavbarIconClick.call(toggle);
-            }
-        }
     });
 
     if (!isMobile()) { //only read/set pin states on non-mobile devices
@@ -821,19 +814,8 @@ export function initRossMods() {
             $(RightNavPanel).addClass('pinnedOpen');
             $(RightNavDrawerIcon).addClass('drawerPinnedOpen');
         }
-        // read the state of WI Lock and apply to WI classlist
+        // SillyBunny: retain WI auto-open preference without applying legacy drawer pin classes.
         $(WIPanelPin).prop('checked', accountStorage.getItem('WINavLockOn') === 'true');
-        if (accountStorage.getItem('WINavLockOn') == 'true') {
-            //console.log('setting pin class via local var');
-            $(WorldInfo).addClass('pinnedOpen');
-            $(WIDrawerIcon).addClass('drawerPinnedOpen');
-        }
-
-        if ($(WIPanelPin).prop('checked')) {
-            console.debug('setting pin class via checkbox state');
-            $(WorldInfo).addClass('pinnedOpen');
-            $(WIDrawerIcon).addClass('drawerPinnedOpen');
-        }
     }
 
 
@@ -846,9 +828,9 @@ export function initRossMods() {
 
     //save state of WI being open or closed
     $('#WorldInfo').on('click', function () {
-        if (!$('#WorldInfo').hasClass('openIcon')) {
-            accountStorage.setItem('WINavOpened', 'true');
-        } else { accountStorage.setItem('WINavOpened', 'false'); }
+        const isWorldInfoTabVisible = $('#WorldInfo').is(':visible')
+            && $('#right-nav-panel').attr('data-menu-type') === 'world-info';
+        accountStorage.setItem('WINavOpened', isWorldInfoTabVisible ? 'true' : 'false');
     });
 
     var chatbarInFocus = false;
@@ -1137,7 +1119,6 @@ export function initRossMods() {
                 isSwipingAllowed() &&
                 !isNanogallery2LightboxActive() &&  // Check if lightbox is NOT active
                 $('#send_textarea').val() === '' &&
-                $('#character_popup').css('display') === 'none' &&
                 $('#shadow_select_chat_popup').css('display') === 'none' &&
                 !isInputElementInFocus() &&
                 !isModifiedKeyboardEvent(event) &&
@@ -1152,7 +1133,6 @@ export function initRossMods() {
                 isSwipingAllowed() &&
                 !isNanogallery2LightboxActive() &&  // Check if lightbox is NOT active
                 $('#send_textarea').val() === '' &&
-                $('#character_popup').css('display') === 'none' &&
                 $('#shadow_select_chat_popup').css('display') === 'none' &&
                 !isInputElementInFocus() &&
                 !isModifiedKeyboardEvent(event) &&
@@ -1169,7 +1149,6 @@ export function initRossMods() {
                 hotkeyTargets.send_textarea.value === '' &&
                 chatbarInFocus === true &&
                 ($('.swipe_right:last').css('display') === 'flex' || $('.last_mes').attr('is_system') === 'true') &&
-                $('#character_popup').css('display') === 'none' &&
                 $('#shadow_select_chat_popup').css('display') === 'none'
             ) {
                 const isUserMesList = document.querySelectorAll('div[is_user="true"]');
@@ -1189,7 +1168,6 @@ export function initRossMods() {
                 chatbarInFocus === true &&
                 //$('.swipe_right:last').css('display') === 'flex' &&
                 $('.last_mes .mes_buttons').is(':visible') &&
-                $('#character_popup').css('display') === 'none' &&
                 $('#shadow_select_chat_popup').css('display') === 'none'
             ) {
                 const lastMes = document.querySelector('.last_mes');
@@ -1221,11 +1199,6 @@ export function initRossMods() {
 
             if ($('#select_chat_popup').is(':visible')) {
                 $('#select_chat_cross').trigger('click');
-                return;
-            }
-
-            if ($('#character_popup').is(':visible')) {
-                $('#character_cross').trigger('click');
                 return;
             }
 
@@ -1271,7 +1244,7 @@ export function initRossMods() {
             }
 
             if ($('#WorldInfo').is(':visible')) {
-                $('#WIDrawerIcon').trigger('click');
+                globalThis.SillyBunnyShell?.closeCharacters?.();
                 return;
             }
 

@@ -1126,25 +1126,63 @@ function switchWaifuMode() {
     scrollChatToBottom();
 }
 
-function switchSpoilerMode() {
-    if (power_user.spoiler_free_mode) {
-        $('#descriptionWrapper').hide();
-        $('#firstMessageWrapper').hide();
-        $('#spoiler_free_desc').addClass('flex1');
-        $('#creators_note_desc_hidden').show();
-    } else {
-        $('#descriptionWrapper').show();
-        $('#firstMessageWrapper').show();
-        $('#spoiler_free_desc').removeClass('flex1');
-        $('#creators_note_desc_hidden').hide();
+const characterSpoilerFreePanelSelector = '#form_create [data-sb-character-editor-panel]:not([data-sb-character-editor-panel="char-info"]):not([data-sb-character-editor-panel="metadata"])';
+
+function showCharacterEditorMetadataPanel() {
+    const metadataTab = document.querySelector('#sb_character_editor_subtabs [data-sb-character-editor-tab="metadata"]');
+
+    if (metadataTab instanceof HTMLElement) {
+        metadataTab.click();
     }
 }
 
+function syncActiveCharacterEditorPanel() {
+    const activeTab = document.querySelector('#sb_character_editor_subtabs [data-sb-character-editor-tab][aria-selected="true"]');
+
+    if (activeTab instanceof HTMLElement) {
+        activeTab.click();
+    }
+}
+
+function setCharacterSpoilerFreeFieldsHidden(hidden) {
+    const form = document.getElementById('form_create');
+    const activePanel = form?.querySelector('[data-sb-character-editor-panel]:not([hidden])');
+    const activePanelCanRemainVisible = activePanel instanceof HTMLElement
+        && ['char-info', 'metadata'].includes(activePanel.dataset.sbCharacterEditorPanel ?? '');
+
+    if (form instanceof HTMLElement) {
+        form.dataset.sbSpoilerFreeFieldsHidden = String(hidden);
+    }
+
+    if (hidden) {
+        document.querySelectorAll(characterSpoilerFreePanelSelector).forEach(panel => {
+            if (!(panel instanceof HTMLElement)) {
+                return;
+            }
+
+            panel.hidden = true;
+            panel.setAttribute('aria-hidden', 'true');
+        });
+    } else {
+        syncActiveCharacterEditorPanel();
+    }
+
+    $('#spoiler_free_desc').toggleClass('flex1', hidden);
+    $('#creators_note_desc_hidden').toggle(hidden);
+
+    if (hidden && !activePanelCanRemainVisible) {
+        showCharacterEditorMetadataPanel();
+    }
+}
+
+function switchSpoilerMode() {
+    setCharacterSpoilerFreeFieldsHidden(power_user.spoiler_free_mode);
+}
+
 function peekSpoilerMode() {
-    $('#descriptionWrapper').toggle();
-    $('#firstMessageWrapper').toggle();
-    $('#spoiler_free_desc').toggleClass('flex1');
-    $('#creators_note_desc_hidden').toggle();
+    const form = document.getElementById('form_create');
+    const isHidden = form instanceof HTMLElement && form.dataset.sbSpoilerFreeFieldsHidden === 'true';
+    setCharacterSpoilerFreeFieldsHidden(!isHidden);
 }
 
 function switchMovingUI() {
@@ -2818,7 +2856,6 @@ async function resetMovablePanels(type) {
         'sheld',
         'left-nav-panel',
         'right-nav-panel',
-        'WorldInfo',
         'floatingPrompt',
         'expression-holder',
         'groupMemberListPopout',
@@ -3279,7 +3316,6 @@ export function forceCharacterEditorTokenize() {
         $(document.getElementById($(this).data('token-counter'))).data('last-value-hash', '');
     });
     $('#rm_ch_create_block').trigger('input');
-    $('#character_popup').trigger('input');
 }
 
 jQuery(async () => {

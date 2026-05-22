@@ -1039,7 +1039,7 @@ async function highlightLaunchpadItem(extensionId) {
     return true;
 }
 
-globalThis.SillyBunnyShell = globalThis.SillyBunnyShell || {};
+globalThis.SillyBunnyShell = /** @type {any} */ (globalThis.SillyBunnyShell || {});
 globalThis.SillyBunnyShell.highlightLaunchpadItem = highlightLaunchpadItem;
 
 /**
@@ -1118,7 +1118,10 @@ function updateRecentChatFilterView(root, { expanded = false } = {}) {
 }
 
 function openShellTab(route) {
-    const [shellKey, tabId] = String(route || '').split(':');
+    // SillyBunny: accept historical launcher routes while opening relocated
+    // World Info in the Characters panel instead of the old left shell.
+    const normalizedRoute = route === 'left:world-info' ? 'characters:world-info' : route;
+    const [shellKey, tabId] = String(normalizedRoute || '').split(':');
 
     if (!shellKey || !tabId) {
         return;
@@ -1132,12 +1135,12 @@ function openShellTab(route) {
     const fallbackSelector = {
         'left:presets': '#ai-config-button > .drawer-toggle',
         'left:api': '#sys-settings-button > .drawer-toggle',
-        'left:world-info': '#WI-SP-button > .drawer-toggle',
+        'characters:world-info': '#WI-SP-button > .drawer-toggle',
         'right:settings': '#user-settings-button > .drawer-toggle',
         'right:extensions': '#extensions-settings-button > .drawer-toggle',
         'characters:persona': '#persona-management-button > .drawer-toggle',
         'right:background': '#backgrounds-button > .drawer-toggle',
-    }[route];
+    }[normalizedRoute];
 
     if (!fallbackSelector) {
         return;

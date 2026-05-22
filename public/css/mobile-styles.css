@@ -794,8 +794,7 @@
     }
 
     /* .world_entry_thin_controls, */
-    #persona-management-block,
-    #character_popup .flex-container {
+    #persona-management-block {
         flex-direction: column;
     }
 
@@ -942,7 +941,6 @@
 
 
     #sheld,
-    #character_popup,
     .drawer-content {
         width: 100dvw !important;
         margin: 0 auto;
@@ -971,12 +969,10 @@
         display: block !important;
     }
 
-    #character_popup,
     #world_popup {
         overflow-y: auto;
     }
 
-    #character_popup,
     #send_form {
         border: 1px solid var(--SmartThemeBorderColor);
         backdrop-filter: blur(20px);
@@ -1138,14 +1134,6 @@
     /*     .avatar_div {
         margin-top: 5px;
     } */
-
-    #character_popup {
-        width: 100%;
-        border-radius: 0 0 20px 20px;
-        margin-top: 0px;
-        height: calc(100% - var(--topBarBlockSize));
-        transform: none;
-    }
 
     .drawer25pWidth {
         flex-basis: max(calc(100% / 4 - 10px), 190px);
@@ -1333,7 +1321,6 @@
 
     }
 
-    #character_popup,
     #world_popup,
     #left-nav-panel,
     #right-nav-panel,
@@ -1358,7 +1345,6 @@
         transform: none;
     }
 
-    #character_popup,
     #world_popup,
     .drawer-content {
         margin-top: 0;
@@ -1435,10 +1421,6 @@
         border-radius: 0 !important;
         backdrop-filter: blur(20px);
         background: var(--SmartThemeBlurTintColor);
-    }
-
-    #character_popup {
-        z-index: var(--sb-z-loader) !important;
     }
 
     /*

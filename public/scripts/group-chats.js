@@ -81,6 +81,7 @@ import {
     unshallowCharacter,
     chatElement,
     ensureMessageMediaIsArray,
+    syncCharacterMenuActiveEntity,
 } from '../script.js';
 import { printTagList, createTagMapFromList, applyTagsOnCharacterSelect, tag_map, applyTagsOnGroupSelect, printTagFilters, tag_filter_type } from './tags.js';
 import { FILTER_TYPES, FilterHelper } from './filters.js';
@@ -129,10 +130,49 @@ const GROUP_MEMBER_MODELS_KEY = 'member_models';
 const GROUP_AUTO_MODE_KEY = 'SillyBunny.groupAutoModeEnabled';
 const GROUP_DM_SETTINGS_KEY = 'SillyBunny.groupDmSettings';
 const GROUP_DM_UNREAD_KEY = 'SillyBunny.groupDmUnread';
+const ENTITY_SELECTION_PULSE_CLEANUP_MS = 900;
 const defaultGroupDmSettings = {
     autoDmEnabled: false,
     autoDmMember: '',
 };
+let entitySelectionPulseId = 0;
+
+function pulseSelectedEntityCard(card) {
+    const charactersBlock = card?.closest?.('#rm_print_characters_block');
+    if (!(charactersBlock instanceof HTMLElement) || !(card instanceof HTMLElement)) {
+        return;
+    }
+
+    charactersBlock.querySelectorAll('.sb-just-selected').forEach(element => {
+        element.classList.remove('sb-just-selected');
+        element.removeAttribute('data-sb-selection-pulse');
+    });
+
+    const pulseToken = String(++entitySelectionPulseId);
+    let cleanupTimer = 0;
+    const cleanupPulse = () => {
+        window.clearTimeout(cleanupTimer);
+        card.removeEventListener('animationend', cleanupPulseOnAnimationEnd);
+        if (card.dataset.sbSelectionPulse !== pulseToken) {
+            return;
+        }
+
+        card.classList.remove('sb-just-selected');
+        card.removeAttribute('data-sb-selection-pulse');
+    };
+    const cleanupPulseOnAnimationEnd = (event) => {
+        if (event.target !== card || event.animationName !== 'sb-entity-select-pulse') {
+            return;
+        }
+
+        cleanupPulse();
+    };
+
+    card.dataset.sbSelectionPulse = pulseToken;
+    card.classList.add('sb-just-selected');
+    card.addEventListener('animationend', cleanupPulseOnAnimationEnd, { once: true });
+    cleanupTimer = window.setTimeout(cleanupPulse, ENTITY_SELECTION_PULSE_CLEANUP_MS);
+}
 
 function getGlobalGroupAutoModeEnabled() {
     return accountStorage.getItem(GROUP_AUTO_MODE_KEY) === 'true';
@@ -1188,9 +1228,11 @@ async function validateGroup(group) {
  * Loads the chat messages for a specific group.
  * @param {string} groupId - The ID of the group to load chat messages for.
  * @param {boolean} reload - Whether to reload the group chat after loading.
+ * @param {object} options - Load options.
+ * @param {boolean} [options.switchMenu=true] Whether to switch the right menu to the group editor.
  * @returns {Promise<void>} A promise that resolves when the chat messages have been loaded.
  */
-export async function getGroupChat(groupId, reload = false) {
+export async function getGroupChat(groupId, reload = false, { switchMenu = true } = {}) {
     const group = groups.find((x) => x.id === groupId);
     if (!group) {
         console.warn('Group not found', groupId);
@@ -1245,7 +1287,7 @@ export async function getGroupChat(groupId, reload = false) {
     updateChatMetadata(metadata, true);
     applyGroupDmChatMode(metadata);
 
-    if (reload) {
+    if (reload && switchMenu) {
         select_group_chats(groupId, true);
     }
 
@@ -2767,7 +2809,8 @@ async function renameOpenGroup() {
     await editGroup(openGroupId, true, true);
 }
 
-globalThis.SillyBunnyShell = Object.assign(globalThis.SillyBunnyShell || {}, {
+const sillyBunnyShell = /** @type {any} */ (globalThis.SillyBunnyShell || {});
+globalThis.SillyBunnyShell = Object.assign(sillyBunnyShell, {
     renameOpenGroup,
 });
 
@@ -3261,9 +3304,11 @@ function updateFavButtonState(state) {
 /**
  * Opens a group chat by its ID and updates the UI accordingly.
  * @param {string} groupId ID of the group to open
+ * @param {object} options Open options
+ * @param {boolean} [options.switchMenu=true] Whether to switch the right menu to the group editor
  * @returns {Promise<boolean>} Whether the group was opened
  */
-export async function openGroupById(groupId) {
+export async function openGroupById(groupId, { switchMenu = true } = {}) {
     if (isChatSaving) {
         toastr.info(t`Please wait until the chat is saved before switching characters.`, t`Your chat is still saving...`);
         return false;
@@ -3274,26 +3319,32 @@ export async function openGroupById(groupId) {
         return false;
     }
 
-    if (!is_send_press && !is_group_generating) {
-        select_group_chats(groupId, false);
-
-        if (selected_group !== groupId) {
-            groupChatQueueOrder = new Map();
-            setCharacterId(undefined);
-            setCharacterName('');
-            resetSelectedGroup();
-            await clearChat({ clearData: true });
-            cancelTtsPlay();
-            selected_group = groupId;
-            setEditedMessageId(undefined);
-            updateChatMetadata({}, true);
-            await getGroupChat(groupId);
-            syncGroupAutoModeToggle();
-            return true;
-        }
+    if (is_send_press || is_group_generating) {
+        return false;
     }
 
-    return false;
+    if (switchMenu) {
+        select_group_chats(groupId, false);
+    }
+
+    if (selected_group === groupId) {
+        syncCharacterMenuActiveEntity();
+        return true;
+    }
+
+    groupChatQueueOrder = new Map();
+    setCharacterId(undefined);
+    setCharacterName('');
+    resetSelectedGroup();
+    await clearChat({ clearData: true });
+    cancelTtsPlay();
+    selected_group = groupId;
+    setEditedMessageId(undefined);
+    updateChatMetadata({}, true);
+    await getGroupChat(groupId, false, { switchMenu });
+    syncGroupAutoModeToggle();
+    syncCharacterMenuActiveEntity();
+    return true;
 }
 
 /**
@@ -3789,10 +3840,16 @@ jQuery(() => {
         });
     }
 
-    $(document).on('click', '.group_select', function () {
-        const shouldCloseCharacterMenu = $(this).closest('#rm_print_characters_block').length > 0;
+    $(document).on('click', '.group_select', async function () {
+        const isCharactersBlockClick = $(this).closest('#rm_print_characters_block').length > 0;
+        const shouldCloseCharacterMenu = isCharactersBlockClick && (globalThis.SillyBunnyShell?.isMobileViewport?.() ?? true);
         const groupId = $(this).attr('data-chid') || $(this).attr('data-grid');
-        openGroupById(groupId);
+        // SillyBunny: drawer selection flashes Editor instead of opening it.
+        const didOpenGroup = await openGroupById(groupId, { switchMenu: false });
+        if (didOpenGroup && isCharactersBlockClick) {
+            pulseSelectedEntityCard(this);
+            globalThis.SillyBunnyShell?.highlightCharacterEditorTab?.();
+        }
         if (shouldCloseCharacterMenu) {
             globalThis.SillyBunnyShell?.closeCharacters?.();
         }
