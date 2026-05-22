@@ -24,6 +24,7 @@ const SB_STORAGE_KEYS = Object.freeze({
     mobileButtonScale: 'sb-mobile-button-scale',
     mobileNavLayout: 'sb-mobile-nav-layout',
     mobileNavIconOnly: 'sb-mobile-nav-icon-only',
+    mobileNavShowWorkspaceApi: 'sb-mobile-nav-show-workspace-api',
     mobileNavShowQuickActions: 'sb-mobile-nav-show-quick-actions',
     mobileNavReplaceQuickActions: 'sb-mobile-nav-replace-quick-actions',
     mobileNavReplacementTarget: 'sb-mobile-nav-replacement-target',
@@ -586,6 +587,10 @@ const SB_MOBILE_DEFAULT_QUICK_ACTIONS = Object.freeze([
     { type: 'tab', shellKey: 'left', tabId: 'advanced-formatting', icon: 'fa-text-height', label: 'Formatting' },
     { type: 'tab', shellKey: 'left', tabId: 'agents', icon: 'fa-robot', label: 'Agents' },
 ]);
+const SB_MOBILE_RAIL_WORKSPACE_API_ACTIONS = Object.freeze([
+    { type: 'shell', shellKey: 'left', icon: 'fa-layer-group', label: 'Workspace' },
+    { type: 'tab', shellKey: 'left', tabId: 'api', icon: 'fa-plug', label: 'API' },
+]);
 const SB_MOBILE_NAV_PAGE_TARGET_DEFAULT = 'left:presets';
 const SB_MOBILE_NAV_PAGE_TARGETS = Object.freeze([
     { value: 'left:presets', shellKey: 'left', tabId: 'presets', label: 'Presets', icon: 'fa-sliders' },
@@ -669,6 +674,7 @@ const sbState = {
         quickActionDivider: null,
         layout: normalizeMobileNavLayout(safeGetItem(SB_STORAGE_KEYS.mobileNavLayout)),
         iconOnly: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavIconOnly), true),
+        showWorkspaceApi: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowWorkspaceApi), false),
         showQuickActions: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowQuickActions), false),
         replaceQuickActions: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavReplaceQuickActions), false),
         replacementTarget: normalizeMobileNavReplacementTarget(safeGetItem(SB_STORAGE_KEYS.mobileNavReplacementTarget)),
@@ -953,19 +959,27 @@ function normalizeMobileQuickAction(value) {
     const legacyTabId = normalizeText(value.tabId || value.tab);
     const shellKey = legacyShellKey === 'left' && legacyTabId === 'world-info' ? 'characters' : legacyShellKey;
     const tabId = legacyShellKey === 'left' && legacyTabId === 'world-info' ? 'world-info' : legacyTabId;
+    const requestedType = normalizeText(value.type);
+    const isShellAction = requestedType === 'shell';
 
-    if (!tabId || (shellKey !== 'characters' && !getShellConfig(shellKey))) {
+    if ((isShellAction ? !shellKey : !tabId) || (shellKey !== 'characters' && !getShellConfig(shellKey))) {
         return null;
     }
 
-    const tabConfig = getMobileQuickActionTabConfig(shellKey, tabId);
+    const tabConfig = isShellAction ? null : getMobileQuickActionTabConfig(shellKey, tabId);
+    if (!isShellAction && !tabConfig) {
+        return null;
+    }
+
     const dedupeKey = clampText(value.dedupeKey, 160);
-    const type = dedupeKey ? 'custom' : 'tab';
+    const type = dedupeKey ? 'custom' : isShellAction ? 'shell' : 'tab';
     const displayText = clampText(value.displayText, 80);
     const sectionLabel = clampText(value.sectionLabel, 80);
     const fallbackLabel = type === 'custom'
         ? displayText || sectionLabel
-        : tabConfig?.label || tabId;
+        : type === 'shell'
+            ? getShellConfig(shellKey)?.title || shellKey
+            : tabConfig?.label || tabId;
     const label = clampText(value.label || fallbackLabel, SB_MOBILE_QUICK_ACTION_LABEL_MAX_LENGTH);
 
     if (!label) {
@@ -976,7 +990,7 @@ function normalizeMobileQuickAction(value) {
         type,
         shellKey,
         tabId,
-        icon: clampText(value.icon || (type === 'custom' ? 'fa-bolt' : tabConfig?.icon || 'fa-bars'), 60),
+        icon: clampText(value.icon || (type === 'custom' ? 'fa-bolt' : type === 'shell' ? getShellConfig(shellKey)?.proxyIcon || 'fa-bars' : tabConfig?.icon || 'fa-bars'), 60),
         label,
     };
 
@@ -1221,6 +1235,7 @@ function restorePersistedTopbarState() {
     sbState.compactMode = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), sbState.compactMode);
     sbState.mobileNav.layout = normalizeMobileNavLayout(safeGetItem(SB_STORAGE_KEYS.mobileNavLayout));
     sbState.mobileNav.iconOnly = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavIconOnly), sbState.mobileNav.iconOnly);
+    sbState.mobileNav.showWorkspaceApi = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowWorkspaceApi), sbState.mobileNav.showWorkspaceApi);
     sbState.mobileNav.showQuickActions = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowQuickActions), sbState.mobileNav.showQuickActions);
     sbState.mobileNav.replaceQuickActions = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavReplaceQuickActions), sbState.mobileNav.replaceQuickActions);
     sbState.mobileNav.replacementTarget = normalizeMobileNavReplacementTarget(safeGetItem(SB_STORAGE_KEYS.mobileNavReplacementTarget));
@@ -1331,6 +1346,7 @@ function applyMobileNavPreferences() {
     const quickActionsShown = sbState.mobileNav.showQuickActions;
     document.documentElement.dataset.sbMobileNavLayout = sbState.mobileNav.layout;
     document.documentElement.dataset.sbMobileNavMode = sbState.mobileNav.iconOnly ? 'icon-only' : 'labeled';
+    document.documentElement.dataset.sbMobileNavWorkspaceApi = sbState.mobileNav.showWorkspaceApi ? 'shown' : 'hidden';
     document.documentElement.dataset.sbMobileNavQuickActions = quickActionsShown ? 'shown' : 'hidden';
 }
 
@@ -1343,6 +1359,7 @@ function setMobileNavLayout(layout, { persist = true } = {}) {
         safeSetItem(SB_STORAGE_KEYS.mobileNavLayout, nextLayout);
     }
 
+    syncMobileShellRailActions();
     updateThemePickerUi();
 }
 
@@ -1355,6 +1372,19 @@ function setMobileNavIconOnly(enabled, { persist = true } = {}) {
         safeSetItem(SB_STORAGE_KEYS.mobileNavIconOnly, String(nextEnabled));
     }
 
+    updateThemePickerUi();
+}
+
+function setMobileNavShowWorkspaceApi(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.mobileNav.showWorkspaceApi = nextEnabled;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavShowWorkspaceApi, String(nextEnabled));
+    }
+
+    syncMobileShellRailActions();
     updateThemePickerUi();
 }
 
@@ -10448,6 +10478,14 @@ function createMobileNavLayoutSettingsGroup() {
         icon: 'fa-icons',
         onChange: input => setMobileNavIconOnly(input.checked),
     });
+    const showWorkspaceApiChoice = createMobileNavChoice({
+        id: 'sb-mobile-nav-show-workspace-api-input',
+        type: 'checkbox',
+        value: 'show-workspace-api',
+        label: 'Show Workspace and API in side rail',
+        icon: 'fa-layer-group',
+        onChange: input => setMobileNavShowWorkspaceApi(input.checked),
+    });
     const showQuickActionsChoice = createMobileNavChoice({
         id: 'sb-mobile-nav-show-quick-actions-input',
         type: 'checkbox',
@@ -10517,6 +10555,7 @@ function createMobileNavLayoutSettingsGroup() {
         layoutGrid,
         iconOnlyChoice,
         createMobileNavDivider(),
+        showWorkspaceApiChoice,
         showQuickActionsChoice,
         replaceQuickActionsChoice,
         replacementField,
@@ -10789,6 +10828,7 @@ function updateThemePickerUi() {
     const customTextInput = document.getElementById('sb-topbar-custom-text-input');
     const compactModeInput = document.getElementById('sb-compact-mode-input');
     const mobileNavIconOnlyInput = document.getElementById('sb-mobile-nav-icon-only-input');
+    const mobileNavShowWorkspaceApiInput = document.getElementById('sb-mobile-nav-show-workspace-api-input');
     const mobileNavShowQuickActionsInput = document.getElementById('sb-mobile-nav-show-quick-actions-input');
     const mobileNavReplaceQuickActionsInput = document.getElementById('sb-mobile-nav-replace-quick-actions-input');
     const mobileNavReplacementSelect = document.getElementById('sb-mobile-nav-replacement-select');
@@ -10880,6 +10920,14 @@ function updateThemePickerUi() {
         mobileNavIconOnlyInput.checked = sbState.mobileNav.iconOnly;
         const choice = mobileNavIconOnlyInput.closest('.sb-mobile-nav-choice');
         choice?.classList.toggle('is-selected', sbState.mobileNav.iconOnly);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (mobileNavShowWorkspaceApiInput instanceof HTMLInputElement) {
+        mobileNavShowWorkspaceApiInput.checked = sbState.mobileNav.showWorkspaceApi;
+        mobileNavShowWorkspaceApiInput.disabled = false;
+        const choice = mobileNavShowWorkspaceApiInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.mobileNav.showWorkspaceApi);
         choice?.classList.toggle('is-disabled', false);
     }
 
@@ -11222,6 +11270,12 @@ function activateMobileNavAction(action) {
     }
 
     closeMobileNav();
+
+    if (normalizedAction.type === 'shell') {
+        closeAllDropdowns({ except: normalizedAction.shellKey });
+        openShell(normalizedAction.shellKey);
+        return;
+    }
 
     if (normalizedAction.type === 'custom') {
         activateMobileQuickAction(normalizedAction);
@@ -11975,17 +12029,22 @@ function createMobileShellRailButton(item, actionHandler, className = '') {
         return null;
     }
 
+    const buttonAttrs = {
+        type: 'button',
+        title: action.label,
+        'aria-label': action.label,
+        'data-sb-rail-action': getMobileQuickActionKey(action),
+        'data-sb-rail-type': action.type,
+        'data-sb-rail-shell-key': action.shellKey,
+    };
+
+    if (action.tabId) {
+        buttonAttrs['data-sb-rail-tab-id'] = action.tabId;
+    }
+
     const button = createElement('button', {
         className: ['sb-shell-tab', 'sb-shell-rail-action', className].filter(Boolean).join(' '),
-        attrs: {
-            type: 'button',
-            title: action.label,
-            'aria-label': action.label,
-            'data-sb-rail-action': getMobileQuickActionKey(action),
-            'data-sb-rail-type': action.type,
-            'data-sb-rail-shell-key': action.shellKey,
-            'data-sb-rail-tab-id': action.tabId,
-        },
+        attrs: buttonAttrs,
     });
     const icon = createElement('i', {
         className: `fa-solid ${action.icon || 'fa-bolt'}`,
@@ -12006,8 +12065,9 @@ function syncMobileShellRailActions(shellKey = null) {
     const shellKeys = shellKey ? [shellKey] : ['left', 'right'];
     const customizeActions = SB_MOBILE_NAV_PAGE_TARGETS.filter(action => action.shellKey === 'right');
     const workspaceActions = SB_MOBILE_NAV_PAGE_TARGETS.filter(action => action.shellKey === 'left');
-    const builtInRailActionKeys = new Set([...workspaceActions, ...customizeActions].map(getMobileQuickActionKey));
+    const builtInRailActionKeys = new Set([...workspaceActions, ...customizeActions, ...SB_MOBILE_RAIL_WORKSPACE_API_ACTIONS].map(getMobileQuickActionKey));
     const railQuickActions = sbState.mobileQuickActions.filter(action => !builtInRailActionKeys.has(getMobileQuickActionKey(action)));
+    const hasVerticalRail = sbState.mobileNav.layout === 'vertical';
 
     for (const currentShellKey of shellKeys) {
         const shellState = getShellState(currentShellKey);
@@ -12023,6 +12083,23 @@ function syncMobileShellRailActions(shellKey = null) {
                 'aria-hidden': 'false',
             },
         });
+        const createWorkspaceApiGroup = () => {
+            const workspaceApiGroup = createElement('div', {
+                className: 'sb-shell-rail-group sb-shell-rail-group-workspace-api',
+                attrs: {
+                    'aria-label': 'Workspace and API',
+                },
+            });
+
+            for (const action of SB_MOBILE_RAIL_WORKSPACE_API_ACTIONS) {
+                const button = createMobileShellRailButton(action, activateMobileNavAction, 'sb-shell-rail-workspace-api-action');
+                if (button) {
+                    workspaceApiGroup.appendChild(button);
+                }
+            }
+
+            return workspaceApiGroup;
+        };
         const createQuickActionsGroup = () => {
             const quickActionsGroup = createElement('div', {
                 className: 'sb-shell-rail-group sb-shell-rail-group-quick-actions',
@@ -12047,6 +12124,20 @@ function syncMobileShellRailActions(shellKey = null) {
 
             return quickActionsGroup;
         };
+
+        if (!hasVerticalRail) {
+            shellState.updateNavScrollIndicators?.();
+            continue;
+        }
+
+        if (currentShellKey === 'right' && sbState.mobileNav.showWorkspaceApi) {
+            const beforeBlock = createRailBlock('before');
+            beforeBlock.append(
+                createWorkspaceApiGroup(),
+                createMobileShellRailDivider('Customize'),
+            );
+            shellState.nav.prepend(beforeBlock);
+        }
 
         if (currentShellKey === 'right' && sbState.mobileNav.showQuickActions && railQuickActions.length) {
             const afterBlock = createRailBlock('after');
