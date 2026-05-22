@@ -1118,6 +1118,7 @@ function setMobileQuickActions(actions, { persist = true } = {}) {
     renderMobileQuickActionSettingsList();
     refreshMobileQuickActionSearchResults();
     refreshMobileNavQuickActions();
+    syncMobileShellRailActions();
 }
 
 function addMobileQuickActionFromMatch(match) {
@@ -1305,7 +1306,7 @@ function setMobileButtonScale(value, { persist = true } = {}) {
 }
 
 function applyMobileNavPreferences() {
-    const quickActionsShown = sbState.mobileNav.showQuickActions && !sbState.mobileNav.replaceQuickActions;
+    const quickActionsShown = sbState.mobileNav.showQuickActions;
     document.documentElement.dataset.sbMobileNavLayout = sbState.mobileNav.layout;
     document.documentElement.dataset.sbMobileNavMode = sbState.mobileNav.iconOnly ? 'icon-only' : 'labeled';
     document.documentElement.dataset.sbMobileNavQuickActions = quickActionsShown ? 'shown' : 'hidden';
@@ -1345,6 +1346,7 @@ function setMobileNavShowQuickActions(enabled, { persist = true } = {}) {
     }
 
     refreshMobileNavQuickActions();
+    syncMobileShellRailActions();
     updateThemePickerUi();
 }
 
@@ -1358,6 +1360,7 @@ function setMobileNavReplaceQuickActions(enabled, { persist = true } = {}) {
     }
 
     refreshMobileNavQuickActions();
+    syncMobileShellRailActions();
     updateMobileNavButtonLabel();
     updateThemePickerUi();
 }
@@ -6670,6 +6673,20 @@ function syncCharacterShellTabs(activeTab = null) {
         tab.setAttribute('tabindex', isActive ? '0' : '-1');
     });
 
+    document.querySelectorAll('[data-sb-rail-shell-key="characters"]').forEach(button => {
+        if (!(button instanceof HTMLElement)) {
+            return;
+        }
+
+        const isActive = button.dataset.sbRailTabId === normalizedTab;
+        button.classList.toggle('is-active', isActive);
+        if (isActive) {
+            button.setAttribute('aria-current', 'page');
+        } else {
+            button.removeAttribute('aria-current');
+        }
+    });
+
     if (panel instanceof HTMLElement && panel.classList.contains('openDrawer')) {
         const tabConfig = getCharacterPanelTabConfig(normalizedTab);
         document.dispatchEvent(new CustomEvent('sb:shell-tab-activated', {
@@ -10845,12 +10862,11 @@ function updateThemePickerUi() {
     }
 
     if (mobileNavShowQuickActionsInput instanceof HTMLInputElement) {
-        const isDisabled = sbState.mobileNav.replaceQuickActions;
-        mobileNavShowQuickActionsInput.checked = sbState.mobileNav.showQuickActions && !isDisabled;
-        mobileNavShowQuickActionsInput.disabled = isDisabled;
+        mobileNavShowQuickActionsInput.checked = sbState.mobileNav.showQuickActions;
+        mobileNavShowQuickActionsInput.disabled = false;
         const choice = mobileNavShowQuickActionsInput.closest('.sb-mobile-nav-choice');
-        choice?.classList.toggle('is-selected', sbState.mobileNav.showQuickActions && !isDisabled);
-        choice?.classList.toggle('is-disabled', isDisabled);
+        choice?.classList.toggle('is-selected', sbState.mobileNav.showQuickActions);
+        choice?.classList.toggle('is-disabled', false);
     }
 
     if (mobileNavReplaceQuickActionsInput instanceof HTMLInputElement) {
@@ -11177,6 +11193,28 @@ function activateMobileQuickAction(action) {
     revealSearchMatch(action.shellKey, match);
 }
 
+function activateMobileNavAction(action) {
+    const normalizedAction = normalizeMobileQuickAction(action);
+    if (!normalizedAction) {
+        return;
+    }
+
+    closeMobileNav();
+
+    if (normalizedAction.type === 'custom') {
+        activateMobileQuickAction(normalizedAction);
+        return;
+    }
+
+    if (normalizedAction.shellKey === 'characters') {
+        openCharacterPanelTab(normalizedAction.tabId);
+        return;
+    }
+
+    closeAllDropdowns({ except: normalizedAction.shellKey });
+    openShell(normalizedAction.shellKey, normalizedAction.tabId);
+}
+
 function renderUniversalSearchResults(query) {
     const searchState = getUniversalSearchState();
     const results = searchState.results;
@@ -11398,6 +11436,20 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
         // Invalidate search index when switching to a tab so stale DOM isn't searched
         if (isActive) tabState.searchIndex = null;
     }
+
+    document.querySelectorAll(`[data-sb-rail-shell-key="${shellKey}"]`).forEach(button => {
+        if (!(button instanceof HTMLElement)) {
+            return;
+        }
+
+        const isActive = button.dataset.sbRailTabId === tabId;
+        button.classList.toggle('is-active', isActive);
+        if (isActive) {
+            button.setAttribute('aria-current', 'page');
+        } else {
+            button.removeAttribute('aria-current');
+        }
+    });
 
     const activeTab = shellState.tabs.get(tabId);
     shellState.headerTitle.textContent = activeTab.label;
@@ -11863,6 +11915,7 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
 
     shellState.nav.appendChild(button);
     shellState.updateNavScrollIndicators?.();
+    syncMobileShellRailActions(shellKey);
     shellState.tabs.set(tabConfig.id, {
         ...tabConfig,
         button,
@@ -11872,6 +11925,162 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
         onActivate: panelBundle.onActivate ?? tabConfig.onActivate ?? null,
         onDeactivate: panelBundle.onDeactivate ?? tabConfig.onDeactivate ?? null,
     });
+}
+
+function createMobileShellRailDivider(label) {
+    return createElement('div', {
+        className: 'sb-shell-rail-divider',
+        attrs: {
+            role: 'separator',
+            'aria-label': label,
+        },
+    });
+}
+
+function createMobileShellRailButton(item, actionHandler, className = '') {
+    const action = normalizeMobileQuickAction({
+        type: item.type || 'tab',
+        shellKey: item.shellKey,
+        tabId: item.tabId,
+        icon: item.icon,
+        label: item.label,
+        sectionLabel: item.sectionLabel,
+        displayText: item.displayText,
+        dedupeKey: item.dedupeKey,
+    });
+
+    if (!action) {
+        return null;
+    }
+
+    const button = createElement('button', {
+        className: ['sb-shell-tab', 'sb-shell-rail-action', className].filter(Boolean).join(' '),
+        attrs: {
+            type: 'button',
+            title: action.label,
+            'aria-label': action.label,
+            'data-sb-rail-action': getMobileQuickActionKey(action),
+            'data-sb-rail-type': action.type,
+            'data-sb-rail-shell-key': action.shellKey,
+            'data-sb-rail-tab-id': action.tabId,
+        },
+    });
+    const icon = createElement('i', {
+        className: `fa-solid ${action.icon || 'fa-bolt'}`,
+        attrs: {
+            'aria-hidden': 'true',
+        },
+    });
+    const copy = createElement('span', { className: 'sb-shell-tab-copy' });
+    const label = createElement('strong', { text: action.label });
+
+    copy.appendChild(label);
+    button.append(icon, copy);
+    button.addEventListener('click', () => actionHandler(action));
+    return button;
+}
+
+function syncMobileShellRailActions(shellKey = null) {
+    const shellKeys = shellKey ? [shellKey] : ['left', 'right'];
+    const workspaceActions = SB_MOBILE_NAV_PAGE_TARGETS.filter(action => action.shellKey === 'left' || action.shellKey === 'characters');
+    const customizeActions = SB_MOBILE_NAV_PAGE_TARGETS.filter(action => action.shellKey === 'right');
+    const worldInfoAction = workspaceActions.find(action => action.shellKey === 'characters' && action.tabId === 'world-info');
+
+    for (const currentShellKey of shellKeys) {
+        const shellState = getShellState(currentShellKey);
+        if (!(shellState?.nav instanceof HTMLElement)) {
+            continue;
+        }
+
+        shellState.nav.querySelectorAll('.sb-shell-rail-shortcuts').forEach(element => element.remove());
+
+        const createRailBlock = (position) => createElement('div', {
+            className: `sb-shell-rail-shortcuts sb-shell-rail-shortcuts-${position}`,
+            attrs: {
+                'aria-hidden': 'false',
+            },
+        });
+        const createRailGroup = (className, label, actions) => {
+            const group = createElement('div', {
+                className: `sb-shell-rail-group ${className}`,
+                attrs: {
+                    'aria-label': label,
+                },
+            });
+            for (const action of actions) {
+                const button = createMobileShellRailButton(action, activateMobileNavAction);
+                if (button) {
+                    group.appendChild(button);
+                }
+            }
+            return group;
+        };
+        const createQuickActionsGroup = () => {
+            const quickActionsGroup = createElement('div', {
+                className: 'sb-shell-rail-group sb-shell-rail-group-quick-actions',
+                attrs: {
+                    'aria-label': 'Quick Actions',
+                },
+            });
+
+            if (sbState.mobileQuickActions.length) {
+                for (const action of sbState.mobileQuickActions) {
+                    const button = createMobileShellRailButton(action, activateMobileNavAction, 'sb-shell-rail-quick-action');
+                    if (button) {
+                        quickActionsGroup.appendChild(button);
+                    }
+                }
+            } else {
+                quickActionsGroup.appendChild(createElement('div', {
+                    className: 'sb-shell-rail-empty',
+                    text: 'No Quick Actions',
+                }));
+            }
+
+            return quickActionsGroup;
+        };
+
+        if (currentShellKey === 'right') {
+            const beforeBlock = createRailBlock('before');
+            beforeBlock.append(
+                createRailGroup('sb-shell-rail-group-workspace', 'Workspace shortcuts', workspaceActions),
+                createMobileShellRailDivider('Customize shortcuts'),
+            );
+            shellState.nav.prepend(beforeBlock);
+
+            if (sbState.mobileNav.showQuickActions) {
+                const afterBlock = createRailBlock('after');
+                afterBlock.append(
+                    createMobileShellRailDivider('Quick Actions'),
+                    createQuickActionsGroup(),
+                );
+                shellState.nav.appendChild(afterBlock);
+            }
+        } else {
+            const afterBlock = createRailBlock('after');
+            const workspaceExtras = worldInfoAction ? [worldInfoAction] : [];
+
+            if (workspaceExtras.length) {
+                afterBlock.appendChild(createRailGroup('sb-shell-rail-group-workspace-extra', 'Workspace shortcuts', workspaceExtras));
+            }
+
+            afterBlock.append(
+                createMobileShellRailDivider('Customize shortcuts'),
+                createRailGroup('sb-shell-rail-group-customize', 'Customize shortcuts', customizeActions),
+            );
+
+            if (sbState.mobileNav.showQuickActions) {
+                afterBlock.append(
+                    createMobileShellRailDivider('Quick Actions'),
+                    createQuickActionsGroup(),
+                );
+            }
+
+            shellState.nav.appendChild(afterBlock);
+        }
+
+        shellState.updateNavScrollIndicators?.();
+    }
 }
 
 function routeDrawerTarget(targetId) {
@@ -12039,63 +12248,6 @@ function updateMobileNavButtonLabel() {
     button.setAttribute('aria-label', title);
 }
 
-function createMobileNavPageButton(item) {
-    const action = normalizeMobileQuickAction({
-        type: 'tab',
-        shellKey: item.shellKey,
-        tabId: item.tabId,
-        icon: item.icon,
-        label: item.label,
-    });
-    if (!action) {
-        return null;
-    }
-
-    const button = createElement('button', {
-        className: 'sb-nav-item sb-mobile-page-item',
-        attrs: {
-            type: 'button',
-        },
-    });
-    const icon = createElement('i', {
-        className: `fa-solid ${action.icon || 'fa-folder-open'}`,
-        attrs: {
-            'aria-hidden': 'true',
-        },
-    });
-    const label = createElement('span', { text: action.label });
-
-    button.append(icon, label);
-    button.addEventListener('click', () => activateMobileNavPageTarget(`${action.shellKey}:${action.tabId}`));
-
-    return button;
-}
-
-function createMobileNavPageSection(title, actions) {
-    const section = createElement('section', { className: 'sb-mobile-section sb-mobile-page-section' });
-    const sectionTitle = createElement('span', { className: 'sb-mobile-section-title', text: title });
-    const list = createElement('div', { className: 'sb-mobile-section-list sb-mobile-page-list' });
-
-    for (const action of actions) {
-        const button = createMobileNavPageButton(action);
-        if (button) {
-            list.appendChild(button);
-        }
-    }
-
-    section.append(sectionTitle, list);
-    return section;
-}
-
-function createMobileNavSectionDivider() {
-    return createElement('div', {
-        className: 'sb-mobile-section-divider',
-        attrs: {
-            role: 'separator',
-        },
-    });
-}
-
 function createMobileQuickActionButton(item) {
     const action = normalizeMobileQuickAction(item);
     if (!action) {
@@ -12142,7 +12294,7 @@ function refreshMobileNavQuickActions() {
     sbState.mobileNav.quickActionContainer = list;
     list.replaceChildren();
 
-    const shouldShowQuickActions = sbState.mobileNav.showQuickActions && !sbState.mobileNav.replaceQuickActions;
+    const shouldShowQuickActions = sbState.mobileNav.showQuickActions;
     if (sbState.mobileNav.quickActionSection instanceof HTMLElement) {
         sbState.mobileNav.quickActionSection.hidden = !shouldShowQuickActions;
     }
@@ -12194,22 +12346,13 @@ function buildMobileNav() {
     const sectionBlock = createElement('section', { className: 'sb-mobile-section' });
     const quickActionTitle = createElement('span', { className: 'sb-mobile-section-title', text: 'Quick Actions' });
     const list = createElement('div', { className: 'sb-mobile-section-list sb-mobile-quick-action-list' });
-    const workspaceActions = SB_MOBILE_NAV_PAGE_TARGETS.filter(action => action.shellKey === 'left' || action.shellKey === 'characters');
-    const customizeActions = SB_MOBILE_NAV_PAGE_TARGETS.filter(action => action.shellKey === 'right');
-    const quickActionDivider = createMobileNavSectionDivider();
 
     sectionBlock.classList.add('sb-mobile-quick-action-section');
     sectionBlock.append(quickActionTitle, list);
-    content.append(
-        createMobileNavPageSection('Workspace', workspaceActions),
-        createMobileNavSectionDivider(),
-        createMobileNavPageSection('Customize', customizeActions),
-        quickActionDivider,
-        sectionBlock,
-    );
+    content.append(sectionBlock);
     sbState.mobileNav.quickActionContainer = list;
     sbState.mobileNav.quickActionSection = sectionBlock;
-    sbState.mobileNav.quickActionDivider = quickActionDivider;
+    sbState.mobileNav.quickActionDivider = null;
     refreshMobileNavQuickActions();
 
     const header = createElement('div', { className: 'sb-mobile-panel-header' });

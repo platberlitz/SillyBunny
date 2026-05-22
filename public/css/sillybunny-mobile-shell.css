@@ -275,6 +275,21 @@
         scrollbar-width: none !important;
     }
 
+    :root[data-sb-mobile-nav-layout='vertical'] #right-nav-panel.openDrawer .sb-character-shell-nav .sb-shell-rail-shortcuts {
+        display: contents !important;
+    }
+
+    :root[data-sb-mobile-nav-layout='vertical'] #right-nav-panel.openDrawer .sb-character-shell-nav .sb-shell-rail-divider {
+        display: block !important;
+        width: calc(100% - 8px) !important;
+        height: 1px !important;
+        min-height: 1px !important;
+        align-self: center !important;
+        margin: 4px 0 !important;
+        border-radius: 999px !important;
+        background: color-mix(in srgb, var(--sb-shell-border) 82%, transparent) !important;
+    }
+
     :root[data-sb-mobile-nav-layout='vertical'][data-sb-mobile-nav-mode='icon-only'] #right-nav-panel.openDrawer .sb-character-shell-nav {
         align-items: center !important;
     }
@@ -304,6 +319,24 @@
         white-space: normal !important;
     }
 
+    :root[data-sb-mobile-nav-layout='vertical'] #right-nav-panel.openDrawer .sb-character-shell-nav .sb-shell-tab:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-selected='true'], [aria-current]) {
+        background: transparent !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+    }
+
+    :root[data-sb-mobile-nav-layout='vertical'] #right-nav-panel.openDrawer .sb-character-shell-nav .sb-shell-rail-action {
+        width: 44px !important;
+        min-width: 44px !important;
+        max-width: 44px !important;
+        min-height: 44px !important;
+        align-self: center !important;
+        padding: 0 !important;
+        border-color: transparent !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
     :root[data-sb-mobile-nav-layout='vertical'] #right-nav-panel.openDrawer .sb-character-shell-nav .sb-shell-tab i {
         width: 100% !important;
         margin: 0 !important;
@@ -326,6 +359,11 @@
         max-width: 44px !important;
         min-height: 44px !important;
         padding: 0 !important;
+    }
+
+    :root[data-sb-mobile-nav-layout='vertical'] #right-nav-panel.openDrawer .sb-character-shell-nav .sb-shell-rail-action .sb-shell-tab-copy,
+    :root[data-sb-mobile-nav-layout='vertical'] #right-nav-panel.openDrawer .sb-character-shell-nav .sb-shell-rail-empty {
+        display: none !important;
     }
 
     #right-nav-panel.openDrawer > .sb-character-shell-header {
@@ -584,7 +622,8 @@
     }
 
     #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_group_chats::after {
-        content: 'Group' !important;
+        content: none !important;
+        display: none !important;
     }
 
     #left-nav-panel.openDrawer .sb-shell-frame,

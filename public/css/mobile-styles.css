@@ -121,11 +121,23 @@
     #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap {
         gap: 6px;
         flex-wrap: nowrap;
+        align-items: center;
+    }
+
+    #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap::before {
+        content: none !important;
+        display: none !important;
+    }
+
+    #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap > #instruct_presets {
+        min-width: 0;
+        flex: 1 1 auto;
     }
 
     #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap > .flex-container.marginLeft5 {
         gap: 4px;
         flex-wrap: nowrap;
+        flex: 0 0 auto;
     }
 
     #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap .menu_button_icon {

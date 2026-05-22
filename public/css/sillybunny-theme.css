@@ -2480,6 +2480,89 @@ input[type='range']::-moz-range-thumb {
     display: none;
 }
 
+.sb-sampling-control-card[data-sb-sampling-control="#cfg_block_ooba"],
+.sb-sampling-control-card[data-sb-sampling-control="#grammar_block_ooba"] {
+    grid-column: span 2;
+}
+
+.sb-sampling-control-card > #cfg_block_ooba {
+    gap: 12px;
+    min-width: 0;
+}
+
+.sb-sampling-control-card > #cfg_block_ooba > h4,
+.sb-sampling-control-card > #grammar_block_ooba > h4 {
+    margin: 0;
+    min-width: 0;
+    line-height: 1.2;
+}
+
+.sb-sampling-control-card > #cfg_block_ooba > .alignitemscenter {
+    display: grid;
+    grid-template-columns: minmax(88px, 0.26fr) minmax(0, 1fr) minmax(56px, auto);
+    gap: 8px 10px;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+}
+
+.sb-sampling-control-card > #cfg_block_ooba > .alignitemscenter > small {
+    margin: 0;
+    text-align: left;
+    font-weight: 700;
+}
+
+.sb-sampling-control-card > #cfg_block_ooba > .alignitemscenter > input[type='range'].neo-range-slider {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    margin: 0;
+}
+
+.sb-sampling-control-card > #cfg_block_ooba > .alignitemscenter > .neo-range-input {
+    width: 56px;
+    min-width: 56px;
+}
+
+.sb-sampling-control-card > #cfg_block_ooba > [data-tg-samplers='negative_prompt'] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+}
+
+.sb-sampling-control-card > #cfg_block_ooba > [data-tg-samplers='negative_prompt'] > .flex-container {
+    justify-content: flex-start;
+    min-width: 0;
+    margin: 0;
+}
+
+.sb-sampling-control-card > #grammar_block_ooba {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    min-width: 0;
+}
+
+.sb-sampling-control-card > #grammar_block_ooba > h4 > .flex-container {
+    min-width: 0;
+}
+
+.sb-sampling-control-card > #grammar_block_ooba > h4 span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+#negative_prompt_textgenerationwebui,
+#grammar_string_textgenerationwebui {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    resize: vertical;
+}
+
 .sb-sampling-priority-after .prompt_order {
     display: flex;
     flex-direction: column;
@@ -2628,6 +2711,39 @@ input[type='range']::-moz-range-thumb {
         width: 52px;
         min-width: 52px;
     }
+
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > #cfg_block_ooba,
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > #grammar_block_ooba {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        align-items: stretch;
+    }
+
+    .sb-sampling-control-card[data-sb-sampling-control="#cfg_block_ooba"],
+    .sb-sampling-control-card[data-sb-sampling-control="#grammar_block_ooba"] {
+        grid-column: auto;
+    }
+
+    .sb-sampling-control-card > #cfg_block_ooba > .alignitemscenter {
+        grid-template-columns: minmax(76px, 0.28fr) minmax(0, 1fr) minmax(48px, auto);
+        gap: 8px;
+    }
+
+    .sb-sampling-control-card > #cfg_block_ooba > h4,
+    .sb-sampling-control-card > #grammar_block_ooba > h4 {
+        font-size: calc(var(--mainFontSize) * 0.88);
+    }
+
+    .sb-sampling-control-card > #grammar_block_ooba > h4 .flex-container {
+        min-width: 0;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    #negative_prompt_textgenerationwebui,
+    #grammar_string_textgenerationwebui {
+        min-height: 88px;
+    }
 }
 
 @media screen and (max-width: 520px) {
@@ -2652,6 +2768,20 @@ input[type='range']::-moz-range-thumb {
     }
 
     .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) .neo-range-input {
+        width: 46px;
+        min-width: 46px;
+        padding-inline: 4px;
+    }
+
+    .sb-sampling-control-card > #cfg_block_ooba > .alignitemscenter {
+        grid-template-columns: minmax(0, 1fr) 46px;
+    }
+
+    .sb-sampling-control-card > #cfg_block_ooba > .alignitemscenter > small {
+        grid-column: 1 / -1;
+    }
+
+    .sb-sampling-control-card > #cfg_block_ooba > .alignitemscenter > .neo-range-input {
         width: 46px;
         min-width: 46px;
         padding-inline: 4px;
