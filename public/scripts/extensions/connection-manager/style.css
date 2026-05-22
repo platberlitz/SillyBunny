@@ -48,9 +48,54 @@
     margin-left: 5px;
 }
 
-#connection_profiles ~ .menu_button {
+.connection-profile-picker {
+    align-items: stretch;
+    gap: 8px;
+}
+
+.connection-profile-actions {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 30px;
+    justify-content: start;
+    gap: 5px;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.connection-profile-actions::-webkit-scrollbar {
+    display: none;
+}
+
+.connection-profile-actions > .menu_button {
+    width: 30px;
+    min-width: 0;
+    max-width: 30px;
+    min-height: 30px;
+    height: 30px;
+    max-height: 30px;
+    padding: 0;
+    border-radius: 9px;
+    font-size: calc(var(--mainFontSize) * 0.82);
     user-select: none;
     -webkit-user-select: none;
+}
+
+@media screen and (max-width: 450px) {
+    .connection-profile-actions > .menu_button {
+        width: 28px;
+        min-width: 28px;
+        max-width: 28px;
+        min-height: 28px;
+        height: 28px;
+        max-height: 28px;
+        border-radius: 8px;
+        font-size: calc(var(--mainFontSize) * 0.76);
+    }
 }
 
 #toggle_profile_favorite.is_fav {
