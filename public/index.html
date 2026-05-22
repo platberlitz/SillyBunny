@@ -47,7 +47,7 @@
     <link rel="stylesheet" type="text/css" href="css/mobile-styles.css?v=20260516d" media="(max-width: 768px)">
     <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260522g">
     <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260522g">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-mobile-shell.css?v=20260522g" media="(max-width: 1000px)">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-mobile-shell.css?v=20260522h" media="(max-width: 1000px)">
     <link rel="stylesheet" type="text/css" href="css/user.css">
     <!-- Scripts are loaded at the end of the body to improve page load speed -->
 </head>
@@ -1247,7 +1247,14 @@
                                         </h4>
                                         <div class="flex-container flexFlowRow alignitemscenter gap10px flexShrink">
                                             <div data-tg-samplers="adaptive_target" class="alignitemscenter flex-container marginBot5 flexFlowColumn flexGrow flexShrink gap0">
-                                                <small data-i18n="Target">Target</small>
+                                                <small class="sb-sampler-inline-title displayNone">
+                                                    <strong data-i18n="Adaptive-P">Adaptive-P</strong>
+                                                    <span aria-hidden="true">:</span>
+                                                    <span data-i18n="Target">Target</span>
+                                                    <a href="https://github.com/MrJackSpade/adaptive-p-docs" target="_blank">
+                                                        <span class="fa-solid fa-circle-info opacity50p"></span>
+                                                    </a>
+                                                </small>
                                                 <input class="neo-range-slider" type="range" id="adaptive_target_textgenerationwebui" min="-0.01" max="1" step="0.01" />
                                                 <input class="neo-range-input" type="number" min="-0.01" max="1" step="0.01" data-for="adaptive_target_textgenerationwebui" id="adaptive_target_counter_textgenerationwebui">
                                             </div>
@@ -1266,7 +1273,12 @@
                                         </h4>
                                         <div data-tg-type="mancer, ooba, koboldcpp, aphrodite, tabby" class="flex-container flexFlowRow gap10px flexShrink">
                                             <div class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
-                                                <small data-i18n="Smoothing Factor">Smoothing Factor</small>
+                                                <small class="sb-sampler-inline-title displayNone">
+                                                    <strong data-i18n="Smooth Sampling">Smooth Sampling</strong>
+                                                    <span aria-hidden="true">:</span>
+                                                    <span data-i18n="Smoothing Factor">Smoothing Factor</span>
+                                                    <span class="fa-solid fa-circle-info opacity50p" data-i18n="[title]Smooth_Sampling_desc" title="Allows you to use quadratic/cubic transformations to adjust the distribution. Lower Smoothing Factor values will be more creative, usually between 0.2-0.3 is the sweetspot (assuming the curve = 1). Higher Smoothing Curve values will make the curve steeper, which will punish low probability choices more aggressively. 1.0 curve is equivalent to only using Smoothing Factor."></span>
+                                                </small>
                                                 <input class="neo-range-slider" type="range" id="smoothing_factor_textgenerationwebui" name="volume" min="0" max="10" step="0.01" />
                                                 <input class="neo-range-input" type="number" min="0" max="10" step="0.01" data-for="smoothing_factor_textgenerationwebui" id="smoothing_factor_counter_textgenerationwebui">
                                             </div>
@@ -1287,7 +1299,14 @@
                                         </h4>
                                         <div class="flex-container flexFlowRow gap10px flexShrink">
                                             <div data-tg-samplers="xtc_threshold" class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
-                                                <small data-i18n="Threshold">Threshold</small>
+                                                <small class="sb-sampler-inline-title displayNone">
+                                                    <strong data-i18n="Exclude Top Choices (XTC)">Exclude Top Choices (XTC)</strong>
+                                                    <span aria-hidden="true">:</span>
+                                                    <span data-i18n="Threshold">Threshold</span>
+                                                    <a href="https://github.com/oobabooga/text-generation-webui/pull/6335" target="_blank">
+                                                        <span class="fa-solid fa-circle-info opacity50p"></span>
+                                                    </a>
+                                                </small>
                                                 <input class="neo-range-slider" type="range" id="xtc_threshold_textgenerationwebui" name="volume" min="0" max="0.5" step="0.01" />
                                                 <input class="neo-range-input" type="number" min="0" max="0.5" step="0.01" data-for="xtc_threshold_textgenerationwebui" id="xtc_threshold_counter_textgenerationwebui">
                                             </div>
@@ -1370,7 +1389,12 @@
                                         </h4>
                                         <div class="flex-container flexFlowRow gap10px flexShrink">
                                             <div class="alignitemscenter flex-container marginBot5 flexFlowColumn flexGrow flexShrink gap0">
-                                                <small data-i18n="Mirostat Mode">Mode</small>
+                                                <small class="sb-sampler-inline-title displayNone">
+                                                    <strong data-i18n="Mirostat (mode=1 is only for llama.cpp)">Mirostat</strong>
+                                                    <span aria-hidden="true">:</span>
+                                                    <span data-i18n="Mirostat Mode">Mode</span>
+                                                    <span class="fa-solid fa-circle-info opacity50p" data-i18n="[title]Mirostat_desc" title="Mirostat is a thermostat for output perplexity.&#13;Mirostat matches the output perplexity to that of the input, thus avoiding the repetition trap&#13;(where, as the autoregressive inference produces text, the perplexity of the output tends toward zero)&#13;and the confusion trap (where the perplexity diverges).&#13;For details, see the paper Mirostat: A Neural Text Decoding Algorithm that Directly Controls Perplexity by Basu et al. (2020).&#13;Mode chooses the Mirostat version. 0=disable, 1=Mirostat 1.0 (llama.cpp only), 2=Mirostat 2.0.&#13;Tau = Variability parameter for Mirostat outputs.&#13;Eta = Learning rate of Mirostat."></span>
+                                                </small>
                                                 <input class="neo-range-slider" type="range" id="mirostat_mode_textgenerationwebui" name="volume" min="0" max="2" step="1" />
                                                 <input class="neo-range-input" type="number" min="0" max="2" step="1" data-for="mirostat_mode_textgenerationwebui" id="mirostat_mode_counter_textgenerationwebui">
                                             </div>

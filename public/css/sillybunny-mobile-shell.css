@@ -873,3 +873,54 @@
         padding-inline: 8px !important;
     }
 }
+
+@media screen and (max-width: 1000px) {
+    #AdvancedFormatting .sb-af-settings-drawer .inline-drawer-content :is(
+        #ContextSettings > div > .title_restorable.standoutHeader > strong,
+        #InstructSettingsColumn > .margin0.title_restorable.standoutHeader > strong
+    ) {
+        display: none !important;
+    }
+
+    #kobold_api_block > .flex-container:has(> #api_button),
+    #novel_api > form > .flex-container:has(> #api_button_novel),
+    #textgenerationwebui_api > form > .flex-container:has(> #api_button_textgenerationwebui),
+    #openai_api > .flex-container.flex:has(> #api_button_openai) {
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    #kobold_api_block > .flex-container:has(> #api_button) > :is(.api_button, .api_loading),
+    #novel_api > form > .flex-container:has(> #api_button_novel) > :is(.api_button, .api_loading),
+    #textgenerationwebui_api > form > .flex-container:has(> #api_button_textgenerationwebui) > :is(.api_button, .api_loading, .openrouter_authorize),
+    #openai_api > .flex-container.flex:has(> #api_button_openai) > :is(.api_button, .api_loading, .openrouter_authorize, #customize_additional_parameters, #test_api_button) {
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+        white-space: normal;
+        text-align: center;
+    }
+
+    :is(#adaptive_p_block, #smoothingBlock, #xtc_block, #mirostat_block_ooba) > h4 {
+        display: none !important;
+    }
+
+    :is(#adaptive_p_block, #smoothingBlock, #xtc_block, #mirostat_block_ooba) > .flex-container.flexFlowRow > div > .sb-sampler-inline-title {
+        display: flex !important;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 4px;
+        min-height: 0;
+        margin: 0 0 4px;
+        text-align: left;
+        overflow-wrap: anywhere;
+        line-height: 1.2;
+        font-size: calc(var(--mainFontSize) * 0.82);
+        font-weight: 700;
+    }
+
+    :is(#adaptive_p_block, #smoothingBlock, #xtc_block, #mirostat_block_ooba) > .flex-container.flexFlowRow > div > .sb-sampler-inline-title > :is(a, div, span, strong) {
+        flex: 0 0 auto;
+    }
+}
