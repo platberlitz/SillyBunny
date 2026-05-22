@@ -7758,8 +7758,8 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         max-height: none !important;
         width: 100%;
         min-width: 0;
-        padding: 0 8px var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px)));
-        padding-inline-end: calc(8px + var(--sb-character-scroll-gutter, 8px));
+        padding: 0 20px var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px)));
+        padding-inline-end: calc(20px + var(--sb-character-scroll-gutter, 8px));
         overflow-y: auto !important;
         overflow-x: hidden !important;
         box-sizing: border-box;
