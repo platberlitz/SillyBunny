@@ -10492,7 +10492,7 @@ function createMobileNavLayoutSettingsGroup() {
         id: 'sb-mobile-nav-show-workspace-api-input',
         type: 'checkbox',
         value: 'show-workspace-api',
-        label: 'Show Workspace and API in side rail',
+        label: 'Show Workspace buttons in side rail',
         icon: 'fa-layer-group',
         onChange: input => setMobileNavShowWorkspaceApi(input.checked),
     });
@@ -10508,7 +10508,7 @@ function createMobileNavLayoutSettingsGroup() {
         id: 'sb-mobile-nav-show-quick-actions-input',
         type: 'checkbox',
         value: 'show-quick-actions',
-        label: 'Show Quick Actions below Customize',
+        label: 'Show Custom Quick Actions below Customize',
         icon: 'fa-bolt',
         onChange: input => setMobileNavShowQuickActions(input.checked),
     });
@@ -12141,23 +12141,6 @@ function syncMobileShellRailActions(shellKey = null) {
         const railQuickActions = sbState.mobileQuickActions.filter(
             action => !builtInRailActionKeys.has(getMobileQuickActionKey(action)),
         );
-        const createWorkspaceApiGroup = () => {
-            const workspaceApiGroup = createElement('div', {
-                className: 'sb-shell-rail-group sb-shell-rail-group-workspace-api',
-                attrs: {
-                    'aria-label': 'Workspace and API',
-                },
-            });
-
-            for (const action of SB_MOBILE_RAIL_WORKSPACE_API_ACTIONS) {
-                const button = createMobileShellRailButton(action, activateMobileNavAction, 'sb-shell-rail-workspace-api-action');
-                if (button) {
-                    workspaceApiGroup.appendChild(button);
-                }
-            }
-
-            return workspaceApiGroup;
-        };
         const createQuickActionsGroup = () => {
             const quickActionsGroup = createElement('div', {
                 className: 'sb-shell-rail-group sb-shell-rail-group-quick-actions',
@@ -12185,11 +12168,7 @@ function syncMobileShellRailActions(shellKey = null) {
 
         const beforeBlock = createRailBlock('before');
 
-        if (sbState.mobileNav.showWorkspaceApi) {
-            beforeBlock.appendChild(createWorkspaceApiGroup());
-        }
-
-        if (sbState.mobileNav.showWorkspaceApi || sbState.mobileNav.showCustomize) {
+        if (sbState.mobileNav.showCustomize) {
             beforeBlock.appendChild(createMobileShellRailDivider('Customize'));
         }
 
@@ -12426,18 +12405,6 @@ function refreshMobileNavQuickActions() {
 
     sbState.mobileNav.quickActionContainer = list;
     list.replaceChildren();
-
-    const shouldShowQuickActions = sbState.mobileNav.showQuickActions;
-    if (sbState.mobileNav.quickActionSection instanceof HTMLElement) {
-        sbState.mobileNav.quickActionSection.hidden = !shouldShowQuickActions;
-    }
-    if (sbState.mobileNav.quickActionDivider instanceof HTMLElement) {
-        sbState.mobileNav.quickActionDivider.hidden = !shouldShowQuickActions;
-    }
-
-    if (!shouldShowQuickActions) {
-        return;
-    }
 
     if (!sbState.mobileQuickActions.length) {
         list.appendChild(createElement('div', {
