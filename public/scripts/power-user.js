@@ -324,6 +324,7 @@ export const power_user = {
     auto_clear_cache_on_update: true,
     send_on_enter: send_on_enter_options.AUTO,
     console_log_prompts: false,
+    prompt_manager_drag_locked: true,
     request_token_probabilities: false,
     show_group_chat_queue: false,
     allow_name1_display: false,

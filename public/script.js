@@ -461,7 +461,8 @@ export let chat = [];
  * @type {import('./scripts/constants.js').SWIPE_STATE}
  */
 export let swipeState = SWIPE_STATE.NONE;
-let chatSaveTimeout;
+let chatSaveTimeout = null;
+let chatSavePromise = null;
 let importFlashTimeout;
 export let isChatSaving = false;
 export let firstRun = false;
@@ -2581,6 +2582,7 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
         RETURN_TRUSTED_TYPE: false,
         MESSAGE_SANITIZE: true,
         ADD_TAGS: ['custom-style', CARD_SCRIPT_MARKER_TAG],
+        ADD_ATTR: ['style'], // Allow inline CSS effects from model-generated message spans.
         ...sanitizerOverrides,
     };
     mes = restoreOocBlocksForDisplay(mes, oocBlocks);
@@ -4489,12 +4491,14 @@ function showStopButton() {
     $('#mes_stop').css({ 'display': 'flex' });
 }
 
-function hideStopButton() {
+function hideStopButton({ emitGenerationEnded = true } = {}) {
     $('#send_form').removeClass('sb-generating-controls');
     // prevent NOOP, because hideStopButton() gets called multiple times
     if ($('#mes_stop').css('display') !== 'none') {
         $('#mes_stop').css({ 'display': 'none' });
-        eventSource.emit(event_types.GENERATION_ENDED, chat.length);
+        if (emitGenerationEnded) {
+            eventSource.emit(event_types.GENERATION_ENDED, chat.length);
+        }
     }
 }
 
@@ -6736,7 +6740,6 @@ export function stopGeneration() {
     let stopped = false;
     if (activeStreamingProcessor) {
         activeStreamingProcessor.onStopStreaming();
-        clearStreamingProcessorIfCurrent(activeStreamingProcessor);
         stopped = true;
     }
     if (shouldAbortRequest && abortController) {
@@ -6744,9 +6747,9 @@ export function stopGeneration() {
         stopped = true;
     }
     if (stopped) {
-        unblockGeneration(activeGenerationType);
-        hideStopButton();
-        eventSource.emit(event_types.GENERATION_STOPPED);
+        eventSource.emitAndWait(event_types.GENERATION_STOPPED);
+        clearStreamingProcessorIfCurrent(activeStreamingProcessor);
+        unblockGeneration(activeGenerationType, { emitGenerationEnded: false });
     }
     return stopped;
 }
@@ -6822,14 +6825,14 @@ function flushWIInjections() {
  * Unblocks the UI after a generation is complete.
  * @param {string} [type] Generation type (optional)
  */
-function unblockGeneration(type) {
+function unblockGeneration(type, { emitGenerationEnded = true } = {}) {
     // Don't unblock if a parallel stream is still running
     if (type === 'quiet' && streamingProcessor && !streamingProcessor.isFinished) {
         return;
     }
 
     is_send_press = false;
-    activateSendButtons();
+    activateSendButtons({ emitGenerationEnded });
     setGenerationProgress(0);
     flushEphemeralStoppingStrings();
     flushWIInjections();
@@ -8317,9 +8320,9 @@ export function getGeneratingModel(mes) {
 /**
  * A function mainly used to switch 'generating' state - setting it to false and activating the buttons again
  */
-export function activateSendButtons() {
+export function activateSendButtons({ emitGenerationEnded = true } = {}) {
     is_send_press = false;
-    hideStopButton();
+    hideStopButton({ emitGenerationEnded });
     showSwipeButtons();
     delete document.body.dataset.generating;
 }
@@ -8619,6 +8622,8 @@ export function saveChatDebounced() {
     cancelDebouncedChatSave();
 
     chatSaveTimeout = setTimeout(async () => {
+        chatSaveTimeout = null;
+
         if (selectedGroup !== selected_group) {
             console.warn('Chat save timeout triggered, but group changed. Aborting.');
             return;
@@ -8630,9 +8635,70 @@ export function saveChatDebounced() {
         }
 
         console.debug('Chat save timeout triggered');
-        await saveChatConditional();
-        console.debug('Chat saved');
+        chatSavePromise = saveChatConditional();
+        try {
+            await chatSavePromise;
+            console.debug('Chat saved');
+        } finally {
+            chatSavePromise = null;
+        }
     }, DEFAULT_SAVE_EDIT_TIMEOUT);
+}
+
+function hasPendingChatSave() {
+    return chatSaveTimeout !== null || chatSavePromise !== null;
+}
+
+/**
+ * Flushes any pending chat save, waits for in-flight saves, and saves the current chat immediately.
+ * @returns {Promise<boolean>} Whether the chat save completed successfully.
+ */
+export async function flushPendingChatSaves() {
+    const chatId = getCurrentChatId();
+
+    if (!chatId) {
+        return true;
+    }
+
+    cancelDebouncedChatSave();
+
+    if (chatSavePromise) {
+        try {
+            await chatSavePromise;
+        } catch (error) {
+            console.error('Error waiting for pending chat save', error);
+        }
+    }
+
+    await waitUntilCondition(() => !isChatSaving, debounce_timeout.extended, 100, { rejectOnTimeout: false });
+    if (isChatSaving) {
+        toastr.error(t`The current chat is still saving. Try again in a moment.`, t`Chat save still in progress`);
+        return false;
+    }
+
+    toastr.info(t`Saving chat...`, t`Saving chat`);
+
+    try {
+        isChatSaving = true;
+
+        const didSave = selected_group
+            ? await saveGroupChat(selected_group, true, false, true)
+            : await saveChat({ throwOnError: true });
+
+        if (!didSave) {
+            return false;
+        }
+
+        saveTokenCache();
+        await saveItemizedPrompts(chatId);
+        toastr.success(t`Chat saved successfully.`, t`Chat saved`);
+        return true;
+    } catch (error) {
+        console.error('Error flushing pending chat saves', error);
+        return false;
+    } finally {
+        isChatSaving = false;
+    }
 }
 
 /**
@@ -9443,6 +9509,19 @@ export async function saveSettings(loopCounter = 0) {
     }
 }
 
+async function confirmCacheClearAfterChatSaveFailure() {
+    const confirmation = await Popup.show.confirm(
+        t`Chat save failed`,
+        t`The cache will still be cleared if you continue, but unsaved chat changes may be lost. Do you want to continue?`,
+        {
+            okButton: t`Continue`,
+            cancelButton: t`Cancel`,
+        },
+    );
+
+    return confirmation === POPUP_RESULT.AFFIRMATIVE;
+}
+
 export async function clearFrontendCache({ skipConfirmation = false, saveBeforeClear = true } = {}) {
     if (!skipConfirmation) {
         const confirmation = await Popup.show.confirm(
@@ -9463,9 +9542,17 @@ export async function clearFrontendCache({ skipConfirmation = false, saveBeforeC
 
     if (saveBeforeClear) {
         try {
-            await saveChatConditional();
+            const didSaveChat = await flushPendingChatSaves();
+            if (!didSaveChat) {
+                if (!await confirmCacheClearAfterChatSaveFailure()) {
+                    return false;
+                }
+            }
         } catch (error) {
             console.warn('Failed to save chat before clearing cache', error);
+            if (!await confirmCacheClearAfterChatSaveFailure()) {
+                return false;
+            }
         }
 
         try {
@@ -9524,7 +9611,7 @@ async function clearAllCacheAndReload() {
     }
 
     toastr.success(t`Cache cleared. Reloading SillyBunny...`, t`Cache cleared`);
-    window.setTimeout(() => window.location.reload(), 450);
+    window.setTimeout(() => window.location.reload(), 1000);
     return true;
 }
 
@@ -9550,7 +9637,7 @@ async function maybeAutoClearCacheOnVersionChange(isVersionChanged) {
     }
 
     toastr.info(t`SillyBunny updated. Clearing cached UI data and reloading...`, t`Update detected`);
-    window.setTimeout(() => window.location.reload(true), 450);
+    window.setTimeout(() => window.location.reload(true), 1000);
     return true;
 }
 
@@ -15403,7 +15490,7 @@ jQuery(async function () {
     await firstLoadInit();
 
     window.addEventListener('beforeunload', (e) => {
-        if (isChatSaving || this_edit_mes_id >= 0) {
+        if (isChatSaving || hasPendingChatSave() || this_edit_mes_id >= 0) {
             e.preventDefault();
             e.returnValue = true;
         }

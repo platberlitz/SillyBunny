@@ -2,7 +2,7 @@
 
 import { DOMPurify } from '../lib.js';
 
-import { event_types, eventSource, is_send_press, main_api, substituteParams } from '../script.js';
+import { event_types, eventSource, is_send_press, main_api, saveSettingsDebounced, substituteParams } from '../script.js';
 import { is_group_generating } from './group-chats.js';
 import { Message, MessageCollection, TokenHandler } from './openai.js';
 import { power_user } from './power-user.js';
@@ -1980,7 +1980,7 @@ class PromptManager {
 
         const totalActiveTokens = this.tokenUsage;
 
-        const headerHtml = await renderTemplateAsync('promptManagerHeader', { error: this.error, errorDiv, prefix: this.configuration.prefix, totalActiveTokens });
+        const headerHtml = await renderTemplateAsync('promptManagerHeader', { error: this.error, errorDiv, prefix: this.configuration.prefix, totalActiveTokens, dragLocked: power_user.prompt_manager_drag_locked });
         promptManagerDiv.insertAdjacentHTML('beforeend', headerHtml);
 
         this.listElement = promptManagerDiv.querySelector(`#${this.configuration.prefix}prompt_manager_list`);
@@ -2014,6 +2014,7 @@ class PromptManager {
             const footerDiv = promptManagerDiv.querySelector(`.${this.configuration.prefix}prompt_manager_footer`);
             if (!(footerDiv instanceof HTMLElement)) {
                 this.bindDrawerPersistence();
+                this.bindDragLockButton();
                 return;
             }
 
@@ -2029,9 +2030,25 @@ class PromptManager {
         }
 
         this.bindDrawerPersistence();
+        this.bindDragLockButton();
         this.syncPopupPlacement();
         this.syncEditorPaneState();
         this.syncListSelection();
+    }
+
+    bindDragLockButton() {
+        const dragLockButton = this.containerElement?.querySelector(`#${this.configuration.prefix}prompt_manager_drag_lock`);
+        if (!(dragLockButton instanceof HTMLElement)) {
+            return;
+        }
+
+        dragLockButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            power_user.prompt_manager_drag_locked = !power_user.prompt_manager_drag_locked;
+            this.updateDragLockState();
+            saveSettingsDebounced();
+        });
     }
 
     /**
@@ -2338,6 +2355,36 @@ class PromptManager {
                 this.saveServiceSettings();
             },
         });
+        this.updateDragLockState();
+    }
+
+    updateDragLockState() {
+        const locked = Boolean(power_user.prompt_manager_drag_locked);
+        const promptList = this.listElement ?? this.containerElement?.querySelector(`#${this.configuration.prefix}prompt_manager_list`);
+        const $promptList = $(`#${this.configuration.prefix}prompt_manager_list`);
+
+        if ($promptList.length && $promptList.data('ui-sortable')) {
+            $promptList.sortable(locked ? 'disable' : 'enable');
+        }
+
+        if (promptList instanceof HTMLElement) {
+            promptList.classList.toggle('prompt-manager-drag-locked', locked);
+            promptList.classList.toggle('prompt-manager-drag-unlocked', !locked);
+        }
+
+        const dragLockButton = this.containerElement?.querySelector(`#${this.configuration.prefix}prompt_manager_drag_lock`);
+        if (dragLockButton instanceof HTMLElement) {
+            dragLockButton.classList.toggle('toggled', locked);
+            dragLockButton.setAttribute('aria-pressed', String(locked));
+
+            const icon = dragLockButton.querySelector('i');
+            if (icon instanceof HTMLElement) {
+                icon.classList.toggle('fa-lock', locked);
+                icon.classList.toggle('fa-unlock', !locked);
+            }
+        }
+
+        this.log(`Prompt reordering ${locked ? 'locked' : 'unlocked'}.`);
     }
 
     /**

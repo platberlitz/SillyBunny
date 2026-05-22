@@ -324,6 +324,12 @@ const SB_DESKTOP_SHELL_LAYOUT = Object.freeze({
     minWidth: 600,
     maxWidth: 900,
     ratio: 0.55,
+    laptopViewportMin: 1001,
+    laptopViewportMax: 1440,
+    laptopMinWidth: 680,
+    laptopMaxWidth: 920,
+    laptopRatio: 0.6,
+    laptopGutter: 28,
     compactMaxWidth: 900,
     compactViewportWidth: 1100,
     compactGap: 20,
@@ -429,7 +435,7 @@ const SB_SHELLS = Object.freeze({
         proxyIcon: 'fa-bars',
         proxyLabel: 'Workspace',
         title: 'Workspace',
-        subtitle: 'Set up models, prompts, lore, and helpers, then get back to the scene.',
+        subtitle: '', // Removed redundant workspace subtext (PR #145 expansion)
         searchPlaceholder: 'Find presets, samplers, lore, or tools...',
         storageKey: SB_STORAGE_KEYS.leftTab,
         defaultTabId: 'presets',
@@ -1907,6 +1913,25 @@ function getDesktopShellDimensions(shellKey = '') {
     const viewportHeight = window.innerHeight;
     const maxShellWidth = shellKey === 'right' ? Math.min(SB_DESKTOP_SHELL_LAYOUT.maxWidth, 760) : SB_DESKTOP_SHELL_LAYOUT.maxWidth;
 
+    if (
+        ['left', 'right'].includes(shellKey)
+        && viewportWidth >= SB_DESKTOP_SHELL_LAYOUT.laptopViewportMin
+        && viewportWidth <= SB_DESKTOP_SHELL_LAYOUT.laptopViewportMax
+    ) {
+        const laptopWidth = clampNumber(
+            viewportWidth * SB_DESKTOP_SHELL_LAYOUT.laptopRatio,
+            SB_DESKTOP_SHELL_LAYOUT.laptopMinWidth,
+            SB_DESKTOP_SHELL_LAYOUT.laptopMaxWidth,
+        );
+        const maxWidth = Math.max(0, viewportWidth - SB_DESKTOP_SHELL_LAYOUT.laptopGutter);
+        const resolvedWidth = Math.min(laptopWidth, maxWidth);
+
+        return {
+            width: resolvedWidth,
+            maxWidth: resolvedWidth,
+        };
+    }
+
     if (isMobileViewport() || (viewportHeight <= SB_DESKTOP_SHELL_LAYOUT.fullWidthMaxHeight && shellKey !== 'characters')) {
         return {
             width: viewportWidth,
@@ -2954,7 +2979,7 @@ async function handleClearCookiesAndCacheClick(event) {
         const clearedCookieCount = clearAllBrowserCookies();
         globalThis.toastr?.success?.('Cookies and cache cleared. Reloading SillyBunny...', 'Cookies cleared');
         console.info(`[Cache] Expired ${clearedCookieCount} browser cookies and queued ${serverCookieResult?.expirationAttempts ?? 0} server cookie expirations before reload`);
-        window.setTimeout(() => window.location.reload(), 450);
+        window.setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
         console.error('Failed to clear cookies and cache', error);
         globalThis.toastr?.error?.(String(error?.message || error), 'Clear failed');

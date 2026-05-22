@@ -1556,13 +1556,14 @@ function resetSelectedGroup() {
  * @param {string} groupId Group ID
  * @param {boolean} shouldSaveGroup Whether to save the group after saving the chat
  * @param {boolean} force Force the saving on integrity error
- * @returns {Promise<void>} A promise that resolves when the group chat has been saved.
+ * @param {boolean} throwOnError Rethrow save errors after notifying the user
+ * @returns {Promise<boolean>} A promise that resolves when the group chat has been saved.
  */
-async function saveGroupChat(groupId, shouldSaveGroup, force = false) {
+async function saveGroupChat(groupId, shouldSaveGroup, force = false, throwOnError = false) {
     const group = groups.find(x => x.id == groupId);
     if (!group) {
         console.warn('Group not found', groupId);
-        return;
+        return false;
     }
     const chatId = group.chat_id;
     if (chatId && Array.isArray(group.chats) && !group.chats.includes(chatId)) {
@@ -1589,7 +1590,10 @@ async function saveGroupChat(groupId, shouldSaveGroup, force = false) {
         if (!isIntegrityError) {
             toastr.error(t`Check the server connection and reload the page to prevent data loss.`, t`Group Chat could not be saved`);
             console.error('Group chat could not be saved', response);
-            return;
+            if (throwOnError) {
+                throw new Error('Group chat could not be saved');
+            }
+            return false;
         }
 
         const popupResult = await Popup.show.input(
@@ -1605,15 +1609,17 @@ async function saveGroupChat(groupId, shouldSaveGroup, force = false) {
         if (!forceSaveConfirmed) {
             console.warn('Chat integrity check failed, and user did not confirm the overwrite. Reloading the page.');
             window.location.reload();
-            return;
+            return false;
         }
 
-        await saveGroupChat(groupId, shouldSaveGroup, true);
+        return await saveGroupChat(groupId, shouldSaveGroup, true, throwOnError);
     }
 
     if (shouldSaveGroup) {
         await editGroup(groupId, false, false);
     }
+
+    return true;
 }
 
 /**
