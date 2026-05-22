@@ -53,48 +53,48 @@
     gap: 8px;
 }
 
-.connection-profile-actions {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 30px;
-    justify-content: start;
-    gap: 5px;
+.connection-profile-picker #connection_profiles {
     width: 100%;
-    min-width: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
 }
 
-.connection-profile-actions::-webkit-scrollbar {
-    display: none;
+.connection-profile-actions {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(24px, 30px));
+    justify-content: start;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
 }
 
 .connection-profile-actions > .menu_button {
-    width: 30px;
-    min-width: 0;
+    width: 100%;
+    min-width: 24px;
     max-width: 30px;
-    min-height: 30px;
-    height: 30px;
-    max-height: 30px;
+    min-height: 28px;
+    height: 28px;
+    max-height: 28px;
     padding: 0;
-    border-radius: 9px;
-    font-size: calc(var(--mainFontSize) * 0.82);
+    border-radius: 8px;
+    font-size: calc(var(--mainFontSize) * 0.78);
     user-select: none;
     -webkit-user-select: none;
 }
 
 @media screen and (max-width: 450px) {
+    .connection-profile-actions {
+        grid-template-columns: repeat(9, minmax(22px, 1fr));
+        gap: 3px;
+    }
+
     .connection-profile-actions > .menu_button {
-        width: 28px;
-        min-width: 28px;
-        max-width: 28px;
-        min-height: 28px;
-        height: 28px;
-        max-height: 28px;
-        border-radius: 8px;
-        font-size: calc(var(--mainFontSize) * 0.76);
+        min-width: 22px;
+        max-width: none;
+        min-height: 26px;
+        height: 26px;
+        max-height: 26px;
+        border-radius: 7px;
+        font-size: calc(var(--mainFontSize) * 0.72);
     }
 }
 

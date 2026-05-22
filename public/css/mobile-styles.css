@@ -37,6 +37,110 @@
         flex-basis: 100%;
     }
 
+    #AdvancedFormatting > .flex-container.alignItemsBaseline:first-child {
+        align-items: center;
+        gap: 8px;
+        flex-wrap: nowrap;
+    }
+
+    #AdvancedFormatting > .flex-container.alignItemsBaseline:first-child > h3 {
+        min-width: 0;
+        font-size: calc(var(--mainFontSize) * 0.92);
+        line-height: 1.15;
+    }
+
+    #AdvancedFormatting > .flex-container.alignItemsBaseline:first-child > h3 span {
+        display: inline-block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #AdvancedFormatting > .flex-container.alignItemsBaseline:first-child > .flex-container {
+        flex: 0 0 auto;
+        gap: 4px;
+    }
+
+    #AdvancedFormatting #af_master_import,
+    #AdvancedFormatting #af_master_export {
+        width: var(--sb-mobile-touch-target, 44px);
+        min-width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+        padding: 0;
+        justify-content: center;
+    }
+
+    #AdvancedFormatting #af_master_import > span,
+    #AdvancedFormatting #af_master_export > span {
+        display: none;
+    }
+
+    #AdvancedFormatting .flex-container.spaceEvenly {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    #AdvancedFormatting .flex-container.spaceEvenly > div {
+        min-width: 0;
+    }
+
+    #InstructSettingsColumn > .margin0.title_restorable.standoutHeader {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: nowrap;
+    }
+
+    #InstructSettingsColumn > .margin0.title_restorable.standoutHeader > strong {
+        min-width: 0;
+        font-size: calc(var(--mainFontSize) * 0.88);
+        line-height: 1.15;
+    }
+
+    #InstructSettingsColumn > .margin0.title_restorable.standoutHeader > .flex-container {
+        flex: 0 0 auto;
+        gap: 4px;
+        flex-wrap: nowrap;
+    }
+
+    #InstructSettingsColumn > .margin0.title_restorable.standoutHeader .menu_button_icon {
+        width: var(--sb-mobile-touch-target, 44px);
+        min-width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+        padding: 0;
+        justify-content: center;
+    }
+
+    #InstructSettingsColumn > .margin0.title_restorable.standoutHeader .menu_button_icon > span {
+        display: none;
+    }
+
+    #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap {
+        gap: 6px;
+        flex-wrap: nowrap;
+    }
+
+    #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap > .flex-container.marginLeft5 {
+        gap: 4px;
+        flex-wrap: nowrap;
+    }
+
+    #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap .menu_button_icon {
+        width: var(--sb-mobile-touch-target, 44px);
+        min-width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+        padding: 0;
+        justify-content: center;
+    }
+
+    #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap .menu_button_icon > span {
+        display: none;
+    }
+
     #rm_button_panel_pin_div {
         display: none;
     }
