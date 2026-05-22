@@ -30,13 +30,93 @@ if not exist .git (
     goto end
 )
 
-call git pull --rebase --autostash
-if %errorlevel% neq 0 (
-    REM In case there is still something wrong.
-    echo [91mThere were errors while updating.[0m
-    echo See the update FAQ at https://docs.sillytavern.app/installation/updating/
-    goto end
+REM Checking current branch
+for /f "tokens=*" %%i in ('git rev-parse --abbrev-ref HEAD') do set "CURRENT_BRANCH=%%i"
+echo Current branch: !CURRENT_BRANCH!
+
+REM Checking for automatic branch switching configuration
+set "AUTO_SWITCH="
+for /f "tokens=*" %%j in ('git config --local script.autoSwitch') do set "AUTO_SWITCH=%%j"
+
+set "TARGET_BRANCH=!CURRENT_BRANCH!"
+
+if /i "!AUTO_SWITCH!"=="s" set "AUTO_SWITCH=staging"
+if /i "!AUTO_SWITCH!"=="r" set "AUTO_SWITCH=release"
+
+if /i "!AUTO_SWITCH!"=="staging" (
+    echo Auto-switching to staging branch
+    git checkout staging
+    if !errorlevel! neq 0 goto end
+    set "TARGET_BRANCH=staging"
+    goto update
 )
+
+if /i "!AUTO_SWITCH!"=="release" (
+    echo Auto-switching to release branch
+    git checkout release
+    if !errorlevel! neq 0 goto end
+    set "TARGET_BRANCH=release"
+    goto update
+)
+
+if not "!AUTO_SWITCH!"=="" (
+    echo Auto-switching defined to stay on current branch
+    goto update
+)
+
+if /i "!CURRENT_BRANCH!"=="staging" (
+    echo Staying on the current branch
+    goto update
+)
+
+if /i "!CURRENT_BRANCH!"=="release" (
+    echo Staying on the current branch
+    goto update
+)
+
+echo You are not on 'staging' or 'release'. You are on '!CURRENT_BRANCH!'.
+set /p "CHOICE=Do you want to switch to 'staging' (s), 'release' (r), or stay (any other key)? "
+if /i "!CHOICE!"=="s" (
+    echo Switching to staging branch
+    git checkout staging
+    if !errorlevel! neq 0 goto end
+    set "TARGET_BRANCH=staging"
+    goto update
+)
+
+if /i "!CHOICE!"=="r" (
+    echo Switching to release branch
+    git checkout release
+    if !errorlevel! neq 0 goto end
+    set "TARGET_BRANCH=release"
+    goto update
+)
+
+echo Staying on the current branch
+
+:update
+REM Checking for 'upstream' remote
+git remote | findstr /x "upstream" > nul
+if !errorlevel! equ 0 (
+    echo Updating and rebasing against 'upstream'
+    git fetch upstream
+    if !errorlevel! neq 0 goto update_error
+    git rebase upstream/!TARGET_BRANCH! --autostash
+    if !errorlevel! neq 0 goto update_error
+    goto install
+)
+
+echo Updating and rebasing against 'origin'
+git pull --rebase --autostash origin !TARGET_BRANCH!
+if !errorlevel! neq 0 goto update_error
+goto install
+
+:update_error
+echo [91mThere were errors while updating.[0m
+echo See the update FAQ at https://docs.sillytavern.app/usage/update/#common-update-problems
+goto end
+
+:install
 
 set NODE_ENV=production
 set NODE_NO_WARNINGS=1

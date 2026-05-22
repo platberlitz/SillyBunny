@@ -13,7 +13,6 @@
     - "Start.bat"
     - "start.sh"
     - "UpdateAndStart.bat"
-    - "UpdateForkAndStart.bat"
 
 ⚙️ config.yaml:
 - changed-files:
