@@ -22,6 +22,9 @@ const SB_STORAGE_KEYS = Object.freeze({
     bottomBarScale: 'sb-bottom-bar-scale',
     bottomChatSecondaryOpen: 'sb-bottom-chat-secondary-open',
     mobileButtonScale: 'sb-mobile-button-scale',
+    mobileNavLayout: 'sb-mobile-nav-layout',
+    mobileNavIconOnly: 'sb-mobile-nav-icon-only',
+    mobileNavHorizontalStyle: 'sb-mobile-nav-horizontal-style',
     mobileQuickActions: 'sb-mobile-quick-actions-v2',
     mobileQuickActionsLegacy: 'sb-mobile-quick-actions',
     settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
@@ -571,6 +574,8 @@ const SB_UNIVERSAL_SEARCH_EMPTY_HINT = 'Could not find query. Try a broader term
 const SB_UNIVERSAL_SEARCH_RESULT_LIMIT = 10;
 const SB_MOBILE_QUICK_ACTION_LIMIT = 12;
 const SB_MOBILE_QUICK_ACTION_LABEL_MAX_LENGTH = 36;
+const SB_MOBILE_NAV_LAYOUTS = Object.freeze(['horizontal', 'vertical']);
+const SB_MOBILE_NAV_HORIZONTAL_STYLES = Object.freeze(['grid', 'row']);
 const SB_MOBILE_DEFAULT_QUICK_ACTIONS = Object.freeze([
     { type: 'tab', shellKey: 'left', tabId: 'presets', icon: 'fa-sliders', label: 'Presets' },
     { type: 'tab', shellKey: 'left', tabId: 'api', icon: 'fa-plug', label: 'API' },
@@ -644,6 +649,9 @@ const sbState = {
     mobileNav: {
         lastOpenedAt: 0,
         quickActionContainer: null,
+        layout: normalizeMobileNavLayout(safeGetItem(SB_STORAGE_KEYS.mobileNavLayout)),
+        iconOnly: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavIconOnly), false),
+        horizontalStyle: normalizeMobileNavHorizontalStyle(safeGetItem(SB_STORAGE_KEYS.mobileNavHorizontalStyle)),
     },
     mobileQuickActions: [],
     chatbar: {
@@ -808,6 +816,16 @@ function normalizeStoredBoolean(value, fallback = false) {
     }
 
     return fallback;
+}
+
+function normalizeMobileNavLayout(value) {
+    const normalizedValue = normalizeText(value);
+    return SB_MOBILE_NAV_LAYOUTS.includes(normalizedValue) ? normalizedValue : 'horizontal';
+}
+
+function normalizeMobileNavHorizontalStyle(value) {
+    const normalizedValue = normalizeText(value);
+    return SB_MOBILE_NAV_HORIZONTAL_STYLES.includes(normalizedValue) ? normalizedValue : 'grid';
 }
 
 function normalizeShellSize(value) {
@@ -1249,6 +1267,48 @@ function setMobileButtonScale(value, { persist = true } = {}) {
 
     if (persist) {
         safeSetItem(SB_STORAGE_KEYS.mobileButtonScale, String(nextScale));
+    }
+
+    updateThemePickerUi();
+}
+
+function applyMobileNavPreferences() {
+    document.documentElement.dataset.sbMobileNavLayout = sbState.mobileNav.layout;
+    document.documentElement.dataset.sbMobileNavMode = sbState.mobileNav.iconOnly ? 'icon-only' : 'labeled';
+    document.documentElement.dataset.sbMobileNavHorizontalStyle = sbState.mobileNav.horizontalStyle;
+}
+
+function setMobileNavLayout(layout, { persist = true } = {}) {
+    const nextLayout = normalizeMobileNavLayout(layout);
+    sbState.mobileNav.layout = nextLayout;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavLayout, nextLayout);
+    }
+
+    updateThemePickerUi();
+}
+
+function setMobileNavIconOnly(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.mobileNav.iconOnly = nextEnabled;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavIconOnly, String(nextEnabled));
+    }
+
+    updateThemePickerUi();
+}
+
+function setMobileNavHorizontalStyle(style, { persist = true } = {}) {
+    const nextStyle = normalizeMobileNavHorizontalStyle(style);
+    sbState.mobileNav.horizontalStyle = nextStyle;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavHorizontalStyle, nextStyle);
     }
 
     updateThemePickerUi();
@@ -10197,6 +10257,137 @@ function createCompactModeSettingsGroup() {
     return group;
 }
 
+function createMobileNavChoice({ id, type = 'radio', name = '', value = '', label, icon, onChange }) {
+    const choice = createElement('label', {
+        className: 'sb-mobile-nav-choice',
+        attrs: {
+            for: id,
+        },
+    });
+    const inputAttrs = {
+        type,
+        value,
+    };
+
+    if (name) {
+        inputAttrs.name = name;
+    }
+
+    const input = createElement('input', {
+        id,
+        className: 'sb-mobile-nav-choice-input',
+        attrs: inputAttrs,
+    });
+    const iconElement = createElement('i', {
+        className: `fa-solid ${icon} sb-mobile-nav-choice-icon`,
+        attrs: {
+            'aria-hidden': 'true',
+        },
+    });
+    const copy = createElement('span', { className: 'sb-mobile-nav-choice-copy' });
+    const title = createElement('strong', { text: label });
+
+    input.addEventListener('change', event => {
+        const target = event.currentTarget;
+        if (!(target instanceof HTMLInputElement)) {
+            return;
+        }
+
+        if (target.type === 'radio' && !target.checked) {
+            return;
+        }
+
+        onChange?.(target);
+    });
+
+    copy.appendChild(title);
+    choice.append(input, iconElement, copy);
+    return choice;
+}
+
+function createMobileNavLayoutSettingsGroup() {
+    const group = createElement('section', {
+        className: 'sb-theme-slider-group sb-mobile-nav-layout-group',
+    });
+    const header = createElement('div', { className: 'sb-mobile-nav-settings-header' });
+    const title = createElement('strong', { text: 'Mobile Navigation' });
+    const layoutGrid = createElement('div', {
+        className: 'sb-mobile-nav-choice-grid',
+        attrs: {
+            role: 'radiogroup',
+            'aria-label': 'Mobile navigation layout',
+        },
+    });
+    const iconOnlyChoice = createMobileNavChoice({
+        id: 'sb-mobile-nav-icon-only-input',
+        type: 'checkbox',
+        value: 'icon-only',
+        label: 'Icons only in shell tabs',
+        icon: 'fa-icons',
+        onChange: input => setMobileNavIconOnly(input.checked),
+    });
+    const horizontalStyleGroup = createElement('div', {
+        className: 'sb-mobile-nav-dependent-group',
+        attrs: {
+            'data-sb-mobile-nav-dependent': 'horizontal',
+        },
+    });
+    const horizontalStyleLabel = createElement('strong', {
+        className: 'sb-mobile-nav-dependent-title',
+        text: 'Hamburger Menu Style',
+    });
+    const horizontalStyleGrid = createElement('div', {
+        className: 'sb-mobile-nav-choice-grid sb-mobile-nav-choice-grid-compact',
+        attrs: {
+            role: 'radiogroup',
+            'aria-label': 'Hamburger menu style',
+        },
+    });
+
+    layoutGrid.append(
+        createMobileNavChoice({
+            id: 'sb-mobile-nav-layout-horizontal',
+            name: 'sb-mobile-nav-layout',
+            value: 'horizontal',
+            label: 'Horizontal top bar',
+            icon: 'fa-grip-lines',
+            onChange: input => setMobileNavLayout(input.value),
+        }),
+        createMobileNavChoice({
+            id: 'sb-mobile-nav-layout-vertical',
+            name: 'sb-mobile-nav-layout',
+            value: 'vertical',
+            label: 'Vertical side rail',
+            icon: 'fa-table-columns',
+            onChange: input => setMobileNavLayout(input.value),
+        }),
+    );
+
+    horizontalStyleGrid.append(
+        createMobileNavChoice({
+            id: 'sb-mobile-nav-horizontal-grid',
+            name: 'sb-mobile-nav-horizontal-style',
+            value: 'grid',
+            label: 'Grid',
+            icon: 'fa-table-cells-large',
+            onChange: input => setMobileNavHorizontalStyle(input.value),
+        }),
+        createMobileNavChoice({
+            id: 'sb-mobile-nav-horizontal-row',
+            name: 'sb-mobile-nav-horizontal-style',
+            value: 'row',
+            label: 'Row',
+            icon: 'fa-ellipsis',
+            onChange: input => setMobileNavHorizontalStyle(input.value),
+        }),
+    );
+
+    header.appendChild(title);
+    horizontalStyleGroup.append(horizontalStyleLabel, horizontalStyleGrid);
+    group.append(header, layoutGrid, iconOnlyChoice, horizontalStyleGroup);
+    return group;
+}
+
 function createFrontendIconSettingsGroup() {
     const group = createElement('section', {
         className: 'sb-theme-slider-group sb-frontend-icon-group',
@@ -10396,10 +10587,12 @@ function injectThemePicker() {
         className: 'sb-mobile-only-setting',
     });
     const topbarLabelSettingsGroup = createTopbarLabelSettingsGroup();
+    const mobileNavLayoutSettingsGroup = createMobileNavLayoutSettingsGroup();
     const compactModeSettingsGroup = createCompactModeSettingsGroup();
     const frontendIconSettingsGroup = createFrontendIconSettingsGroup();
     const shortcutSettingsGroup = createShortcutSettingsGroup();
     const mobileQuickActionSettingsGroup = createMobileQuickActionSettingsGroup();
+    const mobileSettingsOutlet = document.getElementById('sb-mobile-settings-outlet');
     header.append(title, description);
 
     for (const theme of SB_THEMES) {
@@ -10423,7 +10616,14 @@ function injectThemePicker() {
     getMessageStyleSelect()?.addEventListener('change', updateThemePickerUi);
     document.addEventListener('sb:chat-style-updated', updateThemePickerUi);
 
-    card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup, mobileQuickActionSettingsGroup);
+    if (mobileSettingsOutlet instanceof HTMLElement) {
+        mobileSettingsOutlet.replaceChildren(mobileNavLayoutSettingsGroup, mobileButtonSliderGroup, compactModeSettingsGroup, mobileQuickActionSettingsGroup);
+    }
+
+    card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
+    if (!(mobileSettingsOutlet instanceof HTMLElement)) {
+        card.append(mobileNavLayoutSettingsGroup, mobileButtonSliderGroup, compactModeSettingsGroup, mobileQuickActionSettingsGroup);
+    }
     themeBlock.prepend(card);
     updateThemePickerUi();
 }
@@ -10439,6 +10639,7 @@ function updateThemePickerUi() {
     const mobileButtonScaleValue = document.getElementById('sb-mobile-button-scale-value');
     const customTextInput = document.getElementById('sb-topbar-custom-text-input');
     const compactModeInput = document.getElementById('sb-compact-mode-input');
+    const mobileNavIconOnlyInput = document.getElementById('sb-mobile-nav-icon-only-input');
 
     for (const button of document.querySelectorAll('[data-sb-theme-option]')) {
         const themeId = button.getAttribute('data-sb-theme-option');
@@ -10511,6 +10712,45 @@ function updateThemePickerUi() {
     if (compactModeInput instanceof HTMLInputElement) {
         compactModeInput.checked = sbState.compactMode;
         compactModeInput.closest('.sb-compact-mode-option')?.classList.toggle('is-selected', sbState.compactMode);
+    }
+
+    for (const input of document.querySelectorAll('input[name="sb-mobile-nav-layout"]')) {
+        if (!(input instanceof HTMLInputElement)) {
+            continue;
+        }
+
+        const isChecked = input.value === sbState.mobileNav.layout;
+        input.checked = isChecked;
+        input.closest('.sb-mobile-nav-choice')?.classList.toggle('is-selected', isChecked);
+    }
+
+    for (const input of document.querySelectorAll('input[name="sb-mobile-nav-horizontal-style"]')) {
+        if (!(input instanceof HTMLInputElement)) {
+            continue;
+        }
+
+        const isChecked = input.value === sbState.mobileNav.horizontalStyle;
+        const isDisabled = sbState.mobileNav.layout !== 'horizontal';
+        input.checked = isChecked;
+        input.disabled = isDisabled;
+        const choice = input.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', isChecked);
+        choice?.classList.toggle('is-disabled', isDisabled);
+    }
+
+    if (mobileNavIconOnlyInput instanceof HTMLInputElement) {
+        const isDisabled = sbState.mobileNav.layout !== 'vertical';
+        mobileNavIconOnlyInput.checked = sbState.mobileNav.iconOnly;
+        mobileNavIconOnlyInput.disabled = isDisabled;
+        const choice = mobileNavIconOnlyInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.mobileNav.iconOnly);
+        choice?.classList.toggle('is-disabled', isDisabled);
+    }
+
+    for (const group of document.querySelectorAll('[data-sb-mobile-nav-dependent]')) {
+        const dependency = group.getAttribute('data-sb-mobile-nav-dependent');
+        const isDisabled = dependency === 'horizontal' && sbState.mobileNav.layout !== 'horizontal';
+        group.classList.toggle('is-disabled', isDisabled);
     }
 
     for (const button of document.querySelectorAll('[data-sb-message-style]')) {
@@ -12914,6 +13154,7 @@ function initAll() {
     setTopbarScale('mobile', sbState.topbarScale.mobile, { persist: false });
     setBottomBarScale(sbState.bottomBarScale, { persist: false });
     setMobileButtonScale(sbState.mobileButtonScale, { persist: false });
+    applyMobileNavPreferences();
     bindComposerControlPlacement();
     initChatAvatarVariables();
     syncDesktopShellSizing();

@@ -19,7 +19,7 @@
     </style>
     <link rel="preload" as="style" href="style.css">
     <link rel="modulepreload" href="script.js">
-    <link rel="modulepreload" href="scripts/sillybunny-tabs.js?v=20260520b">
+    <link rel="modulepreload" href="scripts/sillybunny-tabs.js?v=20260522a">
     <link rel="preload" as="font" type="font/woff2" href="webfonts/Figtree/Figtree-Regular.woff2?v=20260422b" crossorigin>
     <link rel="manifest" crossorigin="use-credentials" href="manifest.json">
     <link href="webfonts/Figtree/stylesheet.css?v=20260422b" rel="stylesheet">
@@ -45,8 +45,8 @@
     <link rel="stylesheet" type="text/css" href="css/toggle-dependent.css">
     <link rel="stylesheet" type="text/css" href="css/select2-overrides.css">
     <link rel="stylesheet" type="text/css" href="css/mobile-styles.css?v=20260516d" media="(max-width: 768px)">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260520a">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260522a">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260522a">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260522b">
     <link rel="stylesheet" type="text/css" href="css/sillybunny-mobile-shell.css?v=20260522a" media="(max-width: 1000px)">
     <link rel="stylesheet" type="text/css" href="css/user.css">
     <!-- Scripts are loaded at the end of the body to improve page load speed -->
@@ -5861,6 +5861,15 @@
                                 </div>
                             </div>
                             </div>
+                            <div class="inline-drawer wide100p flexFlowColumn sb-settings-subdrawer" id="MobileSection">
+                                <div class="inline-drawer-toggle inline-drawer-header userSettingsInnerExpandable">
+                                    <b><i class="fa-solid fa-mobile-screen-button"></i> <span data-i18n="Mobile">Mobile</span></b>
+                                    <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
+                                </div>
+                                <div class="inline-drawer-content flex-container flexFlowColumn sb-settings-subdrawer-body" style="display:none">
+                                    <div id="sb-mobile-settings-outlet" class="flex-container flexFlowColumn"></div>
+                                </div>
+                            </div>
                             <div id="CustomCSS-block" class="inline-drawer wide100p flexFlowColumn sb-settings-subdrawer sb-settings-topdrawer-centered">
                                 <div class="inline-drawer-toggle inline-drawer-header userSettingsInnerExpandable" title="Apply a custom CSS style to the whole SillyBunny interface." data-i18n="[title]Apply a custom CSS style to the whole SillyBunny interface.">
                                     <b><span data-i18n="Custom CSS">Custom CSS</span></b>
@@ -8853,7 +8862,7 @@
     <script type="module" src="scripts/i18n.js"></script>
     <script type="module" src="scripts/performance-loader.js"></script>
     <script type="module" src="script.js"></script>
-    <script type="module" src="scripts/sillybunny-tabs.js?v=20260520b"></script>
+    <script type="module" src="scripts/sillybunny-tabs.js?v=20260522a"></script>
     <script>
         window.addEventListener('load', (event) => {
             const documentHeight = () => {

@@ -2525,6 +2525,69 @@ input[type='range']::-moz-range-thumb {
     }
 }
 
+@media screen and (max-width: 1000px) {
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) {
+        display: grid;
+        grid-template-columns: minmax(92px, 0.36fr) minmax(0, 1fr);
+        gap: 8px 10px;
+        align-items: center;
+        min-height: 0;
+        margin: 0;
+    }
+
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) > .range-block-title {
+        margin: 0;
+        justify-content: flex-start;
+        text-align: left;
+        font-size: calc(var(--mainFontSize) * 0.82);
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) > .range-block-range-and-counter {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(48px, auto);
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        width: 100%;
+        margin: 0;
+    }
+
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) .range-block-range {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) input[type='range'].neo-range-slider {
+        width: 100%;
+        max-width: none;
+        margin-inline: 0;
+    }
+
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) .neo-range-input {
+        width: 52px;
+        min-width: 52px;
+    }
+}
+
+@media screen and (max-width: 520px) {
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) {
+        grid-template-columns: minmax(76px, 0.34fr) minmax(0, 1fr);
+    }
+
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) > .range-block-range-and-counter {
+        grid-template-columns: minmax(0, 1fr) minmax(44px, auto);
+        gap: 6px;
+    }
+
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) .neo-range-input {
+        width: 46px;
+        min-width: 46px;
+        padding-inline: 4px;
+    }
+}
+
 .sb-presets-advanced-formatting {
     margin-top: 12px;
 }
