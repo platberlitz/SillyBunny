@@ -891,7 +891,11 @@ function registerSillyBunnyServiceWorker() {
     }
 
     const register = () => {
-        navigator.serviceWorker.register('/sw.js').catch((error) => {
+        navigator.serviceWorker.register('/sw.js?v=20260522g', { updateViaCache: 'none' }).then((registration) => {
+            return registration.update().catch((error) => {
+                console.warn('Failed to update SillyBunny service worker.', error);
+            });
+        }).catch((error) => {
             console.warn('Failed to register SillyBunny service worker.', error);
         });
     };
