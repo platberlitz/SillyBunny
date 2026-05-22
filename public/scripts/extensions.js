@@ -325,6 +325,8 @@ export const extension_settings = {
         selectedProfile: '',
         /** @type {import('./extensions/connection-manager/index.js').ConnectionProfile[]} */
         profiles: [],
+        /** @type {import('./extensions/connection-manager/index.js').ConnectionProfileFolder[]} */
+        folders: [],
     },
     dice: {},
     /** @type {import('./char-data.js').RegexScriptData[]} */

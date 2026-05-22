@@ -28,6 +28,7 @@ let profileApplySequence = 0;
 
 const DEFAULT_SETTINGS = {
     profiles: [],
+    folders: [],
     selectedProfile: null,
 };
 
@@ -253,7 +254,310 @@ const profilesProvider = () => [
  * @property {string} [system-prompt] System prompt name
  * @property {number|string} [world-info-active-count] Active World Info entries count
  * @property {string[]} [exclude] Commands to exclude
+ * @property {string|null} [folderId] Folder identifier, or null for the root level
+ * @property {boolean|string} [fav] Whether this profile is a favorite
  */
+
+/**
+ * @typedef {Object} ConnectionProfileFolder
+ * @property {string} id Unique identifier
+ * @property {string} name Folder display name
+ * @property {number} sortOrder Folder sort order
+ */
+
+/**
+ * Normalizes a folder name for storage.
+ * @param {unknown} name Folder name
+ * @returns {string} Normalized folder name
+ */
+function normalizeFolderName(name) {
+    return collapseSpaces(DOMPurify.sanitize(String(name ?? ''))).trim();
+}
+
+/**
+ * Normalizes a folder id from UI/settings values.
+ * @param {unknown} folderId Folder id
+ * @returns {string|null} Normalized folder id
+ */
+function normalizeFolderId(folderId) {
+    return typeof folderId === 'string' && folderId.length > 0 ? folderId : null;
+}
+
+/**
+ * Gets the connection profile folders array.
+ * @returns {ConnectionProfileFolder[]} Folders
+ */
+function getConnectionProfileFolders() {
+    if (!Array.isArray(extension_settings.connectionManager.folders)) {
+        extension_settings.connectionManager.folders = [];
+    }
+
+    return extension_settings.connectionManager.folders;
+}
+
+/**
+ * Gets folders sorted by name.
+ * @returns {ConnectionProfileFolder[]} Sorted folders
+ */
+function getSortedFolders() {
+    return getConnectionProfileFolders().slice().sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Gets profiles sorted by name without mutating settings.
+ * @returns {ConnectionProfile[]} Sorted profiles
+ */
+function getSortedProfiles() {
+    return extension_settings.connectionManager.profiles.slice().sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? '')));
+}
+
+/**
+ * Counts profiles in a folder.
+ * @param {string} folderId Folder id
+ * @returns {number} Number of profiles in the folder
+ */
+function getFolderProfileCount(folderId) {
+    return extension_settings.connectionManager.profiles.filter(profile => profile.folderId === folderId).length;
+}
+
+/**
+ * Gets folder manager template data.
+ * @returns {{folders: Array<ConnectionProfileFolder & {profileCount: number}>, hasFolders: boolean}}
+ */
+function getFolderManagerTemplateData() {
+    const folders = getSortedFolders().map(folder => ({
+        ...folder,
+        profileCount: getFolderProfileCount(folder.id),
+    }));
+
+    return {
+        folders,
+        hasFolders: folders.length > 0,
+    };
+}
+
+/**
+ * Creates a new connection profile folder.
+ * @param {unknown} name Folder name
+ * @returns {ConnectionProfileFolder|null} Created folder, or null if invalid
+ */
+function createFolder(name) {
+    const folderName = normalizeFolderName(name);
+    if (!folderName) {
+        toastr.error(t`Folder name cannot be empty.`);
+        return null;
+    }
+
+    const folders = getConnectionProfileFolders();
+    const sortOrder = folders.reduce((max, folder) => Math.max(max, Number(folder.sortOrder) || 0), 0) + 1;
+    const folder = {
+        id: uuidv4(),
+        name: folderName,
+        sortOrder,
+    };
+
+    folders.push(folder);
+    return folder;
+}
+
+/**
+ * Renames a connection profile folder.
+ * @param {string} folderId Folder id
+ * @param {unknown} newName New folder name
+ * @returns {ConnectionProfileFolder|null} Renamed folder, or null if invalid
+ */
+function renameFolder(folderId, newName) {
+    const folder = getConnectionProfileFolders().find(x => x.id === folderId);
+    if (!folder) {
+        toastr.error(t`Folder not found.`);
+        return null;
+    }
+
+    const folderName = normalizeFolderName(newName);
+    if (!folderName) {
+        toastr.error(t`Folder name cannot be empty.`);
+        return null;
+    }
+
+    folder.name = folderName;
+    return folder;
+}
+
+/**
+ * Deletes a connection profile folder and moves contained profiles to root.
+ * @param {string} folderId Folder id
+ * @returns {{folder: ConnectionProfileFolder, affectedProfiles: Array<{oldProfile: ConnectionProfile, profile: ConnectionProfile}>}|null} Deleted folder and moved profiles
+ */
+function deleteFolder(folderId) {
+    const folders = getConnectionProfileFolders();
+    const index = folders.findIndex(x => x.id === folderId);
+    if (index === -1) {
+        toastr.error(t`Folder not found.`);
+        return null;
+    }
+
+    const [folder] = folders.splice(index, 1);
+    const affectedProfiles = extension_settings.connectionManager.profiles
+        .filter(profile => profile.folderId === folderId)
+        .map(profile => ({ oldProfile: structuredClone(profile), profile }));
+
+    for (const { profile } of affectedProfiles) {
+        profile.folderId = null;
+    }
+
+    return { folder, affectedProfiles };
+}
+
+/**
+ * Moves a connection profile to a folder.
+ * @param {string} profileId Profile id
+ * @param {string|null} folderId Folder id, or null for root
+ * @returns {boolean} Whether the profile was moved
+ */
+function moveProfileToFolder(profileId, folderId) {
+    const profile = extension_settings.connectionManager.profiles.find(x => x.id === profileId);
+    if (!profile) {
+        toastr.error(t`Profile not found.`);
+        return false;
+    }
+
+    const normalizedFolderId = normalizeFolderId(folderId);
+    if (normalizedFolderId && !getConnectionProfileFolders().some(folder => folder.id === normalizedFolderId)) {
+        toastr.error(t`Folder not found.`);
+        return false;
+    }
+
+    if (profile.folderId === normalizedFolderId) {
+        return false;
+    }
+
+    profile.folderId = normalizedFolderId;
+    return true;
+}
+
+/**
+ * Toggles a connection profile favorite state.
+ * @param {string} profileId Profile id
+ * @returns {ConnectionProfile|null} Updated profile, or null if missing
+ */
+function toggleProfileFavorite(profileId) {
+    const profile = extension_settings.connectionManager.profiles.find(x => x.id === profileId);
+    if (!profile) {
+        toastr.error(t`Profile not found.`);
+        return null;
+    }
+
+    profile.fav = !profile.fav;
+    return profile;
+}
+
+/**
+ * Updates the favorite button state.
+ * @param {boolean} isFavorite Whether the selected profile is a favorite
+ */
+function updateFavoriteButtonState(isFavorite) {
+    const button = document.getElementById('toggle_profile_favorite');
+    if (!button) {
+        return;
+    }
+
+    const hasProfile = Boolean(extension_settings.connectionManager.selectedProfile);
+    const title = !hasProfile
+        ? t`Select a profile to toggle favorite`
+        : isFavorite
+            ? t`Remove from favorites`
+            : t`Add to favorites`;
+
+    button.classList.toggle('is_fav', isFavorite);
+    button.setAttribute('aria-pressed', String(isFavorite));
+    button.setAttribute('aria-label', title);
+    button.title = title;
+}
+
+/**
+ * Migrates and validates connection manager settings.
+ * @returns {boolean} Whether settings were changed
+ */
+function migrateConnectionManagerSettings() {
+    const settings = extension_settings.connectionManager;
+    let changed = false;
+
+    if (!Array.isArray(settings.profiles)) {
+        settings.profiles = [];
+        changed = true;
+    }
+
+    if (!Array.isArray(settings.folders)) {
+        settings.folders = [];
+        changed = true;
+    }
+
+    const seenFolderIds = new Set();
+    /** @type {ConnectionProfileFolder[]} */
+    const normalizedFolders = [];
+
+    for (const [index, folder] of settings.folders.entries()) {
+        if (!folder || typeof folder !== 'object') {
+            changed = true;
+            continue;
+        }
+
+        const id = typeof folder.id === 'string' && folder.id ? folder.id : uuidv4();
+        if (seenFolderIds.has(id)) {
+            changed = true;
+            continue;
+        }
+
+        const name = normalizeFolderName(folder.name);
+        if (!name) {
+            changed = true;
+            continue;
+        }
+
+        const sortOrder = Number.isFinite(Number(folder.sortOrder)) ? Number(folder.sortOrder) : index;
+        normalizedFolders.push({ id, name, sortOrder });
+        seenFolderIds.add(id);
+
+        if (id !== folder.id || name !== folder.name || sortOrder !== folder.sortOrder) {
+            changed = true;
+        }
+    }
+
+    if (normalizedFolders.length !== settings.folders.length) {
+        changed = true;
+    }
+    settings.folders = normalizedFolders;
+
+    const folderIds = new Set(normalizedFolders.map(folder => folder.id));
+    for (const profile of settings.profiles) {
+        if (!profile || typeof profile !== 'object') {
+            continue;
+        }
+
+        const normalizedFolderId = normalizeFolderId(profile.folderId);
+        if (normalizedFolderId && !folderIds.has(normalizedFolderId)) {
+            console.warn(`Connection profile "${profile.name ?? profile.id}" referenced a missing folder. Moving it to root.`);
+            profile.folderId = null;
+            changed = true;
+        } else if (profile.folderId !== normalizedFolderId) {
+            profile.folderId = normalizedFolderId;
+            changed = true;
+        }
+
+        const isFavorite = profile.fav === true || profile.fav === 'true';
+        if (profile.fav !== isFavorite) {
+            profile.fav = isFavorite;
+            changed = true;
+        }
+    }
+
+    if (settings.selectedProfile && !settings.profiles.some(profile => profile?.id === settings.selectedProfile)) {
+        settings.selectedProfile = null;
+        changed = true;
+    }
+
+    return changed;
+}
 
 /**
  * Finds the best match for the search value.
@@ -413,6 +717,8 @@ async function createConnectionProfile(forceName = null) {
         id,
         mode,
         exclude: [],
+        folderId: null,
+        fav: false,
     };
 
     await readProfileFromCommands(mode, profile);
@@ -677,19 +983,60 @@ async function updateConnectionProfile(profile) {
  */
 function renderConnectionProfiles(profiles) {
     profiles.innerHTML = '';
+    const selectedProfileId = extension_settings.connectionManager.selectedProfile;
     const noneOption = document.createElement('option');
 
     noneOption.value = '';
     noneOption.textContent = NONE;
-    noneOption.selected = !extension_settings.connectionManager.selectedProfile;
+    noneOption.selected = !selectedProfileId;
     profiles.appendChild(noneOption);
 
-    for (const profile of extension_settings.connectionManager.profiles.sort((a, b) => a.name.localeCompare(b.name))) {
+    /**
+     * Creates an option element for a profile.
+     * @param {ConnectionProfile} profile Connection profile
+     * @param {boolean} [allowSelected] Whether this option can become the visible selected option
+     * @returns {HTMLOptionElement} Profile option
+     */
+    function createProfileOption(profile, allowSelected = true) {
         const option = document.createElement('option');
         option.value = profile.id;
-        option.textContent = profile.name;
-        option.selected = profile.id === extension_settings.connectionManager.selectedProfile;
-        profiles.appendChild(option);
+        option.textContent = `${profile.fav ? '★ ' : ''}${profile.name}`;
+        option.selected = allowSelected && profile.id === selectedProfileId;
+        option.dataset.folderId = profile.folderId ?? '';
+        option.dataset.favorite = String(Boolean(profile.fav));
+        return option;
+    }
+
+    const sortedProfiles = getSortedProfiles();
+    const favoriteProfiles = sortedProfiles.filter(profile => profile.fav);
+
+    if (favoriteProfiles.length > 0) {
+        const favoritesGroup = document.createElement('optgroup');
+        favoritesGroup.label = '★ Favorites';
+        for (const profile of favoriteProfiles) {
+            favoritesGroup.appendChild(createProfileOption(profile, false));
+        }
+        profiles.appendChild(favoritesGroup);
+    }
+
+    const rootProfiles = sortedProfiles.filter(profile => !profile.folderId);
+    for (const profile of rootProfiles) {
+        profiles.appendChild(createProfileOption(profile));
+    }
+
+    for (const folder of getSortedFolders()) {
+        const folderProfiles = sortedProfiles.filter(profile => profile.folderId === folder.id);
+        if (folderProfiles.length === 0) {
+            continue;
+        }
+
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = `📁 ${folder.name}`;
+        for (const profile of folderProfiles) {
+            optgroup.appendChild(createProfileOption(profile));
+        }
+
+        profiles.appendChild(optgroup);
     }
 }
 
@@ -936,10 +1283,16 @@ async function generateStreamCallback(args, value) {
 export async function init() {
     extension_settings.connectionManager = extension_settings.connectionManager || structuredClone(DEFAULT_SETTINGS);
 
+    let settingsChanged = false;
     for (const key of Object.keys(DEFAULT_SETTINGS)) {
         if (extension_settings.connectionManager[key] === undefined) {
-            extension_settings.connectionManager[key] = DEFAULT_SETTINGS[key];
+            extension_settings.connectionManager[key] = structuredClone(DEFAULT_SETTINGS[key]);
+            settingsChanged = true;
         }
+    }
+    settingsChanged = migrateConnectionManagerSettings() || settingsChanged;
+    if (settingsChanged) {
+        await saveSettings();
     }
 
     const container = document.getElementById('rm_api_block');
@@ -949,6 +1302,7 @@ export async function init() {
     /** @type {HTMLSelectElement} */
     // @ts-ignore
     const profiles = document.getElementById('connection_profiles');
+    const detailsContent = document.getElementById('connection_profile_details_content');
     renderConnectionProfiles(profiles);
 
     /**
@@ -980,16 +1334,176 @@ export async function init() {
 
     function toggleProfileSpecificButtons() {
         const profileId = extension_settings.connectionManager.selectedProfile;
+        const profile = extension_settings.connectionManager.profiles.find(p => p.id === profileId);
         const profileSpecificButtons = [
             'view_connection_profile',
             'update_connection_profile',
             'edit_connection_profile',
+            'toggle_profile_favorite',
             'reload_connection_profile',
             'delete_connection_profile',
         ];
         profileSpecificButtons.forEach(id => setActionButtonDisabled(document.getElementById(id), !profileId));
+        updateFavoriteButtonState(Boolean(profile?.fav));
     }
     toggleProfileSpecificButtons();
+
+    /**
+     * Refreshes profile organization controls after folder/favorite changes.
+     * @returns {Promise<void>}
+     */
+    async function refreshProfileOrganizationUi() {
+        renderConnectionProfiles(profiles);
+        await renderDetailsContent(detailsContent);
+        toggleProfileSpecificButtons();
+    }
+
+    /**
+     * Emits profile update events for changed profiles.
+     * @param {Array<{oldProfile: ConnectionProfile, profile: ConnectionProfile}>} profilePairs Changed profiles
+     * @returns {Promise<void>}
+     */
+    async function emitProfileUpdatePairs(profilePairs) {
+        for (const { oldProfile, profile } of profilePairs) {
+            await eventSource.emit(event_types.CONNECTION_PROFILE_UPDATED, oldProfile, profile);
+        }
+    }
+
+    /**
+     * Opens the profile folder manager popup.
+     * @returns {Promise<void>}
+     */
+    async function showProfileFolderManager() {
+        /** @type {Popup|null} */
+        let popup = null;
+
+        async function refreshFolderManagerContent() {
+            if (!popup) {
+                return;
+            }
+
+            const content = await buildFolderManagerContent();
+            popup.content.innerHTML = '';
+            $(popup.content).append(content);
+        }
+
+        async function buildFolderManagerContent() {
+            const template = $(await renderExtensionTemplateAsync(MODULE_NAME, 'folder-manager', getFolderManagerTemplateData()));
+
+            template.find('#add_new_folder').on('click', async () => {
+                const nameInput = template.find('#new_profile_folder_name');
+                const folder = createFolder(nameInput.val());
+                if (!folder) {
+                    return;
+                }
+
+                await saveSettings();
+                await refreshProfileOrganizationUi();
+                await refreshFolderManagerContent();
+                toastr.success(t`Profile folder created.`);
+            });
+            template.find('#new_profile_folder_name').on('keydown', function (event) {
+                if (event.key !== 'Enter') {
+                    return;
+                }
+
+                event.preventDefault();
+                template.find('#add_new_folder').trigger('click');
+            });
+
+            template.find('.folder-name-input').on('change', async function () {
+                const input = $(this);
+                const originalName = String(input.data('originalName') ?? '');
+                const folderId = String(input.closest('.folder-item').data('folderId') ?? '');
+                const newName = normalizeFolderName(input.val());
+
+                if (newName === originalName) {
+                    input.val(originalName);
+                    return;
+                }
+
+                const folder = renameFolder(folderId, newName);
+                if (!folder) {
+                    input.val(originalName);
+                    return;
+                }
+
+                await saveSettings();
+                await refreshProfileOrganizationUi();
+                await refreshFolderManagerContent();
+                toastr.success(t`Profile folder renamed.`);
+            });
+
+            template.find('.folder-delete-btn').on('click', async function () {
+                const folderId = String($(this).closest('.folder-item').data('folderId') ?? '');
+                const folder = getConnectionProfileFolders().find(x => x.id === folderId);
+                if (!folder) {
+                    toastr.error(t`Folder not found.`);
+                    return;
+                }
+
+                const profileCount = getFolderProfileCount(folderId);
+                const confirm = await Popup.show.confirm(
+                    t`Delete profile folder?`,
+                    profileCount > 0
+                        ? t`Deleting "${folder.name}" will move ${profileCount} profile(s) to the root level.`
+                        : folder.name,
+                );
+                if (!confirm) {
+                    return;
+                }
+
+                const result = deleteFolder(folderId);
+                if (!result) {
+                    return;
+                }
+
+                await saveSettings();
+                await emitProfileUpdatePairs(result.affectedProfiles);
+                await refreshProfileOrganizationUi();
+                await refreshFolderManagerContent();
+                toastr.success(t`Profile folder deleted.`);
+            });
+
+            return template;
+        }
+
+        const content = await buildFolderManagerContent();
+        popup = new Popup(content, POPUP_TYPE.TEXT, '', {
+            okButton: t`Close`,
+            cancelButton: false,
+            wide: true,
+            allowVerticalScrolling: true,
+        });
+        await popup.show();
+    }
+
+    const manageFoldersButton = document.getElementById('manage_profile_folders');
+    manageFoldersButton?.addEventListener('click', showProfileFolderManager);
+
+    const favoriteButton = document.getElementById('toggle_profile_favorite');
+    favoriteButton?.addEventListener('click', async () => {
+        if (isActionButtonDisabled(favoriteButton)) {
+            return;
+        }
+
+        const profileId = extension_settings.connectionManager.selectedProfile;
+        const profile = extension_settings.connectionManager.profiles.find(p => p.id === profileId);
+        if (!profile) {
+            toastr.warning(t`No profile selected.`);
+            return;
+        }
+
+        const oldProfile = structuredClone(profile);
+        const updatedProfile = toggleProfileFavorite(profile.id);
+        if (!updatedProfile) {
+            return;
+        }
+
+        await saveSettings();
+        await eventSource.emit(event_types.CONNECTION_PROFILE_UPDATED, oldProfile, updatedProfile);
+        await refreshProfileOrganizationUi();
+    });
 
     profiles.addEventListener('change', async function () {
         const applySequence = ++profileApplySequence;
@@ -1147,7 +1661,11 @@ export async function init() {
             acc[fancyName] = !profile.exclude.includes(command);
             return acc;
         }, {});
-        const template = $(await renderExtensionTemplateAsync(MODULE_NAME, 'edit', { name: profile.name, settings }));
+        const folders = getSortedFolders().map(folder => ({
+            ...folder,
+            selected: folder.id === profile.folderId,
+        }));
+        const template = $(await renderExtensionTemplateAsync(MODULE_NAME, 'edit', { name: profile.name, settings, folders }));
         let newName = await callGenericPopup(template, POPUP_TYPE.INPUT, profile.name, {
             customButtons: [{
                 text: t`Save and Update`,
@@ -1177,8 +1695,11 @@ export async function init() {
         const newExcludeList = template.find('input[name="exclude"]:not(:checked)').map(function () {
             return Object.entries(FANCY_NAMES).find(x => x[1] === String($(this).val()))?.[0];
         }).get();
+        const newFolderId = normalizeFolderId(template.find('#profile_folder_select').val());
 
         const oldProfile = structuredClone(profile);
+        moveProfileToFolder(profile.id, newFolderId);
+
         if (newExcludeList.length !== profile.exclude.length || !newExcludeList.every(e => profile.exclude.includes(e))) {
             profile.exclude = newExcludeList;
             for (const command of newExcludeList) {
@@ -1204,7 +1725,6 @@ export async function init() {
 
     /** @type {HTMLElement} */
     const viewDetails = document.getElementById('view_connection_profile');
-    const detailsContent = document.getElementById('connection_profile_details_content');
     viewDetails.addEventListener('click', async () => {
         if (isActionButtonDisabled(viewDetails)) {
             return;
