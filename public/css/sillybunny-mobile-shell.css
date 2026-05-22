@@ -562,8 +562,8 @@
 
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) > .scrollableInner,
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) > .scrollableInnerFull {
-        padding-inline-start: 20px !important;
-        padding-inline-end: calc(20px + var(--sb-character-scroll-gutter, 8px)) !important;
+        scrollbar-gutter: auto !important;
+        padding-inline: var(--sb-character-editor-mobile-edge, 6px) !important;
     }
 
     #right-nav-panel.openDrawer #rm_print_characters_block,
@@ -571,6 +571,15 @@
         box-sizing: border-box !important;
         scrollbar-gutter: stable !important;
         padding-inline-end: var(--sb-character-scroll-gutter, 8px) !important;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #rm_ch_create_block {
+        scrollbar-gutter: auto !important;
+        padding-inline: 0 !important;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #form_create {
+        padding-inline: 0 !important;
     }
 
     #right-nav-panel.openDrawer .sb-shell-panel-scroller {
