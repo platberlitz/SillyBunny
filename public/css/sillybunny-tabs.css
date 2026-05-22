@@ -7488,6 +7488,12 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 
 }
 
+@media screen and (min-width: 769px) and (max-width: 1000px) {
+    #sb-left-shell-toggle {
+        display: inline-flex;
+    }
+}
+
 @media screen and (max-width: 450px) {
     .sb-mobile-section-list {
         grid-template-columns: 1fr;

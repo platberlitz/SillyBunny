@@ -12110,6 +12110,24 @@ function createCustomizeGroup() {
     return customizeGroup;
 }
 
+function createWorkspaceApiGroup() {
+    const workspaceApiGroup = createElement('div', {
+        className: 'sb-shell-rail-group sb-shell-rail-group-workspace-api',
+        attrs: {
+            'aria-label': 'Workspace',
+        },
+    });
+
+    for (const action of SB_MOBILE_RAIL_WORKSPACE_API_ACTIONS) {
+        const button = createMobileShellRailButton(action, activateMobileNavAction, 'sb-shell-rail-workspace-api-action');
+        if (button) {
+            workspaceApiGroup.appendChild(button);
+        }
+    }
+
+    return workspaceApiGroup;
+}
+
 function syncMobileShellRailActions(shellKey = null) {
     const shellKeys = shellKey ? [shellKey] : ['left', 'right'];
     const hasVerticalRail = sbState.mobileNav.layout === 'vertical';
@@ -12168,11 +12186,13 @@ function syncMobileShellRailActions(shellKey = null) {
 
         const beforeBlock = createRailBlock('before');
 
-        if (sbState.mobileNav.showCustomize) {
-            beforeBlock.appendChild(createMobileShellRailDivider('Customize'));
+        if (sbState.mobileNav.showWorkspaceApi) {
+            beforeBlock.appendChild(createMobileShellRailDivider('Workspace'));
+            beforeBlock.appendChild(createWorkspaceApiGroup());
         }
 
         if (sbState.mobileNav.showCustomize) {
+            beforeBlock.appendChild(createMobileShellRailDivider('Customize'));
             beforeBlock.appendChild(createCustomizeGroup());
         }
 
