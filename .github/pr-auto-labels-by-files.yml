@@ -12,7 +12,6 @@
     - "webpack.config.js"
     - "Start.bat"
     - "start.sh"
-    - "UpdateAndStart.bat"
 
 ⚙️ config.yaml:
 - changed-files:
