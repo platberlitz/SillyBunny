@@ -12134,7 +12134,7 @@ function syncMobileShellRailTabVisibility(shellState, currentShellKey, hideCusto
 
 function syncMobileShellRailActions(shellKey = null) {
     const shellKeys = shellKey ? [shellKey] : ['left', 'right'];
-    const hasVerticalRail = sbState.mobileNav.layout === 'vertical';
+    const hasVerticalRail = isMobileViewport() && sbState.mobileNav.layout === 'vertical';
 
     for (const currentShellKey of shellKeys) {
         const shellState = getShellState(currentShellKey);
@@ -12999,6 +12999,7 @@ function syncMobileViewportState() {
         closeMobileChatTools();
     }
 
+    syncMobileShellRailActions();
     syncDesktopShellSizing();
     applyTopbarOffset();
     syncChatbarVisibilityState();

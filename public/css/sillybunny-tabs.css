@@ -7675,7 +7675,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     }
 }
 
-@media screen {
+@media screen and (max-width: 768px) {
     :root[data-sb-mobile-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-frame,
     :root[data-sb-mobile-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-frame {
         flex-direction: row;
