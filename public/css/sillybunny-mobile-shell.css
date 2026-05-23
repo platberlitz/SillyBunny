@@ -566,6 +566,16 @@
         max-width: 9em !important;
     }
 
+    #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_create {
+        width: 38px !important;
+        min-width: 38px !important;
+        max-width: 38px !important;
+        height: 38px !important;
+        min-height: 38px !important;
+        max-height: 38px !important;
+        padding: 0 !important;
+    }
+
     #right-nav-panel.openDrawer .sb-character-create-bar :is(#rm_button_search, #rm_print_characters_pagination .menu_button, #rm_print_characters_pagination .paginationjs-pages ul li a) {
         width: 38px !important;
         min-width: 38px !important;
@@ -631,7 +641,8 @@
     }
 
     #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_create::after {
-        content: 'Create' !important;
+        content: none !important;
+        display: none !important;
     }
 
     #right-nav-panel.openDrawer .sb-character-create-bar #rm_button_group_chats::after {
