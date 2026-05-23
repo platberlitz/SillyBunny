@@ -1096,11 +1096,11 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 }
 
 #send_form.sb-generating-controls {
-    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 58%, var(--sb-shell-border));
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 72%, var(--sb-shell-border));
     box-shadow:
         0 -10px 40px color-mix(in srgb, var(--SmartThemeShadowColor) 14%, transparent),
-        0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 32%, transparent),
-        inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 24%, transparent);
+        0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 48%, transparent),
+        inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 36%, transparent);
 }
 
 #send_form.sb-generating-controls::after {
@@ -1112,15 +1112,15 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     inline-size: min(72px, 34%);
     block-size: 3px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 78%, var(--SmartThemeBodyColor));
+    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 88%, var(--SmartThemeBodyColor));
     transform: translateX(-50%);
     pointer-events: none;
 }
 
 #send_form.sb-generating-controls #nonQRFormItems {
-    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 44%, var(--sb-shell-border));
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 58%, var(--sb-shell-border));
     background:
-        linear-gradient(180deg, color-mix(in srgb, var(--color-primary, var(--sb-accent)) 9%, transparent), transparent 82%),
+        linear-gradient(180deg, color-mix(in srgb, var(--color-primary, var(--sb-accent)) 14%, transparent), transparent 82%),
         color-mix(in srgb, var(--SmartThemeBodyColor) 5%, var(--sb-composer-surface-base, transparent));
 }
 
