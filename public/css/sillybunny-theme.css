@@ -3713,6 +3713,37 @@ input[type='range']::-moz-range-thumb {
     max-height: var(--sb-preset-row-control-size) !important;
 }
 
+:is(#kobold_api-presets, #novel_api-presets, #textgenerationwebui_api-presets) .sb-non-chat-preset-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    align-items: stretch;
+}
+
+:is(#kobold_api-presets, #novel_api-presets, #textgenerationwebui_api-presets) .sb-non-chat-preset-row > select {
+    width: 100%;
+    min-width: 0;
+}
+
+:is(#kobold_api-presets, #novel_api-presets, #textgenerationwebui_api-presets) .sb-non-chat-preset-actions {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+:is(#kobold_api-presets, #novel_api-presets, #textgenerationwebui_api-presets) .sb-non-chat-preset-actions > .menu_button,
+:is(#kobold_api-presets, #novel_api-presets, #textgenerationwebui_api-presets) .sb-non-chat-preset-actions > .menu_button_icon {
+    width: var(--sb-preset-row-control-size, var(--sb-field-min-height)) !important;
+    min-width: var(--sb-preset-row-control-size, var(--sb-field-min-height)) !important;
+    max-width: var(--sb-preset-row-control-size, var(--sb-field-min-height)) !important;
+    height: var(--sb-preset-row-control-size, var(--sb-field-min-height)) !important;
+    min-height: var(--sb-preset-row-control-size, var(--sb-field-min-height)) !important;
+    max-height: var(--sb-preset-row-control-size, var(--sb-field-min-height)) !important;
+}
+
 @media screen and (max-width: 760px) {
     #openai_api-presets .flex-container.flexNoGap {
         grid-template-columns: 1fr;
@@ -5923,12 +5954,12 @@ input[type='range']::-moz-range-thumb {
     }
 
     #textgenerationwebui_api-presets .flex-container.marginLeft5:has(> [data-preset-manager-file='textgenerationwebui']) {
-        flex: 0 1 auto;
+        flex: 1 1 100%;
         flex-wrap: wrap;
-        justify-content: flex-end;
-        margin-left: 6px;
+        justify-content: flex-start;
+        margin-left: 0;
         gap: 4px;
-        max-width: min(192px, 46vw);
+        max-width: 100%;
     }
 
     #textgenerationwebui_api-presets .flex-container.marginLeft5:has(> [data-preset-manager-file='textgenerationwebui']) > .menu_button,
@@ -5949,5 +5980,83 @@ input[type='range']::-moz-range-thumb {
         height: 34px;
         min-height: 34px;
         font-size: calc(var(--mainFontSize) * 0.9);
+    }
+
+    :is(#kobold_api-presets, #novel_api-presets, #textgenerationwebui_api-presets) .sb-non-chat-preset-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    :is(#kobold_api-presets, #novel_api-presets, #textgenerationwebui_api-presets) .sb-non-chat-preset-row > select {
+        width: 100%;
+        min-width: 0;
+    }
+
+    :is(#kobold_api-presets, #novel_api-presets, #textgenerationwebui_api-presets) .sb-non-chat-preset-actions {
+        width: 100%;
+        max-width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    :is(#kobold_api-presets, #novel_api-presets, #textgenerationwebui_api-presets) .sb-non-chat-preset-actions > .menu_button,
+    :is(#kobold_api-presets, #novel_api-presets, #textgenerationwebui_api-presets) .sb-non-chat-preset-actions > .menu_button_icon {
+        width: 36px !important;
+        min-width: 36px !important;
+        max-width: 36px !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        max-height: 36px !important;
+        padding: 0 !important;
+        border-radius: 10px;
+    }
+
+    #kobold_api-settings > .flex-container.gap10h5v.justifyCenter > .alignitemscenter.flex-container:has(> input[type='range'].neo-range-slider) {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(46px, auto);
+        gap: 6px;
+        align-items: center;
+        width: 100%;
+        flex: 1 1 100%;
+        flex-basis: 100%;
+        min-width: 0;
+        margin: 0;
+    }
+
+    #kobold_api-settings > .flex-container.gap10h5v.justifyCenter > .alignitemscenter.flex-container:has(> input[type='range'].neo-range-slider) > small {
+        grid-column: 1 / -1;
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 4px;
+        width: 100%;
+        min-width: 0;
+        margin: 0;
+        text-align: left;
+        font-size: calc(var(--mainFontSize) * 0.82);
+        font-weight: 700;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    #kobold_api-settings > .flex-container.gap10h5v.justifyCenter > .alignitemscenter.flex-container:has(> input[type='range'].neo-range-slider) > input[type='range'].neo-range-slider {
+        grid-column: 1;
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        margin: 0;
+    }
+
+    #kobold_api-settings > .flex-container.gap10h5v.justifyCenter > .alignitemscenter.flex-container:has(> input[type='range'].neo-range-slider) > .neo-range-input {
+        grid-column: 2;
+        width: 46px;
+        min-width: 46px;
+        margin: 0;
+        padding-inline: 4px;
+        text-align: center;
     }
 }

@@ -2292,12 +2292,6 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 78%, transparent);
 }
 
-.sb-shell-title:focus-visible {
-    outline: none;
-    border-radius: var(--sb-radius-sm);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 72%, transparent);
-}
-
 #sb_character_editor_exit {
     display: none;
     flex: 0 0 auto;
@@ -2334,6 +2328,10 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     font-weight: var(--sb-weight-title);
     line-height: var(--sb-line-title);
     text-align: left;
+}
+
+.sb-shell-title:focus-visible {
+    box-shadow: none;
 }
 
 .sb-shell-subtitle,
