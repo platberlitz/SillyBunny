@@ -2668,6 +2668,49 @@ input[type='range']::-moz-range-thumb {
         min-width: 52px;
     }
 
+    .sb-sampling-control-card > :is(.alignitemscenter, .alignItemsCenter).flex-container:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers]:has(> input[type='range'].neo-range-slider) {
+        display: grid !important;
+        grid-template-columns: minmax(92px, 0.34fr) minmax(0, 1fr) minmax(52px, auto);
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-height: 0;
+        margin: 0;
+    }
+
+    .sb-sampling-control-card > :is(.alignitemscenter, .alignItemsCenter).flex-container:has(> input[type='range'].neo-range-slider) > :is(small, label),
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers]:has(> input[type='range'].neo-range-slider) > :is(small, label) {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 4px;
+        min-width: 0;
+        margin: 0;
+        text-align: left;
+        font-size: calc(var(--mainFontSize) * 0.82);
+        font-weight: 700;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    .sb-sampling-control-card > :is(.alignitemscenter, .alignItemsCenter).flex-container:has(> input[type='range'].neo-range-slider) > input[type='range'].neo-range-slider,
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers]:has(> input[type='range'].neo-range-slider) > input[type='range'].neo-range-slider {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        margin: 0;
+    }
+
+    .sb-sampling-control-card > :is(.alignitemscenter, .alignItemsCenter).flex-container:has(> input[type='range'].neo-range-slider) > .neo-range-input,
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers]:has(> input[type='range'].neo-range-slider) > .neo-range-input {
+        width: 52px;
+        min-width: 52px;
+        margin: 0;
+        padding-inline: 5px;
+        text-align: center;
+    }
+
     .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) {
         display: grid;
         grid-template-columns: minmax(92px, 0.36fr) minmax(0, 1fr);
@@ -2712,6 +2755,208 @@ input[type='range']::-moz-range-thumb {
         min-width: 52px;
     }
 
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container.flexFlowRow {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container.flexFlowRow > div:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-multi-card > #contrastiveSearchBlock > .alignitemscenter:has(> input[type='range'].neo-range-slider) {
+        display: grid !important;
+        grid-template-columns: minmax(92px, 0.34fr) minmax(0, 1fr) minmax(52px, auto);
+        align-items: center;
+        justify-items: stretch;
+        gap: 8px;
+        width: 100%;
+        min-width: 0;
+        margin: 0;
+    }
+
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container.flexFlowRow > div:has(> input[type='range'].neo-range-slider) > :is(small, label),
+    .sb-sampling-multi-card > #contrastiveSearchBlock > .alignitemscenter:has(> input[type='range'].neo-range-slider) > :is(small, label) {
+        display: flex !important;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 4px;
+        min-height: 0;
+        min-width: 0;
+        margin: 0;
+        text-align: left;
+        font-size: calc(var(--mainFontSize) * 0.82);
+        font-weight: 700;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container.flexFlowRow > div:has(> input[type='range'].neo-range-slider) > input[type='range'].neo-range-slider,
+    .sb-sampling-multi-card > #contrastiveSearchBlock > .alignitemscenter:has(> input[type='range'].neo-range-slider) > input[type='range'].neo-range-slider {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        margin: 0;
+    }
+
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container.flexFlowRow > div:has(> input[type='range'].neo-range-slider) > .neo-range-input,
+    .sb-sampling-multi-card > #contrastiveSearchBlock > .alignitemscenter:has(> input[type='range'].neo-range-slider) > .neo-range-input {
+        width: 52px;
+        min-width: 52px;
+        margin: 0;
+        padding-inline: 5px;
+        text-align: center;
+    }
+
+    #left-nav-panel.openDrawer #pro-settings-block {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) {
+        display: grid !important;
+        grid-template-columns: minmax(92px, 0.34fr) minmax(0, 1fr) minmax(52px, auto);
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-width: 0;
+        flex: 1 1 auto;
+        flex-basis: auto;
+        margin: 0;
+    }
+
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) > small {
+        min-width: 0;
+        margin: 0;
+        text-align: left;
+        font-size: calc(var(--mainFontSize) * 0.82);
+        font-weight: 700;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) > input[type='range'].neo-range-slider {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        margin: 0;
+    }
+
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) > .wide100p:has(> .neo-range-input) {
+        width: auto;
+        min-width: 0;
+    }
+
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) > .wide100p > .neo-range-input {
+        width: 52px;
+        min-width: 52px;
+        margin: 0;
+        padding-inline: 5px;
+        text-align: center;
+    }
+
+    #left-nav-panel.openDrawer #amount_gen_block > :is(#streaming_textgenerationwebui_block, #streaming_kobold_block, #streaming_novel_block) {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+        margin-top: 0;
+    }
+
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .range-block-range-and-counter) {
+        display: grid;
+        grid-template-columns: minmax(92px, 0.34fr) minmax(0, 1fr);
+        align-items: center;
+        gap: 8px 10px;
+        margin: 0;
+    }
+
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .range-block-range-and-counter) > .range-block-title {
+        width: auto;
+        margin: 0;
+        text-align: left;
+        font-size: calc(var(--mainFontSize) * 0.82);
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .range-block-range-and-counter) > .range-block-range-and-counter {
+        grid-template-columns: minmax(0, 1fr) minmax(52px, auto);
+        gap: 8px;
+        margin: 0;
+    }
+
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .range-block-range-and-counter) input[type='range'] {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+    }
+
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .wide100p > #openai_max_tokens) {
+        display: grid;
+        grid-template-columns: minmax(92px, 0.34fr) minmax(52px, auto);
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+    }
+
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .wide100p > #openai_max_tokens) > .range-block-title {
+        width: auto;
+        margin: 0;
+        text-align: left;
+        font-size: calc(var(--mainFontSize) * 0.82);
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .wide100p > #openai_max_tokens) > .wide100p {
+        width: auto;
+        justify-content: flex-end;
+    }
+
     .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > #cfg_block_ooba,
     .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > #grammar_block_ooba {
         display: grid !important;
@@ -2751,6 +2996,24 @@ input[type='range']::-moz-range-thumb {
         gap: 6px;
     }
 
+    .sb-sampling-control-card > :is(.alignitemscenter, .alignItemsCenter).flex-container:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers]:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container.flexFlowRow > div:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-multi-card > #contrastiveSearchBlock > .alignitemscenter:has(> input[type='range'].neo-range-slider),
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) {
+        grid-template-columns: minmax(72px, 0.32fr) minmax(0, 1fr) minmax(46px, auto);
+        gap: 6px;
+    }
+
     .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers] > .neo-range-input {
         width: min(78px, 100%);
         min-width: 46px;
@@ -2773,17 +3036,44 @@ input[type='range']::-moz-range-thumb {
     }
 
     .sb-sampling-control-card > #cfg_block_ooba > .alignitemscenter {
-        grid-template-columns: minmax(0, 1fr) 46px;
+        grid-template-columns: minmax(72px, 0.32fr) minmax(0, 1fr) minmax(46px, auto);
     }
 
     .sb-sampling-control-card > #cfg_block_ooba > .alignitemscenter > small {
-        grid-column: 1 / -1;
+        grid-column: auto;
     }
 
     .sb-sampling-control-card > #cfg_block_ooba > .alignitemscenter > .neo-range-input {
         width: 46px;
         min-width: 46px;
         padding-inline: 4px;
+    }
+
+    .sb-sampling-control-card > :is(.alignitemscenter, .alignItemsCenter).flex-container:has(> input[type='range'].neo-range-slider) > .neo-range-input,
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers]:has(> input[type='range'].neo-range-slider) > .neo-range-input,
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container.flexFlowRow > div:has(> input[type='range'].neo-range-slider) > .neo-range-input,
+    .sb-sampling-multi-card > #contrastiveSearchBlock > .alignitemscenter:has(> input[type='range'].neo-range-slider) > .neo-range-input,
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) > .wide100p > .neo-range-input {
+        width: 46px;
+        min-width: 46px;
+        padding-inline: 4px;
+    }
+
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .range-block-range-and-counter) {
+        grid-template-columns: minmax(72px, 0.32fr) minmax(0, 1fr);
+    }
+
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .wide100p > #openai_max_tokens) {
+        grid-template-columns: minmax(72px, 0.32fr) minmax(46px, auto);
     }
 }
 

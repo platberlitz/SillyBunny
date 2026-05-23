@@ -203,6 +203,10 @@
         flex-direction: column !important;
     }
 
+    :root[data-sb-mobile-nav-layout='vertical'] #sb-hamburger {
+        display: none !important;
+    }
+
     :root[data-sb-mobile-nav-layout='vertical'] #right-nav-panel.openDrawer {
         display: grid !important;
         grid-template-columns: minmax(0, 1fr) 78px !important;
@@ -216,11 +220,15 @@
     }
 
     :root[data-sb-mobile-nav-layout='vertical'] #right-nav-panel.openDrawer > .sb-character-shell-nav-wrapper {
+        display: flex !important;
+        flex-direction: column !important;
         grid-area: nav !important;
         width: 78px !important;
         min-width: 78px !important;
         height: 100% !important;
+        max-height: 100% !important;
         min-height: 0 !important;
+        overflow: hidden !important;
         border-left: 1px solid color-mix(in srgb, var(--sb-shell-border) 80%, transparent) !important;
         border-bottom: 0 !important;
     }
@@ -263,6 +271,8 @@
 
     :root[data-sb-mobile-nav-layout='vertical'] #right-nav-panel.openDrawer .sb-character-shell-nav {
         height: 100% !important;
+        max-height: 100% !important;
+        min-height: 0 !important;
         width: 100% !important;
         flex-direction: column !important;
         align-items: stretch !important;
@@ -271,6 +281,9 @@
         padding: 16px 7px max(16px, var(--sb-mobile-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
         overflow-x: hidden !important;
         overflow-y: auto !important;
+        overscroll-behavior: contain !important;
+        -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-y !important;
         border-bottom: 0 !important;
         scrollbar-width: none !important;
     }
