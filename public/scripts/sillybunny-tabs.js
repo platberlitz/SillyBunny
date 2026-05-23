@@ -12129,7 +12129,7 @@ function syncMobileShellRailActions(shellKey = null) {
 
         shellState.nav.querySelectorAll('.sb-shell-rail-shortcuts').forEach(element => element.remove());
         const showCustomize = hasVerticalRail && sbState.mobileNav.showCustomize;
-        const shouldHideCustomizeTabs = currentShellKey === 'right' && showCustomize;
+        const shouldHideCustomizeTabs = showCustomize;
         syncMobileShellRailTabVisibility(shellState, currentShellKey, shouldHideCustomizeTabs);
 
         const createRailBlock = (position) => createElement('div', {
@@ -12139,7 +12139,7 @@ function syncMobileShellRailActions(shellKey = null) {
             },
         });
 
-        if (currentShellKey !== 'right' || !hasVerticalRail) {
+        if (!hasVerticalRail) {
             shellState.updateNavScrollIndicators?.();
             continue;
         }

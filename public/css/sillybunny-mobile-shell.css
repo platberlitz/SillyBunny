@@ -203,10 +203,6 @@
         flex-direction: column !important;
     }
 
-    :root[data-sb-mobile-nav-layout='vertical'] #sb-hamburger {
-        display: none !important;
-    }
-
     :root[data-sb-mobile-nav-layout='vertical'] #right-nav-panel.openDrawer {
         display: grid !important;
         grid-template-columns: minmax(0, 1fr) 78px !important;
