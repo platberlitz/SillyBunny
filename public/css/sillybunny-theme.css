@@ -5750,3 +5750,143 @@ input[type='range']::-moz-range-thumb {
         padding: 5px 7px;
     }
 }
+
+@media screen and (max-width: 480px) {
+    #AdvancedFormatting .title_restorable.standoutHeader {
+        gap: 6px;
+    }
+
+    #AdvancedFormatting .title_restorable.standoutHeader > .flex-container,
+    #AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5 {
+        gap: 5px;
+    }
+
+    #AdvancedFormatting .title_restorable.standoutHeader .menu_button,
+    #AdvancedFormatting .title_restorable.standoutHeader .menu_button_icon,
+    #AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5 > .menu_button,
+    #AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5 > .menu_button_icon {
+        width: 38px !important;
+        min-width: 38px !important;
+        max-width: 38px !important;
+        height: 38px !important;
+        min-height: 38px !important;
+        max-height: 38px !important;
+        padding: 0 !important;
+        border-radius: 12px;
+    }
+
+    #AdvancedFormatting .title_restorable.standoutHeader .menu_button i,
+    #AdvancedFormatting .title_restorable.standoutHeader .menu_button_icon i,
+    #AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5 > .menu_button i,
+    #AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5 > .menu_button_icon i {
+        font-size: calc(var(--mainFontSize) * 0.95);
+    }
+
+    #AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) {
+        --sb-preset-row-control-size: 38px;
+    }
+
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers='rep_pen_slope']:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers='rep_pen_frequency']:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers='rep_pen_presence']:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-multi-card > #smoothingBlock > .flex-container.flexFlowRow > div:has(> #smoothing_factor_textgenerationwebui),
+    .sb-sampling-multi-card > #xtc_block > .flex-container.flexFlowRow > div[data-tg-samplers='xtc_threshold']:has(> input[type='range'].neo-range-slider) {
+        grid-template-columns: minmax(0, 1fr) minmax(46px, auto);
+        gap: 5px 6px;
+    }
+
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers='rep_pen_slope']:has(> input[type='range'].neo-range-slider) > :is(small, label),
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers='rep_pen_frequency']:has(> input[type='range'].neo-range-slider) > :is(small, label),
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers='rep_pen_presence']:has(> input[type='range'].neo-range-slider) > :is(small, label),
+    .sb-sampling-multi-card > #smoothingBlock > .flex-container.flexFlowRow > div:has(> #smoothing_factor_textgenerationwebui) > :is(small, label),
+    .sb-sampling-multi-card > #xtc_block > .flex-container.flexFlowRow > div[data-tg-samplers='xtc_threshold']:has(> input[type='range'].neo-range-slider) > :is(small, label) {
+        grid-column: 1 / -1;
+    }
+
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers='rep_pen_slope']:has(> input[type='range'].neo-range-slider) > input[type='range'].neo-range-slider,
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers='rep_pen_frequency']:has(> input[type='range'].neo-range-slider) > input[type='range'].neo-range-slider,
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers='rep_pen_presence']:has(> input[type='range'].neo-range-slider) > input[type='range'].neo-range-slider,
+    .sb-sampling-multi-card > #smoothingBlock > .flex-container.flexFlowRow > div:has(> #smoothing_factor_textgenerationwebui) > input[type='range'].neo-range-slider,
+    .sb-sampling-multi-card > #xtc_block > .flex-container.flexFlowRow > div[data-tg-samplers='xtc_threshold']:has(> input[type='range'].neo-range-slider) > input[type='range'].neo-range-slider {
+        grid-column: 1;
+    }
+
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers='rep_pen_slope']:has(> input[type='range'].neo-range-slider) > .neo-range-input,
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers='rep_pen_frequency']:has(> input[type='range'].neo-range-slider) > .neo-range-input,
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers='rep_pen_presence']:has(> input[type='range'].neo-range-slider) > .neo-range-input,
+    .sb-sampling-multi-card > #smoothingBlock > .flex-container.flexFlowRow > div:has(> #smoothing_factor_textgenerationwebui) > .neo-range-input,
+    .sb-sampling-multi-card > #xtc_block > .flex-container.flexFlowRow > div[data-tg-samplers='xtc_threshold']:has(> input[type='range'].neo-range-slider) > .neo-range-input {
+        grid-column: 2;
+    }
+
+    #left-nav-panel.openDrawer #max_context_block {
+        grid-template-columns: minmax(72px, 0.32fr) minmax(0, 1fr) minmax(46px, auto);
+    }
+
+    #left-nav-panel.openDrawer #max_context_block > .quick_context_size_container {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-direction: row !important;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 6px;
+        width: 100%;
+        margin-top: 0;
+    }
+
+    #left-nav-panel.openDrawer #max_context_block .quick_context_size {
+        flex: 0 0 52px;
+        width: 52px;
+        min-width: 52px;
+        max-width: 52px;
+        height: 32px;
+        min-height: 32px;
+        max-height: 32px;
+    }
+
+    #PersonaManagement .persona-management-actions,
+    #PersonaManagement .persona-management-browser {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+    }
+
+    #PersonaManagement .persona-management-actions > .menu_button,
+    #PersonaManagement .persona-management-browser > #create_dummy_persona {
+        flex: 0 0 44px;
+        width: 44px;
+        min-width: 44px;
+        max-width: 44px;
+        height: 44px;
+        min-height: 44px;
+        max-height: 44px;
+        padding: 0;
+        justify-content: center;
+        gap: 0;
+    }
+
+    #PersonaManagement .persona-management-actions > .menu_button > span,
+    #PersonaManagement .persona-management-browser > #create_dummy_persona > div {
+        display: none;
+    }
+
+    #PersonaManagement .persona-management-browser > #persona_search_bar {
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+    }
+
+    #PersonaManagement .persona-management-browser > #persona_sort_order,
+    #PersonaManagement .persona-management-browser > #persona_grid_toggle {
+        flex: 0 0 auto;
+        width: auto;
+    }
+
+    #PersonaManagement .persona-management-browser > #persona_pagination_container {
+        flex: 1 1 120px;
+        min-width: 0;
+        width: auto;
+    }
+}

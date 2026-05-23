@@ -6871,8 +6871,14 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         display: inline-flex;
     }
 
-    #sb-left-shell-toggle {
+    #sb-left-shell-toggle,
+    #sb-right-shell-toggle {
         display: none;
+    }
+
+    :root[data-sb-mobile-nav-layout='horizontal'][data-sb-mobile-nav-customize='shown'] #sb-left-shell-toggle,
+    :root[data-sb-mobile-nav-layout='horizontal'][data-sb-mobile-nav-customize='shown'] #sb-right-shell-toggle {
+        display: inline-flex;
     }
 
     #sb-topbar-inner {
@@ -6923,6 +6929,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     #sb-hamburger,
     #sb-api-toggle,
     #sb-home-toggle,
+    #sb-left-shell-toggle,
     #sb-right-shell-toggle,
     #sb-character-toggle,
     #sb-chatbar-visibility-toggle {
@@ -6937,6 +6944,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     #sb-hamburger span,
     #sb-api-toggle span,
     #sb-home-toggle span,
+    #sb-left-shell-toggle span,
     #sb-right-shell-toggle span,
     #sb-character-toggle span,
     #sb-chatbar-visibility-toggle span {
@@ -6946,6 +6954,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     #sb-hamburger::after,
     #sb-api-toggle::after,
     #sb-home-toggle::after,
+    #sb-left-shell-toggle::after,
     #sb-right-shell-toggle::after,
     #sb-character-toggle::after,
     #sb-chatbar-visibility-toggle::after {
@@ -6957,6 +6966,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     #sb-hamburger i,
     #sb-api-toggle i,
     #sb-home-toggle i,
+    #sb-left-shell-toggle i,
     #sb-right-shell-toggle i,
     #sb-character-toggle i,
     #sb-chatbar-visibility-toggle i {
@@ -7502,6 +7512,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     #sb-hamburger,
     #sb-api-toggle,
     #sb-home-toggle,
+    #sb-left-shell-toggle,
     #sb-right-shell-toggle,
     #sb-character-toggle {
         min-width: var(--sb-mobile-toggle-size);
