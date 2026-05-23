@@ -1319,6 +1319,7 @@ body:not(.movingUI) .drawer-content.maximized {
 #right-nav-panel.openDrawer {
     opacity: 1;
     visibility: visible;
+    z-index: var(--sb-z-shell-panel);
     transition: opacity var(--sb-transition-fast);
 }
 
