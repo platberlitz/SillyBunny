@@ -6871,13 +6871,11 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         display: inline-flex;
     }
 
-    #sb-left-shell-toggle,
-    #sb-right-shell-toggle {
+    #sb-left-shell-toggle {
         display: none;
     }
 
-    :root[data-sb-mobile-nav-layout='horizontal'][data-sb-mobile-nav-customize='shown'] #sb-left-shell-toggle,
-    :root[data-sb-mobile-nav-layout='horizontal'][data-sb-mobile-nav-customize='shown'] #sb-right-shell-toggle {
+    :root[data-sb-mobile-nav-layout='horizontal'][data-sb-mobile-nav-customize='shown'] #sb-left-shell-toggle {
         display: inline-flex;
     }
 
