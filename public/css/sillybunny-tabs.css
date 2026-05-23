@@ -7494,32 +7494,6 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 
 }
 
-@media screen and (min-width: 769px) and (max-width: 1000px) {
-    #sb-left-shell-toggle {
-        display: inline-flex;
-        min-width: var(--sb-mobile-toggle-size);
-        width: var(--sb-mobile-toggle-size);
-        height: var(--sb-mobile-toggle-size);
-        min-height: var(--sb-mobile-toggle-size);
-        padding: 0;
-        gap: 0;
-    }
-
-    #sb-left-shell-toggle span {
-        display: none;
-    }
-
-    #sb-left-shell-toggle::after {
-        left: var(--sb-proxy-underline-inset);
-        right: var(--sb-proxy-underline-inset);
-        bottom: var(--sb-proxy-underline-bottom);
-    }
-
-    #sb-left-shell-toggle i {
-        font-size: var(--sb-topbar-compact-icon-size);
-    }
-}
-
 @media screen and (max-width: 450px) {
     .sb-mobile-section-list {
         grid-template-columns: 1fr;
@@ -7603,7 +7577,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     }
 }
 
-@media screen and (max-width: 1000px) {
+@media screen and (max-width: 768px) {
     .sb-mobile-panel-header {
         grid-template-columns: minmax(0, 1fr) 32px;
         align-items: center;
@@ -7699,7 +7673,9 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     :root[data-sb-mobile-nav-mode='icon-only'] #right-nav-panel.openDrawer .sb-character-editor-subtabs .sb-shell-tab-copy {
         display: flex;
     }
+}
 
+@media screen {
     :root[data-sb-mobile-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-frame,
     :root[data-sb-mobile-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-frame {
         flex-direction: row;
@@ -7864,48 +7840,50 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         overflow: visible !important;
     }
 
-    #left-nav-panel.openDrawer,
-    .sb-shell-root.openDrawer,
-    .sb-shell-root.fillLeft.openDrawer,
-    .sb-shell-root.fillRight.openDrawer {
-        top: var(--sb-topbar-layout-offset) !important;
-        margin-top: 0 !important;
-        height: calc(100dvh - var(--sb-topbar-layout-offset)) !important;
-        max-height: calc(100dvh - var(--sb-topbar-layout-offset)) !important;
-        overflow-y: auto !important;
-        padding-bottom: var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px))) !important;
-        -webkit-overflow-scrolling: touch !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        pointer-events: auto !important;
-        transform: translateZ(0);
-    }
+    @media screen and (max-width: 768px) {
+        #left-nav-panel.openDrawer,
+        .sb-shell-root.openDrawer,
+        .sb-shell-root.fillLeft.openDrawer,
+        .sb-shell-root.fillRight.openDrawer {
+            top: var(--sb-topbar-layout-offset) !important;
+            margin-top: 0 !important;
+            height: calc(100dvh - var(--sb-topbar-layout-offset)) !important;
+            max-height: calc(100dvh - var(--sb-topbar-layout-offset)) !important;
+            overflow-y: auto !important;
+            padding-bottom: var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px))) !important;
+            -webkit-overflow-scrolling: touch !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            pointer-events: auto !important;
+            transform: translateZ(0);
+        }
 
-    #left-nav-panel.openDrawer {
-        transform: none !important;
-        -webkit-overflow-scrolling: auto !important;
-    }
+        #left-nav-panel.openDrawer {
+            transform: none !important;
+            -webkit-overflow-scrolling: auto !important;
+        }
 
-    #left-nav-panel > .scrollableInner,
-    #left-nav-panel > .scrollableInnerFull,
-    #left-nav-panel .sb-shell-panel-scroller {
-        -webkit-overflow-scrolling: auto !important;
-    }
+        #left-nav-panel > .scrollableInner,
+        #left-nav-panel > .scrollableInnerFull,
+        #left-nav-panel .sb-shell-panel-scroller {
+            -webkit-overflow-scrolling: auto !important;
+        }
 
-    #left-nav-panel .sb-shell-frame,
-    #left-nav-panel .sb-shell-nav,
-    #left-nav-panel .sb-shell-main,
-    #left-nav-panel .sb-shell-panel-scroller,
-    #left-nav-panel .sb-shell-panel,
-    #left-nav-panel .sb-shell-panel * {
-        pointer-events: auto !important;
+        #left-nav-panel .sb-shell-frame,
+        #left-nav-panel .sb-shell-nav,
+        #left-nav-panel .sb-shell-main,
+        #left-nav-panel .sb-shell-panel-scroller,
+        #left-nav-panel .sb-shell-panel,
+        #left-nav-panel .sb-shell-panel * {
+            pointer-events: auto !important;
+        }
     }
 }
 
 /* Force character panel visibility on mobile when open.
  * iOS Safari clips position:fixed descendants inside overflow:hidden ancestors.
  * Use JS-toggled class instead of :has() which can cause Safari rendering issues. */
-@media screen and (max-width: 1000px) {
+@media screen and (max-width: 768px) {
     #top-settings-holder #right-nav-panel.openDrawer {
         opacity: 1 !important;
         visibility: visible !important;
