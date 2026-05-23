@@ -58,8 +58,8 @@
 }
 
 .connection-profile-actions {
-    display: grid;
-    grid-template-columns: repeat(9, minmax(24px, 30px));
+    display: flex;
+    flex-wrap: wrap;
     justify-content: start;
     gap: 4px;
     width: 100%;
@@ -68,9 +68,10 @@
 }
 
 .connection-profile-actions > .menu_button {
-    width: 100%;
-    min-width: 24px;
-    max-width: 30px;
+    flex: 0 0 30px;
+    width: 30px !important;
+    min-width: 30px !important;
+    max-width: 30px !important;
     min-height: 28px;
     height: 28px;
     max-height: 28px;
@@ -83,18 +84,19 @@
 
 @media screen and (max-width: 450px) {
     .connection-profile-actions {
-        grid-template-columns: repeat(9, minmax(22px, 1fr));
-        gap: 3px;
+        gap: 5px;
     }
 
     .connection-profile-actions > .menu_button {
-        min-width: 22px;
-        max-width: none;
-        min-height: 26px;
-        height: 26px;
-        max-height: 26px;
-        border-radius: 7px;
-        font-size: calc(var(--mainFontSize) * 0.72);
+        flex-basis: 36px;
+        width: 36px !important;
+        min-width: 36px !important;
+        max-width: 36px !important;
+        min-height: 36px;
+        height: 36px;
+        max-height: 36px;
+        border-radius: 10px;
+        font-size: calc(var(--mainFontSize) * 0.82);
     }
 }
 
