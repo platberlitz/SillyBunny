@@ -290,15 +290,17 @@ router.post('/generate', async function (request, response) {
 
         const controller = new AbortController();
         abortOnResponseClose(response, controller);
-        response.on('close', async function () {
-            if (response.writableEnded) {
-                return;
-            }
 
-            if (request.body.api_type === TEXTGEN_TYPES.KOBOLDCPP && !response.writableEnded) {
+        // SillyBunny: KoboldCpp needs its own upstream abort endpoint; other backends use the shared fetch abort/stream destroy path.
+        if (request.body.api_type === TEXTGEN_TYPES.KOBOLDCPP) {
+            response.on('close', async function () {
+                if (response.writableEnded) {
+                    return;
+                }
+
                 await abortKoboldCppRequest(request, trimV1(baseUrl));
-            }
-        });
+            });
+        }
 
         let url = trimV1(baseUrl);
 
