@@ -911,7 +911,7 @@
         text-align: center;
     }
 
-    :is(#adaptive_p_block, #smoothingBlock, #xtc_block, #mirostat_block_ooba) > h4 {
+    :is(#adaptive_p_block, #smoothingBlock, #xtc_block) > h4 {
         display: none !important;
     }
 
@@ -931,5 +931,9 @@
 
     :is(#adaptive_p_block, #smoothingBlock, #xtc_block, #mirostat_block_ooba) > .flex-container.flexFlowRow > div > .sb-sampler-inline-title > :is(a, div, span, strong) {
         flex: 0 0 auto;
+    }
+
+    #mirostat_block_ooba > .flex-container.flexFlowRow > div > .sb-sampler-inline-title > :is(strong, span[aria-hidden='true']) {
+        display: none;
     }
 }

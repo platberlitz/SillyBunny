@@ -216,32 +216,17 @@
                             </div>
                             <div id="textgenerationwebui_api-presets">
                                 <div>
-                                    <div class="margin0 title_restorable standoutHeader">
-                                        <strong>
-                                            <span data-i18n="Text Completion presets">Text Completion presets</span>
-                                        </strong>
-
-                                        <div class="flex-container gap3px">
+                                    <div class="flex-container flexNoGap">
+                                        <select id="settings_preset_textgenerationwebui" class="flex1 text_pole" data-preset-manager-for="textgenerationwebui">
+                                        </select>
+                                        <div class="flex-container marginLeft5 gap3px">
+                                            <input type="file" hidden data-preset-manager-file="textgenerationwebui" accept=".json, .settings">
                                             <div data-preset-manager-import="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Import preset" data-i18n="[title]Import preset">
                                                 <i class="fa-fw fa-solid fa-file-import"></i>
                                             </div>
                                             <div data-preset-manager-export="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Export preset" data-i18n="[title]Export preset">
                                                 <i class="fa-fw fa-solid fa-file-export"></i>
                                             </div>
-                                            <div data-preset-manager-delete="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Delete the preset" data-i18n="[title]Delete the preset">
-                                                <i class="fa-fw fa-solid fa-trash-can"></i>
-                                            </div>
-                                            <div data-preset-manager-delete-all="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Delete all saved presets" data-i18n="[title]Delete all saved presets">
-                                                <i class="fa-fw fa-solid fa-trash-arrow-up"></i>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex-container flexNoGap">
-                                        <select id="settings_preset_textgenerationwebui" class="flex1 text_pole" data-preset-manager-for="textgenerationwebui">
-                                        </select>
-                                        <div class="flex-container marginLeft5 gap3px">
-                                            <input type="file" hidden data-preset-manager-file="textgenerationwebui" accept=".json, .settings">
                                             <div data-preset-manager-update="textgenerationwebui" class="menu_button menu_button_icon" title="Update current preset" data-i18n="[title]Update current preset">
                                                 <i class="fa-fw fa-solid fa-save"></i>
                                             </div>
@@ -253,6 +238,12 @@
                                             </div>
                                             <div data-preset-manager-restore="textgenerationwebui" class="menu_button menu_button_icon" title="Restore current preset" data-i18n="[title]Restore current preset">
                                                 <i class="fa-fw fa-solid fa-recycle"></i>
+                                            </div>
+                                            <div data-preset-manager-delete="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Delete the preset" data-i18n="[title]Delete the preset">
+                                                <i class="fa-fw fa-solid fa-trash-can"></i>
+                                            </div>
+                                            <div data-preset-manager-delete-all="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Delete all saved presets" data-i18n="[title]Delete all saved presets">
+                                                <i class="fa-fw fa-solid fa-trash-arrow-up"></i>
                                             </div>
                                         </div>
                                     </div>
@@ -977,6 +968,7 @@
                                         <hr class="wide100p">
                                         <div class="range-block-title">
                                             <span data-i18n="Samplers Order">Samplers Order</span>
+                                            <div data-sampler-order-lock="kobold_order" class="sampler-order-lock menu_button menu_button_icon fa-solid fa-lock" role="button" tabindex="0" aria-pressed="true" aria-label="Sampler reordering locked" title="Unlock sampler reordering" data-i18n="[title]Unlock sampler reordering"></div>
                                         </div>
                                         <div class="toggle-description widthUnset" data-i18n="Samplers will be applied in a top-down order. Use with caution.">
                                             Samplers will be applied in a top-down order.
@@ -1022,6 +1014,7 @@
                                 <div class="range-block flexFlowColumn">
                                     <div class="range-block-title">
                                         <span data-i18n="Samplers Order">Samplers Order</span>
+                                        <div data-sampler-order-lock="novel_order" class="sampler-order-lock menu_button menu_button_icon fa-solid fa-lock" role="button" tabindex="0" aria-pressed="true" aria-label="Sampler reordering locked" title="Unlock sampler reordering" data-i18n="[title]Unlock sampler reordering"></div>
                                     </div>
                                     <div class="toggle-description widthUnset" data-i18n="Samplers will be applied in a top-down order. Use with caution.">
                                         Samplers will be applied in a top-down order. Use with caution.
@@ -1604,6 +1597,7 @@
                                         <hr class="wide100p">
                                         <div class="range-block-title">
                                             <span data-i18n="Samplers Order">Samplers Order</span>
+                                            <div data-sampler-order-lock="koboldcpp_order" class="sampler-order-lock menu_button menu_button_icon fa-solid fa-lock" role="button" tabindex="0" aria-pressed="true" aria-label="Sampler reordering locked" title="Unlock sampler reordering" data-i18n="[title]Unlock sampler reordering"></div>
                                         </div>
                                         <div class="toggle-description widthUnset" data-i18n="Samplers will be applied in a top-down order. Use with caution.">
                                             kcpp only. Samplers will be applied in a top-down order.
@@ -1648,6 +1642,7 @@
                                         <h4 class="range-block-title justifyCenter">
                                             <span data-i18n="Sampler Order">Sampler Order</span>
                                             <div class="margin5 fa-solid fa-circle-info opacity50p" data-i18n="[title]llama.cpp only. Determines the order of samplers. If Mirostat mode is not 0, sampler order is ignored." title="llama.cpp only. Determines the order of samplers. If Mirostat mode is not 0, sampler order is ignored."></div>
+                                            <div data-sampler-order-lock="llamacpp_samplers_sortable" class="sampler-order-lock menu_button menu_button_icon fa-solid fa-lock" role="button" tabindex="0" aria-pressed="true" aria-label="Sampler reordering locked" title="Unlock sampler reordering" data-i18n="[title]Unlock sampler reordering"></div>
                                         </h4>
                                         <div class="toggle-description widthUnset" data-i18n="llama.cpp only. Determines the order of samplers. If Mirostat mode is not 0, sampler order is ignored.">
                                             llama.cpp only. Determines the order of samplers. If Mirostat mode is not 0, sampler order is ignored.
@@ -1672,6 +1667,7 @@
                                         <h4 class="range-block-title justifyCenter">
                                             <span data-i18n="Sampler Priority">Sampler Priority</span>
                                             <div class="margin5 fa-solid fa-circle-info opacity50p" title="Ooba only. Determines the order of samplers." data-i18n="[title]Ooba only. Determines the order of samplers."></div>
+                                            <div data-sampler-order-lock="sampler_priority_container" class="sampler-order-lock menu_button menu_button_icon fa-solid fa-lock" role="button" tabindex="0" aria-pressed="true" aria-label="Sampler reordering locked" title="Unlock sampler reordering" data-i18n="[title]Unlock sampler reordering"></div>
                                         </h4>
                                         <div class="toggle-description widthUnset" data-i18n="Ooba only. Determines the order of samplers.">
                                             Ooba only. Determines the order of samplers.
@@ -1707,6 +1703,7 @@
                                         <h4 class="range-block-title justifyCenter">
                                             <span data-i18n="Sampler Order">Sampler Order</span>
                                             <div class="margin5 fa-solid fa-circle-info opacity50p" title="Aphrodite only. Determines the order of samplers. Skew is always applied post-softmax, so it's not included here." data-i18n="[title]Aphrodite only. Determines the order of samplers. Skew is always applied post-softmax, so it's not included here."></div>
+                                            <div data-sampler-order-lock="sampler_priority_container_aphrodite" class="sampler-order-lock menu_button menu_button_icon fa-solid fa-lock" role="button" tabindex="0" aria-pressed="true" aria-label="Sampler reordering locked" title="Unlock sampler reordering" data-i18n="[title]Unlock sampler reordering"></div>
                                         </h4>
                                         <div class="toggle-description widthUnset" data-i18n="Aphrodite only. Determines the order of samplers.">
                                             Aphrodite only. Determines the order of samplers.

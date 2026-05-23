@@ -535,6 +535,29 @@ h3:not(.popup h3):not(#chat h3) {
     border-radius: var(--sb-radius-button);
 }
 
+.sampler-order-lock {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+    color: var(--SmartThemeQuoteColor);
+}
+
+.sampler-order-lock:not(.is-locked) {
+    color: var(--SmartThemeBodyColor);
+}
+
+.prompt_order.is-sampler-order-locked > div::after {
+    content: "\f023";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+}
+
+.prompt_order.is-sampler-order-locked > div {
+    cursor: default;
+}
+
 .checkbox_label {
     min-height: var(--sb-control-min-height);
     font-size: var(--sb-type-control);
@@ -5888,5 +5911,43 @@ input[type='range']::-moz-range-thumb {
         flex: 1 1 120px;
         min-width: 0;
         width: auto;
+    }
+
+    #textgenerationwebui_api-presets > div > .flex-container.flexNoGap {
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    #textgenerationwebui_api-presets select[data-preset-manager-for='textgenerationwebui'] {
+        min-width: 0;
+    }
+
+    #textgenerationwebui_api-presets .flex-container.marginLeft5:has(> [data-preset-manager-file='textgenerationwebui']) {
+        flex: 0 1 auto;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        margin-left: 6px;
+        gap: 4px;
+        max-width: min(192px, 46vw);
+    }
+
+    #textgenerationwebui_api-presets .flex-container.marginLeft5:has(> [data-preset-manager-file='textgenerationwebui']) > .menu_button,
+    #textgenerationwebui_api-presets .flex-container.marginLeft5:has(> [data-preset-manager-file='textgenerationwebui']) > .menu_button_icon {
+        width: 36px !important;
+        min-width: 36px !important;
+        max-width: 36px !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        max-height: 36px !important;
+        padding: 0 !important;
+        border-radius: 10px;
+    }
+
+    .sampler-order-lock {
+        width: 34px;
+        min-width: 34px;
+        height: 34px;
+        min-height: 34px;
+        font-size: calc(var(--mainFontSize) * 0.9);
     }
 }

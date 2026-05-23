@@ -7499,6 +7499,26 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 @media screen and (min-width: 769px) and (max-width: 1000px) {
     #sb-left-shell-toggle {
         display: inline-flex;
+        min-width: var(--sb-mobile-toggle-size);
+        width: var(--sb-mobile-toggle-size);
+        height: var(--sb-mobile-toggle-size);
+        min-height: var(--sb-mobile-toggle-size);
+        padding: 0;
+        gap: 0;
+    }
+
+    #sb-left-shell-toggle span {
+        display: none;
+    }
+
+    #sb-left-shell-toggle::after {
+        left: var(--sb-proxy-underline-inset);
+        right: var(--sb-proxy-underline-inset);
+        bottom: var(--sb-proxy-underline-bottom);
+    }
+
+    #sb-left-shell-toggle i {
+        font-size: var(--sb-topbar-compact-icon-size);
     }
 }
 

@@ -61,6 +61,37 @@ export const nai_settings = {
     extensions: {},
 };
 
+function initNovelSamplerOrderLock() {
+    const button = document.querySelector('[data-sampler-order-lock="novel_order"]');
+    const $sortable = $('#novel_order');
+
+    if (!button || !$sortable.length) {
+        return;
+    }
+
+    const setLocked = (locked) => {
+        button.classList.toggle('is-locked', locked);
+        button.classList.toggle('fa-lock', locked);
+        button.classList.toggle('fa-lock-open', !locked);
+        button.setAttribute('aria-pressed', String(locked));
+        button.setAttribute('aria-label', locked ? 'Sampler reordering locked' : 'Sampler reordering unlocked');
+        button.title = locked ? 'Unlock sampler reordering' : 'Lock sampler reordering';
+        $sortable.sortable(locked ? 'disable' : 'enable');
+        $sortable.toggleClass('is-sampler-order-locked', locked);
+    };
+
+    setLocked(true);
+    button.addEventListener('click', () => setLocked(!button.classList.contains('is-locked')));
+    button.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+
+        event.preventDefault();
+        button.click();
+    });
+}
+
 const nai_tiers = {
     0: 'Paper',
     1: 'Tablet',
@@ -925,6 +956,7 @@ export function initNovelAISettings() {
         delay: getSortableDelay(),
         stop: saveSamplingOrder,
     });
+    initNovelSamplerOrderLock();
 
     $('#novel_order .toggle_button').on('click', function () {
         const $item = $(this).closest('[data-id]');
