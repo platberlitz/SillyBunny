@@ -5619,9 +5619,18 @@
                                         <i class="fa-solid fa-desktop"></i>
                                     </small>
                                 </label>
-                                <div id="movingUIreset" title="Reset MovingUI panel sizes/locations." class="menu_button margin0" data-i18n="[title]Reset MovingUI panel sizes/locations.">
+                                <div id="movingUIreset" title="Reset MovingUI panel sizes/locations, including off-screen panels." class="menu_button margin0" data-i18n="[title]Reset MovingUI panel sizes/locations, including off-screen panels.">
                                     <i class=" fa-solid fa-recycle margin-r5"></i>
                                     <span data-i18n="mui_reset">Reset</span>
+                                </div>
+                            </div>
+                            <!-- SillyBunny: surface recovery when restored MovingUI geometry puts panels outside the viewport. -->
+                            <div id="movingUIOffscreenWarning" class="info-block warning displayNone">
+                                <i class="fa-solid fa-triangle-exclamation margin-r5"></i>
+                                <span data-i18n="A saved MovingUI panel position appears to be off-screen.">A saved MovingUI panel position appears to be off-screen.</span>
+                                <div id="movingUIOffscreenReset" title="Reset MovingUI panel sizes/locations." class="menu_button margin0" data-i18n="[title]Reset MovingUI panel sizes/locations.">
+                                    <i class="fa-solid fa-recycle margin-r5"></i>
+                                    <span data-i18n="Reset panels">Reset panels</span>
                                 </div>
                             </div>
                             <div id="MovingUI-presets-block" class="flex-container alignitemscenter">
