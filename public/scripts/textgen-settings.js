@@ -47,6 +47,37 @@ export const textgen_types = {
     GENERIC: 'generic',
 };
 
+function initSamplerOrderLock(sortableSelector) {
+    const button = document.querySelector(`[data-sampler-order-lock="${sortableSelector.slice(1)}"]`);
+    const $sortable = $(sortableSelector);
+
+    if (!button || !$sortable.length) {
+        return;
+    }
+
+    const setLocked = (locked) => {
+        button.classList.toggle('is-locked', locked);
+        button.classList.toggle('fa-lock', locked);
+        button.classList.toggle('fa-lock-open', !locked);
+        button.setAttribute('aria-pressed', String(locked));
+        button.setAttribute('aria-label', locked ? t`Sampler reordering locked` : t`Sampler reordering unlocked`);
+        button.title = locked ? t`Unlock sampler reordering` : t`Lock sampler reordering`;
+        $sortable.sortable(locked ? 'disable' : 'enable');
+        $sortable.toggleClass('is-sampler-order-locked', locked);
+    };
+
+    setLocked(true);
+    button.addEventListener('click', () => setLocked(!button.classList.contains('is-locked')));
+    button.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+
+        event.preventDefault();
+        button.click();
+    });
+}
+
 const {
     GENERIC,
     MANCER,
@@ -842,6 +873,7 @@ export function initTextGenSettings() {
             saveSettingsDebounced();
         },
     });
+    initSamplerOrderLock('#koboldcpp_order');
 
     $('#koboldcpp_default_order').on('click', function () {
         textgenerationwebui_settings.sampler_order = KOBOLDCPP_ORDER;
@@ -861,6 +893,7 @@ export function initTextGenSettings() {
             saveSettingsDebounced();
         },
     });
+    initSamplerOrderLock('#llamacpp_samplers_sortable');
 
     $('#llamacpp_samplers_default_order').on('click', function () {
         sortLlamacppItemsByOrder(LLAMACPP_DEFAULT_ORDER);
@@ -881,6 +914,7 @@ export function initTextGenSettings() {
             saveSettingsDebounced();
         },
     });
+    initSamplerOrderLock('#sampler_priority_container');
 
     $('#sampler_priority_container_aphrodite').sortable({
         delay: getSortableDelay(),
@@ -894,6 +928,7 @@ export function initTextGenSettings() {
             saveSettingsDebounced();
         },
     });
+    initSamplerOrderLock('#sampler_priority_container_aphrodite');
 
     $('#tabby_json_schema').on('input', function () {
         const json_schema_string = String($(this).val());

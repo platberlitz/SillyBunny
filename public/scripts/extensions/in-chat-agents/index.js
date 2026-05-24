@@ -1476,6 +1476,15 @@ function renderAgentList() {
     }
 
     if (!selectModeActive && allAgents.length > 0) {
+        const legend = $(`
+            <div class="ica--action-legend" aria-label="Agent card action legend">
+                <span><i class="fa-solid fa-eye"></i> Preview</span>
+                <span><i class="fa-solid fa-robot"></i> Apply</span>
+                <span><i class="fa-solid fa-pen-to-square"></i> Edit</span>
+                <span><i class="fa-solid fa-download"></i> Export</span>
+                <span><i class="fa-solid fa-trash"></i> Delete</span>
+            </div>
+        `);
         const favoriteAgents = allAgents.filter(agent => agent.favorite);
         const quickSection = $(`
             <div class="ica--quick-section">
@@ -1490,6 +1499,7 @@ function renderAgentList() {
                 <div class="ica--quick-grid"></div>
             </div>
         `);
+        container.append(legend);
         const quickGrid = quickSection.find('.ica--quick-grid');
 
         if (favoriteAgents.length === 0) {
@@ -1604,7 +1614,7 @@ function renderAgentList() {
             const promptTransformLabel = getPromptTransformLabel(agent);
             const preInterceptEnabled = isPreGenerationInterceptAgent(agent);
             const previewPromptButton = canPreviewPreGenerationPrompt(agent)
-                ? `<button type="button" class="ica--card-btn ica--btn-preview-prompt" title="Preview this pre-generation prompt after macro substitution"><i class="fa-solid fa-eye"></i> ${preInterceptEnabled ? 'Preview Instruction' : 'Preview Prompt'}</button>`
+                ? `<button type="button" class="ica--card-btn ica--btn-preview-prompt" title="Preview this pre-generation prompt after macro substitution" aria-label="${preInterceptEnabled ? 'Preview Instruction' : 'Preview Prompt'}"><i class="fa-solid fa-eye"></i></button>`
                 : '';
             const connectionProfileLabel = agent.connectionProfile
                 ? profileNames.get(agent.connectionProfile) || `Missing profile (${agent.connectionProfile})`
@@ -1642,10 +1652,10 @@ function renderAgentList() {
                     </div>
                     <div class="ica--card-actions">
                         ${previewPromptButton}
-                        ${isPathfinderAgent(agent) ? '' : '<button type="button" class="ica--card-btn ica--btn-run" title="Manually apply this agent to the last assistant reply"><i class="fa-solid fa-robot"></i> Apply to Last Reply</button>'}
-                        <button type="button" class="ica--card-btn ica--btn-edit"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
-                        ${isPathfinderAgent(agent) ? '' : '<button type="button" class="ica--card-btn ica--btn-export"><i class="fa-solid fa-download"></i> Export</button>'}
-                        <button type="button" class="ica--card-btn ica--btn-delete caution"><i class="fa-solid fa-trash"></i></button>
+                        ${isPathfinderAgent(agent) ? '' : '<button type="button" class="ica--card-btn ica--btn-run" title="Manually apply this agent to the last assistant reply" aria-label="Apply to Last Reply"><i class="fa-solid fa-robot"></i></button>'}
+                        <button type="button" class="ica--card-btn ica--btn-edit" title="Edit agent" aria-label="Edit agent"><i class="fa-solid fa-pen-to-square"></i></button>
+                        ${isPathfinderAgent(agent) ? '' : '<button type="button" class="ica--card-btn ica--btn-export" title="Export agent" aria-label="Export agent"><i class="fa-solid fa-download"></i></button>'}
+                        <button type="button" class="ica--card-btn ica--btn-delete caution" title="Delete agent" aria-label="Delete agent"><i class="fa-solid fa-trash"></i></button>
                     </div>
                 </div>
             `);
@@ -1893,6 +1903,18 @@ async function openEditor(agentId = null) {
     });
     editorEl.find('#ica--editor-modelOverride').val(agent.modelOverride || '');
 
+    let editorFullscreen = false;
+    const fullscreenButton = editorEl.find('#ica--editor-fullscreen');
+    const updateEditorFullscreenState = (nextEnabled) => {
+        editorFullscreen = Boolean(nextEnabled);
+        editorEl.toggleClass('ica--editor-fullscreen', editorFullscreen);
+        document.body.classList.toggle('ica--editor-fullscreen-active', editorFullscreen);
+        fullscreenButton.attr('aria-pressed', String(editorFullscreen));
+        fullscreenButton.attr('title', editorFullscreen ? 'Exit fullscreen editor' : 'Toggle fullscreen editor');
+        fullscreenButton.find('i').attr('class', `fa-solid ${editorFullscreen ? 'fa-compress' : 'fa-maximize'}`);
+    };
+    fullscreenButton.on('click', () => updateEditorFullscreenState(!editorFullscreen));
+
     // Injection
     editorEl.find('#ica--editor-position').val(agent.injection.position);
     editorEl.find('#ica--editor-depth').val(agent.injection.depth);
@@ -2094,8 +2116,8 @@ async function openEditor(agentId = null) {
                     <div class="ica--regex-item-actions">
                         <button type="button" class="ica--card-btn ica--regex-up" title="Move up"><i class="fa-solid fa-arrow-up"></i></button>
                         <button type="button" class="ica--card-btn ica--regex-down" title="Move down"><i class="fa-solid fa-arrow-down"></i></button>
-                        <button type="button" class="ica--card-btn ica--regex-edit"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
-                        <button type="button" class="ica--card-btn caution ica--regex-delete"><i class="fa-solid fa-trash"></i></button>
+                        <button type="button" class="ica--card-btn ica--regex-edit" title="Edit regex" aria-label="Edit regex"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button type="button" class="ica--card-btn caution ica--regex-delete" title="Delete regex" aria-label="Delete regex"><i class="fa-solid fa-trash"></i></button>
                     </div>
                 </div>
             `);
@@ -2185,6 +2207,8 @@ async function openEditor(agentId = null) {
         wide: true,
         large: true,
     }).show();
+
+    document.body.classList.remove('ica--editor-fullscreen-active');
 
     if (result !== POPUP_RESULT.AFFIRMATIVE) return;
 

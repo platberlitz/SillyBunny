@@ -22,6 +22,12 @@ const SB_STORAGE_KEYS = Object.freeze({
     bottomBarScale: 'sb-bottom-bar-scale',
     bottomChatSecondaryOpen: 'sb-bottom-chat-secondary-open',
     mobileButtonScale: 'sb-mobile-button-scale',
+    mobileNavLayout: 'sb-mobile-nav-layout',
+    mobileNavIconOnly: 'sb-mobile-nav-icon-only',
+    mobileNavShowCustomize: 'sb-mobile-nav-show-customize',
+    mobileNavShowQuickActions: 'sb-mobile-nav-show-quick-actions',
+    mobileNavReplaceQuickActions: 'sb-mobile-nav-replace-quick-actions',
+    mobileNavReplacementTarget: 'sb-mobile-nav-replacement-target',
     mobileQuickActions: 'sb-mobile-quick-actions-v2',
     mobileQuickActionsLegacy: 'sb-mobile-quick-actions',
     settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
@@ -571,6 +577,7 @@ const SB_UNIVERSAL_SEARCH_EMPTY_HINT = 'Could not find query. Try a broader term
 const SB_UNIVERSAL_SEARCH_RESULT_LIMIT = 10;
 const SB_MOBILE_QUICK_ACTION_LIMIT = 12;
 const SB_MOBILE_QUICK_ACTION_LABEL_MAX_LENGTH = 36;
+const SB_MOBILE_NAV_LAYOUTS = Object.freeze(['horizontal', 'vertical']);
 const SB_MOBILE_DEFAULT_QUICK_ACTIONS = Object.freeze([
     { type: 'tab', shellKey: 'left', tabId: 'presets', icon: 'fa-sliders', label: 'Presets' },
     { type: 'tab', shellKey: 'left', tabId: 'api', icon: 'fa-plug', label: 'API' },
@@ -578,6 +585,32 @@ const SB_MOBILE_DEFAULT_QUICK_ACTIONS = Object.freeze([
     { type: 'tab', shellKey: 'left', tabId: 'advanced-formatting', icon: 'fa-text-height', label: 'Formatting' },
     { type: 'tab', shellKey: 'characters', tabId: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
     { type: 'tab', shellKey: 'left', tabId: 'agents', icon: 'fa-robot', label: 'Agents' },
+]);
+const SB_MOBILE_RAIL_CUSTOMIZE_ACTIONS = Object.freeze([
+    { type: 'tab', shellKey: 'left', tabId: 'presets', icon: 'fa-sliders', label: 'Presets' },
+    { type: 'tab', shellKey: 'left', tabId: 'api', icon: 'fa-plug', label: 'API' },
+    { type: 'tab', shellKey: 'left', tabId: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
+    { type: 'tab', shellKey: 'left', tabId: 'advanced-formatting', icon: 'fa-text-height', label: 'Formatting' },
+    { type: 'tab', shellKey: 'left', tabId: 'agents', icon: 'fa-robot', label: 'Agents' },
+    { type: 'tab', shellKey: 'right', tabId: 'settings', icon: 'fa-gear', label: 'Settings' },
+    { type: 'tab', shellKey: 'right', tabId: 'extensions', icon: 'fa-cubes', label: 'Extensions' },
+    { type: 'tab', shellKey: 'right', tabId: 'background', icon: 'fa-panorama', label: 'Background' },
+    { type: 'tab', shellKey: 'right', tabId: 'server', icon: 'fa-server', label: 'Server' },
+    { type: 'tab', shellKey: 'right', tabId: 'console-logs', icon: 'fa-terminal', label: 'Console Logs' },
+]);
+const SB_MOBILE_NAV_PAGE_TARGET_DEFAULT = 'left:presets';
+const SB_MOBILE_NAV_PAGE_TARGETS = Object.freeze([
+    { value: 'left:presets', shellKey: 'left', tabId: 'presets', label: 'Presets', icon: 'fa-sliders' },
+    { value: 'left:api', shellKey: 'left', tabId: 'api', label: 'API', icon: 'fa-plug' },
+    { value: 'left:sampling', shellKey: 'left', tabId: 'sampling', label: 'Sampling', icon: 'fa-wave-square' },
+    { value: 'left:advanced-formatting', shellKey: 'left', tabId: 'advanced-formatting', label: 'Formatting', icon: 'fa-text-height' },
+    { value: 'characters:world-info', shellKey: 'characters', tabId: 'world-info', label: 'World Info', icon: 'fa-book-atlas' },
+    { value: 'left:agents', shellKey: 'left', tabId: 'agents', label: 'Agents', icon: 'fa-robot' },
+    { value: 'right:settings', shellKey: 'right', tabId: 'settings', label: 'Settings', icon: 'fa-sliders' },
+    { value: 'right:extensions', shellKey: 'right', tabId: 'extensions', label: 'Extensions', icon: 'fa-cubes' },
+    { value: 'right:background', shellKey: 'right', tabId: 'background', label: 'Background', icon: 'fa-panorama' },
+    { value: 'right:server', shellKey: 'right', tabId: 'server', label: 'Server', icon: 'fa-server' },
+    { value: 'right:console-logs', shellKey: 'right', tabId: 'console-logs', label: 'Console Logs', icon: 'fa-terminal' },
 ]);
 
 const sbState = {
@@ -644,6 +677,14 @@ const sbState = {
     mobileNav: {
         lastOpenedAt: 0,
         quickActionContainer: null,
+        quickActionSection: null,
+        quickActionDivider: null,
+        layout: normalizeMobileNavLayout(safeGetItem(SB_STORAGE_KEYS.mobileNavLayout)),
+        iconOnly: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavIconOnly), true),
+        showCustomize: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowCustomize), true),
+        showQuickActions: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowQuickActions), false),
+        replaceQuickActions: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavReplaceQuickActions), false),
+        replacementTarget: normalizeMobileNavReplacementTarget(safeGetItem(SB_STORAGE_KEYS.mobileNavReplacementTarget)),
     },
     mobileQuickActions: [],
     chatbar: {
@@ -810,6 +851,30 @@ function normalizeStoredBoolean(value, fallback = false) {
     return fallback;
 }
 
+function normalizeMobileNavLayout(value) {
+    const normalizedValue = normalizeText(value);
+    return SB_MOBILE_NAV_LAYOUTS.includes(normalizedValue) ? normalizedValue : 'vertical';
+}
+
+function getMobileNavCustomizeLocationLabel() {
+    return sbState.mobileNav.layout === 'horizontal'
+        ? 'Show Workspace and Customize buttons in top bar'
+        : 'Show Workspace and Customize buttons in side rail';
+}
+
+function normalizeMobileNavReplacementTarget(value) {
+    const normalizedValue = String(value ?? '').trim();
+    return SB_MOBILE_NAV_PAGE_TARGETS.some(target => target.value === normalizedValue)
+        ? normalizedValue
+        : SB_MOBILE_NAV_PAGE_TARGET_DEFAULT;
+}
+
+function getMobileNavReplacementTargetConfig(target = sbState.mobileNav.replacementTarget) {
+    const normalizedTarget = normalizeMobileNavReplacementTarget(target);
+    return SB_MOBILE_NAV_PAGE_TARGETS.find(item => item.value === normalizedTarget)
+        ?? SB_MOBILE_NAV_PAGE_TARGETS[0];
+}
+
 function normalizeShellSize(value) {
     let source = value;
 
@@ -907,19 +972,23 @@ function normalizeMobileQuickAction(value) {
     const legacyTabId = normalizeText(value.tabId || value.tab);
     const shellKey = legacyShellKey === 'left' && legacyTabId === 'world-info' ? 'characters' : legacyShellKey;
     const tabId = legacyShellKey === 'left' && legacyTabId === 'world-info' ? 'world-info' : legacyTabId;
+    const requestedType = normalizeText(value.type);
+    const isShellAction = requestedType === 'shell';
 
-    if (!tabId || (shellKey !== 'characters' && !getShellConfig(shellKey))) {
+    if ((isShellAction ? !shellKey : !tabId) || (shellKey !== 'characters' && !getShellConfig(shellKey))) {
         return null;
     }
 
-    const tabConfig = getMobileQuickActionTabConfig(shellKey, tabId);
+    const tabConfig = isShellAction ? null : getMobileQuickActionTabConfig(shellKey, tabId);
     const dedupeKey = clampText(value.dedupeKey, 160);
-    const type = dedupeKey ? 'custom' : 'tab';
+    const type = dedupeKey ? 'custom' : isShellAction ? 'shell' : 'tab';
     const displayText = clampText(value.displayText, 80);
     const sectionLabel = clampText(value.sectionLabel, 80);
     const fallbackLabel = type === 'custom'
         ? displayText || sectionLabel
-        : tabConfig?.label || tabId;
+        : type === 'shell'
+            ? getShellConfig(shellKey)?.title || shellKey
+            : tabConfig?.label || tabId;
     const label = clampText(value.label || fallbackLabel, SB_MOBILE_QUICK_ACTION_LABEL_MAX_LENGTH);
 
     if (!label) {
@@ -930,7 +999,7 @@ function normalizeMobileQuickAction(value) {
         type,
         shellKey,
         tabId,
-        icon: clampText(value.icon || (type === 'custom' ? 'fa-bolt' : tabConfig?.icon || 'fa-bars'), 60),
+        icon: clampText(value.icon || (type === 'custom' ? 'fa-bolt' : type === 'shell' ? getShellConfig(shellKey)?.proxyIcon || 'fa-bars' : tabConfig?.icon || 'fa-bars'), 60),
         label,
     };
 
@@ -1073,6 +1142,7 @@ function setMobileQuickActions(actions, { persist = true } = {}) {
     renderMobileQuickActionSettingsList();
     refreshMobileQuickActionSearchResults();
     refreshMobileNavQuickActions();
+    syncMobileShellRailActions();
 }
 
 function addMobileQuickActionFromMatch(match) {
@@ -1151,6 +1221,12 @@ function restorePersistedTopbarState() {
     sbState.chatbar.visible = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.chatbarVisible), sbState.chatbar.visible);
     sbState.chatbar.topbarOffset = normalizeTopbarOffset(safeGetItem(SB_STORAGE_KEYS.topbarOffset));
     sbState.compactMode = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), sbState.compactMode);
+    sbState.mobileNav.layout = normalizeMobileNavLayout(safeGetItem(SB_STORAGE_KEYS.mobileNavLayout));
+    sbState.mobileNav.iconOnly = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavIconOnly), sbState.mobileNav.iconOnly);
+    sbState.mobileNav.showCustomize = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowCustomize), sbState.mobileNav.showCustomize);
+    sbState.mobileNav.showQuickActions = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowQuickActions), sbState.mobileNav.showQuickActions);
+    sbState.mobileNav.replaceQuickActions = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavReplaceQuickActions), sbState.mobileNav.replaceQuickActions);
+    sbState.mobileNav.replacementTarget = normalizeMobileNavReplacementTarget(safeGetItem(SB_STORAGE_KEYS.mobileNavReplacementTarget));
     sbState.mobileQuickActions = loadMobileQuickActions();
     sbState.characterDrawer.rightLocked = normalizeStoredBoolean(
         getPersistentStorageItem(SB_STORAGE_KEYS.characterDrawerRightLocked),
@@ -1251,6 +1327,94 @@ function setMobileButtonScale(value, { persist = true } = {}) {
         safeSetItem(SB_STORAGE_KEYS.mobileButtonScale, String(nextScale));
     }
 
+    updateThemePickerUi();
+}
+
+function applyMobileNavPreferences() {
+    const quickActionsShown = sbState.mobileNav.showQuickActions;
+    document.documentElement.dataset.sbMobileNavLayout = sbState.mobileNav.layout;
+    document.documentElement.dataset.sbMobileNavMode = sbState.mobileNav.iconOnly ? 'icon-only' : 'labeled';
+    document.documentElement.dataset.sbMobileNavCustomize = sbState.mobileNav.showCustomize ? 'shown' : 'hidden';
+    document.documentElement.dataset.sbMobileNavQuickActions = quickActionsShown ? 'shown' : 'hidden';
+    document.documentElement.dataset.sbMobileNavReplacement = sbState.mobileNav.replaceQuickActions ? 'shown' : 'hidden';
+}
+
+function setMobileNavLayout(layout, { persist = true } = {}) {
+    const nextLayout = normalizeMobileNavLayout(layout);
+    sbState.mobileNav.layout = nextLayout;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavLayout, nextLayout);
+    }
+
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setMobileNavIconOnly(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.mobileNav.iconOnly = nextEnabled;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavIconOnly, String(nextEnabled));
+    }
+
+    updateThemePickerUi();
+}
+
+function setMobileNavShowCustomize(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.mobileNav.showCustomize = nextEnabled;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavShowCustomize, String(nextEnabled));
+    }
+
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setMobileNavShowQuickActions(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.mobileNav.showQuickActions = nextEnabled;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavShowQuickActions, String(nextEnabled));
+    }
+
+    refreshMobileNavQuickActions();
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setMobileNavReplaceQuickActions(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.mobileNav.replaceQuickActions = nextEnabled;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavReplaceQuickActions, String(nextEnabled));
+    }
+
+    refreshMobileNavQuickActions();
+    syncMobileShellRailActions();
+    updateMobileNavButtonLabel();
+    updateThemePickerUi();
+}
+
+function setMobileNavReplacementTarget(target, { persist = true } = {}) {
+    const nextTarget = normalizeMobileNavReplacementTarget(target);
+    sbState.mobileNav.replacementTarget = nextTarget;
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavReplacementTarget, nextTarget);
+    }
+
+    updateMobileNavButtonLabel();
     updateThemePickerUi();
 }
 
@@ -1769,6 +1933,10 @@ function restoreShellFocus(shellKey) {
 
 function scrollShellTabButtonIntoView(nav, button, { smooth = false } = {}) {
     if (!(nav instanceof HTMLElement) || !(button instanceof HTMLElement)) {
+        return;
+    }
+
+    if (!isActuallyVisible(button)) {
         return;
     }
 
@@ -2373,11 +2541,14 @@ function syncExistingMobileNavQuickActions(overlay) {
         return;
     }
 
-    overlay.querySelectorAll('.sb-mobile-section-title').forEach(heading => heading.remove());
-
-    const list = overlay.querySelector('.sb-mobile-section-list');
+    const list = overlay.querySelector('.sb-mobile-quick-action-list')
+        ?? overlay.querySelector('.sb-mobile-section-list');
     if (list instanceof HTMLElement) {
         sbState.mobileNav.quickActionContainer = list;
+        const quickActionSection = list.closest('.sb-mobile-quick-action-section');
+        if (quickActionSection instanceof HTMLElement) {
+            sbState.mobileNav.quickActionSection = quickActionSection;
+        }
         refreshMobileNavQuickActions();
     }
 }
@@ -6445,14 +6616,14 @@ function openCharacterPanelTab(tabId) {
     }
 
     if (!isCharacterPanelOpen()) {
-        toggleCharacterPanel();
+        toggleCharacterPanel({ preferredTab: normalizedTabId });
     } else {
         closeMobileNav();
         closeShell('left');
         closeShell('right');
     }
 
-    window.requestAnimationFrame(() => {
+    const activateRequestedTab = () => {
         const panel = document.getElementById('right-nav-panel');
         if (normalizedTabId === 'persona') {
             setCharacterPanelMenuType(panel, 'persona');
@@ -6473,6 +6644,10 @@ function openCharacterPanelTab(tabId) {
             setCharacterPanelMenuType(panel, 'characters');
             void showCharacterListView();
         }
+    };
+
+    window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(activateRequestedTab);
     });
 }
 
@@ -6541,6 +6716,20 @@ function syncCharacterShellTabs(activeTab = null) {
         tab.classList.toggle('is-active', isActive);
         tab.setAttribute('aria-selected', String(isActive));
         tab.setAttribute('tabindex', isActive ? '0' : '-1');
+    });
+
+    document.querySelectorAll('[data-sb-rail-shell-key="characters"]').forEach(button => {
+        if (!(button instanceof HTMLElement)) {
+            return;
+        }
+
+        const isActive = button.dataset.sbRailTabId === normalizedTab;
+        button.classList.toggle('is-active', isActive);
+        if (isActive) {
+            button.setAttribute('aria-current', 'page');
+        } else {
+            button.removeAttribute('aria-current');
+        }
     });
 
     if (panel instanceof HTMLElement && panel.classList.contains('openDrawer')) {
@@ -6746,13 +6935,18 @@ function ensureCharacterResizeHandle() {
     return handle;
 }
 
-function toggleCharacterPanel() {
+function toggleCharacterPanel({ preferredTab = null } = {}) {
     injectCharacterDrawerControls();
     ensureCharacterResizeHandle();
 
     if (isCharacterPanelOpen()) {
         closeCharacterPanel();
         return;
+    }
+
+    const normalizedPreferredTab = preferredTab ? normalizeCharacterPanelTab(preferredTab) : '';
+    if (normalizedPreferredTab) {
+        sbState.characterDrawer.lastTab = normalizedPreferredTab;
     }
 
     closeAllDropdowns({ except: 'characters' });
@@ -7398,7 +7592,26 @@ const SB_SAMPLING_BACKENDS = Object.freeze([
         apiIds: ['novel'],
         title: 'NovelAI',
         description: 'Uses NovelAI preset sampling fields without changing the backend request format.',
-        controls: ['#temp_novel', '#top_p_novel', '#rep_pen_novel'],
+        controls: [
+            '#temp_novel',
+            '#rep_pen_novel',
+            '#rep_pen_size_novel',
+            '#rep_pen_slope_novel',
+            '#rep_pen_freq_novel',
+            '#rep_pen_presence_novel',
+            '#min_p_novel',
+            '#tail_free_sampling_novel',
+            '#top_p_novel',
+            '#top_a_novel',
+            '#top_k_novel',
+            '#mirostat_tau_novel',
+            '#mirostat_lr_novel',
+            '#typical_p_novel',
+            '#math1_temp_novel',
+            '#math1_quad_novel',
+            '#math1_quad_entropy_scale_novel',
+            '#min_length_novel',
+        ],
     },
 ]);
 
@@ -10197,6 +10410,171 @@ function createCompactModeSettingsGroup() {
     return group;
 }
 
+function createMobileNavChoice({ id, type = 'radio', name = '', value = '', label, icon, onChange }) {
+    const choice = createElement('label', {
+        className: 'sb-mobile-nav-choice',
+        attrs: {
+            for: id,
+        },
+    });
+    const inputAttrs = {
+        type,
+        value,
+    };
+
+    if (name) {
+        inputAttrs.name = name;
+    }
+
+    const input = createElement('input', {
+        id,
+        className: 'sb-mobile-nav-choice-input',
+        attrs: inputAttrs,
+    });
+    const iconElement = createElement('i', {
+        className: `fa-solid ${icon} sb-mobile-nav-choice-icon`,
+        attrs: {
+            'aria-hidden': 'true',
+        },
+    });
+    const copy = createElement('span', { className: 'sb-mobile-nav-choice-copy' });
+    const title = createElement('strong', { text: label });
+
+    input.addEventListener('change', event => {
+        const target = event.currentTarget;
+        if (!(target instanceof HTMLInputElement)) {
+            return;
+        }
+
+        if (target.type === 'radio' && !target.checked) {
+            return;
+        }
+
+        onChange?.(target);
+    });
+
+    copy.appendChild(title);
+    choice.append(input, iconElement, copy);
+    return choice;
+}
+
+function createMobileNavDivider(label = '') {
+    const divider = createElement('div', {
+        className: 'sb-mobile-nav-settings-divider',
+        attrs: label ? { role: 'separator', 'aria-label': label } : { role: 'separator' },
+    });
+    if (label) {
+        divider.appendChild(createElement('span', { text: label }));
+    }
+    return divider;
+}
+
+function createMobileNavLayoutSettingsGroup() {
+    const group = createElement('section', {
+        className: 'sb-theme-slider-group sb-mobile-nav-layout-group',
+    });
+    const header = createElement('div', { className: 'sb-mobile-nav-settings-header' });
+    const title = createElement('strong', { text: 'Mobile Navigation' });
+    const layoutGrid = createElement('div', {
+        className: 'sb-mobile-nav-choice-grid',
+        attrs: {
+            role: 'radiogroup',
+            'aria-label': 'Mobile navigation layout',
+        },
+    });
+    const iconOnlyChoice = createMobileNavChoice({
+        id: 'sb-mobile-nav-icon-only-input',
+        type: 'checkbox',
+        value: 'icon-only',
+        label: 'Icons only in shell tabs',
+        icon: 'fa-icons',
+        onChange: input => setMobileNavIconOnly(input.checked),
+    });
+    const showCustomizeChoice = createMobileNavChoice({
+        id: 'sb-mobile-nav-show-customize-input',
+        type: 'checkbox',
+        value: 'show-customize',
+        label: getMobileNavCustomizeLocationLabel(),
+        icon: 'fa-sliders',
+        onChange: input => setMobileNavShowCustomize(input.checked),
+    });
+    const showQuickActionsChoice = createMobileNavChoice({
+        id: 'sb-mobile-nav-show-quick-actions-input',
+        type: 'checkbox',
+        value: 'show-quick-actions',
+        label: 'Show Custom Quick Actions below Customize',
+        icon: 'fa-bolt',
+        onChange: input => setMobileNavShowQuickActions(input.checked),
+    });
+    const replaceQuickActionsChoice = createMobileNavChoice({
+        id: 'sb-mobile-nav-replace-quick-actions-input',
+        type: 'checkbox',
+        value: 'replace-quick-actions',
+        label: 'Use a chosen page instead of Quick Actions',
+        icon: 'fa-map-location-dot',
+        onChange: input => setMobileNavReplaceQuickActions(input.checked),
+    });
+    const replacementField = createElement('label', {
+        className: 'sb-mobile-nav-replacement-field',
+        attrs: {
+            for: 'sb-mobile-nav-replacement-select',
+        },
+    });
+    const replacementLabel = createElement('span', { text: 'Replacement page' });
+    const replacementSelect = createElement('select', {
+        id: 'sb-mobile-nav-replacement-select',
+        className: 'text_pole sb-mobile-nav-replacement-select',
+    });
+
+    for (const target of SB_MOBILE_NAV_PAGE_TARGETS) {
+        const option = createElement('option', {
+            attrs: {
+                value: target.value,
+            },
+        });
+        option.textContent = target.label;
+        replacementSelect.appendChild(option);
+    }
+
+    replacementSelect.addEventListener('change', event => {
+        const select = event.currentTarget;
+        setMobileNavReplacementTarget(select instanceof HTMLSelectElement ? select.value : '');
+    });
+
+    layoutGrid.append(
+        createMobileNavChoice({
+            id: 'sb-mobile-nav-layout-horizontal',
+            name: 'sb-mobile-nav-layout',
+            value: 'horizontal',
+            label: 'Horizontal top bar',
+            icon: 'fa-grip-lines',
+            onChange: input => setMobileNavLayout(input.value),
+        }),
+        createMobileNavChoice({
+            id: 'sb-mobile-nav-layout-vertical',
+            name: 'sb-mobile-nav-layout',
+            value: 'vertical',
+            label: 'Vertical side rail',
+            icon: 'fa-table-columns',
+            onChange: input => setMobileNavLayout(input.value),
+        }),
+    );
+
+    header.appendChild(title);
+    replacementField.append(replacementLabel, replacementSelect);
+    group.append(
+        header,
+        layoutGrid,
+        iconOnlyChoice,
+        createMobileNavDivider(),
+        showCustomizeChoice,
+        showQuickActionsChoice,
+        replaceQuickActionsChoice,
+        replacementField,
+    );
+    return group;
+}
+
 function createFrontendIconSettingsGroup() {
     const group = createElement('section', {
         className: 'sb-theme-slider-group sb-frontend-icon-group',
@@ -10396,10 +10774,13 @@ function injectThemePicker() {
         className: 'sb-mobile-only-setting',
     });
     const topbarLabelSettingsGroup = createTopbarLabelSettingsGroup();
+    const mobileNavLayoutSettingsGroup = createMobileNavLayoutSettingsGroup();
+    const mobileSettingsDivider = createMobileNavDivider();
     const compactModeSettingsGroup = createCompactModeSettingsGroup();
     const frontendIconSettingsGroup = createFrontendIconSettingsGroup();
     const shortcutSettingsGroup = createShortcutSettingsGroup();
     const mobileQuickActionSettingsGroup = createMobileQuickActionSettingsGroup();
+    const mobileSettingsOutlet = document.getElementById('sb-mobile-settings-outlet');
     header.append(title, description);
 
     for (const theme of SB_THEMES) {
@@ -10423,7 +10804,26 @@ function injectThemePicker() {
     getMessageStyleSelect()?.addEventListener('change', updateThemePickerUi);
     document.addEventListener('sb:chat-style-updated', updateThemePickerUi);
 
-    card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup, mobileQuickActionSettingsGroup);
+    if (mobileSettingsOutlet instanceof HTMLElement) {
+        mobileSettingsOutlet.replaceChildren(
+            mobileNavLayoutSettingsGroup,
+            mobileSettingsDivider,
+            mobileButtonSliderGroup,
+            compactModeSettingsGroup,
+            mobileQuickActionSettingsGroup,
+        );
+    }
+
+    card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
+    if (!(mobileSettingsOutlet instanceof HTMLElement)) {
+        card.append(
+            mobileNavLayoutSettingsGroup,
+            mobileSettingsDivider,
+            mobileButtonSliderGroup,
+            compactModeSettingsGroup,
+            mobileQuickActionSettingsGroup,
+        );
+    }
     themeBlock.prepend(card);
     updateThemePickerUi();
 }
@@ -10439,6 +10839,11 @@ function updateThemePickerUi() {
     const mobileButtonScaleValue = document.getElementById('sb-mobile-button-scale-value');
     const customTextInput = document.getElementById('sb-topbar-custom-text-input');
     const compactModeInput = document.getElementById('sb-compact-mode-input');
+    const mobileNavIconOnlyInput = document.getElementById('sb-mobile-nav-icon-only-input');
+    const mobileNavShowCustomizeInput = document.getElementById('sb-mobile-nav-show-customize-input');
+    const mobileNavShowQuickActionsInput = document.getElementById('sb-mobile-nav-show-quick-actions-input');
+    const mobileNavReplaceQuickActionsInput = document.getElementById('sb-mobile-nav-replace-quick-actions-input');
+    const mobileNavReplacementSelect = document.getElementById('sb-mobile-nav-replacement-select');
 
     for (const button of document.querySelectorAll('[data-sb-theme-option]')) {
         const themeId = button.getAttribute('data-sb-theme-option');
@@ -10511,6 +10916,55 @@ function updateThemePickerUi() {
     if (compactModeInput instanceof HTMLInputElement) {
         compactModeInput.checked = sbState.compactMode;
         compactModeInput.closest('.sb-compact-mode-option')?.classList.toggle('is-selected', sbState.compactMode);
+    }
+
+    for (const input of document.querySelectorAll('input[name="sb-mobile-nav-layout"]')) {
+        if (!(input instanceof HTMLInputElement)) {
+            continue;
+        }
+
+        const isChecked = input.value === sbState.mobileNav.layout;
+        input.checked = isChecked;
+        input.closest('.sb-mobile-nav-choice')?.classList.toggle('is-selected', isChecked);
+    }
+
+    if (mobileNavIconOnlyInput instanceof HTMLInputElement) {
+        mobileNavIconOnlyInput.checked = sbState.mobileNav.iconOnly;
+        const choice = mobileNavIconOnlyInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.mobileNav.iconOnly);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (mobileNavShowCustomizeInput instanceof HTMLInputElement) {
+        mobileNavShowCustomizeInput.checked = sbState.mobileNav.showCustomize;
+        mobileNavShowCustomizeInput.disabled = false;
+        const choice = mobileNavShowCustomizeInput.closest('.sb-mobile-nav-choice');
+        const label = choice?.querySelector('.sb-mobile-nav-choice-copy > strong');
+        if (label instanceof HTMLElement) {
+            label.textContent = getMobileNavCustomizeLocationLabel();
+        }
+        choice?.classList.toggle('is-selected', sbState.mobileNav.showCustomize);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (mobileNavShowQuickActionsInput instanceof HTMLInputElement) {
+        mobileNavShowQuickActionsInput.checked = sbState.mobileNav.showQuickActions;
+        mobileNavShowQuickActionsInput.disabled = false;
+        const choice = mobileNavShowQuickActionsInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.mobileNav.showQuickActions);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (mobileNavReplaceQuickActionsInput instanceof HTMLInputElement) {
+        mobileNavReplaceQuickActionsInput.checked = sbState.mobileNav.replaceQuickActions;
+        const choice = mobileNavReplaceQuickActionsInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.mobileNav.replaceQuickActions);
+    }
+
+    if (mobileNavReplacementSelect instanceof HTMLSelectElement) {
+        mobileNavReplacementSelect.value = normalizeMobileNavReplacementTarget(sbState.mobileNav.replacementTarget);
+        mobileNavReplacementSelect.disabled = !sbState.mobileNav.replaceQuickActions;
+        mobileNavReplacementSelect.closest('.sb-mobile-nav-replacement-field')?.classList.toggle('is-disabled', !sbState.mobileNav.replaceQuickActions);
     }
 
     for (const button of document.querySelectorAll('[data-sb-message-style]')) {
@@ -10825,6 +11279,34 @@ function activateMobileQuickAction(action) {
     revealSearchMatch(action.shellKey, match);
 }
 
+function activateMobileNavAction(action) {
+    const normalizedAction = normalizeMobileQuickAction(action);
+    if (!normalizedAction) {
+        return;
+    }
+
+    closeMobileNav();
+
+    if (normalizedAction.type === 'custom') {
+        activateMobileQuickAction(normalizedAction);
+        return;
+    }
+
+    if (normalizedAction.type === 'shell') {
+        closeAllDropdowns({ except: normalizedAction.shellKey });
+        openShell(normalizedAction.shellKey);
+        return;
+    }
+
+    if (normalizedAction.shellKey === 'characters') {
+        openCharacterPanelTab(normalizedAction.tabId);
+        return;
+    }
+
+    closeAllDropdowns({ except: normalizedAction.shellKey });
+    openShell(normalizedAction.shellKey, normalizedAction.tabId);
+}
+
 function renderUniversalSearchResults(query) {
     const searchState = getUniversalSearchState();
     const results = searchState.results;
@@ -10972,16 +11454,9 @@ function expandHiddenAccordions(target) {
 }
 
 function pulseSearchTarget(target) {
-    document.querySelectorAll('.sb-search-hit').forEach(element => {
-        element.classList.remove('sb-search-hit');
-    });
-
     if (!(target instanceof HTMLElement)) {
         return;
     }
-
-    target.classList.add('sb-search-hit');
-    window.setTimeout(() => target.classList.remove('sb-search-hit'), 2200);
 }
 
 function revealSearchMatch(shellKey, match) {
@@ -11045,14 +11520,17 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
 
     for (const [currentTabId, tabState] of shellState.tabs.entries()) {
         const isActive = currentTabId === tabId;
+        const isHiddenRailDuplicate = tabState.button?.classList.contains('sb-shell-tab-mobile-rail-hidden') ?? false;
         tabState.button?.classList.toggle('is-active', isActive);
         tabState.button?.setAttribute('aria-selected', String(isActive));
-        tabState.button?.setAttribute('tabindex', isActive ? '0' : '-1');
+        tabState.button?.setAttribute('tabindex', isActive && !isHiddenRailDuplicate ? '0' : '-1');
         tabState.panel.classList.toggle('sb-shell-panel-active', isActive);
         tabState.panel.setAttribute('aria-hidden', String(!isActive));
         // Invalidate search index when switching to a tab so stale DOM isn't searched
         if (isActive) tabState.searchIndex = null;
     }
+
+    syncMobileShellRailActionState(shellKey, tabId);
 
     const activeTab = shellState.tabs.get(tabId);
     shellState.headerTitle.textContent = activeTab.label;
@@ -11060,7 +11538,7 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
     scrollShellTabButtonIntoView(shellState.nav, activeTab.button, { smooth: focusButton });
     shellState.updateNavScrollIndicators?.();
 
-    if (focusButton) {
+    if (focusButton && isActuallyVisible(activeTab.button)) {
         activeTab.button?.focus();
     } else if (isShellOpen(shellKey)) {
         window.requestAnimationFrame(() => focusShellPanel(shellKey, { force: true }));
@@ -11485,7 +11963,9 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
     });
 
     button.addEventListener('keydown', event => {
-        const buttons = Array.from(shellState.nav.querySelectorAll('.sb-shell-tab'));
+        const buttons = Array.from(shellState.nav.querySelectorAll('.sb-shell-tab')).filter(
+            item => item instanceof HTMLElement && !item.classList.contains('sb-shell-tab-mobile-rail-hidden'),
+        );
         const currentIndex = buttons.indexOf(button);
 
         if (currentIndex === -1) {
@@ -11516,8 +11996,6 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
         }
     });
 
-    shellState.nav.appendChild(button);
-    shellState.updateNavScrollIndicators?.();
     shellState.tabs.set(tabConfig.id, {
         ...tabConfig,
         button,
@@ -11527,6 +12005,216 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
         onActivate: panelBundle.onActivate ?? tabConfig.onActivate ?? null,
         onDeactivate: panelBundle.onDeactivate ?? tabConfig.onDeactivate ?? null,
     });
+    shellState.nav.appendChild(button);
+    shellState.updateNavScrollIndicators?.();
+    syncMobileShellRailActions(shellKey);
+}
+
+function createMobileShellRailDivider(label) {
+    return createElement('div', {
+        className: 'sb-shell-rail-divider',
+        attrs: {
+            role: 'separator',
+            'aria-label': label,
+        },
+    });
+}
+
+function createMobileShellRailButton(item, actionHandler, className = '') {
+    const action = normalizeMobileQuickAction({
+        type: item.type || 'tab',
+        shellKey: item.shellKey,
+        tabId: item.tabId,
+        icon: item.icon,
+        label: item.label,
+        sectionLabel: item.sectionLabel,
+        displayText: item.displayText,
+        dedupeKey: item.dedupeKey,
+    });
+
+    if (!action) {
+        return null;
+    }
+
+    const buttonAttrs = {
+        type: 'button',
+        title: action.label,
+        'aria-label': action.label,
+        'data-sb-rail-action': getMobileQuickActionKey(action),
+        'data-sb-rail-type': action.type,
+        'data-sb-rail-shell-key': action.shellKey,
+    };
+
+    if (action.tabId) {
+        buttonAttrs['data-sb-rail-tab-id'] = action.tabId;
+    }
+
+    const button = createElement('button', {
+        className: ['sb-shell-tab', 'sb-shell-rail-action', className].filter(Boolean).join(' '),
+        attrs: buttonAttrs,
+    });
+    const icon = createElement('i', {
+        className: `fa-solid ${action.icon || 'fa-bolt'}`,
+        attrs: {
+            'aria-hidden': 'true',
+        },
+    });
+    const copy = createElement('span', { className: 'sb-shell-tab-copy' });
+    const label = createElement('strong', { text: action.label });
+
+    copy.appendChild(label);
+    button.append(icon, copy);
+    button.addEventListener('click', () => actionHandler(action));
+    return button;
+}
+
+function createCustomizeGroup() {
+    const customizeGroup = createElement('div', {
+        className: 'sb-shell-rail-group sb-shell-rail-group-customize',
+        attrs: {
+            'aria-label': 'Customize',
+        },
+    });
+
+    let previousShellKey = '';
+    for (const action of SB_MOBILE_RAIL_CUSTOMIZE_ACTIONS) {
+        if (previousShellKey && action.shellKey !== previousShellKey) {
+            customizeGroup.appendChild(createMobileShellRailDivider('Settings'));
+        }
+
+        const button = createMobileShellRailButton(action, activateMobileNavAction, 'sb-shell-rail-customize-action');
+        if (button) {
+            customizeGroup.appendChild(button);
+        }
+
+        previousShellKey = action.shellKey;
+    }
+
+    return customizeGroup;
+}
+
+function syncMobileShellRailActionState(activeShellKey = '', activeTabId = '') {
+    document.querySelectorAll('.sb-shell-rail-action[data-sb-rail-shell-key]').forEach(button => {
+        if (!(button instanceof HTMLElement)) {
+            return;
+        }
+
+        const isActive = button.dataset.sbRailShellKey === activeShellKey && button.dataset.sbRailTabId === activeTabId;
+        button.classList.toggle('is-active', isActive);
+        button.setAttribute('aria-selected', String(isActive));
+        if (isActive) {
+            button.setAttribute('aria-current', 'page');
+        } else {
+            button.removeAttribute('aria-current');
+        }
+    });
+}
+
+function syncMobileShellRailTabVisibility(shellState, currentShellKey, hideCustomizeTabs) {
+    const hiddenTabIds = new Set(
+        hideCustomizeTabs
+            ? SB_MOBILE_RAIL_CUSTOMIZE_ACTIONS
+                .filter(action => action.shellKey === currentShellKey)
+                .map(action => action.tabId)
+            : [],
+    );
+
+    for (const tabState of shellState.tabs.values()) {
+        if (!(tabState.button instanceof HTMLElement)) {
+            continue;
+        }
+
+        const shouldHide = hiddenTabIds.has(tabState.id);
+        const isActive = tabState.id === shellState.activeTabId;
+        tabState.button.classList.toggle('sb-shell-tab-mobile-rail-hidden', shouldHide);
+        tabState.button.setAttribute('aria-hidden', String(shouldHide));
+        tabState.button.setAttribute('tabindex', isActive && !shouldHide ? '0' : '-1');
+        tabState.button.toggleAttribute('inert', shouldHide);
+    }
+}
+
+function syncMobileShellRailActions(shellKey = null) {
+    const shellKeys = shellKey ? [shellKey] : ['left', 'right'];
+    const hasVerticalRail = isMobileViewport() && sbState.mobileNav.layout === 'vertical';
+
+    for (const currentShellKey of shellKeys) {
+        const shellState = getShellState(currentShellKey);
+        if (!(shellState?.nav instanceof HTMLElement)) {
+            continue;
+        }
+
+        shellState.nav.querySelectorAll('.sb-shell-rail-shortcuts').forEach(element => element.remove());
+        const showCustomize = hasVerticalRail && sbState.mobileNav.showCustomize;
+        const shouldHideCustomizeTabs = showCustomize;
+        syncMobileShellRailTabVisibility(shellState, currentShellKey, shouldHideCustomizeTabs);
+
+        const createRailBlock = (position) => createElement('div', {
+            className: `sb-shell-rail-shortcuts sb-shell-rail-shortcuts-${position}`,
+            attrs: {
+                'aria-hidden': 'false',
+            },
+        });
+
+        if (!hasVerticalRail) {
+            shellState.updateNavScrollIndicators?.();
+            continue;
+        }
+
+        const builtInRailActionKeys = new Set(SB_MOBILE_RAIL_CUSTOMIZE_ACTIONS.map(getMobileQuickActionKey));
+        const railQuickActions = sbState.mobileQuickActions.filter(
+            action => !builtInRailActionKeys.has(getMobileQuickActionKey(action)),
+        );
+        const createQuickActionsGroup = () => {
+            const quickActionsGroup = createElement('div', {
+                className: 'sb-shell-rail-group sb-shell-rail-group-quick-actions',
+                attrs: {
+                    'aria-label': 'Quick Actions',
+                },
+            });
+
+            if (railQuickActions.length) {
+                for (const action of railQuickActions) {
+                    const button = createMobileShellRailButton(action, activateMobileNavAction, 'sb-shell-rail-quick-action');
+                    if (button) {
+                        quickActionsGroup.appendChild(button);
+                    }
+                }
+            } else {
+                quickActionsGroup.appendChild(createElement('div', {
+                    className: 'sb-shell-rail-empty',
+                    text: 'No Quick Actions',
+                }));
+            }
+
+            return quickActionsGroup;
+        };
+
+        const beforeBlock = createRailBlock('before');
+
+        if (showCustomize) {
+            beforeBlock.appendChild(createMobileShellRailDivider('Workspace'));
+            beforeBlock.appendChild(createCustomizeGroup());
+        }
+
+        if (beforeBlock.children.length > 0) {
+            shellState.nav.prepend(beforeBlock);
+        }
+
+        if (sbState.mobileNav.showQuickActions) {
+            const afterBlock = createRailBlock('after');
+            afterBlock.append(
+                createMobileShellRailDivider('Quick Actions'),
+                createQuickActionsGroup(),
+            );
+            shellState.nav.appendChild(afterBlock);
+        }
+
+        shellState.updateNavScrollIndicators?.();
+    }
+
+    const activeShellKey = ['left', 'right'].find(currentShellKey => isShellOpen(currentShellKey)) ?? (shellKeys.length === 1 ? shellKeys[0] : '');
+    const activeShellState = activeShellKey ? getShellState(activeShellKey) : null;
+    syncMobileShellRailActionState(activeShellKey, activeShellState?.activeTabId ?? '');
 }
 
 function routeDrawerTarget(targetId) {
@@ -11656,6 +12344,44 @@ function bindWorldInfoRoute() {
         });
 }
 
+function activateMobileNavPageTarget(target) {
+    const config = getMobileNavReplacementTargetConfig(target);
+
+    closeMobileNav();
+
+    if (config.shellKey === 'characters') {
+        openCharacterPanelTab(config.tabId);
+        return;
+    }
+
+    if (config.shellKey && config.tabId) {
+        openShell(config.shellKey, config.tabId);
+    }
+}
+
+function updateMobileNavButtonLabel() {
+    const button = document.getElementById('sb-hamburger');
+    if (!(button instanceof HTMLElement)) {
+        return;
+    }
+
+    const overlay = document.getElementById('sb-mobile-nav');
+    const isOpen = overlay instanceof HTMLElement
+        && !overlay.hidden
+        && overlay.getAttribute('aria-hidden') === 'false';
+    const replacement = getMobileNavReplacementTargetConfig();
+    let title = 'Open navigation';
+
+    if (isOpen) {
+        title = 'Close navigation';
+    } else if (sbState.mobileNav.replaceQuickActions) {
+        title = `Open ${replacement.label}`;
+    }
+
+    button.title = title;
+    button.setAttribute('aria-label', title);
+}
+
 function createMobileQuickActionButton(item) {
     const action = normalizeMobileQuickAction(item);
     if (!action) {
@@ -11666,6 +12392,8 @@ function createMobileQuickActionButton(item) {
         className: 'sb-nav-item',
         attrs: {
             type: 'button',
+            title: `Open ${action.label}`,
+            'aria-label': `Open ${action.label}`,
         },
     });
     const icon = createElement('i', {
@@ -11682,6 +12410,8 @@ function createMobileQuickActionButton(item) {
 
         if (action.type === 'custom') {
             activateMobileQuickAction(action);
+        } else if (action.type === 'shell') {
+            openShell(action.shellKey);
         } else if (action.shellKey === 'characters') {
             openCharacterPanelTab(action.tabId);
         } else {
@@ -11694,13 +12424,21 @@ function createMobileQuickActionButton(item) {
 
 function refreshMobileNavQuickActions() {
     const list = sbState.mobileNav.quickActionContainer
-        ?? document.querySelector('#sb-mobile-nav .sb-mobile-section-list');
+        ?? document.querySelector('#sb-mobile-nav .sb-mobile-quick-action-list');
     if (!(list instanceof HTMLElement)) {
         return;
     }
 
     sbState.mobileNav.quickActionContainer = list;
     list.replaceChildren();
+
+    if (!sbState.mobileQuickActions.length) {
+        list.appendChild(createElement('div', {
+            className: 'sb-mobile-quick-action-empty',
+            text: 'No mobile Quick Actions selected yet.',
+        }));
+        return;
+    }
 
     for (const action of sbState.mobileQuickActions) {
         const button = createMobileQuickActionButton(action);
@@ -11732,10 +12470,15 @@ function buildMobileNav() {
     }
 
     const sectionBlock = createElement('section', { className: 'sb-mobile-section' });
-    const list = createElement('div', { className: 'sb-mobile-section-list' });
-    sectionBlock.appendChild(list);
-    content.appendChild(sectionBlock);
+    const quickActionTitle = createElement('span', { className: 'sb-mobile-section-title', text: 'Quick Actions' });
+    const list = createElement('div', { className: 'sb-mobile-section-list sb-mobile-quick-action-list' });
+
+    sectionBlock.classList.add('sb-mobile-quick-action-section');
+    sectionBlock.append(quickActionTitle, list);
+    content.append(sectionBlock);
     sbState.mobileNav.quickActionContainer = list;
+    sbState.mobileNav.quickActionSection = sectionBlock;
+    sbState.mobileNav.quickActionDivider = null;
     refreshMobileNavQuickActions();
 
     const header = createElement('div', { className: 'sb-mobile-panel-header' });
@@ -11748,11 +12491,11 @@ function buildMobileNav() {
         },
     });
     const headerCopy = createElement('div', { className: 'sb-mobile-panel-copy' });
-    const eyebrow = createElement('div', { className: 'sb-shell-kicker', text: 'Workspace' });
+    const eyebrow = createElement('div', { className: 'sb-shell-kicker', text: 'Menu' });
     const title = createElement('h2', {
         id: 'sb-mobile-nav-title',
         className: 'sb-shell-title',
-        text: 'Quick Actions',
+        text: 'Navigation',
         attrs: {
             tabindex: '-1',
         },
@@ -11780,6 +12523,7 @@ function buildMobileNav() {
     });
 
     document.body.appendChild(overlay);
+    updateMobileNavButtonLabel();
 
     // Auto-close mobile nav when clicking on main content areas
     const autoCloseSelectors = [
@@ -11856,6 +12600,7 @@ function setMobileNavOpenState(isOpen) {
     button.innerHTML = shouldOpen
         ? '<i class="fa-solid fa-xmark" aria-hidden="true"></i>'
         : '<i class="fa-solid fa-bars" aria-hidden="true"></i>';
+    updateMobileNavButtonLabel();
 
     queueMobileModalStateSync();
 
@@ -11870,6 +12615,11 @@ function setMobileNavOpenState(isOpen) {
 }
 
 function toggleMobileNav() {
+    if (sbState.mobileNav.replaceQuickActions && isMobileViewport()) {
+        activateMobileNavPageTarget(sbState.mobileNav.replacementTarget);
+        return;
+    }
+
     const overlay = ensureMobileNavReady();
 
     if (!(overlay instanceof HTMLElement)) {
@@ -12252,6 +13002,7 @@ function syncMobileViewportState() {
         closeMobileChatTools();
     }
 
+    syncMobileShellRailActions();
     syncDesktopShellSizing();
     applyTopbarOffset();
     syncChatbarVisibilityState();
@@ -12914,6 +13665,7 @@ function initAll() {
     setTopbarScale('mobile', sbState.topbarScale.mobile, { persist: false });
     setBottomBarScale(sbState.bottomBarScale, { persist: false });
     setMobileButtonScale(sbState.mobileButtonScale, { persist: false });
+    applyMobileNavPreferences();
     bindComposerControlPlacement();
     initChatAvatarVariables();
     syncDesktopShellSizing();

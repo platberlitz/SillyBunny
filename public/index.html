@@ -17,9 +17,9 @@
             background-color: #1d2128;
         }
     </style>
-    <link rel="preload" as="style" href="style.css">
+    <link rel="preload" as="style" href="style.css?v=20260523b">
     <link rel="modulepreload" href="script.js">
-    <link rel="modulepreload" href="scripts/sillybunny-tabs.js?v=20260520b">
+    <link rel="modulepreload" href="scripts/sillybunny-tabs.js?v=20260523b">
     <link rel="preload" as="font" type="font/woff2" href="webfonts/Figtree/Figtree-Regular.woff2?v=20260422b" crossorigin>
     <link rel="manifest" crossorigin="use-credentials" href="manifest.json">
     <link href="webfonts/Figtree/stylesheet.css?v=20260422b" rel="stylesheet">
@@ -40,14 +40,14 @@
     <link rel="apple-touch-icon" sizes="114x114" href="img/apple-icon-114x114.png" />
     <link rel="apple-touch-icon" sizes="144x144" href="img/apple-icon-144x144.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="img/apple-icon-180x180.png" />
-    <link rel="stylesheet" type="text/css" href="style.css?v=20260517a">
+    <link rel="stylesheet" type="text/css" href="style.css?v=20260523b">
     <link rel="stylesheet" type="text/css" href="css/st-tailwind.css">
     <link rel="stylesheet" type="text/css" href="css/toggle-dependent.css">
     <link rel="stylesheet" type="text/css" href="css/select2-overrides.css">
     <link rel="stylesheet" type="text/css" href="css/mobile-styles.css?v=20260516d" media="(max-width: 768px)">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260520a">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260522a">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-mobile-shell.css?v=20260522a" media="(max-width: 1000px)">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260523a">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260523b">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-mobile-shell.css?v=20260523b" media="(max-width: 768px)">
     <link rel="stylesheet" type="text/css" href="css/user.css">
     <!-- Scripts are loaded at the end of the body to improve page load speed -->
 </head>
@@ -80,29 +80,18 @@
                     <div class="flex-container flexNoGap" id="ai_response_configuration">
                         <div id="respective-presets-block" class="width100p">
                             <div id="kobold_api-presets">
-                                <div class="margin0 title_restorable standoutHeader">
-                                    <strong>
-                                        <span data-i18n="kobldpresets">Kobold Presets</span>
-                                    </strong>
-
-                                    <div class="flex-container gap3px">
+                                <div class="flex-container flexNoGap sb-non-chat-preset-row">
+                                    <select id="settings_preset" data-preset-manager-for="kobold" class="flex1 text_pole">
+                                        <option value="gui" data-i18n="guikoboldaisettings">GUI KoboldAI Settings</option>
+                                    </select>
+                                    <div class="flex-container marginLeft5 gap3px sb-non-chat-preset-actions">
+                                        <input type="file" hidden data-preset-manager-file="kobold" accept=".json, .settings">
                                         <div data-preset-manager-import="kobold" class="margin0 menu_button_icon menu_button" title="Import preset" data-i18n="[title]Import preset">
                                             <i class="fa-fw fa-solid fa-file-import"></i>
                                         </div>
                                         <div data-preset-manager-export="kobold" class="margin0 menu_button_icon menu_button" title="Export preset" data-i18n="[title]Export preset">
                                             <i class="fa-fw fa-solid fa-file-export"></i>
                                         </div>
-                                        <div data-preset-manager-delete="kobold" class="margin0 menu_button_icon menu_button" title="Delete the preset" data-i18n="[title]Delete the preset">
-                                            <i class="fa-fw fa-solid fa-trash-can"></i>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="flex-container flexNoGap">
-                                    <select id="settings_preset" data-preset-manager-for="kobold" class="flex1 text_pole">
-                                        <option value="gui" data-i18n="guikoboldaisettings">GUI KoboldAI Settings</option>
-                                    </select>
-                                    <div class="flex-container marginLeft5 gap3px">
-                                        <input type="file" hidden data-preset-manager-file="kobold" accept=".json, .settings">
                                         <div data-preset-manager-update="kobold" class="menu_button menu_button_icon" title="Update current preset" data-i18n="[title]Update current preset">
                                             <i class="fa-fw fa-solid fa-save"></i>
                                         </div>
@@ -115,36 +104,25 @@
                                         <div data-preset-manager-restore="kobold" class="menu_button menu_button_icon" title="Restore current preset" data-i18n="[title]Restore current preset">
                                             <i class="fa-fw fa-solid fa-recycle"></i>
                                         </div>
+                                        <div data-preset-manager-delete="kobold" class="margin0 menu_button_icon menu_button" title="Delete the preset" data-i18n="[title]Delete the preset">
+                                            <i class="fa-fw fa-solid fa-trash-can"></i>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             <div id="novel_api-presets">
-                                <div class="margin0 title_restorable standoutHeader">
-                                    <strong>
-                                        <span data-i18n="novelaipresets">NovelAI Presets</span>
-                                        <a href="https://docs.sillytavern.app/usage/api-connections/novelai/" class="notes-link" target="_blank">
-                                            <span class="fa-solid fa-circle-question note-link-span"></span>
-                                        </a>
-                                    </strong>
-
-                                    <div class="flex-container gap3px">
+                                <div class="flex-container flexNoGap sb-non-chat-preset-row">
+                                    <select id="settings_preset_novel" class="flex1 text_pole" data-preset-manager-for="novel">
+                                        <option value="gui" data-i18n="Default">Default</option>
+                                    </select>
+                                    <div class="flex-container marginLeft5 gap3px sb-non-chat-preset-actions">
+                                        <input type="file" hidden data-preset-manager-file="novel" accept=".json, .settings, .preset">
                                         <div data-preset-manager-import="novel" class="margin0 menu_button_icon menu_button" title="Import preset" data-i18n="[title]Import preset">
                                             <i class="fa-fw fa-solid fa-file-import"></i>
                                         </div>
                                         <div data-preset-manager-export="novel" class="margin0 menu_button_icon menu_button" title="Export preset" data-i18n="[title]Export preset">
                                             <i class="fa-fw fa-solid fa-file-export"></i>
                                         </div>
-                                        <div data-preset-manager-delete="novel" class="margin0 menu_button_icon menu_button" title="Delete the preset" data-i18n="[title]Delete the preset">
-                                            <i class="fa-fw fa-solid fa-trash-can"></i>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="flex-container flexNoGap">
-                                    <select id="settings_preset_novel" class="flex1 text_pole" data-preset-manager-for="novel">
-                                        <option value="gui" data-i18n="Default">Default</option>
-                                    </select>
-                                    <div class="flex-container marginLeft5 gap3px">
-                                        <input type="file" hidden data-preset-manager-file="novel" accept=".json, .settings, .preset">
                                         <div data-preset-manager-update="novel" class="menu_button menu_button_icon" title="Update current preset" data-i18n="[title]Update current preset">
                                             <i class="fa-fw fa-solid fa-save"></i>
                                         </div>
@@ -156,6 +134,9 @@
                                         </div>
                                         <div data-preset-manager-restore="novel" class="menu_button menu_button_icon" title="Restore current preset" data-i18n="[title]Restore current preset">
                                             <i class="fa-fw fa-solid fa-recycle"></i>
+                                        </div>
+                                        <div data-preset-manager-delete="novel" class="margin0 menu_button_icon menu_button" title="Delete the preset" data-i18n="[title]Delete the preset">
+                                            <i class="fa-fw fa-solid fa-trash-can"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -216,32 +197,17 @@
                             </div>
                             <div id="textgenerationwebui_api-presets">
                                 <div>
-                                    <div class="margin0 title_restorable standoutHeader">
-                                        <strong>
-                                            <span data-i18n="Text Completion presets">Text Completion presets</span>
-                                        </strong>
-
-                                        <div class="flex-container gap3px">
+                                    <div class="flex-container flexNoGap sb-non-chat-preset-row">
+                                        <select id="settings_preset_textgenerationwebui" class="flex1 text_pole" data-preset-manager-for="textgenerationwebui">
+                                        </select>
+                                        <div class="flex-container marginLeft5 gap3px sb-non-chat-preset-actions">
+                                            <input type="file" hidden data-preset-manager-file="textgenerationwebui" accept=".json, .settings">
                                             <div data-preset-manager-import="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Import preset" data-i18n="[title]Import preset">
                                                 <i class="fa-fw fa-solid fa-file-import"></i>
                                             </div>
                                             <div data-preset-manager-export="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Export preset" data-i18n="[title]Export preset">
                                                 <i class="fa-fw fa-solid fa-file-export"></i>
                                             </div>
-                                            <div data-preset-manager-delete="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Delete the preset" data-i18n="[title]Delete the preset">
-                                                <i class="fa-fw fa-solid fa-trash-can"></i>
-                                            </div>
-                                            <div data-preset-manager-delete-all="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Delete all saved presets" data-i18n="[title]Delete all saved presets">
-                                                <i class="fa-fw fa-solid fa-trash-arrow-up"></i>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex-container flexNoGap">
-                                        <select id="settings_preset_textgenerationwebui" class="flex1 text_pole" data-preset-manager-for="textgenerationwebui">
-                                        </select>
-                                        <div class="flex-container marginLeft5 gap3px">
-                                            <input type="file" hidden data-preset-manager-file="textgenerationwebui" accept=".json, .settings">
                                             <div data-preset-manager-update="textgenerationwebui" class="menu_button menu_button_icon" title="Update current preset" data-i18n="[title]Update current preset">
                                                 <i class="fa-fw fa-solid fa-save"></i>
                                             </div>
@@ -253,6 +219,12 @@
                                             </div>
                                             <div data-preset-manager-restore="textgenerationwebui" class="menu_button menu_button_icon" title="Restore current preset" data-i18n="[title]Restore current preset">
                                                 <i class="fa-fw fa-solid fa-recycle"></i>
+                                            </div>
+                                            <div data-preset-manager-delete="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Delete the preset" data-i18n="[title]Delete the preset">
+                                                <i class="fa-fw fa-solid fa-trash-can"></i>
+                                            </div>
+                                            <div data-preset-manager-delete-all="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Delete all saved presets" data-i18n="[title]Delete all saved presets">
+                                                <i class="fa-fw fa-solid fa-trash-arrow-up"></i>
                                             </div>
                                         </div>
                                     </div>
@@ -327,238 +299,132 @@
                             </div>
                             -->
                             <div id="range_block_novel">
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Temperature">
-                                        Temperature
+                                <div class="flex-container gap10h5v justifyCenter">
+                                    <div data-source="openai,claude,aimlapi,openrouter,ai21,makersuite,vertexai,mistralai,custom,cohere,perplexity,groq,siliconflow,minimax,electronhub,chutes,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,zai,workers_ai" data-tg-samplers="temp" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Temperature">Temperature</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="temp_novel" name="volume" min="0.1" max="2.50" step="0.01">
+                                        <input class="neo-range-input" type="number" min="0.1" max="2.50" step="0.01" data-for="temp_novel" id="temp_counter_novel">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="temp_novel" name="volume" min="0.1" max="2.50" step="0.01">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0.1" max="2.50" step="0.01" data-for="temp_novel" id="temp_counter_novel">
-                                        </div>
+                                    <div data-tg-samplers="rep_pen" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="rep.pen">Repetition Penalty</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="rep_pen_novel" name="volume" min="1" max="8" step="0.025">
+                                        <input class="neo-range-input" type="number" min="1" max="8" step="0.025" data-for="rep_pen_novel" id="rep_pen_counter_novel">
                                     </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="rep.pen">
-                                        Repetition Penalty
+                                    <div data-tg-samplers="rep_pen_range" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Rep. Pen. Range.">Rep Pen Range</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="rep_pen_size_novel" name="volume" min="0" max="8192" step="1">
+                                        <input class="neo-range-input" type="number" min="0" max="8192" step="1" data-for="rep_pen_size_novel" id="rep_pen_size_counter_novel">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="rep_pen_novel" name="volume" min="1" max="8" step="0.025">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="1" max="8" step="0.025" data-for="rep_pen_novel" id="rep_pen_counter_novel">
-                                        </div>
+                                    <div data-tg-samplers="rep_pen_slope" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Rep. Pen. Slope">Repetition Penalty Slope</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="rep_pen_slope_novel" name="volume" min="0" max="10" step="0.01">
+                                        <input class="neo-range-input" type="number" min="0" max="10" step="0.01" data-for="rep_pen_slope_novel" id="rep_pen_slope_counter_novel">
                                     </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Rep. Pen. Range.">
-                                        Rep Pen Range
+                                    <div data-tg-samplers="rep_pen_frequency" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Rep. Pen. Freq.">Repetition Penalty Frequency</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="rep_pen_freq_novel" name="volume" min="0" max="1" step="0.001">
+                                        <input class="neo-range-input" type="number" min="0" max="1" step="0.001" data-for="rep_pen_freq_novel" id="rep_pen_freq_counter_novel">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="rep_pen_size_novel" name="volume" min="0" max="8192" step="1">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="8192" step="1" data-for="rep_pen_size_novel" id="rep_pen_size_counter_novel">
-                                        </div>
+                                    <div data-tg-samplers="rep_pen_presence" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Rep. Pen. Presence">Repetition Penalty Presence</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="rep_pen_presence_novel" name="volume" min="0" max="1" step="0.001">
+                                        <input class="neo-range-input" type="number" min="0" max="1" step="0.001" data-for="rep_pen_presence_novel" id="rep_pen_presence_counter_novel">
                                     </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Rep. Pen. Slope">
-                                        Repetition Penalty Slope
+                                    <div data-tg-samplers="min_p" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Min P">Min P</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="min_p_novel" name="volume" min="0" max="1" step="0.001">
+                                        <input class="neo-range-input" type="number" min="0" max="1" step="0.001" data-for="min_p_novel" id="min_p_counter_novel">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="rep_pen_slope_novel" name="volume" min="0" max="10" step="0.01">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="10" step="0.01" data-for="rep_pen_slope_novel" id="rep_pen_slope_counter_novel">
-                                        </div>
+                                    <div data-tg-samplers="tfs" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="TFS">TFS</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="tail_free_sampling_novel" name="volume" min="0" max="1" step="0.001">
+                                        <input class="neo-range-input" type="number" min="0" max="1" step="0.001" data-for="tail_free_sampling_novel" id="tail_free_sampling_counter_novel">
                                     </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Rep. Pen. Freq.">
-                                        Repetition Penalty Frequency
+                                    <div data-tg-samplers="top_p" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Top P">Top P</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="top_p_novel" name="volume" min="0" max="1" step="0.001">
+                                        <input class="neo-range-input" type="number" min="0" max="1" step="0.001" data-for="top_p_novel" id="top_p_counter_novel">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="rep_pen_freq_novel" name="volume" min="0" max="1" step="0.001">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="1" step="0.001" data-for="rep_pen_freq_novel" id="rep_pen_freq_counter_novel">
-                                        </div>
+                                    <div data-tg-samplers="top_a" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Top A">Top A</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="top_a_novel" name="volume" min="0" max="1" step="0.001">
+                                        <input class="neo-range-input" type="number" min="0" max="1" step="0.001" data-for="top_a_novel" id="top_a_counter_novel">
                                     </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Rep. Pen. Presence">
-                                        Repetition Penalty Presence
+                                    <div data-tg-samplers="top_k" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Top K">Top K</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="top_k_novel" name="volume" min="0" max="300" step="1">
+                                        <input class="neo-range-input" type="number" min="0" max="300" step="1" data-for="top_k_novel" id="top_k_counter_novel">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="rep_pen_presence_novel" name="volume" min="0" max="1" step="0.001">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="1" step="0.001" data-for="rep_pen_presence_novel" id="rep_pen_presence_counter_novel">
-                                        </div>
+                                    <div data-tg-samplers="mirostat_tau" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Mirostat Tau">Mirostat Tau</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="mirostat_tau_novel" name="volume" min="0" max="6" step="0.01">
+                                        <input class="neo-range-input" type="number" min="0" max="6" step="0.01" data-for="mirostat_tau_novel" id="mirostat_tau_counter_novel">
                                     </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Min P">
-                                        Min P
+                                    <div data-tg-samplers="mirostat_lr" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Mirostat LR">Mirostat LR</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="mirostat_lr_novel" name="volume" min="0" max="1" step="0.01">
+                                        <input class="neo-range-input" type="number" min="0" max="1" step="0.01" data-for="mirostat_lr_novel" id="mirostat_lr_counter_novel">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="min_p_novel" name="volume" min="0" max="1" step="0.001">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="1" step="0.001" data-for="min_p_novel" id="min_p_counter_novel">
-                                        </div>
+                                    <div data-tg-samplers="typical_p" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Typical P">Typical P</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="typical_p_novel" name="volume" min="0" max="1" step="0.001">
+                                        <input class="neo-range-input" type="number" min="0" max="1" step="0.001" data-for="typical_p_novel" id="typical_p_counter_novel">
                                     </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="TFS">
-                                        TFS
+                                    <div data-tg-samplers="linear" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Linear">Linear</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="math1_temp_novel" name="volume" min="0" max="1.5" step="0.01">
+                                        <input class="neo-range-input" type="number" min="0" max="1.5" step="0.01" data-for="math1_temp_novel" id="math1_temp_counter_novel">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="tail_free_sampling_novel" name="volume" min="0" max="1" step="0.001">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="1" step="0.001" data-for="tail_free_sampling_novel" id="tail_free_sampling_counter_novel">
-                                        </div>
+                                    <div data-tg-samplers="quad" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Quad">Quad</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="math1_quad_novel" name="volume" min="0" max="0.4" step="0.01">
+                                        <input class="neo-range-input" type="number" min="0" max="0.4" step="0.01" data-for="math1_quad_novel" id="math1_quad_counter_novel">
                                     </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Top P">
-                                        Top P
+                                    <div data-tg-samplers="conf" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Conf">Conf</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="math1_quad_entropy_scale_novel" name="volume" min="-0.4" max="0.4" step="0.01">
+                                        <input class="neo-range-input" type="number" min="-0.4" max="0.4" step="0.01" data-for="math1_quad_entropy_scale_novel" id="math1_quad_entropy_scale_counter_novel">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="top_p_novel" name="volume" min="0" max="1" step="0.001">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="1" step="0.001" data-for="top_p_novel" id="top_p_counter_novel">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Top A">
-                                        Top A
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="top_a_novel" name="volume" min="0" max="1" step="0.001">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="1" step="0.001" data-for="top_a_novel" id="top_a_counter_novel">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Top K">
-                                        Top K
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="top_k_novel" name="volume" min="0" max="300" step="1">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="300" step="1" data-for="top_k_novel" id="top_k_counter_novel">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Mirostat Tau">
-                                        Mirostat Tau
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="mirostat_tau_novel" name="volume" min="0" max="6" step="0.01">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="6" step="0.01" data-for="mirostat_tau_novel" id="mirostat_tau_counter_novel">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Mirostat LR">
-                                        Mirostat LR
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="mirostat_lr_novel" name="volume" min="0" max="1" step="0.01">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="1" step="0.01" data-for="mirostat_lr_novel" id="mirostat_lr_counter_novel">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Typical P">
-                                        Typical P
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="typical_p_novel" name="volume" min="0" max="1" step="0.001">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="1" step="0.001" data-for="typical_p_novel" id="typical_p_counter_novel">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Linear">
-                                        Linear
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="math1_temp_novel" name="volume" min="0" max="1.5" step="0.01">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="1.5" step="0.01" data-for="math1_temp_novel" id="math1_temp_counter_novel">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Quad">
-                                        Quad
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="math1_quad_novel" name="volume" min="0" max="0.4" step="0.01">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="0.4" step="0.01" data-for="math1_quad_novel" id="math1_quad_counter_novel">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Conf">
-                                        Conf
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="math1_quad_entropy_scale_novel" name="volume" min="-0.4" max="0.4" step="0.01">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="-0.4" max="0.4" step="0.01" data-for="math1_quad_entropy_scale_novel" id="math1_quad_entropy_scale_counter_novel">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block">
-                                    <div class="range-block-title" data-i18n="Min Length">
-                                        Min Length
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="min_length_novel" name="volume" min="1" max="150" step="1">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="1" max="150" step="1" data-for="min_length_novel" id="min_length_counter_novel">
-                                        </div>
+                                    <div data-tg-samplers="min_length" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Min Length">Min Length</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="min_length_novel" name="volume" min="1" max="150" step="1">
+                                        <input class="neo-range-input" type="number" min="1" max="150" step="1" data-for="min_length_novel" id="min_length_counter_novel">
                                     </div>
                                 </div>
                                 <div class="range-block">
@@ -682,113 +548,67 @@
                                         </span>
                                     </div>
                                 </div>
-                                <div class="range-block" data-source="openai,claude,aimlapi,openrouter,ai21,makersuite,vertexai,mistralai,custom,cohere,perplexity,groq,siliconflow,minimax,electronhub,chutes,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,zai,workers_ai">
-                                    <div class="range-block-title" data-i18n="Temperature">
-                                        <span data-i18n="Temperature">Temperature</span>
-                                        <div class="fa-solid fa-circle-info opacity50p" data-i18n="[title]Temperature controls the randomness in token selection" title="Temperature controls the randomness in token selection:&#13;- low temperature (<1.0) leads to more predictable text, favoring higher probability tokens.&#13;- high temperature (>1.0) increases creativity and diversity in the output by giving lower probability tokens a better chance.&#13;Set to 1.0 for the original probabilities."></div>
+                                <div class="flex-container gap10h5v justifyCenter">
+                                    <div data-source="openai,claude,aimlapi,openrouter,ai21,makersuite,vertexai,mistralai,custom,cohere,perplexity,groq,siliconflow,minimax,electronhub,chutes,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,zai,workers_ai" data-tg-samplers="temp" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Temperature">Temperature</span>
+                                            <div class="fa-solid fa-circle-info opacity50p" data-i18n="[title]Temperature controls the randomness in token selection" title="Temperature controls the randomness in token selection:&#13;- low temperature (<1.0) leads to more predictable text, favoring higher probability tokens.&#13;- high temperature (>1.0) increases creativity and diversity in the output by giving lower probability tokens a better chance.&#13;Set to 1.0 for the original probabilities."></div>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="temp_openai" name="volume" min="0" max="2.0" step="0.01">
+                                        <input class="neo-range-input" type="number" min="0" max="2.0" step="0.01" data-for="temp_openai" id="temp_counter_openai">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="temp_openai" name="volume" min="0" max="2.0" step="0.01">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="2.0" step="0.01" data-for="temp_openai" id="temp_counter_openai">
-                                        </div>
+                                    <div data-source="openai,aimlapi,openrouter,custom,cohere,perplexity,groq,siliconflow,mistralai,electronhub,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,chutes,workers_ai" data-tg-samplers="freq_pen" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Frequency Penalty">Frequency Penalty</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="freq_pen_openai" name="volume" min="-2" max="2" step="0.01">
+                                        <input class="neo-range-input" type="number" min="-2" max="2" step="0.01" data-for="freq_pen_openai" id="freq_pen_counter_openai">
                                     </div>
-                                </div>
-                                <div class="range-block" data-source="openai,aimlapi,openrouter,custom,cohere,perplexity,groq,siliconflow,mistralai,electronhub,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,chutes,workers_ai">
-                                    <div class="range-block-title" data-i18n="Frequency Penalty">
-                                        Frequency Penalty
+                                    <div data-source="openai,aimlapi,openrouter,custom,cohere,perplexity,groq,siliconflow,mistralai,electronhub,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,chutes,workers_ai" data-tg-samplers="presence_pen" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Presence Penalty">Presence Penalty</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="pres_pen_openai" name="volume" min="-2" max="2" step="0.01">
+                                        <input class="neo-range-input" type="number" min="-2" max="2" step="0.01" data-for="pres_pen_openai" id="pres_pen_counter_openai">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="freq_pen_openai" name="volume" min="-2" max="2" step="0.01">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="-2" max="2" step="0.01" data-for="freq_pen_openai" id="freq_pen_counter_openai">
-                                        </div>
+                                    <div data-source="claude,aimlapi,openrouter,makersuite,vertexai,cohere,perplexity,electronhub,chutes,nanogpt,workers_ai" data-tg-samplers="top_k" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Top K">Top K</span>
+                                            <div class="fa-solid fa-circle-info opacity50p" title="Top K sets a maximum amount of top tokens that can be chosen from.&#13;E.g Top K is 20, this means only the 20 highest ranking tokens will be kept (regardless of their probabilities being diverse or limited).&#13;Set to 0 (or -1, depending on your backend) to disable." data-i18n="[title]Top_K_desc"></div>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="top_k_openai" name="volume" min="0" max="500" step="1">
+                                        <input class="neo-range-input" type="number" min="0" max="500" step="1" data-for="top_k_openai" id="top_k_counter_openai">
                                     </div>
-                                </div>
-                                <div class="range-block" data-source="openai,aimlapi,openrouter,custom,cohere,perplexity,groq,siliconflow,mistralai,electronhub,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,chutes,workers_ai">
-                                    <div class="range-block-title" data-i18n="Presence Penalty">
-                                        Presence Penalty
+                                    <div data-source="openai,claude,aimlapi,openrouter,ai21,makersuite,vertexai,mistralai,custom,cohere,perplexity,groq,siliconflow,minimax,electronhub,chutes,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,zai,workers_ai" data-tg-samplers="top_p" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Top P">Top P</span>
+                                            <div class="fa-solid fa-circle-info opacity50p" title="Top P (a.k.a. nucleus sampling) adds up all the top tokens required to add up to the target percentage.&#13;E.g If the Top 2 tokens are both 25%, and Top P is 0.50, only the Top 2 tokens are considered.&#13;Set to 1.0 to disable." data-i18n="[title]Top_P_desc"></div>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="top_p_openai" name="volume" min="0" max="1" step="0.01">
+                                        <input class="neo-range-input" type="number" min="0" max="1" step="0.01" data-for="top_p_openai" id="top_p_counter_openai">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="pres_pen_openai" name="volume" min="-2" max="2" step="0.01">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="-2" max="2" step="0.01" data-for="pres_pen_openai" id="pres_pen_counter_openai">
-                                        </div>
+                                    <div data-source="openrouter,nanogpt,chutes,workers_ai" data-tg-samplers="repetition_penalty" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Repetition Penalty">Repetition Penalty</span>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="repetition_penalty_openai" name="volume" min="1" max="2" step="0.01">
+                                        <input class="neo-range-input" type="number" min="1" max="2" step="0.01" data-for="repetition_penalty_openai" id="repetition_penalty_counter_openai">
                                     </div>
-                                </div>
-                                <div class="range-block" data-source="claude,aimlapi,openrouter,makersuite,vertexai,cohere,perplexity,electronhub,chutes,nanogpt,workers_ai">
-                                    <div class="range-block-title" data-i18n="Top K">
-                                        <span data-i18n="Top K">Top K</span>
-                                        <div class="fa-solid fa-circle-info opacity50p" title="Top K sets a maximum amount of top tokens that can be chosen from.&#13;E.g Top K is 20, this means only the 20 highest ranking tokens will be kept (regardless of their probabilities being diverse or limited).&#13;Set to 0 (or -1, depending on your backend) to disable." data-i18n="[title]Top_K_desc"></div>
+                                    <div data-source="openrouter,nanogpt,chutes" data-tg-samplers="min_p" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Min P">Min P</span>
+                                            <div class="fa-solid fa-circle-info opacity50p" data-i18n="[title]Min_P_desc" title="Min P sets a base minimum probability. This is scaled according to the top token's probability.&#13;E.g If Top token is 80% probability, and Min P is 0.1, only tokens higher than 8% would be considered.&#13;Set to 0 to disable."></div>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="min_p_openai" name="volume" min="0" max="1" step="0.001">
+                                        <input class="neo-range-input" type="number" min="0" max="1" step="0.001" data-for="min_p_openai" id="min_p_counter_openai">
                                     </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="top_k_openai" name="volume" min="0" max="500" step="1">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="500" step="1" data-for="top_k_openai" id="top_k_counter_openai">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block" data-source="openai,claude,aimlapi,openrouter,ai21,makersuite,vertexai,mistralai,custom,cohere,perplexity,groq,siliconflow,minimax,electronhub,chutes,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,zai,workers_ai">
-                                    <div class="range-block-title" data-i18n="Top P">
-                                        <span data-i18n="Top P">Top P</span>
-                                        <div class="fa-solid fa-circle-info opacity50p" title="Top P (a.k.a. nucleus sampling) adds up all the top tokens required to add up to the target percentage.&#13;E.g If the Top 2 tokens are both 25%, and Top P is 0.50, only the Top 2 tokens are considered.&#13;Set to 1.0 to disable." data-i18n="[title]Top_P_desc"></div>
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="top_p_openai" name="volume" min="0" max="1" step="0.01">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="1" step="0.01" data-for="top_p_openai" id="top_p_counter_openai">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block" data-source="openrouter,nanogpt,chutes,workers_ai">
-                                    <div class="range-block-title" data-i18n="Repetition Penalty">
-                                        Repetition Penalty
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="repetition_penalty_openai" name="volume" min="1" max="2" step="0.01">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="1" max="2" step="0.01" data-for="repetition_penalty_openai" id="repetition_penalty_counter_openai">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block" data-source="openrouter,nanogpt,chutes">
-                                    <div class="range-block-title" data-i18n="Min P">
-                                        <span data-i18n="Min P">Min P</span>
-                                        <div class="fa-solid fa-circle-info opacity50p" data-i18n="[title]Min_P_desc" title="Min P sets a base minimum probability. This is scaled according to the top token's probability.&#13;E.g If Top token is 80% probability, and Min P is 0.1, only tokens higher than 8% would be considered.&#13;Set to 0 to disable."></div>
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="min_p_openai" name="volume" min="0" max="1" step="0.001">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="1" step="0.001" data-for="min_p_openai" id="min_p_counter_openai">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="range-block" data-source="openrouter,nanogpt">
-                                    <div class="range-block-title" data-i18n="Top A">
-                                        <span data-i18n="Top A">Top A</span>
-                                        <div class="fa-solid fa-circle-info opacity50p" title="Top A sets a threshold for token selection based on the square of the highest token probability.&#13;E.g if the Top-A value is 0.2 and the top token's probability is 50%, tokens with probabilities below 5% (0.2 * 0.5^2) are excluded.&#13;Set to 0 to disable." data-i18n="[title]Top_A_desc"></div>
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="top_a_openai" name="volume" min="0" max="1" step="0.001">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <input type="number" min="0" max="1" step="0.001" data-for="top_a_openai" id="top_a_counter_openai">
-                                        </div>
+                                    <div data-source="openrouter,nanogpt" data-tg-samplers="top_a" class="alignitemscenter flex-container flexFlowColumn flexBasis30p flexGrow flexShrink gap0">
+                                        <small>
+                                            <span data-i18n="Top A">Top A</span>
+                                            <div class="fa-solid fa-circle-info opacity50p" title="Top A sets a threshold for token selection based on the square of the highest token probability.&#13;E.g if the Top-A value is 0.2 and the top token's probability is 50%, tokens with probabilities below 5% (0.2 * 0.5^2) are excluded.&#13;Set to 0 to disable." data-i18n="[title]Top_A_desc"></div>
+                                        </small>
+                                        <input class="neo-range-slider" type="range" id="top_a_openai" name="volume" min="0" max="1" step="0.001">
+                                        <input class="neo-range-input" type="number" min="0" max="1" step="0.001" data-for="top_a_openai" id="top_a_counter_openai">
                                     </div>
                                 </div>
                                 <div class="inline-drawer m-t-1 wide100p">
@@ -1129,6 +949,7 @@
                                         <hr class="wide100p">
                                         <div class="range-block-title">
                                             <span data-i18n="Samplers Order">Samplers Order</span>
+                                            <div data-sampler-order-lock="kobold_order" class="sampler-order-lock menu_button menu_button_icon fa-solid fa-lock" role="button" tabindex="0" aria-pressed="true" aria-label="Sampler reordering locked" title="Unlock sampler reordering" data-i18n="[title]Unlock sampler reordering"></div>
                                         </div>
                                         <div class="toggle-description widthUnset" data-i18n="Samplers will be applied in a top-down order. Use with caution.">
                                             Samplers will be applied in a top-down order.
@@ -1174,6 +995,7 @@
                                 <div class="range-block flexFlowColumn">
                                     <div class="range-block-title">
                                         <span data-i18n="Samplers Order">Samplers Order</span>
+                                        <div data-sampler-order-lock="novel_order" class="sampler-order-lock menu_button menu_button_icon fa-solid fa-lock" role="button" tabindex="0" aria-pressed="true" aria-label="Sampler reordering locked" title="Unlock sampler reordering" data-i18n="[title]Unlock sampler reordering"></div>
                                     </div>
                                     <div class="toggle-description widthUnset" data-i18n="Samplers will be applied in a top-down order. Use with caution.">
                                         Samplers will be applied in a top-down order. Use with caution.
@@ -1399,7 +1221,14 @@
                                         </h4>
                                         <div class="flex-container flexFlowRow alignitemscenter gap10px flexShrink">
                                             <div data-tg-samplers="adaptive_target" class="alignitemscenter flex-container marginBot5 flexFlowColumn flexGrow flexShrink gap0">
-                                                <small data-i18n="Target">Target</small>
+                                                <small class="sb-sampler-inline-title displayNone">
+                                                    <strong data-i18n="Adaptive-P">Adaptive-P</strong>
+                                                    <span aria-hidden="true">:</span>
+                                                    <span data-i18n="Target">Target</span>
+                                                    <a href="https://github.com/MrJackSpade/adaptive-p-docs" target="_blank">
+                                                        <span class="fa-solid fa-circle-info opacity50p"></span>
+                                                    </a>
+                                                </small>
                                                 <input class="neo-range-slider" type="range" id="adaptive_target_textgenerationwebui" min="-0.01" max="1" step="0.01" />
                                                 <input class="neo-range-input" type="number" min="-0.01" max="1" step="0.01" data-for="adaptive_target_textgenerationwebui" id="adaptive_target_counter_textgenerationwebui">
                                             </div>
@@ -1418,7 +1247,12 @@
                                         </h4>
                                         <div data-tg-type="mancer, ooba, koboldcpp, aphrodite, tabby" class="flex-container flexFlowRow gap10px flexShrink">
                                             <div class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
-                                                <small data-i18n="Smoothing Factor">Smoothing Factor</small>
+                                                <small class="sb-sampler-inline-title displayNone">
+                                                    <strong data-i18n="Smooth Sampling">Smooth Sampling</strong>
+                                                    <span aria-hidden="true">:</span>
+                                                    <span data-i18n="Smoothing Factor">Smoothing Factor</span>
+                                                    <span class="fa-solid fa-circle-info opacity50p" data-i18n="[title]Smooth_Sampling_desc" title="Allows you to use quadratic/cubic transformations to adjust the distribution. Lower Smoothing Factor values will be more creative, usually between 0.2-0.3 is the sweetspot (assuming the curve = 1). Higher Smoothing Curve values will make the curve steeper, which will punish low probability choices more aggressively. 1.0 curve is equivalent to only using Smoothing Factor."></span>
+                                                </small>
                                                 <input class="neo-range-slider" type="range" id="smoothing_factor_textgenerationwebui" name="volume" min="0" max="10" step="0.01" />
                                                 <input class="neo-range-input" type="number" min="0" max="10" step="0.01" data-for="smoothing_factor_textgenerationwebui" id="smoothing_factor_counter_textgenerationwebui">
                                             </div>
@@ -1439,7 +1273,14 @@
                                         </h4>
                                         <div class="flex-container flexFlowRow gap10px flexShrink">
                                             <div data-tg-samplers="xtc_threshold" class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
-                                                <small data-i18n="Threshold">Threshold</small>
+                                                <small class="sb-sampler-inline-title displayNone">
+                                                    <strong data-i18n="Exclude Top Choices (XTC)">Exclude Top Choices (XTC)</strong>
+                                                    <span aria-hidden="true">:</span>
+                                                    <span data-i18n="Threshold">Threshold</span>
+                                                    <a href="https://github.com/oobabooga/text-generation-webui/pull/6335" target="_blank">
+                                                        <span class="fa-solid fa-circle-info opacity50p"></span>
+                                                    </a>
+                                                </small>
                                                 <input class="neo-range-slider" type="range" id="xtc_threshold_textgenerationwebui" name="volume" min="0" max="0.5" step="0.01" />
                                                 <input class="neo-range-input" type="number" min="0" max="0.5" step="0.01" data-for="xtc_threshold_textgenerationwebui" id="xtc_threshold_counter_textgenerationwebui">
                                             </div>
@@ -1522,7 +1363,12 @@
                                         </h4>
                                         <div class="flex-container flexFlowRow gap10px flexShrink">
                                             <div class="alignitemscenter flex-container marginBot5 flexFlowColumn flexGrow flexShrink gap0">
-                                                <small data-i18n="Mirostat Mode">Mode</small>
+                                                <small class="sb-sampler-inline-title displayNone">
+                                                    <strong data-i18n="Mirostat (mode=1 is only for llama.cpp)">Mirostat</strong>
+                                                    <span aria-hidden="true">:</span>
+                                                    <span data-i18n="Mirostat Mode">Mode</span>
+                                                    <span class="fa-solid fa-circle-info opacity50p" data-i18n="[title]Mirostat_desc" title="Mirostat is a thermostat for output perplexity.&#13;Mirostat matches the output perplexity to that of the input, thus avoiding the repetition trap&#13;(where, as the autoregressive inference produces text, the perplexity of the output tends toward zero)&#13;and the confusion trap (where the perplexity diverges).&#13;For details, see the paper Mirostat: A Neural Text Decoding Algorithm that Directly Controls Perplexity by Basu et al. (2020).&#13;Mode chooses the Mirostat version. 0=disable, 1=Mirostat 1.0 (llama.cpp only), 2=Mirostat 2.0.&#13;Tau = Variability parameter for Mirostat outputs.&#13;Eta = Learning rate of Mirostat."></span>
+                                                </small>
                                                 <input class="neo-range-slider" type="range" id="mirostat_mode_textgenerationwebui" name="volume" min="0" max="2" step="1" />
                                                 <input class="neo-range-input" type="number" min="0" max="2" step="1" data-for="mirostat_mode_textgenerationwebui" id="mirostat_mode_counter_textgenerationwebui">
                                             </div>
@@ -1732,6 +1578,7 @@
                                         <hr class="wide100p">
                                         <div class="range-block-title">
                                             <span data-i18n="Samplers Order">Samplers Order</span>
+                                            <div data-sampler-order-lock="koboldcpp_order" class="sampler-order-lock menu_button menu_button_icon fa-solid fa-lock" role="button" tabindex="0" aria-pressed="true" aria-label="Sampler reordering locked" title="Unlock sampler reordering" data-i18n="[title]Unlock sampler reordering"></div>
                                         </div>
                                         <div class="toggle-description widthUnset" data-i18n="Samplers will be applied in a top-down order. Use with caution.">
                                             kcpp only. Samplers will be applied in a top-down order.
@@ -1776,6 +1623,7 @@
                                         <h4 class="range-block-title justifyCenter">
                                             <span data-i18n="Sampler Order">Sampler Order</span>
                                             <div class="margin5 fa-solid fa-circle-info opacity50p" data-i18n="[title]llama.cpp only. Determines the order of samplers. If Mirostat mode is not 0, sampler order is ignored." title="llama.cpp only. Determines the order of samplers. If Mirostat mode is not 0, sampler order is ignored."></div>
+                                            <div data-sampler-order-lock="llamacpp_samplers_sortable" class="sampler-order-lock menu_button menu_button_icon fa-solid fa-lock" role="button" tabindex="0" aria-pressed="true" aria-label="Sampler reordering locked" title="Unlock sampler reordering" data-i18n="[title]Unlock sampler reordering"></div>
                                         </h4>
                                         <div class="toggle-description widthUnset" data-i18n="llama.cpp only. Determines the order of samplers. If Mirostat mode is not 0, sampler order is ignored.">
                                             llama.cpp only. Determines the order of samplers. If Mirostat mode is not 0, sampler order is ignored.
@@ -1800,6 +1648,7 @@
                                         <h4 class="range-block-title justifyCenter">
                                             <span data-i18n="Sampler Priority">Sampler Priority</span>
                                             <div class="margin5 fa-solid fa-circle-info opacity50p" title="Ooba only. Determines the order of samplers." data-i18n="[title]Ooba only. Determines the order of samplers."></div>
+                                            <div data-sampler-order-lock="sampler_priority_container" class="sampler-order-lock menu_button menu_button_icon fa-solid fa-lock" role="button" tabindex="0" aria-pressed="true" aria-label="Sampler reordering locked" title="Unlock sampler reordering" data-i18n="[title]Unlock sampler reordering"></div>
                                         </h4>
                                         <div class="toggle-description widthUnset" data-i18n="Ooba only. Determines the order of samplers.">
                                             Ooba only. Determines the order of samplers.
@@ -1835,6 +1684,7 @@
                                         <h4 class="range-block-title justifyCenter">
                                             <span data-i18n="Sampler Order">Sampler Order</span>
                                             <div class="margin5 fa-solid fa-circle-info opacity50p" title="Aphrodite only. Determines the order of samplers. Skew is always applied post-softmax, so it's not included here." data-i18n="[title]Aphrodite only. Determines the order of samplers. Skew is always applied post-softmax, so it's not included here."></div>
+                                            <div data-sampler-order-lock="sampler_priority_container_aphrodite" class="sampler-order-lock menu_button menu_button_icon fa-solid fa-lock" role="button" tabindex="0" aria-pressed="true" aria-label="Sampler reordering locked" title="Unlock sampler reordering" data-i18n="[title]Unlock sampler reordering"></div>
                                         </h4>
                                         <div class="toggle-description widthUnset" data-i18n="Aphrodite only. Determines the order of samplers.">
                                             Aphrodite only. Determines the order of samplers.
@@ -4559,9 +4409,6 @@
                     </div>
                     <div id="SystemPromptColumn" class="flex-container flexNoGap flexFlowColumn flex1">
                         <div class="margin0 title_restorable standoutHeader" data-cc-null>
-                            <strong>
-                                <span data-i18n="System Prompt">System Prompt</span>
-                            </strong>
                             <div class="flex-container gap3px">
                                 <label id="sysprompt_enabled_label" for="sysprompt_enabled" class="margin0 menu_button menu_button_icon" title="Enable System Prompt" data-i18n="[title]sysprompt_enabled">
                                     <input id="sysprompt_enabled" type="checkbox" style="display:none;" />
@@ -5860,6 +5707,15 @@
 
                                 </div>
                             </div>
+                            </div>
+                            <div class="inline-drawer wide100p flexFlowColumn sb-settings-subdrawer" id="MobileSection">
+                                <div class="inline-drawer-toggle inline-drawer-header userSettingsInnerExpandable">
+                                    <b><i class="fa-solid fa-mobile-screen-button"></i> <span data-i18n="Mobile">Mobile</span></b>
+                                    <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
+                                </div>
+                                <div class="inline-drawer-content flex-container flexFlowColumn sb-settings-subdrawer-body" style="display:none">
+                                    <div id="sb-mobile-settings-outlet" class="flex-container flexFlowColumn"></div>
+                                </div>
                             </div>
                             <div id="CustomCSS-block" class="inline-drawer wide100p flexFlowColumn sb-settings-subdrawer sb-settings-topdrawer-centered">
                                 <div class="inline-drawer-toggle inline-drawer-header userSettingsInnerExpandable" title="Apply a custom CSS style to the whole SillyBunny interface." data-i18n="[title]Apply a custom CSS style to the whole SillyBunny interface.">
@@ -8853,7 +8709,7 @@
     <script type="module" src="scripts/i18n.js"></script>
     <script type="module" src="scripts/performance-loader.js"></script>
     <script type="module" src="script.js"></script>
-    <script type="module" src="scripts/sillybunny-tabs.js?v=20260520b"></script>
+    <script type="module" src="scripts/sillybunny-tabs.js?v=20260523b"></script>
     <script>
         window.addEventListener('load', (event) => {
             const documentHeight = () => {
