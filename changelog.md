@@ -88,6 +88,7 @@ This update consolidates the v1.6.0 staging work since v1.5.3: preset and connec
 
 ### Merged Staging PRs
 - PR #155 (2026-05-24) `fix: chat scroll and prompt manager scroll position issues`
+- PR #158 (2026-05-24) `feat: add mobile navigation customization`
 - PR #159 (2026-05-24) `fix: Make message generation glow theme-aware`
 
 ## v1.5.3
