@@ -1336,6 +1336,7 @@ function applyMobileNavPreferences() {
     document.documentElement.dataset.sbMobileNavMode = sbState.mobileNav.iconOnly ? 'icon-only' : 'labeled';
     document.documentElement.dataset.sbMobileNavCustomize = sbState.mobileNav.showCustomize ? 'shown' : 'hidden';
     document.documentElement.dataset.sbMobileNavQuickActions = quickActionsShown ? 'shown' : 'hidden';
+    document.documentElement.dataset.sbMobileNavReplacement = sbState.mobileNav.replaceQuickActions ? 'shown' : 'hidden';
 }
 
 function setMobileNavLayout(layout, { persist = true } = {}) {
@@ -12391,6 +12392,8 @@ function createMobileQuickActionButton(item) {
         className: 'sb-nav-item',
         attrs: {
             type: 'button',
+            title: `Open ${action.label}`,
+            'aria-label': `Open ${action.label}`,
         },
     });
     const icon = createElement('i', {
