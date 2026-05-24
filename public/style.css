@@ -1296,14 +1296,9 @@ body.is-macos #chat {
     vertical-align: middle;
 }
 
-.auto_hide {
-    content-visibility: auto;
-}
-
 .mes {
     display: flex;
     align-items: flex-start;
-    content-visibility: auto;
     contain: layout paint style;
     contain-intrinsic-size: auto 180px;
     padding: 12px 14px 4px 14px;

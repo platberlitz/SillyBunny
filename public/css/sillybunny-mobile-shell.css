@@ -29,11 +29,12 @@
     }
 
     #send_form.sb-generating-controls {
-        border-top-color: color-mix(in srgb, var(--sb-color-warning, var(--SmartThemeQuoteColor)) 62%, transparent);
+        border-top-color: color-mix(in srgb, var(--sb-generating-glow-color, var(--SmartThemeQuoteColor)) 78%, transparent);
         box-shadow:
             0 -10px 28px color-mix(in srgb, var(--SmartThemeShadowColor) 16%, transparent),
-            0 0 0 1px color-mix(in srgb, var(--sb-color-warning, var(--SmartThemeQuoteColor)) 28%, transparent),
-            inset 0 1px 0 color-mix(in srgb, var(--sb-color-warning, var(--SmartThemeQuoteColor)) 34%, transparent);
+            0 -6px 24px color-mix(in srgb, var(--sb-generating-glow-color, var(--SmartThemeQuoteColor)) 28%, transparent),
+            0 0 0 1px color-mix(in srgb, var(--sb-generating-glow-color, var(--SmartThemeQuoteColor)) 52%, transparent),
+            inset 0 1px 0 color-mix(in srgb, var(--sb-generating-glow-color, var(--SmartThemeQuoteColor)) 52%, transparent);
     }
 
     #send_form.sb-generating-controls::after {

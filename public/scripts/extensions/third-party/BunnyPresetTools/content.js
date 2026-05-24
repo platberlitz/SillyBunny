@@ -529,6 +529,10 @@ function refreshPromptSections() {
         promptListObserver.disconnect();
     }
 
+    // SillyBunny: Keep PromptManager's scroller anchored while rebuilding section rows.
+    const scrollContainer = promptListElement.closest('.sb-shell-panel-scroller, .scrollableInner');
+    const savedScrollTop = scrollContainer?.scrollTop ?? 0;
+
     try {
         cleanupPromptSections();
 
@@ -649,6 +653,10 @@ function refreshPromptSections() {
                 childList: true,
                 subtree: true,
             });
+        }
+
+        if (scrollContainer) {
+            scrollContainer.scrollTop = savedScrollTop;
         }
     }
 }
