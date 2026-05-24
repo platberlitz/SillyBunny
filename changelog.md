@@ -87,31 +87,7 @@ This update consolidates the v1.6.0 staging work since v1.5.3: preset and connec
 - Added a `changelog:merged-prs` script and GitHub workflow so future merged staging PRs are recorded in `changelog.md` automatically.
 
 ### Merged Staging PRs
-| PR | Release impact |
-|---|---|
-| #36 | Runtime worktree update support |
-| #40 | Bottom chat navigation and hidden full-chat search |
-| #52 | Chat Completion Tabs |
-| #56 | Workflow extensions bundled into core |
-| #60 | Pre-generation interceptors |
-| #62/#63 | iOS streaming stabilization |
-| #66 | Expanded connection profile summaries |
-| #67 | OOC and HTML context-depth controls |
-| #73 | Character menu rework |
-| #80 | Native Echo, Whisper, Hush, Ripple, and Tide chat styles |
-| #83 | Reasoning effort updates |
-| #85 | Pathfinder settings and retrieval improvements |
-| #111 | Guided Generations Guided Correction |
-| #113 | Prompt Manager preview |
-| #119 | OpenRouter quantizations on profile requests |
-| #121 | Docker startup regression fixes |
-| #123 | Memory Sharding quick-reply dedupe and force-update |
-| #124 | Native Prompt Inspector |
-| #126 | Templates browser categories and Pathfinder retirement |
-| #128 | Webpack Chevrotain ESM alias |
-| #131 | Reasoning-block stripping for profile prompt transforms |
-| #134 | Advanced formatting mobile header |
-| #135 | v1.6.0 pre-release cleanup |
+- PR #155 (2026-05-24) `fix: chat scroll and prompt manager scroll position issues`
 
 ## v1.5.3
 
