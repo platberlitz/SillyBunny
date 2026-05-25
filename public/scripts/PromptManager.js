@@ -14,6 +14,7 @@ import { t } from './i18n.js';
 import { isMobile } from './RossAscends-mods.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { getPromptDisplayTokenCounts } from './prompt-token-counts.js';
+import { getRenderedMarkerPrompt } from './prompt-manager-marker-preview.js';
 
 function debouncePromise(func, delay) {
     let timeoutId;
@@ -688,6 +689,7 @@ class PromptManager {
                 '.drag-handle',
                 '.prompt-manager-detach-action',
                 '.prompt-manager-edit-action',
+                '.prompt-manager-inspect-action',
                 '.prompt-manager-toggle-action',
                 '.prompt-manager-send-to-agents-action',
                 'input',
@@ -1805,10 +1807,22 @@ class PromptManager {
         if (!roleField || !promptField || !roleValue || !tokenCount || !previewText) return;
 
         const previewRequest = ++this.previewTokenCountRequest;
-        const preparedPrompt = this.preparePrompt({
-            role: roleField.value || 'system',
-            content: promptField.value || '',
-        });
+        const selectedPrompt = this.getPromptById(this.selectedPromptId);
+        // SillyBunny: marker prompt definitions are usually empty placeholders.
+        // Preview their latest rendered message from the dry-run prompt assembly instead.
+        const renderedMarkerPrompt = selectedPrompt?.marker
+            ? getRenderedMarkerPrompt(selectedPrompt.identifier, this.messages)
+            : null;
+        const preparedPrompt = renderedMarkerPrompt?.content
+            ? {
+                role: renderedMarkerPrompt.role,
+                content: renderedMarkerPrompt.content,
+                identifier: selectedPrompt.identifier,
+            }
+            : this.preparePrompt({
+                role: roleField.value || 'system',
+                content: promptField.value || '',
+            });
         const previewContent = preparedPrompt.content || '';
 
         roleValue.textContent = preparedPrompt.role || 'system';
