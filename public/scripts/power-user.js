@@ -2031,6 +2031,7 @@ function loadCharListState() {
 }
 
 const movingUIPixelStyles = new Set(['width', 'height', 'top', 'right', 'bottom', 'left']);
+const movingUIBoundsTolerance = 1;
 
 function normalizeMovingUIStateStyle(property, value) {
     if (value === null || value === undefined || value === '') {
@@ -2063,11 +2064,112 @@ function applyMovingUIStateStyles(element, state) {
     }
 }
 
+function parseMovingUIStatePixel(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmedValue = value.trim();
+    if (!/^-?\d+(?:\.\d+)?(?:px)?$/.test(trimmedValue)) {
+        return null;
+    }
+
+    return Number.parseFloat(trimmedValue);
+}
+
+function getMovingUIViewportSize() {
+    return {
+        width: window.innerWidth || document.documentElement.clientWidth || 0,
+        height: window.innerHeight || document.documentElement.clientHeight || 0,
+    };
+}
+
+function getMovingUIStateBounds(state) {
+    const { width: viewportWidth, height: viewportHeight } = getMovingUIViewportSize();
+    const width = parseMovingUIStatePixel(state?.width);
+    const height = parseMovingUIStatePixel(state?.height);
+    const right = parseMovingUIStatePixel(state?.right);
+    const bottom = parseMovingUIStatePixel(state?.bottom);
+    let left = parseMovingUIStatePixel(state?.left);
+    let top = parseMovingUIStatePixel(state?.top);
+
+    if (left === null && right !== null && width !== null) {
+        left = viewportWidth - right - width;
+    }
+
+    if (top === null && bottom !== null && height !== null) {
+        top = viewportHeight - bottom - height;
+    }
+
+    if (left === null || top === null || width === null || height === null) {
+        return null;
+    }
+
+    return {
+        left,
+        top,
+        right: left + width,
+        bottom: top + height,
+        width,
+        height,
+    };
+}
+
+function getMovingUIElementBounds(element) {
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+        return null;
+    }
+
+    return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+    };
+}
+
+function isMovingUIBoundsOutOfViewport(bounds) {
+    const { width: viewportWidth, height: viewportHeight } = getMovingUIViewportSize();
+    if (!bounds || viewportWidth <= 0 || viewportHeight <= 0 || bounds.width <= 0 || bounds.height <= 0) {
+        return false;
+    }
+
+    return bounds.left < -movingUIBoundsTolerance
+        || bounds.top < -movingUIBoundsTolerance
+        || bounds.right > viewportWidth + movingUIBoundsTolerance
+        || bounds.bottom > viewportHeight + movingUIBoundsTolerance;
+}
+
+function isMovingUIStateOutOfViewport(element, state) {
+    const elementBounds = getMovingUIElementBounds(element);
+
+    if (elementBounds) {
+        return isMovingUIBoundsOutOfViewport(elementBounds);
+    }
+
+    return isMovingUIBoundsOutOfViewport(getMovingUIStateBounds(state));
+}
+
+function syncMovingUIOffscreenWarning(showWarning) {
+    const warning = document.getElementById('movingUIOffscreenWarning');
+    if (warning) {
+        warning.classList.toggle('displayNone', !showWarning);
+    }
+}
+
 export function loadMovingUIState() {
     if (!isMobile()
         && power_user.movingUIState
         && power_user.movingUI === true) {
         console.debug('loading movingUI state');
+        let hasOffscreenPanel = false;
         for (var elmntName of Object.keys(power_user.movingUIState)) {
             var elmntState = power_user.movingUIState[elmntName];
             try {
@@ -2078,6 +2180,8 @@ export function loadMovingUIState() {
                     if (elmnt.length) {
                         console.debug(`loading state for ${targetName} from ${elmntName}`);
                         applyMovingUIStateStyles(elmnt[0], elmntState);
+                        // SillyBunny: make bad persisted panel geometry recoverable from Settings.
+                        hasOffscreenPanel = isMovingUIStateOutOfViewport(elmnt[0], elmntState) || hasOffscreenPanel;
                         applied = true;
                     }
                 }
@@ -2088,8 +2192,10 @@ export function loadMovingUIState() {
                 console.debug(`error occurred while processing ${elmntName}: ${err}`);
             }
         }
+        syncMovingUIOffscreenWarning(hasOffscreenPanel);
     } else {
         console.debug('skipping movingUI state load');
+        syncMovingUIOffscreenWarning(false);
         return;
     }
 }
@@ -2898,6 +3004,7 @@ async function resetMovablePanels(type) {
     await delay(50);
 
     power_user.movingUIState = {};
+    syncMovingUIOffscreenWarning(false);
 
     //if user manually resets panels, deselect the current preset
     if (type !== 'quiet' && type !== 'resize') {
@@ -3584,7 +3691,7 @@ jQuery(async () => {
         saveSettingsDebounced();
     });
 
-    $('#movingUIreset').on('click', resetMovablePanels);
+    $('#movingUIreset, #movingUIOffscreenReset').on('click', () => resetMovablePanels());
 
     $('#avatar_style').on('change', function () {
         const value = $(this).find(':selected').val();
