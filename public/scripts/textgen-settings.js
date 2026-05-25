@@ -23,7 +23,7 @@ import { power_user, registerDebugFunction } from './power-user.js';
 import { getActiveManualApiSamplers, loadApiSelectedSamplers, isSamplerManualPriorityEnabled } from './samplerSelect.js';
 import { SECRET_KEYS, writeSecret } from './secrets.js';
 import { getEventSourceStream } from './sse-stream.js';
-import { isLikelyLocalServerUrl } from './local-url-utils.js';
+import { getLocalPromptCacheValue, isLikelyLocalServerUrl } from './local-url-utils.js';
 import { getCurrentDreamGenModelTokenizer, getCurrentOpenRouterModelTokenizer, loadAphroditeModels, loadDreamGenModels, loadFeatherlessModels, loadGenericModels, loadInfermaticAIModels, loadLlamaCppModels, loadMancerModels, loadOllamaModels, loadOpenRouterModels, loadTabbyModels, loadTogetherAIModels, loadVllmModels, updateOpenRouterProvidersWarning } from './textgen-models.js';
 import { ENCODE_TOKENIZERS, TEXTGEN_TOKENIZERS, TOKENIZER_SUPPORTED_KEY, getTextTokens, getTokenizerBestMatch, tokenizers } from './tokenizers.js';
 import { AbortReason } from './util/AbortReason.js';
@@ -1874,13 +1874,9 @@ export function createTextGenGenerationData(settings, model, finalPrompt = null,
     }
 
     if (shouldUseLocalPromptCache(settings)) {
-        // SillyBunny: helper generations use the auxiliary cache lane unless the
-        // caller explicitly requests the main chat lane.
-        if (cacheScope === 'main') {
-            params.cache_prompt = true;
-        } else {
-            delete params.cache_prompt;
-        }
+        // SillyBunny: helper generations must explicitly opt out, because some
+        // local llama.cpp servers default to --cache-prompt for every request.
+        params.cache_prompt = getLocalPromptCacheValue(cacheScope);
     }
 
     // Grammar conflicts with with json_schema
