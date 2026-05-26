@@ -43,3 +43,16 @@ export function getChatCompletionConnectionPresetKeys(settingsMap) {
 export function shouldIncludeConnectionFieldsInPreset(settings) {
     return Boolean(settings?.bind_preset_to_connection);
 }
+
+/**
+ * Builds a Chat Completion preset body using the current linked-preset mode.
+ *
+ * @param {Record<string, any>} settings Live OpenAI settings
+ * @param {Record<string, [string, string, boolean, boolean]>} settingsMap OpenAI preset setting map
+ * @returns {Record<string, any>} Preset body
+ */
+export function buildChatCompletionPresetForSave(settings, settingsMap) {
+    return buildChatCompletionPreset(settings, settingsMap, {
+        includeConnection: shouldIncludeConnectionFieldsInPreset(settings),
+    });
+}
