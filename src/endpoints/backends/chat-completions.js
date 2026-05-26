@@ -25,6 +25,7 @@ import {
     forwardFetchResponse,
     abortOnRequestClose,
     getConfigValue,
+    pollStreamingRequestConnection,
     tryParse,
     uuidv4,
     mergeObjectWithYaml,
@@ -469,7 +470,7 @@ async function sendClaudeRequest(request, response) {
 
         if (request.body.stream) {
             // Pipe remote SSE stream to Express response
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const generateResponseText = await generateResponse.text();
@@ -782,7 +783,7 @@ async function sendMakerSuiteRequest(request, response) {
         if (stream) {
             try {
                 // Pipe remote SSE stream to Express response
-                forwardFetchResponse(generateResponse, response);
+                forwardFetchResponse(generateResponse, response, request, () => controller.abort());
             } catch (error) {
                 console.error('Error forwarding streaming response:', error);
                 if (!response.headersSent) {
@@ -890,7 +891,7 @@ async function sendAI21Request(request, response) {
     try {
         const generateResponse = await fetch(API_AI21 + '/chat/completions', options);
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -977,7 +978,7 @@ async function sendMistralAIRequest(request, response) {
 
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -1073,7 +1074,7 @@ async function sendCohereRequest(request, response) {
 
         if (request.body.stream) {
             const stream = await fetch(apiUrl, config);
-            forwardFetchResponse(stream, response);
+            forwardFetchResponse(stream, response, request, () => controller.abort());
         } else {
             const generateResponse = await fetch(apiUrl, config);
             if (!generateResponse.ok) {
@@ -1188,7 +1189,7 @@ async function sendDeepSeekRequest(request, response) {
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -1293,7 +1294,7 @@ async function sendXaiRequest(request, response) {
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -1395,7 +1396,7 @@ async function sendAimlapiRequest(request, response) {
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -1504,7 +1505,7 @@ async function sendElectronHubRequest(request, response) {
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -1602,7 +1603,7 @@ async function sendChutesRequest(request, response) {
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -1679,7 +1680,7 @@ async function sendMinimaxRequest(request, response) {
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
         if (request.body.stream) {
-            return forwardFetchResponse(generateResponse, response);
+            return forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         }
 
         if (!generateResponse.ok) {
@@ -1774,7 +1775,7 @@ async function sendAzureOpenAIRequest(request, response) {
         const fetchResponse = await fetch(endpointUrl, config);
 
         if (request.body.stream) {
-            return forwardFetchResponse(fetchResponse, response);
+            return forwardFetchResponse(fetchResponse, response, request, () => controller.abort());
         }
 
         if (fetchResponse.ok) {
@@ -2343,8 +2344,10 @@ function isExpectedStreamAbort(error) {
  * Transforms a Responses API SSE stream into Chat Completions SSE format.
  * @param {import('node-fetch').Response} fetchResponse The upstream Responses API response
  * @param {import('express').Response} expressResponse The Express response to write to
+ * @param {import('express').Request} request The Express request to poll for OS-level disconnects
+ * @param {() => void} onDisconnect Upstream disconnect callback
  */
-function forwardResponsesApiStream(fetchResponse, expressResponse) {
+function forwardResponsesApiStream(fetchResponse, expressResponse, request, onDisconnect = null) {
     let statusCode = fetchResponse.status;
     const statusText = fetchResponse.statusText;
 
@@ -2370,10 +2373,32 @@ function forwardResponsesApiStream(fetchResponse, expressResponse) {
 
     let buffer = '';
     let done = false;
+    const stopPolling = pollStreamingRequestConnection(request, expressResponse, closeStream);
+
+    function closeStream() {
+        if (done) {
+            return;
+        }
+
+        done = true;
+        stopPolling();
+        try {
+            onDisconnect?.();
+        } catch (error) {
+            console.warn('Error handling Responses API stream disconnect:', error);
+        }
+        if (fetchResponse.body && typeof fetchResponse.body.destroy === 'function') {
+            fetchResponse.body.destroy();
+        }
+        if (!expressResponse.destroyed && !expressResponse.writableEnded) {
+            expressResponse.end();
+        }
+    }
 
     function finishStream() {
         if (done) return;
         done = true;
+        stopPolling();
         if (!expressResponse.writableEnded) {
             expressResponse.write('data: [DONE]\n\n');
             expressResponse.end();
@@ -2423,6 +2448,7 @@ function forwardResponsesApiStream(fetchResponse, expressResponse) {
     });
 
     fetchResponse.body.on('error', (err) => {
+        stopPolling();
         if (done || isExpectedStreamAbort(err) || expressResponse.destroyed) {
             done = true;
             if (!expressResponse.destroyed && !expressResponse.writableEnded) {
@@ -2439,14 +2465,7 @@ function forwardResponsesApiStream(fetchResponse, expressResponse) {
     });
 
     expressResponse.on('close', () => {
-        if (done) {
-            return;
-        }
-
-        done = true;
-        if (fetchResponse.body && typeof fetchResponse.body.destroy === 'function') {
-            fetchResponse.body.destroy();
-        }
+        closeStream();
     });
 }
 
@@ -2575,7 +2594,7 @@ async function sendOpenAIResponsesRequest(request, response) {
 
         if (request.body.stream) {
             console.info('Streaming Responses API request in progress');
-            return forwardResponsesApiStream(fetchResponse, response);
+            return forwardResponsesApiStream(fetchResponse, response, request, () => controller.abort());
         }
 
         if (fetchResponse.ok) {
@@ -3029,7 +3048,7 @@ router.post('/generate', async function (request, response) {
 
         if (request.body.stream) {
             console.info('Streaming request in progress');
-            return forwardFetchResponse(fetchResponse, response);
+            return forwardFetchResponse(fetchResponse, response, request, () => controller.abort());
         }
 
         if (fetchResponse.ok) {

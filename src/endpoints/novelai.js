@@ -270,7 +270,7 @@ router.post('/generate', async function (req, res) {
 
         if (req.body.streaming) {
             // Pipe remote SSE stream to Express response
-            await forwardFetchResponse(response, res);
+            await forwardFetchResponse(response, res, req, () => controller.abort());
         } else {
             if (!response.ok) {
                 const text = await response.text();
