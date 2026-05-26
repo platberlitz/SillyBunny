@@ -23,7 +23,7 @@ import {
 } from '../../constants.js';
 import {
     forwardFetchResponse,
-    abortOnResponseClose,
+    abortOnRequestClose,
     getConfigValue,
     tryParse,
     uuidv4,
@@ -310,7 +310,7 @@ async function sendClaudeRequest(request, response) {
 
     try {
         const controller = new AbortController();
-        abortOnResponseClose(response, controller);
+        abortOnRequestClose(request, controller);
         const additionalHeaders = {};
         const betaHeaders = ['output-128k-2025-02-19', 'context-1m-2025-08-07'];
         const useTools = Array.isArray(request.body.tools) && request.body.tools.length > 0;
@@ -714,7 +714,7 @@ async function sendMakerSuiteRequest(request, response) {
 
     try {
         const controller = new AbortController();
-        abortOnResponseClose(response, controller);
+        abortOnRequestClose(request, controller);
 
         const apiVersion = getConfigValue('gemini.apiVersion', 'v1beta');
         const responseType = (stream ? 'streamGenerateContent' : 'generateContent');
@@ -850,7 +850,7 @@ async function sendAI21Request(request, response) {
 
     const bodyParams = {};
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
     // Hack to support JSON schema
     if (request.body.json_schema) {
         bodyParams.response_format = {
@@ -929,7 +929,7 @@ async function sendMistralAIRequest(request, response) {
     try {
         const messages = convertMistralMessages(request.body.messages, getPromptNames(request));
         const controller = new AbortController();
-        abortOnResponseClose(response, controller);
+        abortOnRequestClose(request, controller);
 
         const requestBody = {
             'model': request.body.model,
@@ -1007,7 +1007,7 @@ async function sendMistralAIRequest(request, response) {
 async function sendCohereRequest(request, response) {
     const apiKey = readSecret(request.user.directories, SECRET_KEYS.COHERE);
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     if (!apiKey) {
         console.warn('Cohere API key is missing.');
@@ -1111,7 +1111,7 @@ async function sendDeepSeekRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         let bodyParams = {};
@@ -1225,7 +1225,7 @@ async function sendXaiRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         let bodyParams = {};
@@ -1330,7 +1330,7 @@ async function sendAimlapiRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         let bodyParams = {};
@@ -1432,7 +1432,7 @@ async function sendElectronHubRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         let bodyParams = {};
@@ -1541,7 +1541,7 @@ async function sendChutesRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         let bodyParams = {};
@@ -1640,7 +1640,7 @@ async function sendMinimaxRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         // MiniMax does not allow consecutive messages with the same role.
@@ -1756,7 +1756,7 @@ async function sendAzureOpenAIRequest(request, response) {
         : undefined;
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     const config = {
         method: 'POST',
@@ -2511,7 +2511,7 @@ async function sendOpenAIResponsesRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         const { input, instructions } = convertMessagesToResponsesFormat(request.body.messages);
@@ -2970,7 +2970,7 @@ router.post('/generate', async function (request, response) {
             `${apiUrl}/chat/completions`;
 
         const controller = new AbortController();
-        abortOnResponseClose(response, controller);
+        abortOnRequestClose(request, controller);
 
         if (!isTextCompletion && Array.isArray(request.body.tools) && request.body.tools.length > 0) {
             bodyParams['tools'] = request.body.tools;
