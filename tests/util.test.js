@@ -3,7 +3,7 @@ import { EventEmitter, once } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { Response } from 'node-fetch';
 import { CHAT_COMPLETION_SOURCES } from '../src/constants';
-import { abortOnResponseClose, flattenSchema, forwardFetchResponse } from '../src/util';
+import { abortOnRequestClose, flattenSchema, forwardFetchResponse } from '../src/util';
 
 function createMockExpressResponse() {
     const response = new PassThrough();
@@ -11,6 +11,10 @@ function createMockExpressResponse() {
     response.statusMessage = '';
 
     return response;
+}
+
+function createMockExpressRequest() {
+    return { socket: new EventEmitter() };
 }
 
 async function collectResponseBody(response) {
@@ -196,25 +200,25 @@ describe('forwardFetchResponse', () => {
     });
 });
 
-describe('abortOnResponseClose', () => {
-    test('should abort the upstream controller when the client response closes early', () => {
-        const response = createMockExpressResponse();
+describe('abortOnRequestClose', () => {
+    test('should abort the upstream controller when the client request socket closes', () => {
+        const request = createMockExpressRequest();
         const controller = new AbortController();
 
-        abortOnResponseClose(response, controller);
-        response.emit('close');
+        abortOnRequestClose(request, controller);
+        request.socket.emit('close');
 
         expect(controller.signal.aborted).toBe(true);
     });
 
-    test('should not abort the upstream controller after a normal response end', () => {
-        const response = createMockExpressResponse();
-        const controller = new AbortController();
+    test('should replace existing socket close listeners before registering the abort handler', () => {
+        const request = createMockExpressRequest();
+        const existingListener = jest.fn();
 
-        abortOnResponseClose(response, controller);
-        response.end();
-        response.emit('close');
+        request.socket.on('close', existingListener);
+        abortOnRequestClose(request, new AbortController());
+        request.socket.emit('close');
 
-        expect(controller.signal.aborted).toBe(false);
+        expect(existingListener).not.toHaveBeenCalled();
     });
 });

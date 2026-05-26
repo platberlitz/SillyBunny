@@ -752,15 +752,14 @@ export async function forwardFetchResponse(from, to) {
 }
 
 /**
- * Aborts an upstream request if the client closes the Express response early.
- * @param {import('express').Response} response The Express response to observe.
+ * Aborts an upstream request if the client connection closes early.
+ * @param {import('express').Request} request The Express request to observe.
  * @param {AbortController} controller Abort controller for the upstream request.
  */
-export function abortOnResponseClose(response, controller) {
-    response.on('close', () => {
-        if (!response.writableEnded) {
-            controller.abort();
-        }
+export function abortOnRequestClose(request, controller) {
+    request.socket.removeAllListeners('close');
+    request.socket.on('close', () => {
+        controller.abort();
     });
 }
 
