@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 
-import { isLikelyLocalServerUrl } from '../public/scripts/local-url-utils.js';
+import { getLocalPromptCacheValue, isLikelyLocalServerUrl } from '../public/scripts/local-url-utils.js';
 
 describe('isLikelyLocalServerUrl', () => {
     const localServerUrls = [
@@ -35,4 +35,16 @@ describe('isLikelyLocalServerUrl', () => {
             expect(isLikelyLocalServerUrl(serverUrl)).toBe(false);
         });
     }
+});
+
+describe('getLocalPromptCacheValue', () => {
+    test('enables prompt cache only for the main chat lane', () => {
+        expect(getLocalPromptCacheValue('main')).toBe(true);
+    });
+
+    test('explicitly disables prompt cache for auxiliary and uncached lanes', () => {
+        expect(getLocalPromptCacheValue('auxiliary')).toBe(false);
+        expect(getLocalPromptCacheValue('none')).toBe(false);
+        expect(getLocalPromptCacheValue(undefined)).toBe(false);
+    });
 });

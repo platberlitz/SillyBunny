@@ -3,7 +3,7 @@ import process from 'node:process';
 import express from 'express';
 import fetch from 'node-fetch';
 import urlJoin from 'url-join';
-import { isLikelyLocalServerUrl } from '../../../public/scripts/local-url-utils.js';
+import { getLocalPromptCacheValue, isLikelyLocalServerUrl } from '../../../public/scripts/local-url-utils.js';
 
 import {
     AIMLAPI_HEADERS,
@@ -271,12 +271,9 @@ function applyLocalPromptCacheScope(bodyParams, requestBody) {
         return;
     }
 
-    // SillyBunny: isolate helper generations so local prompt caches keep the main chat lane hot.
-    if (String(requestBody.cacheScope ?? 'auxiliary') === 'main') {
-        bodyParams.cache_prompt = true;
-    } else {
-        delete bodyParams.cache_prompt;
-    }
+    // SillyBunny: helper generations must explicitly opt out, because some
+    // local llama.cpp servers default to --cache-prompt for every request.
+    bodyParams.cache_prompt = getLocalPromptCacheValue(requestBody.cacheScope);
 }
 
 /**

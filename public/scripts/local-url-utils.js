@@ -46,3 +46,12 @@ export function isLikelyLocalServerUrl(serverUrl, baseUrl = undefined) {
         return FALLBACK_LOCAL_URL_PATTERN.test(serverUrl);
     }
 }
+
+/**
+ * Gets the llama.cpp-compatible prompt cache flag for a generation lane.
+ * @param {'main'|'auxiliary'|'none'|string|undefined|null} cacheScope Prompt cache lane
+ * @returns {boolean} True only for the main chat lane
+ */
+export function getLocalPromptCacheValue(cacheScope) {
+    return String(cacheScope ?? 'auxiliary') === 'main';
+}
