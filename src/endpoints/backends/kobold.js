@@ -99,7 +99,23 @@ router.post('/generate', async function (request, response_generate) {
 
             if (request.body.streaming) {
                 // Pipe remote SSE stream to Express response
-                await forwardFetchResponse(response, response_generate);
+                await forwardFetchResponse(response, response_generate, request, async () => {
+                    if (request.body.can_abort && !response_generate.writableEnded) {
+                        try {
+                            console.info('Aborting Kobold generation...');
+                            const abortResponse = await fetch(`${request.body.api_server}/extra/abort`, {
+                                method: 'POST',
+                            });
+
+                            if (!abortResponse.ok) {
+                                console.error('Error sending abort request to Kobold:', abortResponse.status);
+                            }
+                        } catch (error) {
+                            console.error(error);
+                        }
+                    }
+                    controller.abort();
+                });
                 return;
             } else {
                 if (!response.ok) {
