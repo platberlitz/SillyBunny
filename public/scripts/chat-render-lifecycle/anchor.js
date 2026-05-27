@@ -1,3 +1,5 @@
+import { runSettledFrames } from './scheduler.js';
+
 const DEFAULT_MESSAGE_SELECTOR = '.mes[mesid]';
 
 function canReadElementRect(element) {
@@ -92,8 +94,8 @@ export async function settleVisibleMessageAnchor(scrollElement, anchor, {
         return;
     }
 
-    for (let index = 0; index < frames; index++) {
-        await new Promise(resolve => requestAnimationFrameRef(resolve));
-        restoreVisibleMessageAnchor(scrollElement, anchor, { messageSelector });
-    }
+    await runSettledFrames(() => restoreVisibleMessageAnchor(scrollElement, anchor, { messageSelector }), {
+        frames,
+        requestAnimationFrameRef,
+    });
 }
