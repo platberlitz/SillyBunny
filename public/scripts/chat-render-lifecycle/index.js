@@ -12,14 +12,20 @@ import {
     CHAT_SCROLL_INTENT,
     resolveChatScrollAction,
 } from './scroll-intent.js';
+import {
+    CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
+    resolveChatRenderLifecycleRollout,
+} from './rollout-guard.js';
 
 export {
+    CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     CHAT_SCROLL_ACTION,
     CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
     createFrameWriteScheduler,
     resolveChatScrollAction,
     restoreVisibleMessageAnchor,
+    resolveChatRenderLifecycleRollout,
     runSettledFrames,
     settleVisibleMessageAnchor,
 };
@@ -43,6 +49,10 @@ export function createChatRenderLifecycle() {
             action: CHAT_SCROLL_ACTION,
             intent: CHAT_SCROLL_INTENT,
             resolve: resolveChatScrollAction,
+        },
+        rollout: {
+            key: CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
+            resolve: resolveChatRenderLifecycleRollout,
         },
     };
 }
