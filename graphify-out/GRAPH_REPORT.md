@@ -784,9 +784,13 @@ Nodes (44): _(), alphaChanged(), at(), attributeChangedCallback(), C(), construc
 Cohesion: 0.11
 Nodes (10): assert(), convertBlackAndWhiteToRGBA(), assert(), convertBlackAndWhiteToRGBA(), convertToRGBA(), decodeAndClamp(), ImageResizer, PDFImage (+2 more)
 
+### Community 90 - "Community 90"
+Cohesion: 0.1
+Nodes (8): a(), H(), i(), M(), nt(), o(), S(), st()
+
 ### Community 91 - "Community 91"
-Cohesion: 0.22
-Nodes (30): bindCharacterEditorFullscreenToggle(), ensureCharacterListToolbarLayout(), ensureCharacterPersonaPanel(), ensureCharacterWorldInfoPanel(), hasActiveCharacterChat(), hideCharacterMainPanels(), injectCharacterDrawerControls(), isCharacterEditorMenuType() (+22 more)
+Cohesion: 0.19
+Nodes (32): bindCharacterEditorFullscreenToggle(), ensureCharacterListToolbarLayout(), ensureCharacterPersonaPanel(), ensureCharacterWorldInfoPanel(), getMainScriptModule(), hasActiveCharacterChat(), hideCharacterMainPanels(), injectCharacterDrawerControls() (+24 more)
 
 ### Community 93 - "Community 93"
 Cohesion: 0.06
@@ -1085,8 +1089,8 @@ Cohesion: 0.04
 Nodes (46): 1. Overview, 2. Colors, 3. Typography, 4. Elevation, 5. Components, 6. Do's and Don'ts, Buttons, Cards / Containers (+38 more)
 
 ### Community 182 - "Community 182"
-Cohesion: 0.26
-Nodes (22): A(), c(), d(), f(), G(), h(), i(), j() (+14 more)
+Cohesion: 0.12
+Nodes (39): A(), c(), d(), f(), G(), h(), i(), j() (+31 more)
 
 ### Community 183 - "Community 183"
 Cohesion: 0.12
@@ -1228,6 +1232,10 @@ Nodes (15): Bundled Extensions, Templates, And Styles, Character Cards, Characte
 Cohesion: 0.03
 Nodes (13): AnnotationFactory, BasePdfManager, ChunkedStreamManager, clearGlobalCaches(), getVerbosityLevel(), isRefsEqual(), LocalPdfManager, MessageHandler (+5 more)
 
+### Community 321 - "Community 321"
+Cohesion: 0.25
+Nodes (8): 2026-04-04 to 2026-04-05: bootstrap and first mobile stabilization, 2026-04-06 to 2026-04-17: feature expansion and agent foundations, 2026-04-21 to 2026-04-23: shell, theme, docs, screenshot, and Pathfinder polish, 2026-04-24 to 2026-04-26: cast/groups/Pathfinder and mobile agent hardening, 2026-04-29 to 2026-05-03: release polish, chat anchoring, iOS, cache, and reverts, 2026-05-04 to 2026-05-05: upstream 1.18 sync and performance work, 2026-05-06 to 2026-05-08: Codex worktree support and latest mobile/settings stabilization, Commit History Clusters
+
 ### Community 322 - "Community 322"
 Cohesion: 0.11
 Nodes (12): class YourTtsProvider, generateTts(text, voiceId), getVoice(voiceName), loadSettings(settingsObject), Optional, processText(text), Provider Requirements., Required (+4 more)
@@ -1244,6 +1252,10 @@ Nodes (16): a(), c(), d(), f(), g(), h(), i(), l() (+8 more)
 Cohesion: 0.27
 Nodes (4): isPinned(), sortRecentChatFiles(), Rename, PinnedChatsManager
 
+### Community 326 - "Community 326"
+Cohesion: 0.29
+Nodes (7): code:bash (git clone https://github.com/platberlitz/SillyBunny.git), code:bash (bun run start:mobile   # lower-memory (--smol)), code:bash (pkg update && pkg upgrade -y), How to Update, Installation, macOS notes, Termux (Android) notes
+
 ### Community 327 - "Community 327"
 Cohesion: 0.12
 Nodes (16): Character Drawer, In-Chat Agents, In-Chat Agents, Local Commits, Mobile UI Polish, Pathfinder, Pathfinder And Release Metadata, PR #13 SillyTavern 1.18.0 Sync (+8 more)
@@ -1251,6 +1263,10 @@ Nodes (16): Character Drawer, In-Chat Agents, In-Chat Agents, Local Commits, Mob
 ### Community 328 - "Community 328"
 Cohesion: 0.19
 Nodes (10): initPrivateRequestFilter(), privateIpRanges, PrivateRequestAgent, agent, allowedAgent, blockedAgent, initAgent(), mockLookup (+2 more)
+
+### Community 329 - "Community 329"
+Cohesion: 0.33
+Nodes (3): IsomorphicGitClient, normalizeCloneOptions(), SimpleGitClient
 
 ### Community 330 - "Community 330"
 Cohesion: 0.13
@@ -1267,6 +1283,10 @@ Nodes (5): createMessage(), FakeClassList, FakeDocument, FakeElement, setupRunti
 ### Community 332 - "Community 332"
 Cohesion: 0.16
 Nodes (3): XfaLayer, XfaText, FakeElement
+
+### Community 332 - "Community 332"
+Cohesion: 0.08
+Nodes (12): XfaLayer, getActiveSandboxCount(), { button }, createMessage(), { executeSlashCommandsWithOptions }, FakeDocument, FakeElement, { message, button, buildSandboxDocument } (+4 more)
 
 ### Community 333 - "Community 333"
 Cohesion: 0.13
@@ -1289,8 +1309,20 @@ Cohesion: 0.32
 Nodes (12): applyAppendedGenerationToTarget(), cloneChatMessage(), copyGeneratedMessageToTarget(), executeSTScriptCommand(), generateCorrection(), getTargetForceCharacterId(), guidedCorrection(), isolateTargetMessage() (+4 more)
 
 ### Community 338 - "Community 338"
-Cohesion: 0.19
-Nodes (9): Options, deserialize(), deserializer(), options, serialize(), serializer(), shouldSkip(), {toString} (+1 more)
+Cohesion: 0.05
+Nodes (35): BaseMessageExtra, Character, ChatCompletionMessage, ChatCompletionSettings, ChatHeader, ChatMessage, ChatMessageExtra, ChatMetadata (+27 more)
+
+### Community 340 - "Community 340"
+Cohesion: 0.4
+Nodes (4): Card Script Sandbox Invariants, Operating Principles Going Forward, Scope, SillyBunny Lessons
+
+### Community 341 - "Community 341"
+Cohesion: 0.4
+Nodes (5): Bun-first runtime, Bundled Goodies & Tutorials, Changes vs. SillyTavern, Different UI, In-Chat Agentic Support
+
+### Community 342 - "Community 342"
+Cohesion: 0.4
+Nodes (5): Latest Update, v1.5.1 (2026-04-29), v1.5.2 (2026-04-30), v1.5.3 (2026-05-03), v1.6.0 (2026-05-18)
 
 ### Community 343 - "Community 343"
 Cohesion: 0.08
@@ -1443,7 +1475,7 @@ Nodes (4): doChatInject(), getExtensionPrompt(), getExtensionPromptMaxDepth(), p
 ## Knowledge Gaps
 - **1956 isolated node(s):** `ServerStartedEvent`, `ServerEventMap`, `Process`, `CookieSessionObject`, `Request` (+1951 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **146 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **131 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
