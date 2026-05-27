@@ -150,7 +150,6 @@
 - [[_COMMUNITY_Community 132|Community 132]]
 - [[_COMMUNITY_Community 133|Community 133]]
 - [[_COMMUNITY_Community 134|Community 134]]
-- [[_COMMUNITY_Community 135|Community 135]]
 - [[_COMMUNITY_Community 136|Community 136]]
 - [[_COMMUNITY_Community 137|Community 137]]
 - [[_COMMUNITY_Community 138|Community 138]]
@@ -162,7 +161,6 @@
 - [[_COMMUNITY_Community 144|Community 144]]
 - [[_COMMUNITY_Community 145|Community 145]]
 - [[_COMMUNITY_Community 146|Community 146]]
-- [[_COMMUNITY_Community 147|Community 147]]
 - [[_COMMUNITY_Community 148|Community 148]]
 - [[_COMMUNITY_Community 149|Community 149]]
 - [[_COMMUNITY_Community 150|Community 150]]
@@ -864,6 +862,10 @@ Nodes (3): AutoComplete, AutoCompleteNameResultBase, AutoCompleteSecondaryNameRe
 Cohesion: 0.14
 Nodes (3): AutoComplete, AutoCompleteNameResultBase, AutoCompleteSecondaryNameResult
 
+### Community 106 - "Community 106"
+Cohesion: 0.08
+Nodes (9): AutoComplete, AUTOCOMPLETE_SELECT_KEY, AUTOCOMPLETE_WIDTH, AutoCompleteFuzzyScore, AutoCompleteNameResult, AutoCompleteNameResultBase, AutoCompleteSecondaryNameResult, BlankAutoCompleteOption (+1 more)
+
 ### Community 108 - "Community 108"
 Cohesion: 0.04
 Nodes (72): groups, env_provider_order, getGroupValue(), MacroEnvBuilder, callPopup(), characters, create_save, createLazyFields() (+64 more)
@@ -921,8 +923,8 @@ Cohesion: 0.1
 Nodes (7): compute(), B, FontSelector, i, layoutText(), p, TextMeasure
 
 ### Community 124 - "Community 124"
-Cohesion: 0.22
-Nodes (19): fetchCharacterChatFiles(), fetchGroupChatFiles(), getAuthorizedRequestHeadersOrNull(), getChatFilesForContext(), getCsrfTokenFromHeaders(), getImporterRefs(), getImporterState(), handleSillyTavernExtensionSync() (+11 more)
+Cohesion: 0.21
+Nodes (20): fetchCharacterChatFiles(), fetchGroupChatFiles(), getAuthorizedRequestHeadersOrNull(), getChatFilesForContext(), getCsrfTokenFromHeaders(), getImporterRefs(), getImporterState(), handleSillyTavernExtensionSync() (+12 more)
 
 ### Community 125 - "Community 125"
 Cohesion: 0.1
@@ -1285,8 +1287,8 @@ Cohesion: 0.32
 Nodes (16): a(), c(), d(), f(), g(), h(), i(), l() (+8 more)
 
 ### Community 325 - "Community 325"
-Cohesion: 0.27
-Nodes (4): isPinned(), sortRecentChatFiles(), Rename, PinnedChatsManager
+Cohesion: 0.22
+Nodes (8): At a glance, Contributors, Desktop, Mobile, Project Goals (AKA, why we made this fork), 🐰 SillyBunny 🐰, Table of Contents, Upstream Information
 
 ### Community 326 - "Community 326"
 Cohesion: 0.29
@@ -1363,6 +1365,10 @@ Nodes (5): Latest Update, v1.5.1 (2026-04-29), v1.5.2 (2026-04-30), v1.5.3 (2026
 ### Community 339 - "Community 339"
 Cohesion: 0.12
 Nodes (3): CosyVoiceProvider, GoogleNativeTtsProvider, generateTts()
+
+### Community 339 - "Community 339"
+Cohesion: 0.36
+Nodes (7): context, defaultSettings, initExtensionUI(), initializeOpenAITabs(), renderExtensionSettings(), addExtensionsButtonAndMenu(), initExtensions()
 
 ### Community 343 - "Community 343"
 Cohesion: 0.08
