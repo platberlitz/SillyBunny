@@ -34,7 +34,10 @@ import {
     parseTextgenLogprobs,
     parseTabbyLogprobs,
     initTextGenSettings,
+    getTextGenServer,
+    getStatusTextgen,
 } from './scripts/textgen-settings.js';
+import { shouldRestoreTextGenStatusOnStartup } from './scripts/textgen-startup-status.js';
 
 import {
     world_info,
@@ -9396,6 +9399,10 @@ export async function getSettings(initLoaderHandle = null) {
         $('#main_api').val(main_api);
         $(`#main_api option[value=${main_api}]`).attr('selected', 'true');
         changeMainAPI();
+        if (shouldRestoreTextGenStatusOnStartup({ mainApi: main_api, serverUrl: getTextGenServer() })) {
+            startStatusLoading();
+            getStatusTextgen();
+        }
 
         //Load User's Name and Avatar
         initUserAvatar(settings.user_avatar);
@@ -13261,7 +13268,7 @@ export async function processDroppedFiles(files, data = new Map()) {
 
     if (avatarFileNames.length > 0) {
         await importCharactersTags(avatarFileNames);
-        selectImportedChar(avatarFileNames[avatarFileNames.length - 1]);
+        await selectImportedChar(avatarFileNames[avatarFileNames.length - 1]);
     }
 }
 
@@ -13282,13 +13289,18 @@ async function importCharactersTags(avatarFileNames) {
 /**
  * Selects the given imported char
  * @param {string} charId char to select
+ * @returns {Promise<boolean>} True if the imported character was selected
  */
-function selectImportedChar(charId) {
-    let oldSelectedChar = null;
-    if (this_chid !== undefined) {
-        oldSelectedChar = characters[this_chid].avatar;
+async function selectImportedChar(charId) {
+    const avatarFileName = String(charId).endsWith('.png') ? String(charId) : `${charId}.png`;
+    const importedCharacterId = characters.findIndex(character => character.avatar === avatarFileName);
+
+    if (importedCharacterId === -1) {
+        console.log(`Could not find imported character ${charId} in the list`);
+        return false;
     }
-    select_rm_info('char_import_no_toast', charId, oldSelectedChar);
+
+    return selectCharacterById(importedCharacterId);
 }
 
 /**
@@ -13355,7 +13367,7 @@ async function importCharacter(file, { preserveFileName = '', importTags = false
             }
             if (importTags) {
                 await importCharactersTags([avatarFileName]);
-                selectImportedChar(data.file_name);
+                await selectImportedChar(data.file_name);
             }
             return avatarFileName;
         }
@@ -14880,7 +14892,7 @@ jQuery(async function () {
 
         if (avatarFileNames.length > 0) {
             await importCharactersTags(avatarFileNames);
-            selectImportedChar(avatarFileNames[avatarFileNames.length - 1]);
+            await selectImportedChar(avatarFileNames[avatarFileNames.length - 1]);
         }
 
         // Clear the file input value to allow re-uploading the same file

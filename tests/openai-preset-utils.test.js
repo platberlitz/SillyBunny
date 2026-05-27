@@ -1,6 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import {
     buildChatCompletionPreset,
+    buildChatCompletionPresetForSave,
     getChatCompletionConnectionPresetKeys,
     shouldIncludeConnectionFieldsInPreset,
 } from '../public/scripts/openai-preset-utils.js';
@@ -78,6 +79,29 @@ describe('Chat Completion preset utilities', () => {
         });
 
         expect(buildChatCompletionPreset(settings, settingsMap, { includeConnection })).toEqual({
+            chat_completion_source: 'custom',
+            temperature: 0.72,
+            openai_model: 'mimo-model',
+            assistant_prefill: '',
+            custom_url: 'http://127.0.0.1:8080/v1',
+            prompts: [{ identifier: 'main', content: 'Prompt after edit' }],
+        });
+    });
+
+    test('builds preset manager save snapshots from the current link mode', () => {
+        expect(buildChatCompletionPresetForSave({
+            ...settings,
+            bind_preset_to_connection: false,
+        }, settingsMap)).toEqual({
+            temperature: 0.72,
+            assistant_prefill: '',
+            prompts: [{ identifier: 'main', content: 'Prompt after edit' }],
+        });
+
+        expect(buildChatCompletionPresetForSave({
+            ...settings,
+            bind_preset_to_connection: true,
+        }, settingsMap)).toEqual({
             chat_completion_source: 'custom',
             temperature: 0.72,
             openai_model: 'mimo-model',
