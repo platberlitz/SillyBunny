@@ -3,6 +3,16 @@ import { expect, test } from '@playwright/test';
 
 const APP_URL = process.env.SILLYBUNNY_TEST_BASE_URL || '/';
 
+async function dismissOnboardingIfPresent(page) {
+    const onboardingDialog = page.locator('dialog[open]:has(.onboarding)').first();
+
+    if (await onboardingDialog.isVisible().catch(() => false)) {
+        await onboardingDialog.locator('.popup-input').fill('Screenshot Tester');
+        await onboardingDialog.locator('.popup-button-ok').click();
+        await onboardingDialog.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+    }
+}
+
 async function installScreenshotMessage(page, messageText) {
     await page.evaluate(async (text) => {
         const context = window.SillyTavern.getContext();
@@ -64,6 +74,7 @@ test.describe('message screenshots', () => {
 
         await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction('document.getElementById("preloader") === null', { timeout: 0 });
+        await dismissOnboardingIfPresent(page);
         await installScreenshotMessage(page, 'single screenshot oklch regression');
 
         const singleDownload = await exportScreenshot(page, 0, 0, 0);
