@@ -1,6 +1,6 @@
 ---
 status: in-progress
-phase: 3
+phase: 4
 updated: 2026-05-27
 ---
 
@@ -43,6 +43,7 @@ Initial internal modules:
 | `index.js` | Compatibility-facing lifecycle adapter factory and exported public seam. |
 | `scheduler.js` | One-per-frame DOM/state write queue, requestAnimationFrame coalescing, timer cleanup. |
 | `scroll-intent.js` | Pure scroll state transitions: pinned bottom, anchored, user scrolling, jump, replace. |
+| `bottom-scroll.js` | Bottom-scroll action resolution for guarded compatibility-shell routing. |
 | `anchor.js` | Capture and restore viewport-relative message anchors. |
 | `render-batch.js` | Append, prepend, replace, and update batching. |
 | `stream-buffer.js` | Coalesce streaming token DOM updates without re-entering anchor logic. |
@@ -100,20 +101,20 @@ Core invariants:
 - [x] 2.7 Add last-message swipe replace coverage; add top/middle once lifecycle replace supports non-tail replacement.
 - [ ] 2.8 Add export-surface snapshot coverage for `public/script.js`.
 
-## Phase 3: Lifecycle Module Scaffold [IN PROGRESS]
+## Phase 3: Lifecycle Module Scaffold [COMPLETE]
 - [x] 3.1 Create `public/scripts/chat-render-lifecycle/`.
 - [x] 3.2 Add empty or pass-through adapter exports with no behavior change.
 - [x] 3.3 Add `scheduler.js` with tests; route anchor settle through it as the first low-risk adapter.
 - [x] 3.4 Add `scroll-intent.js` as pure logic with table-driven tests.
 - [x] 3.5 Add `anchor.js` with DOM fixture tests.
 - [x] 3.6 Add lifecycle kill-switch only as temporary rollout protection, not a permanent compatibility layer.
-- [ ] **3.7 Keep each commit green and small.** <- CURRENT
+- [x] 3.7 Keep each commit green and small.
 
-## Phase 4: Route Tail Append And Bottom Pin [PENDING]
+## Phase 4: Route Tail Append And Bottom Pin [IN PROGRESS]
 - [ ] 4.1 Route `addOneMessage()` tail append through lifecycle append intent.
 - [ ] 4.2 Preserve jQuery return behavior.
 - [ ] 4.3 Preserve `.last_mes`, swipe button refresh, style pins, character tags, and edit arrows.
-- [ ] 4.4 Replace direct bottom pin logic with lifecycle scroll request.
+- [ ] **4.4 Replace direct bottom pin logic with lifecycle scroll request.** <- CURRENT
 - [ ] 4.5 Keep legacy code path available only behind temporary rollout guard.
 - [ ] 4.6 Validate send-scroll e2e and unit scheduler coverage.
 
@@ -243,6 +244,7 @@ Recommended waves:
 | Static | `npm run lint` |
 | Unit | `npm run test:unit --prefix tests -- chat-scroll-edges.test.js mobile-streaming.test.js` |
 | Unit | New lifecycle scheduler, scroll intent, anchor, and render batch tests. |
+| Unit | Lifecycle bottom-scroll action tests. |
 | Budget | `npm run check:frontend-budgets` |
 | Build | `npm run build:frontend` |
 | E2E | `npm run test:e2e --prefix tests -- chat-send-scroll.e2e.js` |

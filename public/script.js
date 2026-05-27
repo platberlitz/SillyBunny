@@ -306,10 +306,14 @@ import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker
 import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
 import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
 import {
+    CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     captureVisibleMessageAnchor,
+    resolveChatBottomScrollAction,
+    resolveChatRenderLifecycleRollout,
     restoreVisibleMessageAnchor,
     settleVisibleMessageAnchor,
-} from './scripts/chat-render-lifecycle/anchor.js';
+    shouldApplyChatBottomScrollAction,
+} from './scripts/chat-render-lifecycle/index.js';
 import {
     CARD_SCRIPT_MARKER_TAG,
     buildCardScriptToastKey,
@@ -1932,6 +1936,30 @@ function getMobileChatRenderBatchSize(messageCount) {
 
 function waitForNextFrame() {
     return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+function getChatRenderLifecycleRolloutQueryValue() {
+    try {
+        return new URLSearchParams(globalThis.location?.search ?? '').get(CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY);
+    } catch {
+        return null;
+    }
+}
+
+function getChatRenderLifecycleRolloutStorage() {
+    try {
+        return globalThis.localStorage ?? null;
+    } catch {
+        return null;
+    }
+}
+
+function isChatRenderLifecycleRolloutEnabled() {
+    // SillyBunny: keep lifecycle routing opt-in while chat scroll paths move behind the seam in small PRs.
+    return resolveChatRenderLifecycleRollout({
+        queryValue: getChatRenderLifecycleRolloutQueryValue(),
+        storage: getChatRenderLifecycleRolloutStorage(),
+    }).enabled;
 }
 
 function captureVisibleChatMessageAnchor() {
@@ -3665,35 +3693,57 @@ function formatGenerationTimer(gen_started, gen_finished, tokenCount, reasoningD
 
 let requestId = null;
 
+function scrollChatElementToBottom() {
+    let position = chatElement[0].scrollHeight;
+
+    if (power_user.waifuMode) {
+        const lastMessage = chatElement.find('.mes').last();
+        if (lastMessage.length) {
+            const lastMessagePosition = lastMessage.position().top;
+            position = chatElement.scrollTop() + lastMessagePosition;
+        }
+    }
+
+    chatElement.scrollTop(position);
+}
+
 /**
  * Scrolls the chat to the bottom if configured to do so.
  * @param {object} [options] Options
  * @param {boolean} [options.waitForFrame] If true, waits for the animation frame before scrolling
  * @param {boolean} [options.force=false] If true, bypasses the auto-scroll preference and temporary mobile manual-scroll suppression
+ * @param {boolean} [options.isNearBottom=true] Lifecycle hint for future call sites that capture pre-mutation scroll state
  */
-export function scrollChatToBottom({ waitForFrame, force = false } = {}) {
+export function scrollChatToBottom({ waitForFrame, force = false, isNearBottom = true } = {}) {
     if (!force && !power_user.auto_scroll_chat_to_bottom) {
         return;
     }
 
     const doScroll = () => {
+        // SillyBunny: guarded lifecycle route keeps the legacy path available during rollout.
+        if (isChatRenderLifecycleRolloutEnabled()) {
+            const action = resolveChatBottomScrollAction({
+                force,
+                autoScrollEnabled: power_user.auto_scroll_chat_to_bottom,
+                isNearBottom,
+                isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll(),
+            });
+
+            if (shouldApplyChatBottomScrollAction(action)) {
+                scrollChatElementToBottom();
+            }
+
+            requestId = null;
+            return;
+        }
+
         // SillyBunny: mobile browsers can fight streaming autoscroll during touch and momentum scrolling.
         if (!force && shouldSuppressMobileChatAutoScroll()) {
             requestId = null;
             return;
         }
 
-        let position = chatElement[0].scrollHeight;
-
-        if (power_user.waifuMode) {
-            const lastMessage = chatElement.find('.mes').last();
-            if (lastMessage.length) {
-                const lastMessagePosition = lastMessage.position().top;
-                position = chatElement.scrollTop() + lastMessagePosition;
-            }
-        }
-
-        chatElement.scrollTop(position);
+        scrollChatElementToBottom();
         requestId = null;
     };
 
