@@ -1274,6 +1274,10 @@ Nodes (6): getTransformMatrix(), lookupMatrix(), lookupRect(), TextState, Util, 
 Cohesion: 0.27
 Nodes (8): DEFAULT_SCROLL_EDGE_SETTLE_DELAYS, getScrollEdgePosition(), jumpScrollElementToEdge(), toFiniteScrollSize(), cancelJump, frames, scrollElement, timers
 
+### Community 321 - "Community 321"
+Cohesion: 0.29
+Nodes (7): code:bash (git clone https://github.com/platberlitz/SillyBunny.git), code:bash (bun run start:mobile   # lower-memory (--smol)), code:bash (pkg update && pkg upgrade -y), How to Update, Installation, macOS notes, Termux (Android) notes
+
 ### Community 322 - "Community 322"
 Cohesion: 0.11
 Nodes (12): class YourTtsProvider, generateTts(text, voiceId), getVoice(voiceName), loadSettings(settingsObject), Optional, processText(text), Provider Requirements., Required (+4 more)
@@ -1325,6 +1329,10 @@ Nodes (3): XfaLayer, XfaText, FakeElement
 ### Community 332 - "Community 332"
 Cohesion: 0.08
 Nodes (12): XfaLayer, getActiveSandboxCount(), { button }, createMessage(), { executeSlashCommandsWithOptions }, FakeDocument, FakeElement, { message, button, buildSandboxDocument } (+4 more)
+
+### Community 332 - "Community 332"
+Cohesion: 0.08
+Nodes (13): XfaLayer, XfaText, getActiveSandboxCount(), { button }, createMessage(), { executeSlashCommandsWithOptions }, FakeDocument, FakeElement (+5 more)
 
 ### Community 333 - "Community 333"
 Cohesion: 0.13
@@ -1397,6 +1405,26 @@ Nodes (6): getPathToTokenizer(), gunzip, SentencePieceTokenizer, shouldPatchWebT
 ### Community 352 - "Community 352"
 Cohesion: 0.2
 Nodes (10): Chat And Reasoning, Chat Management, In-Chat Agents, Loading, Local Commits, Pathfinder, Server Admin, UI Polish (+2 more)
+
+### Community 348 - "Community 348"
+Cohesion: 0.4
+Nodes (5): Bun-first runtime, Bundled Goodies & Tutorials, Changes vs. SillyTavern, Different UI, In-Chat Agentic Support
+
+### Community 349 - "Community 349"
+Cohesion: 0.4
+Nodes (5): Latest Update, v1.5.1 (2026-04-29), v1.5.2 (2026-04-30), v1.5.3 (2026-05-03), v1.6.0 (2026-05-18)
+
+### Community 350 - "Community 350"
+Cohesion: 0.02
+Nodes (28): render(), ci, data(), ei, es, hs, js, ms (+20 more)
+
+### Community 351 - "Community 351"
+Cohesion: 0.06
+Nodes (4): InternalRenderTask, PDFDataRangeTransport, PDFDataTransportStreamRangeReader, PDFDataTransportStreamReader
+
+### Community 352 - "Community 352"
+Cohesion: 0.6
+Nodes (3): checkPostInterceptChatBudget(), chat, countTokens
 
 ### Community 353 - "Community 353"
 Cohesion: 0.18

@@ -41,6 +41,8 @@ describe('in-chat agent post-processing runner', () => {
     let updateMessageMetaBadges;
     let connectionManagerRequestService;
     let globalSettings;
+    let extensionSettings;
+    let executeSlashCommandsWithOptions;
     let currentChatId;
     let mainApi;
     let documentListeners;
@@ -108,6 +110,14 @@ describe('in-chat agent post-processing runner', () => {
             promptTransformShowNotifications: false,
             appendAgentsExecutionMode: 'parallel',
         };
+        extensionSettings = {
+            'guided-generations': {
+                promptImpersonate1st: 'Write in first person: {{input}}',
+                profileImpersonate1st: '',
+                presetImpersonate1st: '',
+            },
+        };
+        executeSlashCommandsWithOptions = jest.fn();
         currentChatId = 'chat-a';
         mainApi = 'kobold';
         documentListeners = new Map();
@@ -134,6 +144,7 @@ describe('in-chat agent post-processing runner', () => {
         globalThis.addEventListener = jest.fn((event, handler) => addListener(windowListeners, event, handler));
         globalThis.removeEventListener = jest.fn((event, handler) => removeListener(windowListeners, event, handler));
         globalThis.HTMLSelectElement = class HTMLSelectElement {};
+        globalThis.HTMLTextAreaElement = class HTMLTextAreaElement {};
         globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
         globalThis.toastr = {
             clear: jest.fn(),
@@ -170,6 +181,8 @@ describe('in-chat agent post-processing runner', () => {
             extension_prompt_roles: { SYSTEM: 0, USER: 1, ASSISTANT: 2 },
             extension_prompt_types: { IN_PROMPT: 0, IN_CHAT: 1 },
             extension_prompts: extensionPrompts,
+            eventSource,
+            event_types: eventTypes,
             setExtensionPrompt: jest.fn((key, value) => {
                 extensionPrompts[key] = { value };
             }),
@@ -177,6 +190,7 @@ describe('in-chat agent post-processing runner', () => {
             generateQuietPrompt,
             getCurrentChatId: jest.fn(() => currentChatId),
             normalizeContentText: jest.fn(value => String(value ?? '')),
+            main_api: mainApi,
             saveChatDebounced,
             stopGeneration: jest.fn(() => false),
             streamingProcessor,
@@ -197,12 +211,23 @@ describe('in-chat agent post-processing runner', () => {
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions.js', () => ({
+            extension_settings: extensionSettings,
             getContext: jest.fn(() => ({
                 saveChat,
                 updateMessageMetaBadges,
                 ConnectionManagerRequestService: connectionManagerRequestService,
+                executeSlashCommandsWithOptions,
                 generateRaw,
                 mainApi,
+            })),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/preset-manager.js', () => ({
+            getPresetManager: jest.fn(() => ({
+                findPreset: jest.fn(() => null),
+                getAllPresets: jest.fn(() => []),
+                getSelectedPresetName: jest.fn(() => ''),
+                selectPreset: jest.fn(),
             })),
         }));
 
@@ -487,6 +512,29 @@ describe('in-chat agent post-processing runner', () => {
                 triggerProbability: 100,
                 generationTypes: ['impersonate'],
                 runOnImpersonate,
+            },
+        }];
+    }
+
+    function useSavedProsePolisherWithoutImpersonateFlag() {
+        enabledAgents = [{
+            id: 'agent-prose-polisher',
+            name: 'Prose Polisher',
+            sourceTemplateId: 'tpl-prose-polisher',
+            phase: 'post',
+            prompt: 'Polish the generated impersonation text.',
+            injection: { order: 100 },
+            postProcess: {
+                enabled: false,
+                promptTransformEnabled: true,
+                promptTransformMode: 'rewrite',
+                promptTransformMaxTokens: 8192,
+                promptTransformShowNotifications: false,
+            },
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal', 'continue', 'impersonate'],
             },
         }];
     }
@@ -1637,6 +1685,34 @@ describe('in-chat agent post-processing runner', () => {
         expect(sentPrompt[1].content).toContain('Draft impersonation');
         expect(textarea.value).toBe('Polished impersonation');
         expect(textarea.dispatchEvent).toHaveBeenCalledTimes(1);
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+    });
+
+    test('runs saved bundled Prose Polisher for guided impersonate output', async () => {
+        useSavedProsePolisherWithoutImpersonateFlag();
+        generateQuietPrompt.mockResolvedValue('<assistant_response>Polished guided impersonation</assistant_response>');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        const { guidedImpersonate } = await import('../public/scripts/extensions/guided-generations/scripts/guidedImpersonate.js');
+        initAgentRunner();
+
+        const textarea = new globalThis.HTMLTextAreaElement();
+        textarea.value = 'Please write this in first person.';
+        textarea.dispatchEvent = jest.fn();
+        document.getElementById = jest.fn(id => id === 'send_textarea' ? textarea : null);
+        document.querySelector = jest.fn(selector => selector === '#send_textarea' ? textarea : null);
+        executeSlashCommandsWithOptions.mockImplementation(async (script) => {
+            expect(script).toContain('/impersonate await=true');
+            textarea.value = 'Draft guided impersonation';
+            await eventSource.emit(eventTypes.IMPERSONATE_READY, 'Draft guided impersonation');
+        });
+
+        await guidedImpersonate();
+
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(1);
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('generated impersonation text');
+        expect(textarea.value).toBe('Polished guided impersonation');
+        expect(textarea.dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: 'input' }));
         expect(saveChatDebounced).not.toHaveBeenCalled();
     });
 
