@@ -309,6 +309,11 @@ import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker
 import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
 import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
 import {
+    captureVisibleMessageAnchor,
+    restoreVisibleMessageAnchor,
+    settleVisibleMessageAnchor,
+} from './scripts/chat-render-lifecycle/anchor.js';
+import {
     CARD_SCRIPT_MARKER_TAG,
     buildCardScriptToastKey,
     forgetAllCardScripts,
@@ -1933,52 +1938,18 @@ function waitForNextFrame() {
 }
 
 function captureVisibleChatMessageAnchor() {
-    const chatNode = chatElement[0];
-
-    if (!(chatNode instanceof HTMLElement)) {
-        return null;
-    }
-
-    const chatRect = chatNode.getBoundingClientRect();
-    const messages = Array.from(chatNode.querySelectorAll('.mes[mesid]'));
-    const anchorElement = messages.find(message => {
-        const messageRect = message.getBoundingClientRect();
-        return messageRect.bottom > chatRect.top && messageRect.top < chatRect.bottom;
-    });
-
-    if (!(anchorElement instanceof HTMLElement)) {
-        return null;
-    }
-
-    return {
-        messageId: anchorElement.getAttribute('mesid'),
-        offsetTop: anchorElement.getBoundingClientRect().top - chatRect.top,
-    };
+    return captureVisibleMessageAnchor(chatElement[0]);
 }
 
 function restoreVisibleChatMessageAnchor(anchor) {
-    const chatNode = chatElement[0];
-
-    if (!(chatNode instanceof HTMLElement) || !anchor?.messageId) {
-        return;
-    }
-
-    const anchorElement = chatNode.querySelector(`.mes[mesid="${anchor.messageId}"]`);
-
-    if (!(anchorElement instanceof HTMLElement)) {
-        return;
-    }
-
-    const chatRect = chatNode.getBoundingClientRect();
-    const nextOffsetTop = anchorElement.getBoundingClientRect().top - chatRect.top;
-    chatNode.scrollTop += nextOffsetTop - anchor.offsetTop;
+    restoreVisibleMessageAnchor(chatElement[0], anchor);
 }
 
 async function settleVisibleChatMessageAnchor(anchor, frames = 8) {
-    for (let i = 0; i < frames; i++) {
-        await waitForNextFrame();
-        restoreVisibleChatMessageAnchor(anchor);
-    }
+    await settleVisibleMessageAnchor(chatElement[0], anchor, {
+        frames,
+        requestAnimationFrameRef: requestAnimationFrame,
+    });
 }
 
 function flushPendingMobileMessageUpdates() {
@@ -13158,6 +13129,8 @@ export async function swipe(event, direction, { source, repeated, message = chat
      * @param {boolean} [skipSwipeOut=false]
      */
     async function animateSwipe(run_generate = false, skipSwipeOut = false) {
+        let swipeAnchor = null;
+
         if (!skipSwipeOut) {
             //Swipe out.
             await animateSwipeTransition(mesId, { xEnd: `${swipeRange}px`, duration: swipeDuration });
@@ -13176,10 +13149,17 @@ export async function swipe(event, direction, { source, repeated, message = chat
             //console.log('showing previously generated swipe candidate, or "..."');
             //console.log('onclick right swipe calling addOneMessage');
 
-            //Only scroll when swiping the last message.
-            const scroll = (mesId == chat.length - 1);
+            // SillyBunny: preserve a manual viewport position when replacing the last message via swipe.
+            const isLastMessageSwipe = (mesId == chat.length - 1);
+            swipeAnchor = isLastMessageSwipe && !isChatScrolledNearBottom()
+                ? captureVisibleChatMessageAnchor()
+                : null;
             //The swipe buttons will be refreshed in endSwipe(), refreshing them now will cause flickering.
-            addOneMessage(chat[mesId], { type: 'swipe', forceId: mesId, scroll: scroll, showSwipes: false });
+            addOneMessage(chat[mesId], { type: 'swipe', forceId: mesId, scroll: isLastMessageSwipe && !swipeAnchor, showSwipes: false });
+
+            if (swipeAnchor) {
+                await settleVisibleChatMessageAnchor(swipeAnchor);
+            }
 
             if (power_user.message_token_count_enabled) {
                 if (!chat[mesId].extra) {
@@ -13208,6 +13188,10 @@ export async function swipe(event, direction, { source, repeated, message = chat
 
         //Swipe in from the opposite side.
         await animateSwipeTransition(mesId, { xStart: `${-swipeRange}px`, xEnd: `${0}px`, duration: swipeDuration });
+
+        if (swipeAnchor) {
+            await settleVisibleChatMessageAnchor(swipeAnchor);
+        }
     }
 
     if (mesId === Number(this_edit_mes_id)) {

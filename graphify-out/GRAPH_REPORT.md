@@ -93,7 +93,6 @@
 - [[_COMMUNITY_Community 75|Community 75]]
 - [[_COMMUNITY_Community 76|Community 76]]
 - [[_COMMUNITY_Community 77|Community 77]]
-- [[_COMMUNITY_Community 78|Community 78]]
 - [[_COMMUNITY_Community 79|Community 79]]
 - [[_COMMUNITY_Community 80|Community 80]]
 - [[_COMMUNITY_Community 81|Community 81]]
@@ -347,7 +346,6 @@
 - [[_COMMUNITY_Community 343|Community 343]]
 - [[_COMMUNITY_Community 344|Community 344]]
 - [[_COMMUNITY_Community 345|Community 345]]
-- [[_COMMUNITY_Community 346|Community 346]]
 - [[_COMMUNITY_Community 347|Community 347]]
 - [[_COMMUNITY_Community 348|Community 348]]
 - [[_COMMUNITY_Community 349|Community 349]]
@@ -374,7 +372,6 @@
 - [[_COMMUNITY_Community 370|Community 370]]
 - [[_COMMUNITY_Community 371|Community 371]]
 - [[_COMMUNITY_Community 372|Community 372]]
-- [[_COMMUNITY_Community 373|Community 373]]
 - [[_COMMUNITY_Community 374|Community 374]]
 - [[_COMMUNITY_Community 375|Community 375]]
 - [[_COMMUNITY_Community 376|Community 376]]
@@ -411,10 +408,10 @@
 4. `get()` - 374 edges
 5. `ConfigNamespace` - 279 edges
 6. `TemplateNamespace` - 220 edges
-7. `c()` - 189 edges
-8. `set()` - 185 edges
-9. `AnnotationEditor` - 176 edges
-10. `ChatCompletion` - 171 edges
+7. `n()` - 194 edges
+8. `c()` - 189 edges
+9. `set()` - 185 edges
+10. `AnnotationEditor` - 176 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `importRisuChat()` --calls--> `number`  [INFERRED]
@@ -794,6 +791,10 @@ Nodes (9): init(), loadSettings(), normalizeSummarySource(), onSummarySourceChan
 Cohesion: 0.18
 Nodes (3): AllTalkTtsProvider, updateStatus(), loadSettings()
 
+### Community 90 - "Community 90"
+Cohesion: 0.18
+Nodes (3): AllTalkTtsProvider, updateStatus(), loadSettings()
+
 ### Community 91 - "Community 91"
 Cohesion: 0.19
 Nodes (32): bindCharacterEditorFullscreenToggle(), ensureCharacterListToolbarLayout(), ensureCharacterPersonaPanel(), ensureCharacterWorldInfoPanel(), getMainScriptModule(), hasActiveCharacterChat(), hideCharacterMainPanels(), injectCharacterDrawerControls() (+24 more)
@@ -811,8 +812,8 @@ Cohesion: 0.08
 Nodes (19): captionExtras(), callExtrasSummarizeAPI(), getGenerateUrl(), doExtrasFetch(), getApiUrl(), modules, coquiApiModels, coquiApiModelsFull (+11 more)
 
 ### Community 96 - "Community 96"
-Cohesion: 0.06
-Nodes (18): messageElement, dryRunEventData, eventData, existingSnapshot, firstRun, generationPromise, inactiveEventData, invalidOutputText (+10 more)
+Cohesion: 0.08
+Nodes (7): jn, to, FreeHighlightOutline, HighlightOutline, Outline, Outliner, Util
 
 ### Community 97 - "Community 97"
 Cohesion: 0.05
@@ -1110,6 +1111,42 @@ Nodes (46): 1. Overview, 2. Colors, 3. Typography, 4. Elevation, 5. Components, 
 Cohesion: 0.12
 Nodes (39): A(), c(), d(), f(), G(), h(), i(), j() (+31 more)
 
+### Community 174 - "Community 174"
+Cohesion: 0.25
+Nodes (8): At a glance, Contributors, Desktop, Mobile, Project Goals (AKA, why we made this fork), 🐰 SillyBunny 🐰, Table of Contents, Upstream Information
+
+### Community 175 - "Community 175"
+Cohesion: 0.14
+Nodes (3): fr, ImageManager, XmlObject
+
+### Community 176 - "Community 176"
+Cohesion: 0.13
+Nodes (3): sanitizeId(), VoiceMapEntry, OpenAITtsProvider
+
+### Community 177 - "Community 177"
+Cohesion: 0.33
+Nodes (14): buildConsoleLogsPanel(), formatConsoleLogDateTime(), formatConsoleLogEntry(), formatConsoleLogTime(), getConsoleLogsRefs(), getConsoleLogsState(), isConsoleLogsTabActive(), isScrolledNearBottom() (+6 more)
+
+### Community 178 - "Community 178"
+Cohesion: 0.2
+Nodes (17): hasPromptPayload(), escapeHtml(), extractOocBlocksForDisplay(), hasTextOrArrayPayload(), normalizeContextRetentionDepth(), renderOocBlock(), replaceBalancedOocBlocks(), restoreOocBlocksForDisplay() (+9 more)
+
+### Community 179 - "Community 179"
+Cohesion: 0.04
+Nodes (50): <a id="lalib-help-cmd-message_edit"></a>`/message-edit`, <a id="lalib-help-cmd-message_get"></a>`/message-get`, <a id="lalib-help-cmd-message_list"></a>`/message-list`, <a id="lalib-help-cmd-message_move"></a>`/message-move`, <a id="lalib-help-cmd-swipes_add"></a>`/swipes-add`, <a id="lalib-help-cmd-swipes_count"></a>`/swipes-count`, <a id="lalib-help-cmd-swipes_del"></a>`/swipes-del`, <a id="lalib-help-cmd-swipes_get"></a>`/swipes-get` (+42 more)
+
+### Community 180 - "Community 180"
+Cohesion: 0.04
+Nodes (46): 1. Overview, 2. Colors, 3. Typography, 4. Elevation, 5. Components, 6. Do's and Don'ts, Buttons, Cards / Containers (+38 more)
+
+### Community 181 - "Community 181"
+Cohesion: 0.11
+Nodes (17): EnhancedMacroAutoCompleteOption, isShortOperatorPrefix(), ValidVariableShorthandSymbols, VARIABLE_SHORTHAND_NAME_PATTERN, VariableOperatorDefinitions, VariableShorthandDefinitions, VariableShorthandType, CATEGORY_CONFIG (+9 more)
+
+### Community 182 - "Community 182"
+Cohesion: 0.12
+Nodes (22): A(), bt(), C(), Ct(), D(), Dt(), f(), gt() (+14 more)
+
 ### Community 183 - "Community 183"
 Cohesion: 0.12
 Nodes (15): CookieSessionObject, Process, Request, ServerEventMap, ServerStartedEvent, CookieSessionObject, Process, Request (+7 more)
@@ -1127,8 +1164,8 @@ Cohesion: 0.16
 Nodes (19): clearDefaultPresetDeletion(), findDefaultPreset(), getDefaultPresetDeletionKey(), getDefaultPresetDeletionPath(), getDefaultPresetDeletions(), getDefaultPresetFile(), getDefaultPresets(), isDefaultPresetDeleted() (+11 more)
 
 ### Community 188 - "Community 188"
-Cohesion: 0.27
-Nodes (6): createRateLimiter(), DEFAULT_RATE_LIMITS, pruneTimestamps(), RateLimiter, limiter, limiter
+Cohesion: 0.4
+Nodes (3): DEFAULT_RATE_LIMITS, pruneTimestamps(), RateLimiter
 
 ### Community 191 - "Community 191"
 Cohesion: 0.29
@@ -1229,6 +1266,10 @@ Nodes (11): characterGroupOverlay, disableBulkEdit(), disableBulkSelect(), enabl
 ### Community 220 - "Community 220"
 Cohesion: 0.33
 Nodes (13): cloneActivationSnapshot(), deferPostProcessing(), ensureMessageRegexSnapshot(), getDeferredActivationSnapshot(), getPromptTransformAgents(), getPromptTransformAgentsForMessage(), isAssistantPostProcessingGenerationType(), isGreetingGenerationType() (+5 more)
+
+### Community 220 - "Community 220"
+Cohesion: 0.4
+Nodes (5): ae, At(), be, me, Te
 
 ### Community 222 - "Community 222"
 Cohesion: 0.67
@@ -1334,6 +1375,10 @@ Nodes (12): XfaLayer, getActiveSandboxCount(), { button }, createMessage(), { ex
 Cohesion: 0.08
 Nodes (13): XfaLayer, XfaText, getActiveSandboxCount(), { button }, createMessage(), { executeSlashCommandsWithOptions }, FakeDocument, FakeElement (+5 more)
 
+### Community 332 - "Community 332"
+Cohesion: 0.11
+Nodes (5): XfaLayer, XfaText, createMessage(), FakeDocument, FakeElement
+
 ### Community 333 - "Community 333"
 Cohesion: 0.13
 Nodes (15): Bundled Extensions, Templates, And Styles, Character Cards, Character Editor, Character Menu And Drawer, Chat Completion Tabs, Chat Loading And Search, In-Chat Agents And Context Tools, Merged Staging PRs (+7 more)
@@ -1347,8 +1392,12 @@ Cohesion: 0.15
 Nodes (13): 10. Release notes have been used as operational memory, 11. Worktrees are now part of the development model, 12. Small, repeatable fixes beat large heroic patches, 1. Mobile shell work needs executable guardrails, 2. The shell script is a critical subsystem, not glue, 3. Reverts show where risk concentrates, 4. Upstream syncs are product events, 5. Caching fixes need lifecycle thinking (+5 more)
 
 ### Community 336 - "Community 336"
-Cohesion: 0.2
-Nodes (13): fetchUrl, formality, key, lang, params, router, secretUrl, text (+5 more)
+Cohesion: 0.29
+Nodes (12): applyScrollResetBehavior(), getAllInteractables(), handleGlobalKeyDown(), handleNodeChange(), initializeInteractables(), initializeScrollResetBehaviors(), initKeyboard(), interactableSelectors (+4 more)
+
+### Community 337 - "Community 337"
+Cohesion: 0.05
+Nodes (38): <a id="lalib-help-cmd-char_get"></a>`/char-get`, <a id="lalib-help-cmd-costumes"></a>`/costumes`, <a id="lalib-help-cmd-dom"></a>`/dom`, <a id="lalib-help-cmd-fireandforget"></a>`/fireandforget`, <a id="lalib-help-cmd-fonts"></a>`/fonts`, <a id="lalib-help-cmd-lalib_"></a>`/lalib?`, <a id="lalib-help-cmd-sfx"></a>`/sfx`, <a id="lalib-help-cmd-timestamp"></a>`/timestamp` (+30 more)
 
 ### Community 337 - "Community 337"
 Cohesion: 0.32
@@ -1377,6 +1426,10 @@ Nodes (3): CosyVoiceProvider, GoogleNativeTtsProvider, generateTts()
 ### Community 339 - "Community 339"
 Cohesion: 0.36
 Nodes (7): context, defaultSettings, initExtensionUI(), initializeOpenAITabs(), renderExtensionSettings(), addExtensionsButtonAndMenu(), initExtensions()
+
+### Community 341 - "Community 341"
+Cohesion: 0.1
+Nodes (19): 1327(), 5588(), 6201(), ao(), bo, co, Eo(), fo() (+11 more)
 
 ### Community 343 - "Community 343"
 Cohesion: 0.08
