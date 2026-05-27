@@ -649,8 +649,8 @@ Cohesion: 0.06
 Nodes (64): applyFrontendIcon(), applyMobileNavPreferences(), bindCharacterEditorExitButton(), bindClearCookiesAndCacheButton(), bindComposerControlPlacement(), bindInlineDrawerAutoCloseToggle(), bindMessageActionExtensionEvents(), buildMobileNav() (+56 more)
 
 ### Community 55 - "Community 55"
-Cohesion: 0.06
-Nodes (28): a, all, b, ctx, env1, env2, evalOrder, evaluateWithEngine() (+20 more)
+Cohesion: 0.05
+Nodes (29): results, a, all, b, ctx, env1, env2, evalOrder (+21 more)
 
 ### Community 56 - "Community 56"
 Cohesion: 0.08
@@ -778,7 +778,11 @@ Nodes (34): applyChatSearchHighlights(), bindTopBarBrand(), bindTopBarBrandWindo
 
 ### Community 89 - "Community 89"
 Cohesion: 0.05
-Nodes (45): _(), alphaChanged(), at(), attributeChangedCallback(), C(), connectedCallback(), constructor(), ct() (+37 more)
+Nodes (44): _(), alphaChanged(), at(), attributeChangedCallback(), C(), constructor(), ct(), dt() (+36 more)
+
+### Community 90 - "Community 90"
+Cohesion: 0.11
+Nodes (10): assert(), convertBlackAndWhiteToRGBA(), assert(), convertBlackAndWhiteToRGBA(), convertToRGBA(), decodeAndClamp(), ImageResizer, PDFImage (+2 more)
 
 ### Community 91 - "Community 91"
 Cohesion: 0.22
@@ -840,6 +844,10 @@ Nodes (3): AutoComplete, AutoCompleteNameResultBase, AutoCompleteSecondaryNameRe
 Cohesion: 0.1
 Nodes (6): FandomScraper, FileScraper, MediaWikiScraper, Notepad, WebScraper, YouTubeScraper
 
+### Community 106 - "Community 106"
+Cohesion: 0.14
+Nodes (3): AutoComplete, AutoCompleteNameResultBase, AutoCompleteSecondaryNameResult
+
 ### Community 108 - "Community 108"
 Cohesion: 0.04
 Nodes (72): groups, env_provider_order, getGroupValue(), MacroEnvBuilder, callPopup(), characters, create_save, createLazyFields() (+64 more)
@@ -870,7 +878,7 @@ Nodes (30): elementAutoCompleteMap, enableMacroAutoCompleteById(), getAutocomple
 
 ### Community 117 - "Community 117"
 Cohesion: 0.14
-Nodes (18): a11yRules, applyA11yRules(), buttonSelectors, listItemSelectors, listSelectors, setAccessibilityObserver(), tabItemSelectors, tabListSelectors (+10 more)
+Nodes (19): a11yRules, applyA11yRules(), buttonSelectors, initAccessibility(), listItemSelectors, listSelectors, setAccessibilityObserver(), tabItemSelectors (+11 more)
 
 ### Community 118 - "Community 118"
 Cohesion: 0.1
@@ -901,12 +909,12 @@ Cohesion: 0.22
 Nodes (19): fetchCharacterChatFiles(), fetchGroupChatFiles(), getAuthorizedRequestHeadersOrNull(), getChatFilesForContext(), getCsrfTokenFromHeaders(), getImporterRefs(), getImporterState(), handleSillyTavernExtensionSync() (+11 more)
 
 ### Community 125 - "Community 125"
-Cohesion: 0.23
-Nodes (12): applyExtraQuickContextSize(), bindExtraQuickContextButtons(), buildExtraQuickContextButton(), createExtraQuickContextContainer(), ensureExtraQuickContextButtons(), EXTRA_CONTEXT_SIZES, EXTRA_CONTEXT_TARGETS, getOptionalUnlockToggle() (+4 more)
+Cohesion: 0.1
+Nodes (25): ensureLastGenerationTypeTracking(), registerStateMacros(), characterGroupOverlay, disableBulkEdit(), disableBulkSelect(), enableBulkEdit(), enableBulkSelect(), onEditButtonClick() (+17 more)
 
 ### Community 126 - "Community 126"
-Cohesion: 0.15
-Nodes (20): snapshots, cardScriptSnapshots, containsEmbeddedCardScript(), forgetAllCardScripts(), getCardScriptSnapshot(), getShownCardScriptToastCount(), getStoredCardScriptCount(), hashCardScriptHtml() (+12 more)
+Cohesion: 0.14
+Nodes (22): buildCardScriptToastKey(), cardScriptSnapshots, containsEmbeddedCardScript(), forgetAllCardScripts(), getCardScriptSnapshot(), getShownCardScriptToastCount(), getStoredCardScriptCount(), hasCardScriptToastBeenShown() (+14 more)
 
 ### Community 128 - "Community 128"
 Cohesion: 0.03
@@ -1064,6 +1072,14 @@ Nodes (3): sanitizeId(), VoiceMapEntry, OpenAITtsProvider
 Cohesion: 0.2
 Nodes (18): addModelIdSearchOption(), ensureModelFavoritesStore(), ensureModelIdSearchFavoriteButton(), getModelFavoritesForSource(), getModelIdSearchDynamicOptions(), getModelIdSearchState(), getModelIdSearchStaticEntries(), initModelIdSearchControl() (+10 more)
 
+### Community 178 - "Community 178"
+Cohesion: 0.13
+Nodes (3): sanitizeId(), VoiceMapEntry, OpenAITtsProvider
+
+### Community 179 - "Community 179"
+Cohesion: 0.12
+Nodes (16): Character Drawer, In-Chat Agents, In-Chat Agents, Local Commits, Mobile UI Polish, Pathfinder, Pathfinder And Release Metadata, PR #13 SillyTavern 1.18.0 Sync (+8 more)
+
 ### Community 180 - "Community 180"
 Cohesion: 0.04
 Nodes (46): 1. Overview, 2. Colors, 3. Typography, 4. Elevation, 5. Components, 6. Do's and Don'ts, Buttons, Cards / Containers (+38 more)
@@ -1113,8 +1129,8 @@ Cohesion: 0.38
 Nodes (7): Characters Screen (v1.6.0), Customize Screen (v1.4.0), Customize Screen (v1.6.0), In-Chat Screen (v1.4.0), In-Chat Screen (v1.6.0), Navigation Screen (v1.4.0), Search Screen (v1.4.0)
 
 ### Community 196 - "Community 196"
-Cohesion: 0.7
-Nodes (4): Add-ToPath(), Install-Bun(), Install-Git(), Refresh-KnownCommandPaths()
+Cohesion: 0.13
+Nodes (15): Bundled Extensions, Templates, And Styles, Character Cards, Character Editor, Character Menu And Drawer, Chat Completion Tabs, Chat Loading And Search, In-Chat Agents And Context Tools, Merged Staging PRs (+7 more)
 
 ### Community 197 - "Community 197"
 Cohesion: 0.29
@@ -1180,6 +1196,10 @@ Nodes (16): Character Drawer, In-Chat Agents, In-Chat Agents, Local Commits, Mob
 Cohesion: 0.18
 Nodes (11): characterGroupOverlay, disableBulkEdit(), disableBulkSelect(), enableBulkEdit(), enableBulkSelect(), onEditButtonClick(), toggleBulkEditMode(), BulkEditOverlayState (+3 more)
 
+### Community 220 - "Community 220"
+Cohesion: 0.33
+Nodes (13): cloneActivationSnapshot(), deferPostProcessing(), ensureMessageRegexSnapshot(), getDeferredActivationSnapshot(), getPromptTransformAgents(), getPromptTransformAgentsForMessage(), isAssistantPostProcessingGenerationType(), isGreetingGenerationType() (+5 more)
+
 ### Community 222 - "Community 222"
 Cohesion: 0.67
 Nodes (3): Desktop Chat Interface (v1.6.0), Desktop Navigation Sidebar (v1.4.0), Desktop Search Interface (v1.4.0)
@@ -1187,6 +1207,10 @@ Nodes (3): Desktop Chat Interface (v1.6.0), Desktop Navigation Sidebar (v1.4.0),
 ### Community 223 - "Community 223"
 Cohesion: 0.12
 Nodes (11): destroySpy, disconnectHandler, finished, infoSpy, mockExecFile, mockPlatform, mockReadFile, response (+3 more)
+
+### Community 316 - "Community 316"
+Cohesion: 0.09
+Nodes (11): lines, accessKey, appId, audioChunks_, audioData, { code, data, message }, { data, code, message }, finalAudioData (+3 more)
 
 ### Community 317 - "Community 317"
 Cohesion: 0.19
@@ -1225,7 +1249,7 @@ Cohesion: 0.12
 Nodes (16): Character Drawer, In-Chat Agents, In-Chat Agents, Local Commits, Mobile UI Polish, Pathfinder, Pathfinder And Release Metadata, PR #13 SillyTavern 1.18.0 Sync (+8 more)
 
 ### Community 328 - "Community 328"
-Cohesion: 0.17
+Cohesion: 0.19
 Nodes (10): initPrivateRequestFilter(), privateIpRanges, PrivateRequestAgent, agent, allowedAgent, blockedAgent, initAgent(), mockLookup (+2 more)
 
 ### Community 330 - "Community 330"
@@ -1239,6 +1263,10 @@ Nodes (10): testSetup, env, ctx, earlyIndex, env, lateIndex, normalIndex, custom
 ### Community 332 - "Community 332"
 Cohesion: 0.1
 Nodes (5): createMessage(), FakeClassList, FakeDocument, FakeElement, setupRuntime()
+
+### Community 332 - "Community 332"
+Cohesion: 0.16
+Nodes (3): XfaLayer, XfaText, FakeElement
 
 ### Community 333 - "Community 333"
 Cohesion: 0.13
@@ -1279,6 +1307,10 @@ Nodes (8): DEFAULT_SCROLL_EDGE_SETTLE_DELAYS, getScrollEdgePosition(), jumpScrol
 ### Community 352 - "Community 352"
 Cohesion: 0.36
 Nodes (10): initPlugin(), isCommonJS(), isESModule(), isValidPluginID(), loadedPlugins, loadFromDirectory(), loadFromFile(), loadFromPackage() (+2 more)
+
+### Community 352 - "Community 352"
+Cohesion: 0.1
+Nodes (5): getGenerateUrl(), EdgeTtsProvider, GSVITtsProvider, updateVoiceMap(), SystemTtsProvider
 
 ### Community 353 - "Community 353"
 Cohesion: 0.18
