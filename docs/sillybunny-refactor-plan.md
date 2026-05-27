@@ -1,7 +1,7 @@
 ---
-status: in-progress
-phase: 3
-updated: 2026-05-27
+status: not-started
+phase: 1
+updated: 2026-05-26
 ---
 
 # SillyBunny Refactor Plan
@@ -64,8 +64,8 @@ High-level lifecycle intents:
 | Intent | Meaning |
 | --- | --- |
 | `initial-load` | Render current chat and land at the expected latest position. |
-| `history-prepend` | Add older messages while preserving first visible anchor. |
-| `tail-append` | Add a tail message and optionally pin bottom. |
+| `prepend-history` | Add older messages while preserving first visible anchor. |
+| `append-message` | Add a tail message and optionally pin bottom. |
 | `replace-message` | Replace/swipe existing message without treating it as append. |
 | `stream-progress` | Coalesce live text updates and respect user scroll state. |
 | `media-resize` | Reconcile late image/video/code/reasoning layout growth. |
@@ -82,17 +82,17 @@ Core invariants:
 | Stream path is low priority | Token bursts are buffered and never re-trigger full render unnecessarily. |
 | Shell remains thin | Upstream-origin files contain adapter calls, not growing fork logic. |
 
-## Phase 1: Plan, Ledger, And Baseline [COMPLETE]
+## Phase 1: Plan, Ledger, And Baseline [IN PROGRESS]
 - [x] 1.1 Create `docs/sillybunny-refactor-plan.md` with this plan.
 - [x] 1.2 Add `docs/upstream-touch-ledger.md`.
-- [x] 1.3 Capture current validation baseline: `npm run lint`, targeted unit tests, and `npm run check:frontend-budgets`.
-- [x] 1.4 Record current upstream-origin hot files: `public/script.js`, `public/style.css`, `public/scripts/sillybunny-tabs.js`, and core settings modules touched later.
-- [x] 1.5 Capture current issue `#167` repro notes before behavior changes.
-- [x] 1.6 Keep Phase 1 docs and ledger scoped; runtime changes moved into later tested slices.
+- [ ] **1.3 Capture current validation baseline: `npm run lint`, targeted unit tests, and `npm run check:frontend-budgets`.** <- CURRENT
+- [ ] 1.4 Record current upstream-origin hot files: `public/script.js`, `public/style.css`, `public/scripts/sillybunny-tabs.js`, and core settings modules touched later.
+- [ ] 1.5 Capture current issue `#167` repro notes before behavior changes.
+- [ ] 1.6 Do not change runtime behavior in this phase.
 
 ## Phase 2: Tests Before Extraction [IN PROGRESS]
-- [x] 2.1 Add pure unit tests for scroll intent transitions.
-- [x] 2.2 Add scheduler unit tests for requestAnimationFrame coalescing and cancellation.
+- [ ] 2.1 Add pure unit tests for scroll intent transitions.
+- [ ] 2.2 Add scheduler unit tests for requestAnimationFrame coalescing and cancellation.
 - [x] 2.3 Add anchor unit tests for prepend, replace, and late resize.
 - [x] 2.4 Expand `tests/chat-send-scroll.e2e.js` for long-chat send behavior.
 - [x] 2.5 Add long-chat fixture generation in-browser, avoiding committed user data.
@@ -102,9 +102,9 @@ Core invariants:
 
 ## Phase 3: Lifecycle Module Scaffold [IN PROGRESS]
 - [x] 3.1 Create `public/scripts/chat-render-lifecycle/`.
-- [ ] **3.2 Add empty or pass-through adapter exports with no behavior change.** <- CURRENT
+- [ ] 3.2 Add empty or pass-through adapter exports with no behavior change.
 - [x] 3.3 Add `scheduler.js` with tests; route anchor settle through it as the first low-risk adapter.
-- [x] 3.4 Add `scroll-intent.js` as pure logic with table-driven tests.
+- [ ] 3.4 Add `scroll-intent.js` as pure logic with table-driven tests.
 - [x] 3.5 Add `anchor.js` with DOM fixture tests.
 - [ ] 3.6 Add lifecycle kill-switch only as temporary rollout protection, not a permanent compatibility layer.
 - [ ] 3.7 Keep each commit green and small.

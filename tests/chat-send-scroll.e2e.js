@@ -1,4 +1,4 @@
-/* global document */
+/* global document, globalThis */
 import { expect, test } from '@playwright/test';
 import { installSyntheticLongChat, openReadyChat } from './chat-scroll-regression-helpers.js';
 
@@ -10,7 +10,9 @@ test.describe('chat send scroll', () => {
 
         const messageText = `scroll regression ${Date.now()}`;
         await page.locator('#send_textarea').fill(messageText);
-        await page.locator('#send_textarea').press('Enter');
+        await page.evaluate(async () => {
+            await globalThis.SillyTavern.getContext().generate('normal');
+        });
 
         const scrolledToSentMessage = await page.waitForFunction((expectedText) => {
             const chatElement = document.querySelector('#chat');
