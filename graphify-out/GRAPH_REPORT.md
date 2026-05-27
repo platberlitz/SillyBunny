@@ -511,6 +511,10 @@ Nodes (169): middleware, CONTENT_TYPES, extensionsEnabledFeatureGuard(), getClie
 Cohesion: 0.02
 Nodes (129): characterToEntity(), entitiesFilter, getBackBlock(), getEmptyBlock(), getHiddenBlock(), printCharacters(), printCharactersDebounced, verifyCharactersSearchSortRule() (+121 more)
 
+### Community 21 - "Community 21"
+Cohesion: 0.06
+Nodes (4): CanvasGraphics, copyCtxState(), resetCtxToDefault(), StateManager
+
 ### Community 22 - "Community 22"
 Cohesion: 0.06
 Nodes (33): areFilesEqual(), AUTOSAVE_FUNCTIONS, backupSettings(), backupUserSettings(), content, { fileContents: koboldai_settings, fileNames: koboldai_setting_names }, { fileContents: novelai_settings, fileNames: novelai_setting_names }, { fileContents: openai_settings, fileNames: openai_setting_names } (+25 more)
@@ -1147,6 +1151,38 @@ Nodes (17): EnhancedMacroAutoCompleteOption, isShortOperatorPrefix(), ValidVaria
 Cohesion: 0.12
 Nodes (22): A(), bt(), C(), Ct(), D(), Dt(), f(), gt() (+14 more)
 
+### Community 174 - "Community 174"
+Cohesion: 0.25
+Nodes (8): At a glance, Contributors, Desktop, Mobile, Project Goals (AKA, why we made this fork), 🐰 SillyBunny 🐰, Table of Contents, Upstream Information
+
+### Community 175 - "Community 175"
+Cohesion: 0.02
+Nodes (86): success, create(), gn, In, nn, zs, BaseCanvasFactory, _createCanvas() (+78 more)
+
+### Community 177 - "Community 177"
+Cohesion: 0.22
+Nodes (19): buildConsoleLogsPanel(), buildInChatAgentsPanel(), buildSamplingPanel(), buildShell(), createShellPanel(), formatConsoleLogDateTime(), formatConsoleLogEntry(), formatConsoleLogTime() (+11 more)
+
+### Community 178 - "Community 178"
+Cohesion: 0.2
+Nodes (17): hasPromptPayload(), escapeHtml(), extractOocBlocksForDisplay(), hasTextOrArrayPayload(), normalizeContextRetentionDepth(), renderOocBlock(), replaceBalancedOocBlocks(), restoreOocBlocksForDisplay() (+9 more)
+
+### Community 179 - "Community 179"
+Cohesion: 0.04
+Nodes (50): <a id="lalib-help-cmd-message_edit"></a>`/message-edit`, <a id="lalib-help-cmd-message_get"></a>`/message-get`, <a id="lalib-help-cmd-message_list"></a>`/message-list`, <a id="lalib-help-cmd-message_move"></a>`/message-move`, <a id="lalib-help-cmd-swipes_add"></a>`/swipes-add`, <a id="lalib-help-cmd-swipes_count"></a>`/swipes-count`, <a id="lalib-help-cmd-swipes_del"></a>`/swipes-del`, <a id="lalib-help-cmd-swipes_get"></a>`/swipes-get` (+42 more)
+
+### Community 180 - "Community 180"
+Cohesion: 0.04
+Nodes (46): 1. Overview, 2. Colors, 3. Typography, 4. Elevation, 5. Components, 6. Do's and Don'ts, Buttons, Cards / Containers (+38 more)
+
+### Community 181 - "Community 181"
+Cohesion: 0.22
+Nodes (9): CATEGORY_CONFIG, createAliasIndicator(), createSourceIndicator(), createTypeBadge(), formatMacroSignature(), getCategoryConfig(), MacroBrowser, renderMacroDetails() (+1 more)
+
+### Community 182 - "Community 182"
+Cohesion: 0.12
+Nodes (22): A(), bt(), C(), Ct(), D(), Dt(), f(), gt() (+14 more)
+
 ### Community 183 - "Community 183"
 Cohesion: 0.12
 Nodes (15): CookieSessionObject, Process, Request, ServerEventMap, ServerStartedEvent, CookieSessionObject, Process, Request (+7 more)
@@ -1500,8 +1536,8 @@ Cohesion: 0.29
 Nodes (7): Chat Naming And Workspace, Group Chats And Agents, Launchpad And Extensions, Mobile Chat Stability, Pathfinder, Shell And Mobile UI, v1.5.2
 
 ### Community 360 - "Community 360"
-Cohesion: 0.31
-Nodes (8): DEFAULT_FLATTEN_KEYS, DEFAULT_IGNORE_KEYS, expectedCst, expectedErrors, runParser(), runParserAndGetErrors(), simplifyCstNode(), simplifyErrors()
+Cohesion: 0.15
+Nodes (13): require, defaultConfig, repoRoot, { chromium, devices }, measurePage(), outputDir, repoRoot, require (+5 more)
 
 ### Community 361 - "Community 361"
 Cohesion: 0.12
