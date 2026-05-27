@@ -38,6 +38,7 @@ const MODULE_NAME = '1_memory';
 let lastMessageHash = null;
 let lastMessageId = null;
 let inApiCall = false;
+let isExtensionActive = false;
 
 /**
  * Count the number of tokens in the provided text.
@@ -171,6 +172,19 @@ function loadSettings() {
     $('#memory_max_messages_per_request').val(extension_settings.memory.maxMessagesPerRequest).trigger('input');
     $('#memory_include_wi_scan').prop('checked', extension_settings.memory.scan).trigger('input');
     switchSourceControls(extension_settings.memory.source);
+}
+
+function getMemoryPromptSettings() {
+    const settings = extension_settings.memory && typeof extension_settings.memory === 'object'
+        ? extension_settings.memory
+        : {};
+    return { ...defaultSettings, ...settings };
+}
+
+function clearMemoryContext() {
+    const settings = getMemoryPromptSettings();
+    setExtensionPrompt(MODULE_NAME, '', settings.position, settings.depth, settings.scan, settings.role);
+    $('#memory_contents').val('');
 }
 
 async function onPromptForceWordsAutoClick() {
@@ -416,12 +430,20 @@ function isContextChanged(context) {
 }
 
 function onChatChanged() {
+    if (!isExtensionActive) {
+        return;
+    }
+
     const context = getContext();
     const latestMemory = getLatestMemoryFromChat(context.chat);
     setMemoryContext(latestMemory, false);
 }
 
 async function onChatEvent() {
+    if (!isExtensionActive) {
+        return;
+    }
+
     // Module not enabled
     if (extension_settings.memory.source === summary_sources.extras && !modules.includes('summarize')) {
         return;
@@ -483,6 +505,10 @@ async function onChatEvent() {
  * @returns {Promise<string>} Summarized text
  */
 async function forceSummarizeChat(quiet) {
+    if (!isExtensionActive) {
+        return '';
+    }
+
     if (extension_settings.memory.source === summary_sources.extras) {
         toastr.warning('Force summarization is not supported for Extras API');
         return;
@@ -969,6 +995,10 @@ function reinsertMemory() {
  * @param {number|null} index Index of the chat message to save the summary to. If null, the pre-last message is used.
  */
 function setMemoryContext(value, saveToMessage, index = null) {
+    if (!isExtensionActive && value) {
+        return;
+    }
+
     setExtensionPrompt(MODULE_NAME, formatMemoryValue(value), extension_settings.memory.position, extension_settings.memory.depth, extension_settings.memory.scan, extension_settings.memory.role);
     $('#memory_contents').val(value);
 
@@ -1071,6 +1101,12 @@ function setupListeners() {
 }
 
 export async function init() {
+    if (isExtensionActive) {
+        return;
+    }
+
+    isExtensionActive = true;
+
     async function addExtensionControls() {
         const settingsHtml = await renderExtensionTemplateAsync('memory', 'settings', { defaultSettings });
         $('#summarize_container').append(settingsHtml);
@@ -1134,5 +1170,16 @@ export async function init() {
         MacrosParser.registerMacro('summary',
             () => summaryMacroHandler(),
             'Returns the latest memory/summary from the current chat.');
+    }
+}
+
+export function deactivate() {
+    isExtensionActive = false;
+    inApiCall = false;
+    clearMemoryContext();
+    eventSource.removeListener(event_types.CHAT_CHANGED, onChatChanged);
+    eventSource.removeListener(event_types.CHARACTER_MESSAGE_RENDERED, onChatEvent);
+    for (const event of [event_types.MESSAGE_DELETED, event_types.MESSAGE_UPDATED, event_types.MESSAGE_SWIPED]) {
+        eventSource.removeListener(event, onChatEvent);
     }
 }

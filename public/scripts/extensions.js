@@ -504,8 +504,25 @@ function isAlwaysEnabledExtension(externalId) {
     return ['core', 'bundled'].includes(getExtensionType(externalId));
 }
 
+function areExtensionIdsEqual(left, right) {
+    return getExtensionDedupKey(left) === getExtensionDedupKey(right);
+}
+
+function resolveExtensionName(name) {
+    return extensionNames.find(extName => {
+        return equalsIgnoreCaseAndAccents(extName, name) || equalsIgnoreCaseAndAccents(extName, `third-party/${name}`);
+    }) ?? name;
+}
+
 function isExtensionDisabled(externalId) {
-    return !isAlwaysEnabledExtension(externalId) && extension_settings.disabledExtensions.includes(externalId);
+    return !isAlwaysEnabledExtension(externalId) && extension_settings.disabledExtensions.some(name => areExtensionIdsEqual(name, externalId));
+}
+
+function markExtensionInactive(name) {
+    const extensionKey = getExtensionDedupKey(name);
+    activeExtensions.delete(name);
+    activeExtensionDedupKeys.delete(extensionKey);
+    activatingExtensionDedupKeys.delete(extensionKey);
 }
 
 /**
@@ -700,8 +717,9 @@ async function callExtensionHook(name, hookName) {
  * @param {boolean} [reload=true] If true, reload the page after enabling the extension
  */
 export async function enableExtension(name, reload = true) {
-    await callExtensionHook(name, 'enable');
-    extension_settings.disabledExtensions = extension_settings.disabledExtensions.filter(x => x !== name);
+    const extensionName = resolveExtensionName(name);
+    await callExtensionHook(extensionName, 'enable');
+    extension_settings.disabledExtensions = extension_settings.disabledExtensions.filter(x => !areExtensionIdsEqual(x, extensionName));
     stateChanged = true;
     await saveSettings();
     if (reload) {
@@ -717,13 +735,17 @@ export async function enableExtension(name, reload = true) {
  * @param {boolean} [reload=true] If true, reload the page after disabling the extension
  */
 export async function disableExtension(name, reload = true) {
-    if (isAlwaysEnabledExtension(name)) {
-        console.warn(`Extension "${name}" is always enabled and cannot be disabled.`);
+    const extensionName = resolveExtensionName(name);
+
+    if (isAlwaysEnabledExtension(extensionName)) {
+        console.warn(`Extension "${extensionName}" is always enabled and cannot be disabled.`);
         return;
     }
 
-    await callExtensionHook(name, 'disable');
-    extension_settings.disabledExtensions.push(name);
+    await callExtensionHook(extensionName, 'disable');
+    extension_settings.disabledExtensions = extension_settings.disabledExtensions.filter(x => !areExtensionIdsEqual(x, extensionName));
+    extension_settings.disabledExtensions.push(extensionName);
+    markExtensionInactive(extensionName);
     stateChanged = true;
     await saveSettings();
     if (reload) {
@@ -740,10 +762,8 @@ export async function disableExtension(name, reload = true) {
  * @returns {{name: string, enabled: boolean}|null} Object with name and enabled properties, or null if not found
  */
 export function findExtension(name) {
-    const internalExtensionName = extensionNames.find(extName => {
-        return equalsIgnoreCaseAndAccents(extName, name) || equalsIgnoreCaseAndAccents(extName, `third-party/${name}`);
-    });
-    if (!internalExtensionName) return null;
+    const internalExtensionName = resolveExtensionName(name);
+    if (!extensionNames.includes(internalExtensionName)) return null;
     const isEnabled = !isExtensionDisabled(internalExtensionName);
     return { name: internalExtensionName, enabled: isEnabled };
 }
@@ -2426,7 +2446,11 @@ export async function runGenerationInterceptors(chat, contextSize, type) {
         exitImmediately = immediately;
     };
 
-    for (const manifest of Object.values(manifests).filter(x => x.generate_interceptor).sort((a, b) => sortManifestsByOrder(a, b))) {
+    for (const [name, manifest] of Object.entries(manifests).filter(([, x]) => x.generate_interceptor).sort((a, b) => sortManifestsByOrder(a[1], b[1]))) {
+        if (isExtensionDisabled(name) || !activeExtensions.has(name)) {
+            continue;
+        }
+
         const interceptorKey = manifest.generate_interceptor;
         if (typeof globalThis[interceptorKey] === 'function') {
             try {
