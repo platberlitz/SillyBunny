@@ -307,9 +307,11 @@ import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-
 import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
 import {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
+    CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
     resolveChatBottomScrollAction,
     resolveChatRenderLifecycleRollout,
+    resolveChatScrollAction,
     restoreVisibleMessageAnchor,
     settleVisibleMessageAnchor,
     shouldApplyChatBottomScrollAction,
@@ -2108,8 +2110,23 @@ export async function printMessages() {
 
     // Wait for next frame to ensure batch rendering completes
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    scrollLoadedChatToBottom();
+    scrollLoadedChatToBottomThroughLifecycle();
     delay(debounce_timeout.short).then(() => scrollOnMediaLoad({ force: true }));
+}
+
+function scrollLoadedChatToBottomThroughLifecycle() {
+    if (!isChatRenderLifecycleRolloutEnabled()) {
+        scrollLoadedChatToBottom();
+        return;
+    }
+
+    const action = resolveChatScrollAction({
+        intent: CHAT_SCROLL_INTENT.INITIAL_LOAD,
+    });
+
+    if (shouldApplyChatBottomScrollAction(action)) {
+        scrollLoadedChatToBottom();
+    }
 }
 
 function scrollLoadedChatToBottom() {
