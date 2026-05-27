@@ -698,7 +698,7 @@ function sortAphroditeItemsByOrder(orderArray) {
     });
 }
 
-async function getStatusTextgen() {
+export async function getStatusTextgen() {
     const url = '/api/backends/text-completions/status';
 
     const endpoint = getTextGenServer();

@@ -1304,6 +1304,54 @@ describe('in-chat agent post-processing runner', () => {
         );
     });
 
+    test('keeps text-completion profile reasoning out of post-transform replacements', async () => {
+        usePromptTransformPostAgent();
+        enabledAgents[0].connectionProfile = 'profile-textgen-reasoning';
+        connectionManagerRequestService = {
+            getProfile: jest.fn(() => ({ name: 'Textgen Reasoner', model: 'r1-textgen' })),
+            sendRequest: jest.fn(async () => ({
+                choices: [{
+                    text: 'Visible rewrite',
+                    reasoning: 'hidden choice reasoning',
+                    thinking: 'hidden choice thinking',
+                    message: {
+                        content: [
+                            { type: 'reasoning', reasoning: 'hidden content reasoning' },
+                            { type: 'thinking', thinking: 'hidden content thinking' },
+                            { type: 'text', text: 'Visible rewrite' },
+                        ],
+                        reasoning: 'hidden message reasoning',
+                        reasoning_content: 'hidden message reasoning content',
+                    },
+                }],
+            })),
+        };
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Needs rewrite',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('Visible rewrite');
+        expect(chat[0].mes).not.toContain('hidden');
+        expect(chat[0].extra.inChatAgentPromptRuns[0]).toEqual(expect.objectContaining({
+            nextMessageText: 'Visible rewrite',
+            runner: 'profile',
+            profileId: 'profile-textgen-reasoning',
+        }));
+        expect(chat[0].extra.inChatAgentTransformHistory[0]).toEqual(expect.objectContaining({
+            afterText: 'Visible rewrite',
+        }));
+    });
+
     test('keeps prompt-transform storage separate for each swipe', async () => {
         usePromptTransformPostAgent();
         generateQuietPrompt
