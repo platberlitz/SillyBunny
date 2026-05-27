@@ -3342,7 +3342,9 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
         }
         return chat.length - 1;
     })();
-    const shouldPinMobileBottom = !insertAfter && !insertBefore && scroll && shouldPinMobileChatToBottom();
+    const isTailAppend = !insertAfter && !insertBefore;
+    const tailAppendIsNearBottom = isTailAppend && scroll ? isChatScrolledNearBottom() : true;
+    const shouldPinMobileBottom = isTailAppend && scroll && shouldPinMobileChatToBottom();
 
     let messageElement;
     let insertedElement = null;
@@ -3382,11 +3384,11 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
 
     if (showSwipes) refreshSwipeButtons();
     // Don't scroll if not inserting last
-    if (!insertAfter && !insertBefore && scroll) {
+    if (isTailAppend && scroll) {
         if (shouldPinMobileBottom) {
             pinMobileChatToBottom({ waitForFrame: true, settle: true });
         } else {
-            scrollChatToBottom({ waitForFrame: true });
+            scrollChatToBottom({ waitForFrame: true, isNearBottom: tailAppendIsNearBottom });
         }
     }
 

@@ -3,13 +3,54 @@
 export const APP_URL = process.env.SILLYBUNNY_TEST_BASE_URL || '/';
 
 export async function dismissOnboardingIfPresent(page) {
-    const onboardingInput = page.locator('dialog[open] textarea.popup-input').first();
+    const openDialog = page.locator('dialog[open]').first();
 
-    if (await onboardingInput.isVisible().catch(() => false)) {
-        await onboardingInput.fill('Scroll Tester');
-        await page.locator('dialog[open] .popup-button-ok').first().click();
-        await page.locator('dialog[open]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+    await openDialog.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+
+    if (!(await openDialog.isVisible().catch(() => false))) {
+        return;
     }
+
+    const dialogText = await openDialog.textContent().catch(() => '');
+    const onboardingInput = openDialog.locator('textarea.popup-input, input.popup-input, input[type="text"], textarea').first();
+    const hasOnboardingInput = await onboardingInput.isVisible().catch(() => false);
+    const isWelcomeDialog = /Welcome to SillyBunny/i.test(dialogText ?? '');
+
+    if (!isWelcomeDialog && !hasOnboardingInput) {
+        return;
+    }
+
+    if (hasOnboardingInput) {
+        await onboardingInput.fill('Scroll Tester');
+    }
+
+    const okControl = openDialog.locator('.popup-button-ok, [data-result="1"]').first();
+
+    if (await okControl.isVisible().catch(() => false)) {
+        await okControl.click();
+    } else {
+        await page.evaluate(() => {
+            document.querySelectorAll('dialog[open]').forEach(dialog => {
+                dialog.close();
+                dialog.remove();
+            });
+        });
+    }
+
+    await page.locator('dialog[open]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+}
+
+export async function dismissOpenDialogIfPresent(page) {
+    const openDialog = page.locator('dialog[open]').first();
+
+    await openDialog.waitFor({ state: 'visible', timeout: 1000 }).catch(() => {});
+    await page.evaluate(() => {
+        document.querySelectorAll('dialog[open]').forEach(dialog => {
+            dialog.close();
+            dialog.remove();
+        });
+    });
+    await page.waitForFunction(() => document.querySelectorAll('dialog[open]').length === 0, { timeout: 5000 }).catch(() => {});
 }
 
 export async function selectSampleCharacter(page) {
@@ -97,9 +138,11 @@ export async function openReadyChat(page, { chatSaveDelayMs = 0, selectCharacter
     await page.goto(APP_URL);
     await page.waitForFunction('document.getElementById("preloader") === null', { timeout: 0 });
     await dismissOnboardingIfPresent(page);
+    await dismissOpenDialogIfPresent(page);
     if (selectCharacter) {
         await selectSampleCharacter(page);
     }
+    await dismissOpenDialogIfPresent(page);
     await waitForChatRenderIdle(page);
 }
 

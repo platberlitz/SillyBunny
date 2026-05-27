@@ -2,6 +2,16 @@
 import { expect, test } from '@playwright/test';
 import { installSyntheticLongChat, openReadyChat } from './chat-scroll-regression-helpers.js';
 
+async function submitChatInput(page) {
+    const simpleSendButton = page.locator('#gg_simple_send_button');
+    if (await simpleSendButton.isVisible().catch(() => false)) {
+        await simpleSendButton.click();
+        return;
+    }
+
+    await page.locator('#send_textarea').press('Enter');
+}
+
 test.describe('chat send scroll', () => {
     test('scrolls to the latest user message immediately after send', async ({ page }) => {
         await openReadyChat(page, { chatSaveDelayMs: 1200 });
@@ -10,7 +20,7 @@ test.describe('chat send scroll', () => {
 
         const messageText = `scroll regression ${Date.now()}`;
         await page.locator('#send_textarea').fill(messageText);
-        await page.locator('#send_textarea').press('Enter');
+        await submitChatInput(page);
 
         const scrolledToSentMessage = await page.waitForFunction((expectedText) => {
             const chatElement = document.querySelector('#chat');
