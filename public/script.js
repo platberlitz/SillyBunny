@@ -34,7 +34,10 @@ import {
     parseTextgenLogprobs,
     parseTabbyLogprobs,
     initTextGenSettings,
+    getTextGenServer,
+    getStatusTextgen,
 } from './scripts/textgen-settings.js';
+import { shouldRestoreTextGenStatusOnStartup } from './scripts/textgen-startup-status.js';
 
 import {
     world_info,
@@ -9396,6 +9399,10 @@ export async function getSettings(initLoaderHandle = null) {
         $('#main_api').val(main_api);
         $(`#main_api option[value=${main_api}]`).attr('selected', 'true');
         changeMainAPI();
+        if (shouldRestoreTextGenStatusOnStartup({ mainApi: main_api, serverUrl: getTextGenServer() })) {
+            startStatusLoading();
+            getStatusTextgen();
+        }
 
         //Load User's Name and Avatar
         initUserAvatar(settings.user_avatar);
