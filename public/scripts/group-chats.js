@@ -3294,6 +3294,26 @@ async function onGroupActionClick(event) {
     await eventSource.emit(event_types.GROUP_UPDATED);
 }
 
+function isMobileGroupCandidateRowTap(event) {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (!target || target.closest('.right_menu_button, input, button, select, textarea, a')) {
+        return false;
+    }
+
+    return globalThis.SillyBunnyShell?.isMobileViewport?.() ?? Boolean(globalThis.matchMedia?.('(max-width: 768px)')?.matches);
+}
+
+async function onGroupCandidateRowClick(event) {
+    if (!isMobileGroupCandidateRowTap(event)) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    await modifyGroupMember(openGroupId, $(this), false);
+    await eventSource.emit(event_types.GROUP_UPDATED);
+}
+
 function updateFavButtonState(state) {
     fav_grp_checked = state;
     $('#rm_group_fav').val(String(fav_grp_checked));
@@ -3900,6 +3920,7 @@ jQuery(() => {
     $('#group_avatar_button').on('input', uploadGroupAvatar);
     $('#rm_group_restore_avatar').on('click', restoreGroupAvatar);
     $(document).on('click', '.group_member .right_menu_button', onGroupActionClick);
+    $(document).on('click', '#rm_group_add_members .group_member', onGroupCandidateRowClick);
     $(document).on('change', '.group_member_model_input', onGroupMemberModelInput);
     eventSource.on(event_types.CHAT_CHANGED, updateGroupSpeakerControls);
     eventSource.on(event_types.GROUP_UPDATED, updateGroupSpeakerControls);

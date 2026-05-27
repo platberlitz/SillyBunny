@@ -792,6 +792,10 @@ Nodes (8): a(), H(), i(), M(), nt(), o(), S(), st()
 Cohesion: 0.09
 Nodes (9): init(), loadSettings(), normalizeSummarySource(), onSummarySourceChange(), switchSourceControls(), RegexPresetManager, AllTalkTtsProvider, updateStatus() (+1 more)
 
+### Community 90 - "Community 90"
+Cohesion: 0.18
+Nodes (3): AllTalkTtsProvider, updateStatus(), loadSettings()
+
 ### Community 91 - "Community 91"
 Cohesion: 0.19
 Nodes (32): bindCharacterEditorFullscreenToggle(), ensureCharacterListToolbarLayout(), ensureCharacterPersonaPanel(), ensureCharacterWorldInfoPanel(), getMainScriptModule(), hasActiveCharacterChat(), hideCharacterMainPanels(), injectCharacterDrawerControls() (+24 more)
@@ -1020,6 +1024,10 @@ Nodes (93): generateWebLlmChatPrompt(), getWebLlmContextSize(), isWebLlmSupporte
 Cohesion: 0.18
 Nodes (3): findFormSubmitter(), findNearestDialog(), maybeHandleSubmit()
 
+### Community 158 - "Community 158"
+Cohesion: 0.19
+Nodes (16): addToInputHistory(), getInputHistory(), hideHistoryMenu(), inputHistoryBack(), inputHistoryForward(), placeButtonWrap(), setInputHistory(), Settings (+8 more)
+
 ### Community 159 - "Community 159"
 Cohesion: 0.19
 Nodes (19): bindBottomChatBarEvents(), bindBottomChatBarWindowEvents(), buildBottomChatBar(), getBottomChatBarState(), getChatScriptModule(), getMassDeleteOlderThanDays(), handleAutoNameChat(), handleMassDeleteChats() (+11 more)
@@ -1156,13 +1164,21 @@ Nodes (7): Changelog, SillyBunny Contribution Guide, Design System: SillyBunny, 
 Cohesion: 0.33
 Nodes (6): Fandom Scraper Setup Template, Attachments Storage Bank Manager, MediaWiki Web Page Scraper Options, Move Attachment Targeting Modal UI, Attachments Inline Notepad Editor Window, YouTube Video Transcript Downloader Configuration
 
+### Community 200 - "Community 200"
+Cohesion: 0.32
+Nodes (12): applyAppendedGenerationToTarget(), cloneChatMessage(), copyGeneratedMessageToTarget(), executeSTScriptCommand(), generateCorrection(), getTargetForceCharacterId(), guidedCorrection(), isolateTargetMessage() (+4 more)
+
+### Community 203 - "Community 203"
+Cohesion: 0.11
+Nodes (3): CanvasExtraState, PageViewport, Util
+
 ### Community 204 - "Community 204"
 Cohesion: 0.23
 Nodes (17): buildServerChatCompletionConfigCard(), buildServerChatCompletionConfigDrawer(), cloneServerChatCompletionConfig(), collectServerChatCompletionConfigForm(), createOpenAISettingsDrawer(), fillServerChatCompletionConfigForm(), getServerChatCompletionConfigRefs(), injectServerChatCompletionConfigCard() (+9 more)
 
 ### Community 206 - "Community 206"
-Cohesion: 0.7
-Nodes (4): highlightMatchingElements(), isParentHeader(), removeHighlighting(), searchSettings()
+Cohesion: 0.35
+Nodes (12): cloneServerChatCompletionConfig(), collectServerChatCompletionConfigForm(), fillServerChatCompletionConfigForm(), getServerChatCompletionConfigRefs(), loadServerChatCompletionConfig(), normalizeServerChatCompletionConfig(), requestServerChatCompletionConfig(), saveServerChatCompletionConfig() (+4 more)
 
 ### Community 207 - "Community 207"
 Cohesion: 0.5
@@ -1224,6 +1240,10 @@ Nodes (11): destroySpy, disconnectHandler, finished, infoSpy, mockExecFile, mock
 Cohesion: 0.09
 Nodes (11): lines, accessKey, appId, audioChunks_, audioData, { code, data, message }, { data, code, message }, finalAudioData (+3 more)
 
+### Community 316 - "Community 316"
+Cohesion: 0.1
+Nodes (11): lines, accessKey, appId, audioChunks_, audioData, { code, data, message }, { data, code, message }, finalAudioData (+3 more)
+
 ### Community 317 - "Community 317"
 Cohesion: 0.19
 Nodes (15): [command, profile], getCurrentState(), getDevelopmentInstallIssue(), getFirstMajor(), getRuntimeVersion(), hashFileState(), MARKER_PATH, markInstalled() (+7 more)
@@ -1247,6 +1267,10 @@ Nodes (8): 2026-04-04 to 2026-04-05: bootstrap and first mobile stabilization, 2
 ### Community 321 - "Community 321"
 Cohesion: 0.08
 Nodes (6): getTransformMatrix(), lookupMatrix(), lookupRect(), TextState, Util, WorkerTask
+
+### Community 321 - "Community 321"
+Cohesion: 0.27
+Nodes (8): DEFAULT_SCROLL_EDGE_SETTLE_DELAYS, getScrollEdgePosition(), jumpScrollElementToEdge(), toFiniteScrollSize(), cancelJump, frames, scrollElement, timers
 
 ### Community 322 - "Community 322"
 Cohesion: 0.11
@@ -1406,7 +1430,7 @@ Nodes (9): Changelog, Chat Naming And Workspace, Group Chats And Agents, Launchp
 
 ### Community 365 - "Community 365"
 Cohesion: 0.25
-Nodes (3): data(), Datasets, DatasetsNamespace
+Nodes (8): 2026-04-04 to 2026-04-05: bootstrap and first mobile stabilization, 2026-04-06 to 2026-04-17: feature expansion and agent foundations, 2026-04-21 to 2026-04-23: shell, theme, docs, screenshot, and Pathfinder polish, 2026-04-24 to 2026-04-26: cast/groups/Pathfinder and mobile agent hardening, 2026-04-29 to 2026-05-03: release polish, chat anchoring, iOS, cache, and reverts, 2026-05-04 to 2026-05-05: upstream 1.18 sync and performance work, 2026-05-06 to 2026-05-08: Codex worktree support and latest mobile/settings stabilization, Commit History Clusters
 
 ### Community 366 - "Community 366"
 Cohesion: 0.2
