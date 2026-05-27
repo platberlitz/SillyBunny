@@ -788,6 +788,10 @@ Nodes (10): assert(), convertBlackAndWhiteToRGBA(), assert(), convertBlackAndWhi
 Cohesion: 0.1
 Nodes (8): a(), H(), i(), M(), nt(), o(), S(), st()
 
+### Community 90 - "Community 90"
+Cohesion: 0.09
+Nodes (9): init(), loadSettings(), normalizeSummarySource(), onSummarySourceChange(), switchSourceControls(), RegexPresetManager, AllTalkTtsProvider, updateStatus() (+1 more)
+
 ### Community 91 - "Community 91"
 Cohesion: 0.19
 Nodes (32): bindCharacterEditorFullscreenToggle(), ensureCharacterListToolbarLayout(), ensureCharacterPersonaPanel(), ensureCharacterWorldInfoPanel(), getMainScriptModule(), hasActiveCharacterChat(), hideCharacterMainPanels(), injectCharacterDrawerControls() (+24 more)
@@ -813,8 +817,8 @@ Cohesion: 0.05
 Nodes (56): getCurrentSwipeId(), getFirstDisplayedMessageId(), getLastCharMessage(), getLastMessage(), getLastMessageId(), getLastSwipeId(), getLastUserMessage(), registerChatMacros() (+48 more)
 
 ### Community 98 - "Community 98"
-Cohesion: 0.24
-Nodes (27): buildServerAdminPanel(), describeAutoStashState(), getServerAdminRefs(), getServerAdminState(), getThumbnailSettingsFromRefs(), handleServerAdminBranchSwitch(), handleServerAdminReloadConfig(), handleServerAdminRestart() (+19 more)
+Cohesion: 0.21
+Nodes (29): appendServerAdminStat(), buildServerAdminPanel(), createThumbnailSizeRow(), describeAutoStashState(), getServerAdminRefs(), getServerAdminState(), getThumbnailSettingsFromRefs(), handleServerAdminBranchSwitch() (+21 more)
 
 ### Community 99 - "Community 99"
 Cohesion: 0.05
@@ -847,6 +851,10 @@ Nodes (3): AutoComplete, AutoCompleteNameResultBase, AutoCompleteSecondaryNameRe
 ### Community 107 - "Community 107"
 Cohesion: 0.1
 Nodes (6): FandomScraper, FileScraper, MediaWikiScraper, Notepad, WebScraper, YouTubeScraper
+
+### Community 106 - "Community 106"
+Cohesion: 0.14
+Nodes (3): AutoComplete, AutoCompleteNameResultBase, AutoCompleteSecondaryNameResult
 
 ### Community 106 - "Community 106"
 Cohesion: 0.14
@@ -945,8 +953,8 @@ Cohesion: 0.11
 Nodes (38): calculateGenTime(), calculateStats(), calculateTotalGenTimeAndWordCount(), collectAndCreateStats(), countWordsInString(), init(), onExit(), parseTimestamp() (+30 more)
 
 ### Community 135 - "Community 135"
-Cohesion: 0.2
-Nodes (17): hasPromptPayload(), escapeHtml(), extractOocBlocksForDisplay(), hasTextOrArrayPayload(), normalizeContextRetentionDepth(), renderOocBlock(), replaceBalancedOocBlocks(), restoreOocBlocksForDisplay() (+9 more)
+Cohesion: 0.22
+Nodes (14): escapeHtml(), extractOocBlocksForDisplay(), hasTextOrArrayPayload(), normalizeContextRetentionDepth(), renderOocBlock(), replaceBalancedOocBlocks(), shouldRetainContextAtDepth(), stripHtmlTagsFromContext() (+6 more)
 
 ### Community 137 - "Community 137"
 Cohesion: 0.09
@@ -1236,6 +1244,10 @@ Nodes (13): AnnotationFactory, BasePdfManager, ChunkedStreamManager, clearGlobal
 Cohesion: 0.25
 Nodes (8): 2026-04-04 to 2026-04-05: bootstrap and first mobile stabilization, 2026-04-06 to 2026-04-17: feature expansion and agent foundations, 2026-04-21 to 2026-04-23: shell, theme, docs, screenshot, and Pathfinder polish, 2026-04-24 to 2026-04-26: cast/groups/Pathfinder and mobile agent hardening, 2026-04-29 to 2026-05-03: release polish, chat anchoring, iOS, cache, and reverts, 2026-05-04 to 2026-05-05: upstream 1.18 sync and performance work, 2026-05-06 to 2026-05-08: Codex worktree support and latest mobile/settings stabilization, Commit History Clusters
 
+### Community 321 - "Community 321"
+Cohesion: 0.08
+Nodes (6): getTransformMatrix(), lookupMatrix(), lookupRect(), TextState, Util, WorkerTask
+
 ### Community 322 - "Community 322"
 Cohesion: 0.11
 Nodes (12): class YourTtsProvider, generateTts(text, voiceId), getVoice(voiceName), loadSettings(settingsObject), Optional, processText(text), Provider Requirements., Required (+4 more)
@@ -1324,6 +1336,10 @@ Nodes (5): Bun-first runtime, Bundled Goodies & Tutorials, Changes vs. SillyTave
 Cohesion: 0.4
 Nodes (5): Latest Update, v1.5.1 (2026-04-29), v1.5.2 (2026-04-30), v1.5.3 (2026-05-03), v1.6.0 (2026-05-18)
 
+### Community 339 - "Community 339"
+Cohesion: 0.12
+Nodes (3): CosyVoiceProvider, GoogleNativeTtsProvider, generateTts()
+
 ### Community 343 - "Community 343"
 Cohesion: 0.08
 Nodes (24): Best Code Practices, code:block1 (**SillyBunny version XXX has released**), Correct target branch, Getting the code ready, License, PR Structure, Project Etiquette, Project Goals (taken from README) (+16 more)
@@ -1343,6 +1359,14 @@ Nodes (10): initPlugin(), isCommonJS(), isESModule(), isValidPluginID(), loadedP
 ### Community 352 - "Community 352"
 Cohesion: 0.1
 Nodes (5): getGenerateUrl(), EdgeTtsProvider, GSVITtsProvider, updateVoiceMap(), SystemTtsProvider
+
+### Community 350 - "Community 350"
+Cohesion: 0.2
+Nodes (6): getPathToTokenizer(), gunzip, SentencePieceTokenizer, shouldPatchWebTokenizerRuntimeLocation(), WebTokenizer, withWebTokenizerRuntimeLocation()
+
+### Community 352 - "Community 352"
+Cohesion: 0.2
+Nodes (10): Chat And Reasoning, Chat Management, In-Chat Agents, Loading, Local Commits, Pathfinder, Server Admin, UI Polish (+2 more)
 
 ### Community 353 - "Community 353"
 Cohesion: 0.18
@@ -1393,8 +1417,8 @@ Cohesion: 0.2
 Nodes (10): A. Add a future shell smoke checklist, B. Add a future cache lifecycle checklist, C. Add a future in-chat agent lifecycle matrix, Card Script Sandbox Invariants, D. Add future history-aware review prompts, E. Keep AGENTS.md as a map, not a manual, Operating Principles Going Forward, Scope (+2 more)
 
 ### Community 368 - "Community 368"
-Cohesion: 0.47
-Nodes (5): expectedErrors, expectedTokens, runLexerGetTokens(), runLexerGetTokensAndErrors(), simplifyTokens()
+Cohesion: 0.25
+Nodes (8): 2026-04-04 to 2026-04-05: bootstrap and first mobile stabilization, 2026-04-06 to 2026-04-17: feature expansion and agent foundations, 2026-04-21 to 2026-04-23: shell, theme, docs, screenshot, and Pathfinder polish, 2026-04-24 to 2026-04-26: cast/groups/Pathfinder and mobile agent hardening, 2026-04-29 to 2026-05-03: release polish, chat anchoring, iOS, cache, and reverts, 2026-05-04 to 2026-05-05: upstream 1.18 sync and performance work, 2026-05-06 to 2026-05-08: Codex worktree support and latest mobile/settings stabilization, Commit History Clusters
 
 ### Community 369 - "Community 369"
 Cohesion: 0.22
