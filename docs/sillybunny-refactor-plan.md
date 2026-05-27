@@ -104,7 +104,7 @@ Core invariants:
 - [x] 3.1 Create `public/scripts/chat-render-lifecycle/`.
 - [ ] 3.2 Add empty or pass-through adapter exports with no behavior change.
 - [x] 3.3 Add `scheduler.js` with tests; route anchor settle through it as the first low-risk adapter.
-- [ ] 3.4 Add `scroll-intent.js` as pure logic with table-driven tests.
+- [x] 3.4 Add `scroll-intent.js` as pure logic with table-driven tests.
 - [x] 3.5 Add `anchor.js` with DOM fixture tests.
 - [ ] 3.6 Add lifecycle kill-switch only as temporary rollout protection, not a permanent compatibility layer.
 - [ ] 3.7 Keep each commit green and small.
