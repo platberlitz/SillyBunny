@@ -1201,6 +1201,38 @@ Nodes (46): 1. Overview, 2. Colors, 3. Typography, 4. Elevation, 5. Components, 
 Cohesion: 0.12
 Nodes (22): A(), bt(), C(), Ct(), D(), Dt(), f(), gt() (+14 more)
 
+### Community 174 - "Community 174"
+Cohesion: 0.25
+Nodes (8): At a glance, Contributors, Desktop, Mobile, Project Goals (AKA, why we made this fork), 🐰 SillyBunny 🐰, Table of Contents, Upstream Information
+
+### Community 176 - "Community 176"
+Cohesion: 0.13
+Nodes (3): sanitizeId(), VoiceMapEntry, OpenAITtsProvider
+
+### Community 177 - "Community 177"
+Cohesion: 0.33
+Nodes (14): buildConsoleLogsPanel(), formatConsoleLogDateTime(), formatConsoleLogEntry(), formatConsoleLogTime(), getConsoleLogsRefs(), getConsoleLogsState(), isConsoleLogsTabActive(), isScrolledNearBottom() (+6 more)
+
+### Community 178 - "Community 178"
+Cohesion: 0.25
+Nodes (4): drawImageAtIntegerCoords(), getImageSmoothingEnabled(), putBinaryImageData(), putBinaryImageMask()
+
+### Community 179 - "Community 179"
+Cohesion: 0.04
+Nodes (52): <a id="lalib-help-cmd-message_edit"></a>`/message-edit`, <a id="lalib-help-cmd-message_get"></a>`/message-get`, <a id="lalib-help-cmd-message_move"></a>`/message-move`, <a id="lalib-help-cmd-swipes_add"></a>`/swipes-add`, <a id="lalib-help-cmd-swipes_count"></a>`/swipes-count`, <a id="lalib-help-cmd-swipes_del"></a>`/swipes-del`, <a id="lalib-help-cmd-swipes_get"></a>`/swipes-get`, <a id="lalib-help-cmd-swipes_get"></a>`/swipes-get` (+44 more)
+
+### Community 180 - "Community 180"
+Cohesion: 0.04
+Nodes (46): 1. Overview, 2. Colors, 3. Typography, 4. Elevation, 5. Components, 6. Do's and Don'ts, Buttons, Cards / Containers (+38 more)
+
+### Community 181 - "Community 181"
+Cohesion: 0.16
+Nodes (10): CATEGORY_CONFIG, createAliasIndicator(), createSourceIndicator(), createTypeBadge(), formatMacroSignature(), getCategoryConfig(), MacroBrowser, renderMacroDetails() (+2 more)
+
+### Community 182 - "Community 182"
+Cohesion: 0.12
+Nodes (22): A(), bt(), C(), Ct(), D(), Dt(), f(), gt() (+14 more)
+
 ### Community 183 - "Community 183"
 Cohesion: 0.12
 Nodes (15): CookieSessionObject, Process, Request, ServerEventMap, ServerStartedEvent, CookieSessionObject, Process, Request (+7 more)
@@ -1220,6 +1252,10 @@ Nodes (19): clearDefaultPresetDeletion(), findDefaultPreset(), getDefaultPresetD
 ### Community 188 - "Community 188"
 Cohesion: 0.4
 Nodes (3): DEFAULT_RATE_LIMITS, pruneTimestamps(), RateLimiter
+
+### Community 190 - "Community 190"
+Cohesion: 0.2
+Nodes (17): hasPromptPayload(), escapeHtml(), extractOocBlocksForDisplay(), hasTextOrArrayPayload(), normalizeContextRetentionDepth(), renderOocBlock(), replaceBalancedOocBlocks(), restoreOocBlocksForDisplay() (+9 more)
 
 ### Community 191 - "Community 191"
 Cohesion: 0.29
@@ -1537,9 +1573,21 @@ Nodes (4): InternalRenderTask, PDFDataRangeTransport, PDFDataTransportStreamRang
 Cohesion: 0.6
 Nodes (3): checkPostInterceptChatBudget(), chat, countTokens
 
-### Community 353 - "Community 353"
-Cohesion: 0.18
-Nodes (8): warnings, aliasDef, def, overwriteWarning, registrationError, secondAliasDef, targetDef, warnings
+### Community 352 - "Community 352"
+Cohesion: 0.2
+Nodes (8): 2934(), 315(), 3770(), 609(), 6794(), 8661(), io(), o()
+
+### Community 355 - "Community 355"
+Cohesion: 0.06
+Nodes (39): pollinations, electronhub, splitRecursive(), EDGE_TTS_PROVIDER, addAudioJob(), audioElement, audioJobQueue, completeCurrentAudioJob() (+31 more)
+
+### Community 356 - "Community 356"
+Cohesion: 0.33
+Nodes (6): <a id="lalib-help-cmd-message_list"></a>`/message-list`, code:stscript, code:stscript, code:stscript, code:stscript, **Examples**
+
+### Community 357 - "Community 357"
+Cohesion: 0.05
+Nodes (27): EnhancedMacroAutoCompleteOption, isShortOperatorPrefix(), isValidVariableShorthandName(), MacroClosingTagAutoCompleteOption, MacroFlagAutoCompleteOption, parseMacroContext(), SimpleAutoCompleteOption, ValidVariableShorthandSymbols (+19 more)
 
 ### Community 354 - "Community 354"
 Cohesion: 0.11
@@ -1686,4 +1734,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **What connects `ServerStartedEvent`, `ServerEventMap`, `Process` to the rest of the system?**
   _1956 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.0 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.01 - nodes in this community are weakly interconnected._
