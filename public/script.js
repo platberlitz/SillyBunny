@@ -327,6 +327,11 @@ import {
     shouldApplyChatBottomScrollAction,
 } from './scripts/chat-render-lifecycle/index.js';
 import {
+    resolveGenerationUiLockState,
+    resolveGenerationUnblockState,
+    resolveStopGenerationState,
+} from './scripts/generation-lifecycle/index.js';
+import {
     CARD_SCRIPT_MARKER_TAG,
     buildCardScriptToastKey,
     forgetAllCardScripts,
@@ -7256,23 +7261,34 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
  */
 export function stopGeneration() {
     const activeStreamingProcessor = streamingProcessor;
-    const activeGenerationType = activeStreamingProcessor?.type;
-    const shouldAbortRequest = Boolean(is_send_press || is_group_generating || activeStreamingProcessor);
-    let stopped = false;
-    if (activeStreamingProcessor) {
+    const stopState = resolveStopGenerationState({
+        isSendPressed: is_send_press,
+        isGroupGenerating: is_group_generating,
+        hasStreamingProcessor: Boolean(activeStreamingProcessor),
+        streamingType: activeStreamingProcessor?.type,
+    });
+
+    if (stopState.shouldStopStreaming) {
         activeStreamingProcessor.onStopStreaming();
-        stopped = true;
     }
-    if (shouldAbortRequest && abortController) {
-        abortController.abort('Clicked stop button');
-        stopped = true;
+
+    if (stopState.shouldAbortRequest && abortController) {
+        abortController.abort(stopState.abortReason);
     }
-    if (stopped) {
+
+    if (stopState.shouldEmitStopped) {
         eventSource.emitAndWait(event_types.GENERATION_STOPPED);
-        clearStreamingProcessorIfCurrent(activeStreamingProcessor);
-        unblockGeneration(activeGenerationType, { emitGenerationEnded: false });
     }
-    return stopped;
+
+    if (stopState.shouldClearStreamingProcessor) {
+        clearStreamingProcessorIfCurrent(activeStreamingProcessor);
+    }
+
+    if (stopState.shouldStop) {
+        unblockGeneration(stopState.unblockType, { emitGenerationEnded: false });
+    }
+
+    return stopState.shouldStop;
 }
 
 /**
@@ -7347,16 +7363,27 @@ function flushWIInjections() {
  * @param {string} [type] Generation type (optional)
  */
 function unblockGeneration(type, { emitGenerationEnded = true } = {}) {
-    // Don't unblock if a parallel stream is still running
-    if (type === 'quiet' && streamingProcessor && !streamingProcessor.isFinished) {
+    const unblockState = resolveGenerationUnblockState({
+        type,
+        hasStreamingProcessor: Boolean(streamingProcessor),
+        isStreamingFinished: Boolean(streamingProcessor?.isFinished),
+    });
+
+    if (!unblockState.shouldUnblock) {
         return;
     }
 
     is_send_press = false;
-    activateSendButtons({ emitGenerationEnded });
-    setGenerationProgress(0);
-    flushEphemeralStoppingStrings();
-    flushWIInjections();
+    if (unblockState.shouldActivateSendButtons) {
+        activateSendButtons({ emitGenerationEnded });
+    }
+    if (unblockState.shouldResetProgress) {
+        setGenerationProgress(0);
+    }
+    if (unblockState.shouldFlushEphemeralState) {
+        flushEphemeralStoppingStrings();
+        flushWIInjections();
+    }
 }
 
 export function getNextMessageId(type) {
@@ -8842,19 +8869,37 @@ export function getGeneratingModel(mes) {
  * A function mainly used to switch 'generating' state - setting it to false and activating the buttons again
  */
 export function activateSendButtons({ emitGenerationEnded = true } = {}) {
+    const lockState = resolveGenerationUiLockState({ isGenerating: false });
     is_send_press = false;
-    hideStopButton({ emitGenerationEnded });
-    showSwipeButtons();
-    delete document.body.dataset.generating;
+    if (!lockState.shouldShowStopButton) {
+        hideStopButton({ emitGenerationEnded });
+    }
+    if (!lockState.shouldHideSwipeButtons) {
+        showSwipeButtons();
+    }
+    if (lockState.bodyGeneratingValue === null) {
+        delete document.body.dataset.generating;
+    } else {
+        document.body.dataset.generating = lockState.bodyGeneratingValue;
+    }
 }
 
 /**
  * A function mainly used to switch 'generating' state - setting it to true and deactivating the buttons
  */
 export function deactivateSendButtons() {
-    showStopButton();
-    hideSwipeButtons();
-    document.body.dataset.generating = 'true';
+    const lockState = resolveGenerationUiLockState({ isGenerating: true });
+    if (lockState.shouldShowStopButton) {
+        showStopButton();
+    }
+    if (lockState.shouldHideSwipeButtons) {
+        hideSwipeButtons();
+    }
+    if (lockState.bodyGeneratingValue === null) {
+        delete document.body.dataset.generating;
+    } else {
+        document.body.dataset.generating = lockState.bodyGeneratingValue;
+    }
 }
 
 export function resetChatState() {
