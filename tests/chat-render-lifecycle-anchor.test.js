@@ -62,6 +62,54 @@ describe('chat render lifecycle anchor helpers', () => {
         expect(scrollElement.scrollTop).toBe(72);
     });
 
+    test('preserves viewport-relative anchors during top, middle, and tail replacements', () => {
+        const cases = [
+            {
+                messages: [
+                    new FakeMessageElement(10, { top: 12, bottom: 68 }),
+                    new FakeMessageElement(11, { top: 76, bottom: 132 }),
+                    new FakeMessageElement(12, { top: 140, bottom: 196 }),
+                ],
+                mutate(messages) {
+                    messages[0].rect = { top: 42, bottom: 118 };
+                },
+                expectedScrollTop: 30,
+            },
+            {
+                messages: [
+                    new FakeMessageElement(20, { top: -92, bottom: -24 }),
+                    new FakeMessageElement(21, { top: 18, bottom: 82 }),
+                    new FakeMessageElement(22, { top: 90, bottom: 160 }),
+                ],
+                mutate(messages) {
+                    messages[1].rect = { top: -14, bottom: 106 };
+                },
+                expectedScrollTop: -32,
+            },
+            {
+                messages: [
+                    new FakeMessageElement(30, { top: -150, bottom: -80 }),
+                    new FakeMessageElement(31, { top: -72, bottom: -8 }),
+                    new FakeMessageElement(32, { top: 28, bottom: 94 }),
+                ],
+                mutate(messages) {
+                    messages[2].rect = { top: 64, bottom: 156 };
+                },
+                expectedScrollTop: 36,
+            },
+        ];
+
+        for (const { messages, mutate, expectedScrollTop } of cases) {
+            const scrollElement = new FakeScrollElement(messages);
+            const anchor = captureVisibleMessageAnchor(scrollElement);
+
+            mutate(messages);
+            restoreVisibleMessageAnchor(scrollElement, anchor);
+
+            expect(scrollElement.scrollTop).toBe(expectedScrollTop);
+        }
+    });
+
     test('settles the anchor across multiple animation frames', async () => {
         const anchorMessage = new FakeMessageElement(5, { top: 10, bottom: 60 });
         const scrollElement = new FakeScrollElement([anchorMessage]);
