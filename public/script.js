@@ -2142,6 +2142,38 @@ function hasScrollableWheelTarget(target, boundaryElement) {
     return false;
 }
 
+const CHAT_SHELL_WHEEL_SURFACE_SELECTOR = '#sheld, #chat_wrapper, #form_sheld, #top-bar, #send_form';
+
+function getChatShellWheelBoundary(target) {
+    if (!(target instanceof Element)) {
+        return null;
+    }
+
+    return target.closest(CHAT_SHELL_WHEEL_SURFACE_SELECTOR);
+}
+
+function isInteractiveShellWheelTarget(target) {
+    if (!(target instanceof Element)) {
+        return false;
+    }
+
+    return Boolean(target.closest([
+        '#left-nav-panel',
+        '#right-nav-panel',
+        '.popup',
+        'dialog',
+        '.scrollableInner',
+        '.inline-drawer-content',
+        '.select2-container',
+        'input',
+        'textarea',
+        'select',
+        'button',
+        'a',
+        '[contenteditable="true"]',
+    ].join(',')));
+}
+
 function getWheelDeltaYPixels(event, scrollElement) {
     if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
         return event.deltaY * scrollElement.clientHeight;
@@ -2169,7 +2201,16 @@ function routeShellWheelToChat(event) {
         return;
     }
 
-    if (hasScrollableWheelTarget(event.target, event.currentTarget)) {
+    const shellBoundary = getChatShellWheelBoundary(event.target);
+    if (!shellBoundary) {
+        return;
+    }
+
+    if (isInteractiveShellWheelTarget(event.target)) {
+        return;
+    }
+
+    if (hasScrollableWheelTarget(event.target, shellBoundary)) {
         return;
     }
 
@@ -15015,7 +15056,6 @@ jQuery(async function () {
     }
 
     const chatElementScroll = document.getElementById('chat');
-    const chatShellElement = document.getElementById('sheld');
     const markMobileChatTouchScrollStart = () => {
         clearChatLoadBottomLock();
         markMobileChatManualScroll({ touchActive: true });
@@ -15035,7 +15075,7 @@ jQuery(async function () {
     chatElementScroll.addEventListener('touchend', releaseMobileChatTouchScroll, { passive: true });
     chatElementScroll.addEventListener('touchcancel', releaseMobileChatTouchScroll, { passive: true });
     chatElementScroll.addEventListener('wheel', markMobileChatWheelScroll, { passive: true });
-    chatShellElement?.addEventListener('wheel', routeShellWheelToChat, { passive: false });
+    document.addEventListener('wheel', routeShellWheelToChat, { passive: false, capture: true });
     setupMobileChatViewportObserver(markMobileViewportScroll);
 
     const chatScrollHandler = function () {

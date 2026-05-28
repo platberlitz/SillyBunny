@@ -1,4 +1,4 @@
-/* global window */
+/* global document, WheelEvent, window */
 import { expect, test } from '@playwright/test';
 import {
     getChatScrollSnapshot,
@@ -102,6 +102,36 @@ test.describe('issue 167 chat scroll regressions', () => {
         expect(after.firstVisibleMesId).toBe(before.firstVisibleMesId);
         expect(Math.abs(after.firstVisibleOffsetTop - before.firstVisibleOffsetTop)).toBeLessThanOrEqual(8);
         expect(after.scrollTop).toBeGreaterThan(before.scrollTop + 300);
+    });
+
+    test('desktop wheel over chat shell scrolls the chat viewport', async ({ page }) => {
+        await installSyntheticLongChat(page, { messageCount: 96, visibleCount: 96 });
+        await expect.poll(async () => {
+            await page.evaluate(() => {
+                const chat = document.querySelector('#chat');
+                const maxScrollTop = Math.max(0, chat.scrollHeight - chat.clientHeight);
+
+                chat.scrollTop = Math.min(640, Math.max(0, maxScrollTop - 720));
+                chat.dispatchEvent(new Event('scroll', { bubbles: true }));
+            });
+            await waitForAnimationFrames(page, 2);
+
+            return (await getChatScrollSnapshot(page)).bottomDelta;
+        }, { timeout: 5000 }).toBeGreaterThan(360);
+
+        const before = await getChatScrollSnapshot(page);
+        await page.evaluate(() => {
+            const shellTarget = document.querySelector('#form_sheld');
+            shellTarget.dispatchEvent(new WheelEvent('wheel', {
+                bubbles: true,
+                cancelable: true,
+                deltaY: 360,
+            }));
+        });
+        await waitForAnimationFrames(page, 2);
+        const after = await getChatScrollSnapshot(page);
+
+        expect(after.scrollTop).toBeGreaterThan(before.scrollTop + 100);
     });
 });
 
