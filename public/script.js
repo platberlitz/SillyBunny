@@ -315,6 +315,7 @@ import {
     captureVisibleMessageAnchor,
     createDelegatedResizeObserver,
     createMessageUpdateQueue,
+    createMobileViewportObserver,
     createStreamWriteBuffer,
     renderMessagesInBatches,
     resolveChatBottomScrollAction,
@@ -604,6 +605,7 @@ let messageUpdateQueue = null;
 let mobileMessageUpdateQueue = null;
 let streamingVisibleWriteBuffer = null;
 let chatMessageResizeObserver = null;
+let mobileChatViewportObserver = null;
 const chatMessageResizeStates = new Map();
 
 let dialogueResolve = null;
@@ -1935,6 +1937,52 @@ function pinMobileChatToBottom({ waitForFrame = true, settle = false } = {}) {
     }
 }
 
+function resetMobileViewportScrollState() {
+    mobileChatTouchScrolling = false;
+    mobileChatManualScrollSuppressedUntil = 0;
+    mobileChatBottomPinUntil = 0;
+}
+
+function getMobileViewportScrollHandler() {
+    return () => {
+        if (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil) {
+            markMobileChatManualScroll({ suppressMs: MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS });
+        }
+    };
+}
+
+function disposeMobileChatViewportObserver() {
+    mobileChatViewportObserver?.dispose();
+    mobileChatViewportObserver = null;
+}
+
+function resetMobileChatViewportLifecycle() {
+    if (!isChatRenderLifecycleRolloutEnabled()) {
+        return;
+    }
+
+    resetMobileViewportScrollState();
+
+    if (mobileChatViewportObserver) {
+        setupMobileChatViewportObserver(getMobileViewportScrollHandler());
+    }
+}
+
+function setupMobileChatViewportObserver(onViewportChange) {
+    if (!isChatRenderLifecycleRolloutEnabled()) {
+        window.visualViewport?.addEventListener('scroll', onViewportChange, { passive: true });
+        window.visualViewport?.addEventListener('resize', onViewportChange, { passive: true });
+        return;
+    }
+
+    disposeMobileChatViewportObserver();
+    mobileChatViewportObserver = createMobileViewportObserver({
+        onViewportChange,
+        onViewportSettle: onViewportChange,
+    });
+    mobileChatViewportObserver.start();
+}
+
 function shouldDeferMobileMessageUpdates() {
     return Boolean(shouldBatchMobileChatRendering() && !is_send_press);
 }
@@ -2674,6 +2722,7 @@ export async function clearChat({ clearData = false } = {}) {
     cancelDebouncedMetadataSave();
     closeMessageEditor();
     disposeChatMessageResizeObserver();
+    resetMobileChatViewportLifecycle();
     extension_prompts = {};
     if (is_delete_mode) {
         $('#dialogue_del_mes_cancel').trigger('click');
@@ -14636,19 +14685,14 @@ jQuery(async function () {
     const markMobileChatTouchScrollStart = () => markMobileChatManualScroll({ touchActive: true });
     const markMobileChatTouchScrollMove = () => markMobileChatManualScroll();
     const markMobileChatWheelScroll = () => markMobileChatManualScroll();
-    const markMobileViewportScroll = () => {
-        if (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil) {
-            markMobileChatManualScroll({ suppressMs: MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS });
-        }
-    };
+    const markMobileViewportScroll = getMobileViewportScrollHandler();
 
     chatElementScroll.addEventListener('touchstart', markMobileChatTouchScrollStart, { passive: true });
     chatElementScroll.addEventListener('touchmove', markMobileChatTouchScrollMove, { passive: true });
     chatElementScroll.addEventListener('touchend', releaseMobileChatTouchScroll, { passive: true });
     chatElementScroll.addEventListener('touchcancel', releaseMobileChatTouchScroll, { passive: true });
     chatElementScroll.addEventListener('wheel', markMobileChatWheelScroll, { passive: true });
-    window.visualViewport?.addEventListener('scroll', markMobileViewportScroll, { passive: true });
-    window.visualViewport?.addEventListener('resize', markMobileViewportScroll, { passive: true });
+    setupMobileChatViewportObserver(markMobileViewportScroll);
 
     const chatScrollHandler = function () {
         refreshObservedChatMessageResizeViewportStates();
@@ -15923,6 +15967,7 @@ jQuery(async function () {
 
     $(window).on('beforeunload', () => {
         disposeChatMessageResizeObserver();
+        disposeMobileChatViewportObserver();
         cancelTtsPlay();
         if (streamingProcessor) {
             console.log('Page reloaded. Aborting streaming...');

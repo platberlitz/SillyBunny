@@ -522,4 +522,59 @@ describe('chat render lifecycle script wiring', () => {
         const onChatMessageResize = findFunctionDeclaration('onChatMessageResize');
         expect(getSource(onChatMessageResize)).toContain('unobserveChatMessageResizeBlock(element);');
     });
+
+    test('guard-on mobile viewport events route through the lifecycle observer helper', () => {
+        expect(scriptSource).toContain('createMobileViewportObserver,');
+        expect(scriptSource).toContain('let mobileChatViewportObserver = null;');
+
+        const setupMobileChatViewportObserver = findFunctionDeclaration('setupMobileChatViewportObserver');
+        const setupSource = getSource(setupMobileChatViewportObserver);
+
+        expect(setupSource).toContain('if (!isChatRenderLifecycleRolloutEnabled())');
+        expect(setupSource).toContain('window.visualViewport?.addEventListener(\'scroll\', onViewportChange, { passive: true });');
+        expect(setupSource).toContain('window.visualViewport?.addEventListener(\'resize\', onViewportChange, { passive: true });');
+        expect(setupSource).toContain('disposeMobileChatViewportObserver();');
+        expect(setupSource).toContain('mobileChatViewportObserver = createMobileViewportObserver({');
+        expect(setupSource).toContain('onViewportChange,');
+        expect(setupSource).toContain('onViewportSettle: onViewportChange');
+        expect(setupSource).toContain('mobileChatViewportObserver.start();');
+
+        const initSource = scriptSource.slice(scriptSource.indexOf('const chatElementScroll = document.getElementById(\'chat\');'));
+        expect(initSource).toContain('const markMobileViewportScroll = getMobileViewportScrollHandler();');
+        expect(initSource).toContain('setupMobileChatViewportObserver(markMobileViewportScroll);');
+    });
+
+    test('mobile viewport lifecycle route preserves existing scroll suppression policy', () => {
+        const getMobileViewportScrollHandler = findFunctionDeclaration('getMobileViewportScrollHandler');
+        const handlerSource = getSource(getMobileViewportScrollHandler);
+
+        expect(handlerSource).toContain('if (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil)');
+        expect(handlerSource).toContain('markMobileChatManualScroll({ suppressMs: MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS });');
+
+        const resetMobileViewportScrollState = findFunctionDeclaration('resetMobileViewportScrollState');
+        const resetSource = getSource(resetMobileViewportScrollState);
+
+        expect(resetSource).toContain('mobileChatTouchScrolling = false;');
+        expect(resetSource).toContain('mobileChatManualScrollSuppressedUntil = 0;');
+        expect(resetSource).toContain('mobileChatBottomPinUntil = 0;');
+    });
+
+    test('mobile viewport lifecycle observer resets on chat clear and disposes on unload', () => {
+        const disposeMobileChatViewportObserver = findFunctionDeclaration('disposeMobileChatViewportObserver');
+        const disposeSource = getSource(disposeMobileChatViewportObserver);
+
+        expect(disposeSource).toContain('mobileChatViewportObserver?.dispose();');
+        expect(disposeSource).toContain('mobileChatViewportObserver = null;');
+
+        const resetMobileChatViewportLifecycle = findFunctionDeclaration('resetMobileChatViewportLifecycle');
+        const resetSource = getSource(resetMobileChatViewportLifecycle);
+
+        expect(resetSource).toContain('if (!isChatRenderLifecycleRolloutEnabled())');
+        expect(resetSource).toContain('resetMobileViewportScrollState();');
+        expect(resetSource).toContain('setupMobileChatViewportObserver(getMobileViewportScrollHandler());');
+
+        expect(getSource(findExportedFunction('clearChat'))).toContain('resetMobileChatViewportLifecycle();');
+        expect(scriptSource).toContain('$(window).on(\'beforeunload\', () => {');
+        expect(scriptSource).toContain('disposeMobileChatViewportObserver();');
+    });
 });
