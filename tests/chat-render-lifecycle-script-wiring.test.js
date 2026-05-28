@@ -50,6 +50,11 @@ function findExportedFunction(name) {
         ?.declaration;
 }
 
+function findFunctionDeclaration(name) {
+    return scriptAst.body
+        .find(node => node.type === 'FunctionDeclaration' && node.id?.name === name);
+}
+
 function findTopLevelVariable(functionNode, name) {
     for (const statement of functionNode.body.body) {
         if (statement.type !== 'VariableDeclaration') {
@@ -70,6 +75,24 @@ function getSource(node) {
 }
 
 describe('chat render lifecycle script wiring', () => {
+    test('printMessages routes initial-load bottom landing through the lifecycle gate', () => {
+        const printMessages = findExportedFunction('printMessages');
+        const source = getSource(printMessages);
+
+        expect(source).toContain('scrollLoadedChatToBottomThroughLifecycle();');
+        expect(source).toContain('delay(debounce_timeout.short).then(() => scrollOnMediaLoad({ force: true }));');
+
+        const lifecycleGate = findFunctionDeclaration('scrollLoadedChatToBottomThroughLifecycle');
+        expect(lifecycleGate).toBeTruthy();
+
+        const lifecycleGateSource = getSource(lifecycleGate);
+        expect(lifecycleGateSource).toContain('isChatRenderLifecycleRolloutEnabled()');
+        expect(lifecycleGateSource).toContain('resolveChatScrollAction({');
+        expect(lifecycleGateSource).toContain('intent: CHAT_SCROLL_INTENT.INITIAL_LOAD');
+        expect(lifecycleGateSource).toContain('shouldApplyChatBottomScrollAction(action)');
+        expect(lifecycleGateSource).toContain('scrollLoadedChatToBottom();');
+    });
+
     test('addOneMessage passes pre-mutation bottom state into lifecycle bottom scroll', () => {
         const addOneMessage = findExportedFunction('addOneMessage');
         expect(addOneMessage).toBeTruthy();

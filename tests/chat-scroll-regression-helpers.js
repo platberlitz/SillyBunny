@@ -177,25 +177,7 @@ async function renderSyntheticLongChat(page, { messageCount, visibleCount }) {
             });
         }
 
-        const startIndex = Math.max(0, syntheticMessageCount - syntheticVisibleCount);
-
-        if (startIndex > 0) {
-            const showMoreButton = document.createElement('div');
-            showMoreButton.id = 'show_more_messages';
-            showMoreButton.textContent = 'Show more messages';
-            chatElement.appendChild(showMoreButton);
-        }
-
-        for (let index = startIndex; index < syntheticMessageCount; index++) {
-            context.addOneMessage(context.chat[index], {
-                forceId: index,
-                scroll: false,
-                showSwipes: false,
-            });
-        }
-
-        context.swipe.refresh(false, false);
-        context.scrollChatToBottom({ force: true });
+        await context.printMessages();
     }, { messageCount, visibleCount });
 }
 
