@@ -1173,6 +1173,10 @@ function resetMobileQuickActions() {
 }
 
 function normalizeTopbarScale(value) {
+    if (value === null || value === undefined || value === '') {
+        return SB_TOPBAR_SCALE.defaultValue;
+    }
+
     const numericValue = Number(value);
 
     if (!Number.isFinite(numericValue)) {
