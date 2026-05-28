@@ -143,6 +143,59 @@ describe('chat render lifecycle script wiring', () => {
         expect(source).toContain('return renderedMessageIds;');
     });
 
+    test('showMoreMessages delegates selected history messages to the guarded show-more renderer', () => {
+        const showMoreMessages = findExportedFunction('showMoreMessages');
+        const source = getSource(showMoreMessages);
+
+        expect(source).toContain('const firstId = clamp(messageId - count, 0, Infinity);');
+        expect(source).toContain('const messages = chat.slice(firstId, messageId);');
+        expect(source).toContain('const anchor = captureVisibleChatMessageAnchor();');
+        expect(source).toContain('await renderShowMoreMessages({');
+        expect(source).toContain('refreshSwipeButtons();');
+        expect(source).toContain('showMoreButton.remove();');
+        expect(source).toContain('applyStylePins();');
+        expect(source).toContain('await settleVisibleChatMessageAnchor(anchor);');
+        expect(source).toContain('await eventSource.emit(event_types.MORE_MESSAGES_LOADED);');
+    });
+
+    test('showMoreMessages keeps render-batch routing behind the lifecycle rollout guard', () => {
+        const renderShowMoreMessages = findFunctionDeclaration('renderShowMoreMessages');
+        const source = getSource(renderShowMoreMessages);
+
+        expect(source).toContain('const batchSize = getMobileChatRenderBatchSize(messages.length);');
+        expect(source).toContain('if (isChatRenderLifecycleRolloutEnabled())');
+        expect(source).toContain('await renderShowMoreMessagesThroughLifecycle(renderOptions);');
+        expect(source).toContain('await renderShowMoreMessagesLegacy(renderOptions);');
+    });
+
+    test('guard-on showMoreMessages delegates batch insertion to the lifecycle render batch helper', () => {
+        const renderShowMoreMessagesThroughLifecycle = findFunctionDeclaration('renderShowMoreMessagesThroughLifecycle');
+        const source = getSource(renderShowMoreMessagesThroughLifecycle);
+
+        expect(source).toContain('renderMessagesInBatches({');
+        expect(source).toContain('messages,');
+        expect(source).toContain('firstMessageId: firstId');
+        expect(source).toContain('batchSize,');
+        expect(source).toContain('renderMessageElement: (message, messageId) => updateMessageElement(message, { messageId })');
+        expect(source).toContain('insertFragment: fragment => insertShowMoreFragment(insertionReference, fragment)');
+        expect(source).toContain('waitForNextFrame: async () =>');
+        expect(source).toContain('await waitForNextFrame();');
+        expect(source).toContain('afterBatch: restoreAnchorIfNeeded');
+    });
+
+    test('guard-off showMoreMessages keeps legacy inline batching and anchor restores', () => {
+        const renderShowMoreMessagesLegacy = findFunctionDeclaration('renderShowMoreMessagesLegacy');
+        const source = getSource(renderShowMoreMessagesLegacy);
+
+        expect(source).not.toContain('renderMessagesInBatches');
+        expect(source).toContain('const fragment = document.createDocumentFragment();');
+        expect(source).toContain('const batch = messages.slice(offset, offset + batchSize);');
+        expect(source).toContain('const messageElement = updateMessageElement(message, { messageId: firstId + offset + id });');
+        expect(source).toContain('insertShowMoreFragment(insertionReference, fragment);');
+        expect(source).toContain('restoreVisibleChatMessageAnchor(anchor);');
+        expect(source).toContain('await waitForNextFrame();');
+    });
+
     test('addOneMessage passes pre-mutation bottom state into lifecycle bottom scroll', () => {
         const addOneMessage = findExportedFunction('addOneMessage');
         expect(addOneMessage).toBeTruthy();
