@@ -12,8 +12,11 @@ const outputDir = path.join(repoRoot, 'output', 'performance');
 const baseUrl = process.env.SILLYBUNNY_PERF_URL || 'http://127.0.0.1:4444';
 const outputPath = process.env.SILLYBUNNY_PERF_OUTPUT || path.join(outputDir, `frontend-${Date.now()}.json`);
 const mobileProfile = devices['Pixel 5'];
+export const LONG_CHAT_RENDER_MESSAGE_COUNT = 96;
+export const LONG_CHAT_RENDER_VISIBLE_COUNT = 24;
+export const LONG_CHAT_RENDER_FILLER_REPEAT = 36;
 
-function summarizeRequests(requests) {
+export function summarizeRequests(requests) {
     const totals = {
         count: requests.length,
         js: 0,
@@ -38,6 +41,82 @@ function summarizeRequests(requests) {
     }
 
     return totals;
+}
+
+export function createLongChatRenderFixture({
+    messageCount = LONG_CHAT_RENDER_MESSAGE_COUNT,
+    visibleCount = LONG_CHAT_RENDER_VISIBLE_COUNT,
+    fillerRepeat = LONG_CHAT_RENDER_FILLER_REPEAT,
+} = {}) {
+    const messages = [];
+
+    for (let index = 0; index < messageCount; index++) {
+        const isUser = index % 2 === 0;
+        const baseText = `performance synthetic message ${index}`;
+        messages.push({
+            name: isUser ? 'Scroll Tester' : 'Bunny Guide',
+            is_user: isUser,
+            is_system: false,
+            send_date: new Date(Date.UTC(2024, 0, 1, 0, index)).toISOString(),
+            mes: `${baseText}\n${'long chat filler '.repeat(fillerRepeat)}`,
+            extra: {},
+        });
+    }
+
+    return {
+        messageCount,
+        visibleCount,
+        fillerRepeat,
+        messages,
+    };
+}
+
+export async function measureLongChatRender(page, fixture = createLongChatRenderFixture()) {
+    const renderResult = await page.evaluate(async ({ messages, messageCount, visibleCount, fillerRepeat }) => {
+        const browserGlobal = globalThis;
+        const context = browserGlobal.SillyTavern?.getContext?.();
+        const chatElement = browserGlobal.document.querySelector('#chat');
+
+        if (!context || !(chatElement instanceof browserGlobal.HTMLElement) || typeof context.printMessages !== 'function') {
+            return {
+                available: false,
+                reason: 'chat-context-unavailable',
+            };
+        }
+
+        context.powerUserSettings.auto_scroll_chat_to_bottom = true;
+        context.powerUserSettings.chat_truncation = visibleCount;
+        context.chat.length = 0;
+        chatElement.replaceChildren();
+        context.chat.push(...messages);
+
+        const start = browserGlobal.performance.now();
+        await context.printMessages();
+        await new Promise(resolve => browserGlobal.requestAnimationFrame(() => browserGlobal.requestAnimationFrame(resolve)));
+        const durationMs = browserGlobal.performance.now() - start;
+        const renderedMessages = Array.from(chatElement.querySelectorAll('.mes[mesid]'));
+
+        return {
+            available: true,
+            durationMs,
+            messageCount: context.chat.length,
+            visibleCount,
+            fillerRepeat,
+            renderedCount: renderedMessages.length,
+            firstRenderedMesId: renderedMessages.at(0)?.getAttribute('mesid') ?? null,
+            lastRenderedMesId: renderedMessages.at(-1)?.getAttribute('mesid') ?? null,
+            bottomDelta: chatElement.scrollHeight - chatElement.clientHeight - chatElement.scrollTop,
+        };
+    }, fixture);
+
+    return {
+        fixture: {
+            messageCount: fixture.messageCount,
+            visibleCount: fixture.visibleCount,
+            fillerRepeat: fixture.fillerRepeat,
+        },
+        ...renderResult,
+    };
 }
 
 async function measurePage(page) {
@@ -107,10 +186,13 @@ async function measurePage(page) {
     return {
         ...metrics,
         scrollFps,
+        chatRender: {
+            longChat: await measureLongChatRender(page),
+        },
     };
 }
 
-async function run() {
+export async function run() {
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
 
     const browser = await chromium.launch();
@@ -136,6 +218,11 @@ async function run() {
 
     await page.goto(baseUrl, { waitUntil: 'networkidle' });
     await page.waitForFunction('document.getElementById("preloader") === null', { timeout: 60000 }).catch(() => {});
+    await page.waitForFunction(() => {
+        const browserGlobal = globalThis;
+        return typeof browserGlobal.SillyTavern?.getContext === 'function'
+            && browserGlobal.document.querySelector('#chat') instanceof browserGlobal.HTMLElement;
+    }, { timeout: 60000 }).catch(() => {});
 
     const result = {
         url: baseUrl,
@@ -151,7 +238,13 @@ async function run() {
     await browser.close();
 }
 
-run().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-});
+function isDirectRun() {
+    return Boolean(process.argv[1]) && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+}
+
+if (isDirectRun()) {
+    run().catch((error) => {
+        console.error(error);
+        process.exitCode = 1;
+    });
+}
