@@ -332,6 +332,13 @@ import {
     resolveStopGenerationState,
 } from './scripts/generation-lifecycle/index.js';
 import {
+    TOOLING_UI_HYDRATION_STATUS,
+    buildToolingCaptureFilename,
+    normalizeToolingCaptureRange,
+    resolveLazyToolingLibraryHydration,
+    resolveToolingAssetWait,
+} from './scripts/tooling-ui-hydration/index.js';
+import {
     CARD_SCRIPT_MARKER_TAG,
     buildCardScriptToastKey,
     forgetAllCardScripts,
@@ -10238,33 +10245,22 @@ async function handleClearAllCacheButtonClick(event) {
 }
 
 function normalizeMessageScreenshotRange(startId, endId) {
-    if (!Number.isInteger(startId) || !Number.isInteger(endId)) {
-        return null;
-    }
-
-    const normalizedStart = Math.min(startId, endId);
-    const normalizedEnd = Math.max(startId, endId);
-
-    if (normalizedStart < 0 || normalizedEnd >= chat.length) {
-        return null;
-    }
-
-    return {
-        startId: normalizedStart,
-        endId: normalizedEnd,
-    };
+    return normalizeToolingCaptureRange({
+        startId,
+        endId,
+        maxId: chat.length - 1,
+    });
 }
 
 function buildMessageScreenshotFilename(startId, endId) {
     const activeGroupName = selected_group ? groups.find(group => group.id == selected_group)?.name : null;
     const baseName = activeGroupName ?? getCharaFilename(this_chid) ?? neutralCharacterName ?? 'chat';
-    const safeBaseName = String(baseName)
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '') || 'chat';
-    const rangeLabel = startId === endId ? `message-${startId}` : `messages-${startId}-${endId}`;
-    return `${safeBaseName}-${rangeLabel}.png`;
+
+    return buildToolingCaptureFilename({
+        baseName,
+        startId,
+        endId,
+    });
 }
 
 function closeExpandedMessageActionMenus() {
@@ -10331,8 +10327,12 @@ function buildMessageScreenshotElements(startId, endId) {
 
 async function waitForMessageScreenshotAssets(container) {
     const assets = Array.from(container.querySelectorAll('img'));
+    const assetWait = resolveToolingAssetWait({
+        assetCount: assets.length,
+        timeoutMs: 2000,
+    });
 
-    if (assets.length === 0) {
+    if (!assetWait.shouldWait) {
         return;
     }
 
@@ -10355,18 +10355,23 @@ async function waitForMessageScreenshotAssets(container) {
 
     await Promise.race([
         Promise.all(assetLoads),
-        delay(2000),
+        delay(assetWait.timeoutMs),
     ]);
 }
 
 let messageScreenshotLibraryPromise = null;
 
 async function getMessageScreenshotLibrary() {
-    if (typeof window.html2canvas === 'function') {
+    const hydrationState = resolveLazyToolingLibraryHydration({
+        isLoaded: typeof window.html2canvas === 'function',
+        hasPendingLoad: Boolean(messageScreenshotLibraryPromise),
+    });
+
+    if (hydrationState.status === TOOLING_UI_HYDRATION_STATUS.READY) {
         return window.html2canvas;
     }
 
-    if (!messageScreenshotLibraryPromise) {
+    if (hydrationState.shouldLoad) {
         messageScreenshotLibraryPromise = loadFileToDocument('/lib/html2canvas.min.js', 'js')
             .then(() => {
                 if (typeof window.html2canvas !== 'function') {
