@@ -46,6 +46,17 @@ describe('prompt manager lifecycle wiring', () => {
         expect(source).not.toContain('scrollPosition === undefined || scrollPosition === null');
     });
 
+    test('captures prompt manager scroll before save-triggered render', () => {
+        const saveStart = promptManagerSource.indexOf('this.handleSavePrompt = (event) => {');
+        const saveEnd = promptManagerSource.indexOf('// Reset prompt should it be a system prompt', saveStart);
+        const saveSource = promptManagerSource.slice(saveStart, saveEnd);
+
+        expect(saveSource).toContain('this.#queuePromptManagerScrollRestore();');
+        expect(saveSource.indexOf('this.#queuePromptManagerScrollRestore();')).toBeLessThan(saveSource.indexOf('this.render(false);'));
+        expect(promptManagerSource).toContain('pendingPromptManagerScrollPosition');
+        expect(promptManagerSource).toContain('resolvePromptManagerScrollRestore({ scrollPosition: this.#readScrollPosition() })');
+    });
+
     test('routes render gating through the lifecycle seam before waiting', () => {
         const source = getMethodSource('render');
 

@@ -378,6 +378,9 @@ class PromptManager {
         // Prompt row token counts of last dry run/live generation.
         this.promptTokenCounts = {};
 
+        // One-shot scroll restore captured before save-time layout changes.
+        this.pendingPromptManagerScrollPosition = null;
+
         // Error state, contains error message.
         this.error = null;
 
@@ -772,6 +775,7 @@ class PromptManager {
             const promptId = event.target.dataset.pmPrompt;
             const prompt = this.getPromptById(promptId);
             const isDesktopSplit = this.isDesktopSplitLayout();
+            this.#queuePromptManagerScrollRestore();
 
             if (null === prompt) {
                 const newPrompt = {};
@@ -1146,11 +1150,26 @@ class PromptManager {
      * @returns {number} - Scroll position of the prompt manager
      */
     #getScrollPosition() {
+        if (this.pendingPromptManagerScrollPosition !== null) {
+            const scrollPosition = this.pendingPromptManagerScrollPosition;
+            this.pendingPromptManagerScrollPosition = null;
+            return scrollPosition;
+        }
+
+        return this.#readScrollPosition();
+    }
+
+    #readScrollPosition() {
         // SillyBunny: prefer .sb-shell-panel-scroller (the actual scroll container inside
         // the SillyBunny shell) before falling back to upstream .scrollableInner, which is
         // set to overflow:visible inside the shell and always reports scrollTop 0.
         return document.getElementById(this.configuration.prefix + 'prompt_manager')
             ?.closest('.sb-shell-panel-scroller, .scrollableInner')?.scrollTop;
+    }
+
+    #queuePromptManagerScrollRestore() {
+        const restoreState = resolvePromptManagerScrollRestore({ scrollPosition: this.#readScrollPosition() });
+        this.pendingPromptManagerScrollPosition = restoreState.shouldRestore ? restoreState.scrollPosition : null;
     }
 
     /**
