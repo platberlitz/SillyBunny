@@ -5146,6 +5146,10 @@ class TokenHandler {
         return token_count;
     }
 
+    async countUntrackedAsync(messages, full) {
+        return this.countTokenAsyncFn(messages, full);
+    }
+
     getTokensForIdentifier(identifier) {
         return this.counts[identifier] ?? 0;
     }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { getPromptDisplayTokenCounts } from '../public/scripts/prompt-token-counts.js';
+import { getPromptDisplayTokenCounts, getPromptSourceTokenCounts } from '../public/scripts/prompt-token-counts.js';
 
 function makeMessage(identifier, tokens) {
     return {
@@ -44,5 +44,30 @@ describe('prompt token display counts', () => {
         expect(counts.chatHistory).toBe(89);
         expect(counts['chatHistory-2']).toBe(34);
         expect(counts['chatHistory-1']).toBe(55);
+    });
+
+    test('counts enabled source prompt content when runtime messages are absent', async () => {
+        const countedMessages = [];
+        const prompts = [
+            { identifier: 'main', role: 'system', content: 'Main prompt text' },
+            { identifier: 'jailbreak', role: 'user', content: 'Post-history instruction' },
+            { identifier: 'chatHistory', marker: true, content: 'Marker content is not source prompt text' },
+            { identifier: 'empty', role: 'system', content: '' },
+        ];
+
+        const counts = await getPromptSourceTokenCounts(prompts, async (message, extraArgument) => {
+            expect(extraArgument).toBeUndefined();
+            countedMessages.push(message);
+            return message.content.length;
+        });
+
+        expect(counts).toEqual({
+            main: 16,
+            jailbreak: 24,
+        });
+        expect(countedMessages).toEqual([
+            { role: 'system', content: 'Main prompt text' },
+            { role: 'user', content: 'Post-history instruction' },
+        ]);
     });
 });

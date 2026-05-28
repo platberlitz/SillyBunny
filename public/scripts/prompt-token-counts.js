@@ -23,6 +23,10 @@ function addCount(counts, identifier, tokens) {
     counts[identifier] = (counts[identifier] ?? 0) + tokenCount;
 }
 
+function getPromptContent(prompt) {
+    return typeof prompt?.content === 'string' ? prompt.content : '';
+}
+
 function collectDirectMessageCounts(item, counts) {
     const collection = getCollection(item);
     if (collection) {
@@ -46,4 +50,24 @@ export function getPromptDisplayTokenCounts(messages) {
     }
 
     return { ...aggregateCounts, ...directCounts };
+}
+
+export async function getPromptSourceTokenCounts(prompts, countPromptTokens) {
+    const counts = {};
+
+    if (!Array.isArray(prompts) || typeof countPromptTokens !== 'function') {
+        return counts;
+    }
+
+    for (const prompt of prompts) {
+        const content = getPromptContent(prompt);
+        if (!prompt?.identifier || prompt?.marker || !content) {
+            continue;
+        }
+
+        const tokens = await countPromptTokens({ role: prompt.role || 'system', content });
+        addCount(counts, prompt.identifier, tokens);
+    }
+
+    return counts;
 }
