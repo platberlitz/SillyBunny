@@ -102,11 +102,23 @@ This ledger tracks intentional SillyBunny divergence in upstream-origin files. I
 | Last reviewed | 2026-05-28 extension boot lifecycle wiring. |
 | Owner | Refactor integrator and extension runtime owner. |
 
+### `public/scripts/PromptManager.js` - prompt manager lifecycle
+| Field | Value |
+| --- | --- |
+| Area | Prompt manager lifecycle. |
+| Divergence reason | SillyBunny Prompt Manager needs explicit render gating, generation-active waiting, dry-run/live render selection, and scroll restoration while keeping prompt assembly, token counting, and DOM rendering in the existing class. |
+| Target seam | `public/scripts/prompt-manager-lifecycle/`. |
+| Adapter shape | PromptManager keeps prompt/render implementation and delegates render gating, render mode, and scroll-restore decisions to the lifecycle module. |
+| Protecting tests | `tests/prompt-manager-lifecycle.test.js`, `tests/prompt-manager-lifecycle-wiring.test.js`. |
+| Validation | `npm run test:unit --prefix tests -- prompt-manager-lifecycle.test.js prompt-manager-lifecycle-wiring.test.js`, `npm run lint --prefix tests -- prompt-manager-lifecycle.test.js prompt-manager-lifecycle-wiring.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
+| Rollback path | Revert lifecycle calls in `PromptManager.js` while leaving prompt data and service settings untouched. |
+| Last reviewed | 2026-05-28 prompt manager lifecycle wiring. |
+| Owner | Refactor integrator and prompt manager owner. |
+
 ## Candidate Entries To Add Later
 | File or area | Add entry when |
 | --- | --- |
 | Core settings modules | Preset/API sync refactor starts. |
-| Prompt manager code | Heavy prompt preview/render scheduling starts. |
 | Screenshot/image-gen UI code | Lazy loading of non-active tooling begins. |
 
 ## Review Checklist
