@@ -29,6 +29,9 @@ import {
 import {
     createMessageUpdateQueue,
 } from './update-queue.js';
+import {
+    createDelegatedResizeObserver,
+} from './resize-observer.js';
 
 export {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
@@ -36,6 +39,7 @@ export {
     CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
     createMessageUpdateQueue,
+    createDelegatedResizeObserver,
     createFrameWriteScheduler,
     createStreamWriteBuffer,
     resolveChatBottomScrollAction,
@@ -84,6 +88,9 @@ export function createChatRenderLifecycle() {
         },
         updateQueue: {
             create: createMessageUpdateQueue,
+        },
+        resizeObserver: {
+            create: createDelegatedResizeObserver,
         },
     };
 }
