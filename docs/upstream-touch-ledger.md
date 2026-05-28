@@ -89,11 +89,23 @@ This ledger tracks intentional SillyBunny divergence in upstream-origin files. I
 | Last reviewed | 2026-05-26 refactor plan. |
 | Owner | Refactor integrator. |
 
+### `public/scripts/extensions.js` - extension boot lifecycle
+| Field | Value |
+| --- | --- |
+| Area | Extension boot. |
+| Divergence reason | SillyBunny extension boot needs duplicate manifest protection, deterministic activation ordering, dependency/module gating, disabled dependency handling, and client-version checks while preserving the existing extension runtime loading hooks. |
+| Target seam | `public/scripts/extension-boot-lifecycle/`. |
+| Adapter shape | Extension runtime keeps fetch/script/style/hook behavior and delegates manifest registration, dedupe keys, activation ordering, and activation eligibility decisions to the lifecycle module. |
+| Protecting tests | `tests/extension-boot-lifecycle.test.js`, `tests/extension-boot-lifecycle-wiring.test.js`, `tests/extensions-disable.test.js`. |
+| Validation | `npm run test:unit --prefix tests -- extension-boot-lifecycle.test.js extension-boot-lifecycle-wiring.test.js extensions-disable.test.js`, `npm run lint --prefix tests -- extension-boot-lifecycle.test.js extension-boot-lifecycle-wiring.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
+| Rollback path | Revert helper calls in `extensions.js` while leaving extension settings and runtime load paths unchanged. |
+| Last reviewed | 2026-05-28 extension boot lifecycle wiring. |
+| Owner | Refactor integrator and extension runtime owner. |
+
 ## Candidate Entries To Add Later
 | File or area | Add entry when |
 | --- | --- |
 | Core settings modules | Preset/API sync refactor starts. |
-| Extension boot code | Lazy hydration or boot manifest work starts. |
 | Prompt manager code | Heavy prompt preview/render scheduling starts. |
 | Screenshot/image-gen UI code | Lazy loading of non-active tooling begins. |
 
