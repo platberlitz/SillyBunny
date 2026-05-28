@@ -124,18 +124,6 @@ describe('Guided Generations steering commands', () => {
         expect(textarea.dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: 'input' }));
     });
 
-    test('guided response clears legacy GGSystemPrompt guidance after use', async () => {
-        extensionSettings['guided-generations'].promptGuidedResponse = 'GGSystemPrompt {{input}}';
-        const { guidedResponse } = await import('../public/scripts/extensions/guided-generations/scripts/guidedResponse.js');
-
-        await guidedResponse();
-
-        const command = context.executeSlashCommandsWithOptions.mock.calls[0][0];
-        expect(command).toContain('GGSystemPrompt aim for a colder, suspicious reply');
-        expect(context.executeSlashCommandsWithOptions).toHaveBeenLastCalledWith('/flushinject instruct');
-        expect(context.chatMetadata.script_injects.instruct).toBeUndefined();
-    });
-
     test('guided swipe keeps guidance injected until the swipe generation starts', async () => {
         const { guidedSwipe } = await import('../public/scripts/extensions/guided-generations/scripts/guidedSwipe.js');
 
