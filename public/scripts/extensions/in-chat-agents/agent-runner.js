@@ -64,6 +64,9 @@ const PREPEND_PROMPT_TRANSFORM_TEMPLATE_IDS = new Set([
     'tpl-scene-tracker',
     'tpl-time-tracker',
 ]);
+const IMPERSONATE_PROMPT_TRANSFORM_TEMPLATE_IDS = new Set([
+    'tpl-prose-polisher',
+]);
 const PREPEND_PROMPT_TRANSFORM_TAG_RE = /\[(?:SCENE|TIME)\|/;
 const ASSISTANT_RESPONSE_WRAPPER_RE = /^\s*<assistant_response>\s*([\s\S]*?)\s*<\/assistant_response>\s*$/i;
 const CONTEXT_INTERCEPT_OUTPUT_RE = /^\s*<context>\s*([\s\S]*?)\s*<\/context>\s*$/i;
@@ -1611,7 +1614,14 @@ function getPromptTransformAgentsForMessage(activeAgents, generationType) {
 }
 
 function getPromptTransformAgentsForImpersonate(activeAgents) {
-    return getPromptTransformAgents(activeAgents).filter(agent => Boolean(agent?.conditions?.runOnImpersonate));
+    return getPromptTransformAgents(activeAgents).filter(agent => {
+        if (agent?.conditions?.runOnImpersonate) {
+            return true;
+        }
+
+        const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+        return IMPERSONATE_PROMPT_TRANSFORM_TEMPLATE_IDS.has(sourceTemplateId);
+    });
 }
 
 function getPreGenerationInterceptAgents(activeAgents) {

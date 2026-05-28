@@ -3,11 +3,9 @@ import { describe, expect, test } from '@jest/globals';
 import {
     CHAT_SCROLL_ACTION,
     CHAT_SCROLL_INTENT,
-    CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     captureVisibleMessageAnchor,
     createChatRenderLifecycle,
     createFrameWriteScheduler,
-    resolveChatRenderLifecycleRollout,
     resolveChatScrollAction,
     restoreVisibleMessageAnchor,
     runSettledFrames,
@@ -22,10 +20,8 @@ describe('chat render lifecycle index seam', () => {
         expect(typeof createFrameWriteScheduler).toBe('function');
         expect(typeof runSettledFrames).toBe('function');
         expect(typeof resolveChatScrollAction).toBe('function');
-        expect(typeof resolveChatRenderLifecycleRollout).toBe('function');
         expect(CHAT_SCROLL_INTENT.TAIL_APPEND).toBe('tail-append');
         expect(CHAT_SCROLL_ACTION.PIN_BOTTOM).toBe('pin-bottom');
-        expect(CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY).toBe('sillybunny.chatRenderLifecycle.enabled');
     });
 
     test('creates a pass-through lifecycle adapter without mutating runtime behavior', () => {
@@ -39,7 +35,5 @@ describe('chat render lifecycle index seam', () => {
         expect(lifecycle.scrollIntent.resolve).toBe(resolveChatScrollAction);
         expect(lifecycle.scrollIntent.intent).toBe(CHAT_SCROLL_INTENT);
         expect(lifecycle.scrollIntent.action).toBe(CHAT_SCROLL_ACTION);
-        expect(lifecycle.rollout.key).toBe(CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY);
-        expect(lifecycle.rollout.resolve).toBe(resolveChatRenderLifecycleRollout);
     });
 });

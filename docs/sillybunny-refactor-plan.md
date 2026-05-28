@@ -106,8 +106,8 @@ Core invariants:
 - [x] 3.3 Add `scheduler.js` with tests; route anchor settle through it as the first low-risk adapter.
 - [x] 3.4 Add `scroll-intent.js` as pure logic with table-driven tests.
 - [x] 3.5 Add `anchor.js` with DOM fixture tests.
-- [x] 3.6 Add lifecycle kill-switch only as temporary rollout protection, not a permanent compatibility layer.
-- [ ] **3.7 Keep each commit green and small.** <- CURRENT
+- [ ] **3.6 Add lifecycle kill-switch only as temporary rollout protection, not a permanent compatibility layer.** <- CURRENT
+- [ ] 3.7 Keep each commit green and small.
 
 ## Phase 4: Route Tail Append And Bottom Pin [PENDING]
 - [ ] 4.1 Route `addOneMessage()` tail append through lifecycle append intent.
