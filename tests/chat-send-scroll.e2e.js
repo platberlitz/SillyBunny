@@ -1,4 +1,4 @@
-/* global document, globalThis */
+/* global document */
 import { expect, test } from '@playwright/test';
 import { installSyntheticLongChat, openReadyChat } from './chat-scroll-regression-helpers.js';
 

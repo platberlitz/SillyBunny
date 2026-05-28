@@ -309,10 +309,14 @@ import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker
 import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
 import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
 import {
+    CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     captureVisibleMessageAnchor,
+    resolveChatBottomScrollAction,
+    resolveChatRenderLifecycleRollout,
     restoreVisibleMessageAnchor,
     settleVisibleMessageAnchor,
-} from './scripts/chat-render-lifecycle/anchor.js';
+    shouldApplyChatBottomScrollAction,
+} from './scripts/chat-render-lifecycle/index.js';
 import {
     CARD_SCRIPT_MARKER_TAG,
     buildCardScriptToastKey,
