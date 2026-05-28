@@ -316,7 +316,6 @@
 - [[_COMMUNITY_Community 314|Community 314]]
 - [[_COMMUNITY_Community 315|Community 315]]
 - [[_COMMUNITY_Community 316|Community 316]]
-- [[_COMMUNITY_Community 317|Community 317]]
 - [[_COMMUNITY_Community 318|Community 318]]
 - [[_COMMUNITY_Community 319|Community 319]]
 - [[_COMMUNITY_Community 320|Community 320]]
@@ -797,6 +796,10 @@ Nodes (3): AllTalkTtsProvider, updateStatus(), loadSettings()
 Cohesion: 0.18
 Nodes (3): AllTalkTtsProvider, updateStatus(), loadSettings()
 
+### Community 90 - "Community 90"
+Cohesion: 0.1
+Nodes (6): AllTalkTtsProvider, CoquiTtsProvider, initLocalModels(), resetModelSettings(), throwIfModuleMissing(), loadSettings()
+
 ### Community 91 - "Community 91"
 Cohesion: 0.19
 Nodes (32): bindCharacterEditorFullscreenToggle(), ensureCharacterListToolbarLayout(), ensureCharacterPersonaPanel(), ensureCharacterWorldInfoPanel(), getMainScriptModule(), hasActiveCharacterChat(), hideCharacterMainPanels(), injectCharacterDrawerControls() (+24 more)
@@ -1233,6 +1236,42 @@ Nodes (10): CATEGORY_CONFIG, createAliasIndicator(), createSourceIndicator(), cr
 Cohesion: 0.12
 Nodes (22): A(), bt(), C(), Ct(), D(), Dt(), f(), gt() (+14 more)
 
+### Community 174 - "Community 174"
+Cohesion: 0.25
+Nodes (8): At a glance, Contributors, Desktop, Mobile, Project Goals (AKA, why we made this fork), 🐰 SillyBunny 🐰, Table of Contents, Upstream Information
+
+### Community 175 - "Community 175"
+Cohesion: 0.06
+Nodes (4): AnnotationLayer, PDFPageProxy, setLayerDimensions(), TextLayer
+
+### Community 176 - "Community 176"
+Cohesion: 0.13
+Nodes (3): sanitizeId(), VoiceMapEntry, OpenAITtsProvider
+
+### Community 177 - "Community 177"
+Cohesion: 0.29
+Nodes (16): buildConsoleLogsPanel(), buildInChatAgentsPanel(), buildSamplingPanel(), buildShell(), createShellPanel(), formatConsoleLogDateTime(), getConsoleLogsRefs(), getConsoleLogsState() (+8 more)
+
+### Community 178 - "Community 178"
+Cohesion: 0.25
+Nodes (5): drawImageAtIntegerCoords(), getCurrentTransformInverse(), getImageSmoothingEnabled(), putBinaryImageData(), putBinaryImageMask()
+
+### Community 179 - "Community 179"
+Cohesion: 0.04
+Nodes (50): <a id="lalib-help-cmd-message_edit"></a>`/message-edit`, <a id="lalib-help-cmd-message_get"></a>`/message-get`, <a id="lalib-help-cmd-message_list"></a>`/message-list`, <a id="lalib-help-cmd-message_move"></a>`/message-move`, <a id="lalib-help-cmd-swipes_add"></a>`/swipes-add`, <a id="lalib-help-cmd-swipes_count"></a>`/swipes-count`, <a id="lalib-help-cmd-swipes_del"></a>`/swipes-del`, <a id="lalib-help-cmd-swipes_get"></a>`/swipes-get` (+42 more)
+
+### Community 180 - "Community 180"
+Cohesion: 0.04
+Nodes (46): 1. Overview, 2. Colors, 3. Typography, 4. Elevation, 5. Components, 6. Do's and Don'ts, Buttons, Cards / Containers (+38 more)
+
+### Community 181 - "Community 181"
+Cohesion: 0.16
+Nodes (10): CATEGORY_CONFIG, createAliasIndicator(), createSourceIndicator(), createTypeBadge(), formatMacroSignature(), getCategoryConfig(), MacroBrowser, renderMacroDetails() (+2 more)
+
+### Community 182 - "Community 182"
+Cohesion: 0.12
+Nodes (22): A(), bt(), C(), Ct(), D(), Dt(), f(), gt() (+14 more)
+
 ### Community 183 - "Community 183"
 Cohesion: 0.12
 Nodes (15): CookieSessionObject, Process, Request, ServerEventMap, ServerStartedEvent, CookieSessionObject, Process, Request (+7 more)
@@ -1252,6 +1291,10 @@ Nodes (19): clearDefaultPresetDeletion(), findDefaultPreset(), getDefaultPresetD
 ### Community 188 - "Community 188"
 Cohesion: 0.4
 Nodes (3): DEFAULT_RATE_LIMITS, pruneTimestamps(), RateLimiter
+
+### Community 190 - "Community 190"
+Cohesion: 0.2
+Nodes (17): hasPromptPayload(), escapeHtml(), extractOocBlocksForDisplay(), hasTextOrArrayPayload(), normalizeContextRetentionDepth(), renderOocBlock(), replaceBalancedOocBlocks(), restoreOocBlocksForDisplay() (+9 more)
 
 ### Community 190 - "Community 190"
 Cohesion: 0.2

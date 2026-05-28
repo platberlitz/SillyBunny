@@ -7,11 +7,13 @@ import {
     captureVisibleMessageAnchor,
     createChatRenderLifecycle,
     createFrameWriteScheduler,
+    resolveChatBottomScrollAction,
     resolveChatRenderLifecycleRollout,
     resolveChatScrollAction,
     restoreVisibleMessageAnchor,
     runSettledFrames,
     settleVisibleMessageAnchor,
+    shouldApplyChatBottomScrollAction,
 } from '../public/scripts/chat-render-lifecycle/index.js';
 
 describe('chat render lifecycle index seam', () => {
@@ -21,6 +23,8 @@ describe('chat render lifecycle index seam', () => {
         expect(typeof settleVisibleMessageAnchor).toBe('function');
         expect(typeof createFrameWriteScheduler).toBe('function');
         expect(typeof runSettledFrames).toBe('function');
+        expect(typeof resolveChatBottomScrollAction).toBe('function');
+        expect(typeof shouldApplyChatBottomScrollAction).toBe('function');
         expect(typeof resolveChatScrollAction).toBe('function');
         expect(typeof resolveChatRenderLifecycleRollout).toBe('function');
         expect(CHAT_SCROLL_INTENT.TAIL_APPEND).toBe('tail-append');
@@ -36,6 +40,8 @@ describe('chat render lifecycle index seam', () => {
         expect(lifecycle.anchor.settle).toBe(settleVisibleMessageAnchor);
         expect(lifecycle.scheduler.createFrameWriteScheduler).toBe(createFrameWriteScheduler);
         expect(lifecycle.scheduler.runSettledFrames).toBe(runSettledFrames);
+        expect(lifecycle.bottomScroll.resolve).toBe(resolveChatBottomScrollAction);
+        expect(lifecycle.bottomScroll.shouldApply).toBe(shouldApplyChatBottomScrollAction);
         expect(lifecycle.scrollIntent.resolve).toBe(resolveChatScrollAction);
         expect(lifecycle.scrollIntent.intent).toBe(CHAT_SCROLL_INTENT);
         expect(lifecycle.scrollIntent.action).toBe(CHAT_SCROLL_ACTION);
