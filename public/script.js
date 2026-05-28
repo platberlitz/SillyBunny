@@ -310,6 +310,7 @@ import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-
 import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
 import {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
+    CHAT_RENDER_LIFECYCLE_ROUTE,
     CHAT_SCROLL_ACTION,
     CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
@@ -1957,7 +1958,7 @@ function disposeMobileChatViewportObserver() {
 }
 
 function resetMobileChatViewportLifecycle() {
-    if (!isChatRenderLifecycleRolloutEnabled()) {
+    if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MOBILE_VIEWPORT)) {
         return;
     }
 
@@ -1969,7 +1970,7 @@ function resetMobileChatViewportLifecycle() {
 }
 
 function setupMobileChatViewportObserver(onViewportChange) {
-    if (!isChatRenderLifecycleRolloutEnabled()) {
+    if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MOBILE_VIEWPORT)) {
         window.visualViewport?.addEventListener('scroll', onViewportChange, { passive: true });
         window.visualViewport?.addEventListener('resize', onViewportChange, { passive: true });
         return;
@@ -2015,10 +2016,11 @@ function getChatRenderLifecycleRolloutStorage() {
     }
 }
 
-function isChatRenderLifecycleRolloutEnabled() {
-    // SillyBunny: keep lifecycle routing opt-in while chat scroll paths move behind the seam in small PRs.
+function isChatRenderLifecycleRolloutEnabled(route = null) {
+    // SillyBunny: explicit overrides remain global; defaults are per-route for one-route-at-a-time rollout.
     return resolveChatRenderLifecycleRollout({
         queryValue: getChatRenderLifecycleRolloutQueryValue(),
+        route,
         storage: getChatRenderLifecycleRolloutStorage(),
     }).enabled;
 }
@@ -2150,7 +2152,7 @@ function refreshObservedChatMessageResizeViewportStates() {
 }
 
 async function applyChatMessageResizeAction(element, entry, metadata) {
-    if (!isChatRenderLifecycleRolloutEnabled()) {
+    if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MEDIA_RESIZE)) {
         return;
     }
 
@@ -2227,7 +2229,7 @@ function unobserveChatMessageResizeBlock(messageBlock) {
 }
 
 function observeChatMessageResize(messageElement) {
-    if (!isChatRenderLifecycleRolloutEnabled() || !canObserveChatMessageResize()) {
+    if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MEDIA_RESIZE) || !canObserveChatMessageResize()) {
         return;
     }
 
@@ -2238,7 +2240,7 @@ function observeChatMessageResize(messageElement) {
     }
 
     requestAnimationFrame(() => {
-        if (!isChatRenderLifecycleRolloutEnabled() || !messageBlock.isConnected) {
+        if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MEDIA_RESIZE) || !messageBlock.isConnected) {
             return;
         }
 
@@ -2276,7 +2278,7 @@ function updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessag
 }
 
 function scrollStartedStreamingMessageThroughLifecycle() {
-    if (!isChatRenderLifecycleRolloutEnabled()) {
+    if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.STREAM_START)) {
         scrollChatToBottom({ waitForFrame: true });
         return;
     }
@@ -2296,7 +2298,7 @@ function scrollStartedStreamingMessageThroughLifecycle() {
 }
 
 function getSwipeReplacementViewportUpdate({ isLastMessageSwipe, useLifecycleRoute }) {
-    if (!useLifecycleRoute || !isChatRenderLifecycleRolloutEnabled()) {
+    if (!useLifecycleRoute || !isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.REPLACE_MESSAGE)) {
         const anchor = isLastMessageSwipe && !isChatScrolledNearBottom()
             ? captureVisibleChatMessageAnchor()
             : null;
@@ -2454,7 +2456,7 @@ async function renderShowMoreMessages({
         shouldPreserveScroll,
     };
 
-    if (isChatRenderLifecycleRolloutEnabled()) {
+    if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.SHOW_MORE_BATCH)) {
         await renderShowMoreMessagesThroughLifecycle(renderOptions);
         return;
     }
@@ -2545,7 +2547,7 @@ export async function printMessages() {
 }
 
 function scrollLoadedChatToBottomThroughLifecycle() {
-    if (!isChatRenderLifecycleRolloutEnabled()) {
+    if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD)) {
         scrollLoadedChatToBottom();
         return;
     }
@@ -2621,7 +2623,7 @@ async function renderRedisplayChatMessagesThroughLifecycle({ messages, startInde
 async function renderRedisplayChatMessages({ messages, startIndex }) {
     const batchSize = getMobileChatRenderBatchSize(messages.length);
 
-    if (isChatRenderLifecycleRolloutEnabled()) {
+    if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.REDISPLAY_BATCH)) {
         return renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize });
     }
 
@@ -3292,7 +3294,7 @@ export function updateMessageBlock(messageId, message, { rerenderMessage = true 
         return;
     }
 
-    if (isChatRenderLifecycleRolloutEnabled()) {
+    if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MESSAGE_UPDATE)) {
         updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessage });
         return;
     }
@@ -4212,7 +4214,7 @@ export function scrollChatToBottom({ waitForFrame, force = false, isNearBottom =
 
     const doScroll = () => {
         // SillyBunny: guarded lifecycle route keeps the legacy path available during rollout.
-        if (isChatRenderLifecycleRolloutEnabled()) {
+        if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.BOTTOM_SCROLL)) {
             const action = resolveChatBottomScrollAction({
                 force,
                 autoScrollEnabled: power_user.auto_scroll_chat_to_bottom,
@@ -5105,7 +5107,7 @@ class StreamingProcessor {
     }
 
     #queueStreamingVisibleWrite({ messageId, write, isFinal }) {
-        if (!isChatRenderLifecycleRolloutEnabled()) {
+        if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.STREAM_PROGRESS)) {
             applyStreamingVisibleWrite(messageId, write, { isFinal });
             return;
         }

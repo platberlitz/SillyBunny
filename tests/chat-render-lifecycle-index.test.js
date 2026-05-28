@@ -4,6 +4,8 @@ import {
     CHAT_SCROLL_ACTION,
     CHAT_SCROLL_INTENT,
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
+    CHAT_RENDER_LIFECYCLE_ROUTE,
+    CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS,
     captureVisibleMessageAnchor,
     createChatRenderLifecycle,
     createDelegatedResizeObserver,
@@ -41,6 +43,8 @@ describe('chat render lifecycle index seam', () => {
         expect(CHAT_SCROLL_INTENT.TAIL_APPEND).toBe('tail-append');
         expect(CHAT_SCROLL_ACTION.PIN_BOTTOM).toBe('pin-bottom');
         expect(CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY).toBe('sillybunny.chatRenderLifecycle.enabled');
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD).toBe('initial-load');
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD]).toBe(false);
         expect(MOBILE_VIEWPORT_SETTLE_DELAY_MS).toBe(180);
     });
 
@@ -58,6 +62,8 @@ describe('chat render lifecycle index seam', () => {
         expect(lifecycle.scrollIntent.intent).toBe(CHAT_SCROLL_INTENT);
         expect(lifecycle.scrollIntent.action).toBe(CHAT_SCROLL_ACTION);
         expect(lifecycle.rollout.key).toBe(CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY);
+        expect(lifecycle.rollout.route).toBe(CHAT_RENDER_LIFECYCLE_ROUTE);
+        expect(lifecycle.rollout.routeDefaults).toBe(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS);
         expect(lifecycle.rollout.resolve).toBe(resolveChatRenderLifecycleRollout);
         expect(lifecycle.renderBatch.render).toBe(renderMessagesInBatches);
         expect(lifecycle.streamBuffer.create).toBe(createStreamWriteBuffer);

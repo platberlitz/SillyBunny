@@ -1,4 +1,28 @@
 export const CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY = 'sillybunny.chatRenderLifecycle.enabled';
+export const CHAT_RENDER_LIFECYCLE_ROUTE = Object.freeze({
+    BOTTOM_SCROLL: 'bottom-scroll',
+    INITIAL_LOAD: 'initial-load',
+    MEDIA_RESIZE: 'media-resize',
+    MESSAGE_UPDATE: 'message-update',
+    MOBILE_VIEWPORT: 'mobile-viewport',
+    REDISPLAY_BATCH: 'redisplay-batch',
+    REPLACE_MESSAGE: 'replace-message',
+    SHOW_MORE_BATCH: 'show-more-batch',
+    STREAM_PROGRESS: 'stream-progress',
+    STREAM_START: 'stream-start',
+});
+export const CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS = Object.freeze({
+    [CHAT_RENDER_LIFECYCLE_ROUTE.BOTTOM_SCROLL]: false,
+    [CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD]: false,
+    [CHAT_RENDER_LIFECYCLE_ROUTE.MEDIA_RESIZE]: false,
+    [CHAT_RENDER_LIFECYCLE_ROUTE.MESSAGE_UPDATE]: false,
+    [CHAT_RENDER_LIFECYCLE_ROUTE.MOBILE_VIEWPORT]: false,
+    [CHAT_RENDER_LIFECYCLE_ROUTE.REDISPLAY_BATCH]: false,
+    [CHAT_RENDER_LIFECYCLE_ROUTE.REPLACE_MESSAGE]: false,
+    [CHAT_RENDER_LIFECYCLE_ROUTE.SHOW_MORE_BATCH]: false,
+    [CHAT_RENDER_LIFECYCLE_ROUTE.STREAM_PROGRESS]: false,
+    [CHAT_RENDER_LIFECYCLE_ROUTE.STREAM_START]: false,
+});
 
 function parseBooleanOverride(value) {
     if (value === true || value === 'true' || value === '1') {
@@ -24,17 +48,33 @@ function readStorageOverride(storage) {
     }
 }
 
+function resolveDefaultEnabled({ defaultEnabled, route, routeDefaults }) {
+    if (typeof defaultEnabled === 'boolean') {
+        return defaultEnabled;
+    }
+
+    if (!route || !routeDefaults || !Object.prototype.hasOwnProperty.call(routeDefaults, route)) {
+        return false;
+    }
+
+    return Boolean(routeDefaults[route]);
+}
+
 /**
  * Resolves the temporary lifecycle rollout guard for future runtime routing.
  * @param {object} [options] Options.
- * @param {boolean} [options.defaultEnabled=false] Safe default until routes are proven.
+ * @param {boolean} [options.defaultEnabled] Explicit default override.
  * @param {string|boolean|null} [options.queryValue] Explicit query override value.
+ * @param {string|null} [options.route] Lifecycle route name.
+ * @param {Record<string, boolean>} [options.routeDefaults] Per-route default map.
  * @param {{getItem: (key: string) => string|null}|null} [options.storage] Storage override source.
  * @returns {{enabled: boolean, source: 'query'|'storage'|'default'}}
  */
 export function resolveChatRenderLifecycleRollout({
-    defaultEnabled = false,
+    defaultEnabled,
     queryValue = null,
+    route = null,
+    routeDefaults = CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS,
     storage = null,
 } = {}) {
     const queryOverride = parseBooleanOverride(queryValue);
@@ -49,5 +89,8 @@ export function resolveChatRenderLifecycleRollout({
         return { enabled: storageOverride, source: 'storage' };
     }
 
-    return { enabled: Boolean(defaultEnabled), source: 'default' };
+    return {
+        enabled: resolveDefaultEnabled({ defaultEnabled, route, routeDefaults }),
+        source: 'default',
+    };
 }

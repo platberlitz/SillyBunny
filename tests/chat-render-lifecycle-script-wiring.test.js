@@ -86,7 +86,7 @@ describe('chat render lifecycle script wiring', () => {
         expect(lifecycleGate).toBeTruthy();
 
         const lifecycleGateSource = getSource(lifecycleGate);
-        expect(lifecycleGateSource).toContain('isChatRenderLifecycleRolloutEnabled()');
+        expect(lifecycleGateSource).toContain('isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD)');
         expect(lifecycleGateSource).toContain('resolveChatScrollAction({');
         expect(lifecycleGateSource).toContain('intent: CHAT_SCROLL_INTENT.INITIAL_LOAD');
         expect(lifecycleGateSource).toContain('shouldApplyChatBottomScrollAction(action)');
@@ -110,7 +110,7 @@ describe('chat render lifecycle script wiring', () => {
         const source = getSource(renderRedisplayChatMessages);
 
         expect(source).toContain('const batchSize = getMobileChatRenderBatchSize(messages.length);');
-        expect(source).toContain('if (isChatRenderLifecycleRolloutEnabled())');
+        expect(source).toContain('if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.REDISPLAY_BATCH))');
         expect(source).toContain('return renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize });');
         expect(source).toContain('return renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize });');
     });
@@ -163,7 +163,7 @@ describe('chat render lifecycle script wiring', () => {
         const source = getSource(renderShowMoreMessages);
 
         expect(source).toContain('const batchSize = getMobileChatRenderBatchSize(messages.length);');
-        expect(source).toContain('if (isChatRenderLifecycleRolloutEnabled())');
+        expect(source).toContain('if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.SHOW_MORE_BATCH))');
         expect(source).toContain('await renderShowMoreMessagesThroughLifecycle(renderOptions);');
         expect(source).toContain('await renderShowMoreMessagesLegacy(renderOptions);');
     });
@@ -243,6 +243,16 @@ describe('chat render lifecycle script wiring', () => {
             && node.callee?.name === 'scrollChatToBottom')).toBeTruthy();
     });
 
+    test('scrollChatToBottom keeps bottom-scroll routing behind its route gate', () => {
+        const scrollChatToBottom = findExportedFunction('scrollChatToBottom');
+        const source = getSource(scrollChatToBottom);
+
+        expect(source).toContain('if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.BOTTOM_SCROLL))');
+        expect(source).toContain('resolveChatBottomScrollAction({');
+        expect(source).toContain('shouldApplyChatBottomScrollAction(action)');
+        expect(source).toContain('scrollChatElementToBottom();');
+    });
+
     test('addOneMessage keeps compatibility follow-up hooks in place', () => {
         const addOneMessage = findExportedFunction('addOneMessage');
         const source = getSource(addOneMessage);
@@ -270,7 +280,7 @@ describe('chat render lifecycle script wiring', () => {
 
         expect(source).toContain('if (shouldDeferMobileMessageUpdates())');
         expect(source).toContain('queueMobileMessageBlockUpdate(messageId, message, { rerenderMessage });');
-        expect(source).toContain('if (isChatRenderLifecycleRolloutEnabled())');
+        expect(source).toContain('if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MESSAGE_UPDATE))');
         expect(source).toContain('updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessage });');
         expect(source).toContain('applyMessageBlockUpdate(messageId, message, { rerenderMessage });');
     });
@@ -334,7 +344,7 @@ describe('chat render lifecycle script wiring', () => {
         const scrollStartedStreamingMessageThroughLifecycle = findFunctionDeclaration('scrollStartedStreamingMessageThroughLifecycle');
         const source = getSource(scrollStartedStreamingMessageThroughLifecycle);
 
-        expect(source).toContain('if (!isChatRenderLifecycleRolloutEnabled())');
+        expect(source).toContain('if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.STREAM_START))');
         expect(source).toContain('scrollChatToBottom({ waitForFrame: true });');
         expect(source).toContain('resolveChatScrollAction({');
         expect(source).toContain('intent: CHAT_SCROLL_INTENT.STREAM_PROGRESS');
@@ -383,7 +393,7 @@ describe('chat render lifecycle script wiring', () => {
             && node.key?.name === 'queueStreamingVisibleWrite');
         const queueSource = getSource(queueStreamingVisibleWrite.value);
 
-        expect(queueSource).toContain('if (!isChatRenderLifecycleRolloutEnabled())');
+        expect(queueSource).toContain('if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.STREAM_PROGRESS))');
         expect(queueSource).toContain('applyStreamingVisibleWrite(messageId, write, { isFinal });');
         expect(queueSource).toContain('getStreamingVisibleWriteBuffer().queue(messageId, write, { isFinal });');
     });
@@ -392,7 +402,7 @@ describe('chat render lifecycle script wiring', () => {
         const getSwipeReplacementViewportUpdate = findFunctionDeclaration('getSwipeReplacementViewportUpdate');
         const source = getSource(getSwipeReplacementViewportUpdate);
 
-        expect(source).toContain('if (!useLifecycleRoute || !isChatRenderLifecycleRolloutEnabled())');
+        expect(source).toContain('if (!useLifecycleRoute || !isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.REPLACE_MESSAGE))');
         expect(source).toContain('const anchor = isLastMessageSwipe && !isChatScrolledNearBottom()');
         expect(source).toContain('captureVisibleChatMessageAnchor()');
         expect(source).toContain('scrollWithAddOneMessage: isLastMessageSwipe && !anchor');
@@ -449,7 +459,7 @@ describe('chat render lifecycle script wiring', () => {
         const observeChatMessageResize = findFunctionDeclaration('observeChatMessageResize');
         const observeSource = getSource(observeChatMessageResize);
 
-        expect(observeSource).toContain('if (!isChatRenderLifecycleRolloutEnabled() || !canObserveChatMessageResize())');
+        expect(observeSource).toContain('if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MEDIA_RESIZE) || !canObserveChatMessageResize())');
         expect(observeSource).toContain('const messageBlock = getMessageBlockElement(messageElement);');
         expect(observeSource).toContain('requestAnimationFrame(() =>');
         expect(observeSource).toContain('const observer = getChatMessageResizeObserver();');
@@ -470,7 +480,7 @@ describe('chat render lifecycle script wiring', () => {
         const applyChatMessageResizeAction = findFunctionDeclaration('applyChatMessageResizeAction');
         const source = getSource(applyChatMessageResizeAction);
 
-        expect(source).toContain('if (!isChatRenderLifecycleRolloutEnabled())');
+        expect(source).toContain('if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MEDIA_RESIZE))');
         expect(source).toContain('const resizeState = metadata ?? captureChatMessageResizeState(element, entry);');
         expect(source).toContain('intent: CHAT_SCROLL_INTENT.MEDIA_RESIZE');
         expect(source).toContain('autoScrollEnabled: power_user.auto_scroll_chat_to_bottom');
@@ -530,7 +540,7 @@ describe('chat render lifecycle script wiring', () => {
         const setupMobileChatViewportObserver = findFunctionDeclaration('setupMobileChatViewportObserver');
         const setupSource = getSource(setupMobileChatViewportObserver);
 
-        expect(setupSource).toContain('if (!isChatRenderLifecycleRolloutEnabled())');
+        expect(setupSource).toContain('if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MOBILE_VIEWPORT))');
         expect(setupSource).toContain('window.visualViewport?.addEventListener(\'scroll\', onViewportChange, { passive: true });');
         expect(setupSource).toContain('window.visualViewport?.addEventListener(\'resize\', onViewportChange, { passive: true });');
         expect(setupSource).toContain('disposeMobileChatViewportObserver();');
@@ -569,7 +579,7 @@ describe('chat render lifecycle script wiring', () => {
         const resetMobileChatViewportLifecycle = findFunctionDeclaration('resetMobileChatViewportLifecycle');
         const resetSource = getSource(resetMobileChatViewportLifecycle);
 
-        expect(resetSource).toContain('if (!isChatRenderLifecycleRolloutEnabled())');
+        expect(resetSource).toContain('if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MOBILE_VIEWPORT))');
         expect(resetSource).toContain('resetMobileViewportScrollState();');
         expect(resetSource).toContain('setupMobileChatViewportObserver(getMobileViewportScrollHandler());');
 
