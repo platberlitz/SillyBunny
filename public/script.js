@@ -34,7 +34,10 @@ import {
     parseTextgenLogprobs,
     parseTabbyLogprobs,
     initTextGenSettings,
+    getTextGenServer,
+    getStatusTextgen,
 } from './scripts/textgen-settings.js';
+import { shouldRestoreTextGenStatusOnStartup } from './scripts/textgen-startup-status.js';
 
 import {
     world_info,
@@ -306,14 +309,10 @@ import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker
 import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
 import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
 import {
-    CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     captureVisibleMessageAnchor,
-    resolveChatBottomScrollAction,
-    resolveChatRenderLifecycleRollout,
     restoreVisibleMessageAnchor,
     settleVisibleMessageAnchor,
-    shouldApplyChatBottomScrollAction,
-} from './scripts/chat-render-lifecycle/index.js';
+} from './scripts/chat-render-lifecycle/anchor.js';
 import {
     CARD_SCRIPT_MARKER_TAG,
     buildCardScriptToastKey,
@@ -9419,6 +9418,10 @@ export async function getSettings(initLoaderHandle = null) {
         $('#main_api').val(main_api);
         $(`#main_api option[value=${main_api}]`).attr('selected', 'true');
         changeMainAPI();
+        if (shouldRestoreTextGenStatusOnStartup({ mainApi: main_api, serverUrl: getTextGenServer() })) {
+            startStatusLoading();
+            getStatusTextgen();
+        }
 
         //Load User's Name and Avatar
         initUserAvatar(settings.user_avatar);
@@ -9869,12 +9872,118 @@ function normalizeSrgbAlpha(alpha) {
     return Number.isFinite(numericAlpha) ? clamp(numericAlpha, 0, 1) : null;
 }
 
+function normalizeOklabLightness(lightness) {
+    const trimmedLightness = lightness.trim();
+
+    if (trimmedLightness.endsWith('%')) {
+        const percent = Number.parseFloat(trimmedLightness.slice(0, -1));
+        return Number.isFinite(percent) ? clamp(percent / 100, 0, 1) : null;
+    }
+
+    const numericLightness = Number.parseFloat(trimmedLightness);
+    if (!Number.isFinite(numericLightness)) {
+        return null;
+    }
+
+    return clamp(numericLightness > 1 ? numericLightness / 100 : numericLightness, 0, 1);
+}
+
+function normalizeOklchChroma(chroma) {
+    const trimmedChroma = chroma.trim();
+    if (trimmedChroma === 'none') {
+        return 0;
+    }
+
+    if (trimmedChroma.endsWith('%')) {
+        const percent = Number.parseFloat(trimmedChroma.slice(0, -1));
+        return Number.isFinite(percent) ? Math.max(0, percent / 100 * 0.4) : null;
+    }
+
+    const numericChroma = Number.parseFloat(trimmedChroma);
+    return Number.isFinite(numericChroma) ? Math.max(0, numericChroma) : null;
+}
+
+function normalizeCssHueToDegrees(hue) {
+    const trimmedHue = hue.trim().toLowerCase();
+    if (trimmedHue === 'none') {
+        return 0;
+    }
+
+    const numericHue = Number.parseFloat(trimmedHue);
+    if (!Number.isFinite(numericHue)) {
+        return null;
+    }
+
+    if (trimmedHue.endsWith('turn')) {
+        return numericHue * 360;
+    }
+
+    if (trimmedHue.endsWith('rad')) {
+        return numericHue * 180 / Math.PI;
+    }
+
+    if (trimmedHue.endsWith('grad')) {
+        return numericHue * 0.9;
+    }
+
+    return numericHue;
+}
+
+function linearSrgbToRgbChannel(channel) {
+    const clampedChannel = clamp(channel, 0, 1);
+    const srgbChannel = clampedChannel <= 0.0031308
+        ? 12.92 * clampedChannel
+        : 1.055 * Math.pow(clampedChannel, 1 / 2.4) - 0.055;
+
+    return Math.round(clamp(srgbChannel, 0, 1) * 255);
+}
+
+function oklabToRgbString(lightness, a, b, alpha) {
+    const lPrime = lightness + 0.3963377774 * a + 0.2158037573 * b;
+    const mPrime = lightness - 0.1055613458 * a - 0.0638541728 * b;
+    const sPrime = lightness - 0.0894841775 * a - 1.2914855480 * b;
+    const l = lPrime ** 3;
+    const m = mPrime ** 3;
+    const s = sPrime ** 3;
+    const red = linearSrgbToRgbChannel(+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s);
+    const green = linearSrgbToRgbChannel(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s);
+    const blue = linearSrgbToRgbChannel(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s);
+
+    return alpha >= 1
+        ? `rgb(${red}, ${green}, ${blue})`
+        : `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function normalizeOklchFunctionString(value) {
+    return value.replace(/oklch\(\s*([^()]+?)\s*\)/gi, (_match, contents) => {
+        const [channelSection, alphaSection] = contents.split('/').map(section => section.trim());
+        const channels = channelSection.split(/\s+/).filter(Boolean);
+
+        if (channels.length < 2) {
+            return _match;
+        }
+
+        const lightness = normalizeOklabLightness(channels[0]);
+        const chroma = normalizeOklchChroma(channels[1]);
+        const hue = normalizeCssHueToDegrees(channels[2] ?? '0');
+        const alpha = alphaSection ? normalizeSrgbAlpha(alphaSection) : 1;
+        if ([lightness, chroma, hue, alpha].some(channel => channel === null)) {
+            return _match;
+        }
+
+        const hueRadians = hue * Math.PI / 180;
+        const a = chroma * Math.cos(hueRadians);
+        const b = chroma * Math.sin(hueRadians);
+        return oklabToRgbString(lightness, a, b, alpha);
+    });
+}
+
 function normalizeColorFunctionString(value) {
-    if (!/color\(srgb/i.test(value)) {
+    if (!/(?:color\(srgb|oklch\()/i.test(value)) {
         return value;
     }
 
-    return value.replace(/color\(srgb\s+([^()]+?)\)/gi, (_match, contents) => {
+    const normalizedSrgbValue = value.replace(/color\(srgb\s+([^()]+?)\)/gi, (_match, contents) => {
         const [channelSection, alphaSection] = contents.split('/').map(section => section.trim());
         const channels = channelSection.split(/\s+/).filter(Boolean);
 
@@ -9898,6 +10007,8 @@ function normalizeColorFunctionString(value) {
 
         return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
     });
+
+    return normalizeOklchFunctionString(normalizedSrgbValue);
 }
 
 function normalizeMessageScreenshotStyles(container) {
@@ -9915,7 +10026,7 @@ function normalizeMessageScreenshotStyles(container) {
             }
 
             const propertyValue = computedStyle.getPropertyValue(propertyName);
-            if (!/color\(srgb/i.test(propertyValue)) {
+            if (!/(?:color\(srgb|oklch\()/i.test(propertyValue)) {
                 continue;
             }
 
@@ -13297,7 +13408,7 @@ export async function processDroppedFiles(files, data = new Map()) {
 
     if (avatarFileNames.length > 0) {
         await importCharactersTags(avatarFileNames);
-        selectImportedChar(avatarFileNames[avatarFileNames.length - 1]);
+        await selectImportedChar(avatarFileNames[avatarFileNames.length - 1]);
     }
 }
 
@@ -13318,13 +13429,18 @@ async function importCharactersTags(avatarFileNames) {
 /**
  * Selects the given imported char
  * @param {string} charId char to select
+ * @returns {Promise<boolean>} True if the imported character was selected
  */
-function selectImportedChar(charId) {
-    let oldSelectedChar = null;
-    if (this_chid !== undefined) {
-        oldSelectedChar = characters[this_chid].avatar;
+async function selectImportedChar(charId) {
+    const avatarFileName = String(charId).endsWith('.png') ? String(charId) : `${charId}.png`;
+    const importedCharacterId = characters.findIndex(character => character.avatar === avatarFileName);
+
+    if (importedCharacterId === -1) {
+        console.log(`Could not find imported character ${charId} in the list`);
+        return false;
     }
-    select_rm_info('char_import_no_toast', charId, oldSelectedChar);
+
+    return selectCharacterById(importedCharacterId);
 }
 
 /**
@@ -13391,7 +13507,7 @@ async function importCharacter(file, { preserveFileName = '', importTags = false
             }
             if (importTags) {
                 await importCharactersTags([avatarFileName]);
-                selectImportedChar(data.file_name);
+                await selectImportedChar(data.file_name);
             }
             return avatarFileName;
         }
@@ -14916,7 +15032,7 @@ jQuery(async function () {
 
         if (avatarFileNames.length > 0) {
             await importCharactersTags(avatarFileNames);
-            selectImportedChar(avatarFileNames[avatarFileNames.length - 1]);
+            await selectImportedChar(avatarFileNames[avatarFileNames.length - 1]);
         }
 
         // Clear the file input value to allow re-uploading the same file

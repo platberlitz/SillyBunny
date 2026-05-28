@@ -85,7 +85,7 @@ import { COMETAPI_IGNORE_PATTERNS, IGNORE_SYMBOL, MEDIA_DISPLAY, MEDIA_TYPE } fr
 import { syncOpenRouterProvidersForModel, updateOpenRouterProvidersWarning } from './textgen-models.js';
 import { hasTextOrArrayPayload, shouldRetainContextAtDepth, stripHtmlTagsFromContext, stripOocBlocksFromContext } from './ooc-blocks.js';
 import { checkPostInterceptChatBudget } from './openai-prompt-budget.js';
-import { buildChatCompletionPreset, shouldIncludeConnectionFieldsInPreset } from './openai-preset-utils.js';
+import { buildChatCompletionPresetForSave } from './openai-preset-utils.js';
 
 export {
     openai_messages_count,
@@ -6283,7 +6283,7 @@ async function getStatusOpen() {
  * @returns {Object} The preset body object
  */
 export function getChatCompletionPreset(settings = oai_settings) {
-    return buildChatCompletionPreset(settings, settingsToUpdate);
+    return buildChatCompletionPresetForSave(settings, settingsToUpdate);
 }
 
 function normalizeLogitBiasEntry(entry) {
@@ -6371,9 +6371,7 @@ function refreshLogitBiasPresetOptions() {
  * @returns {Promise<void>}
  */
 async function saveOpenAIPreset(name, settings, triggerUi = true) {
-    const presetBody = buildChatCompletionPreset(settings, settingsToUpdate, {
-        includeConnection: shouldIncludeConnectionFieldsInPreset(settings),
-    });
+    const presetBody = getChatCompletionPreset(settings);
     const savePresetSettings = await fetch('/api/presets/save', {
         method: 'POST',
         headers: getRequestHeaders(),
@@ -6390,7 +6388,7 @@ async function saveOpenAIPreset(name, settings, triggerUi = true) {
         if (Object.keys(openai_setting_names).includes(data.name)) {
             oai_settings.preset_settings_openai = data.name;
             const value = openai_setting_names[data.name];
-            Object.assign(openai_settings[value], presetBody);
+            openai_settings[value] = presetBody;
             $(`#settings_preset_openai option[value="${value}"]`).prop('selected', true);
             if (triggerUi) $('#settings_preset_openai').trigger('change');
         } else {

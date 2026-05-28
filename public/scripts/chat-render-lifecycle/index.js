@@ -4,10 +4,6 @@ import {
     settleVisibleMessageAnchor,
 } from './anchor.js';
 import {
-    resolveChatBottomScrollAction,
-    shouldApplyChatBottomScrollAction,
-} from './bottom-scroll.js';
-import {
     createFrameWriteScheduler,
     runSettledFrames,
 } from './scheduler.js';
@@ -27,13 +23,11 @@ export {
     CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
     createFrameWriteScheduler,
-    resolveChatBottomScrollAction,
     resolveChatScrollAction,
     restoreVisibleMessageAnchor,
     resolveChatRenderLifecycleRollout,
     runSettledFrames,
     settleVisibleMessageAnchor,
-    shouldApplyChatBottomScrollAction,
 };
 
 /**
@@ -50,10 +44,6 @@ export function createChatRenderLifecycle() {
         scheduler: {
             createFrameWriteScheduler,
             runSettledFrames,
-        },
-        bottomScroll: {
-            resolve: resolveChatBottomScrollAction,
-            shouldApply: shouldApplyChatBottomScrollAction,
         },
         scrollIntent: {
             action: CHAT_SCROLL_ACTION,
