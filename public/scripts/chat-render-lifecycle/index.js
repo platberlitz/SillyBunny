@@ -24,6 +24,9 @@ import {
     renderMessagesInBatches,
 } from './render-batch.js';
 import {
+    createStreamWriteBuffer,
+} from './stream-buffer.js';
+import {
     createMessageUpdateQueue,
 } from './update-queue.js';
 
@@ -34,6 +37,7 @@ export {
     captureVisibleMessageAnchor,
     createMessageUpdateQueue,
     createFrameWriteScheduler,
+    createStreamWriteBuffer,
     resolveChatBottomScrollAction,
     resolveChatScrollAction,
     restoreVisibleMessageAnchor,
@@ -74,6 +78,9 @@ export function createChatRenderLifecycle() {
         },
         renderBatch: {
             render: renderMessagesInBatches,
+        },
+        streamBuffer: {
+            create: createStreamWriteBuffer,
         },
         updateQueue: {
             create: createMessageUpdateQueue,
