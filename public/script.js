@@ -312,6 +312,7 @@ import {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
+    createMessageUpdateQueue,
     renderMessagesInBatches,
     resolveChatBottomScrollAction,
     resolveChatRenderLifecycleRollout,
@@ -598,6 +599,7 @@ let pendingMobileMessageUpdateFrame = 0;
 let pendingMobileMessageUpdateTimer = 0;
 /** @type {Map<number, { message: object, rerenderMessage: boolean }>} */
 const pendingMobileMessageUpdates = new Map();
+let messageUpdateQueue = null;
 
 let dialogueResolve = null;
 let dialogueCloseStop = false;
@@ -1983,6 +1985,22 @@ async function settleVisibleChatMessageAnchor(anchor, frames = 8) {
     });
 }
 
+function getMessageUpdateQueue() {
+    if (!messageUpdateQueue) {
+        messageUpdateQueue = createMessageUpdateQueue({
+            applyUpdate: applyMessageBlockUpdate,
+        });
+    }
+
+    return messageUpdateQueue;
+}
+
+function updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessage }) {
+    const queue = getMessageUpdateQueue();
+    queue.queue(messageId, message, { rerenderMessage });
+    queue.flush();
+}
+
 function flushPendingMobileMessageUpdates() {
     pendingMobileMessageUpdateFrame = 0;
     pendingMobileMessageUpdateTimer = 0;
@@ -2926,6 +2944,11 @@ function applyMessageBlockUpdate(messageId, message, { rerenderMessage = true } 
 export function updateMessageBlock(messageId, message, { rerenderMessage = true } = {}) {
     if (shouldDeferMobileMessageUpdates()) {
         queueMobileMessageBlockUpdate(messageId, message, { rerenderMessage });
+        return;
+    }
+
+    if (isChatRenderLifecycleRolloutEnabled()) {
+        updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessage });
         return;
     }
 
