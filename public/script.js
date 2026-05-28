@@ -313,6 +313,7 @@ import {
     CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
     createMessageUpdateQueue,
+    createStreamWriteBuffer,
     renderMessagesInBatches,
     resolveChatBottomScrollAction,
     resolveChatRenderLifecycleRollout,
@@ -599,6 +600,7 @@ let pendingMobileMessageUpdateFrame = 0;
 let pendingMobileMessageUpdateTimer = 0;
 let messageUpdateQueue = null;
 let mobileMessageUpdateQueue = null;
+let streamingVisibleWriteBuffer = null;
 
 let dialogueResolve = null;
 let dialogueCloseStop = false;
@@ -2002,6 +2004,54 @@ function getMobileMessageUpdateQueue() {
     }
 
     return mobileMessageUpdateQueue;
+}
+
+function applyStreamingVisibleWrite(messageId, {
+    messageTextDom,
+    messageTimerDom,
+    messageTokenCounterDom,
+    messageDom,
+    message,
+    formattedText,
+    timePassed,
+    currentTokenCount,
+    shouldRefreshTokenCount,
+    shouldUpdateMetaBadges,
+    shouldUseStreamFadeIn,
+    bypassFadeIn,
+}, { isFinal = false } = {}) {
+    if (shouldRefreshTokenCount && messageTokenCounterDom instanceof HTMLElement) {
+        messageTokenCounterDom.textContent = `${currentTokenCount}t`;
+    }
+
+    if (shouldUpdateMetaBadges) {
+        updateMessageMetaBadges(messageDom, message);
+    }
+
+    if (messageTextDom instanceof HTMLElement) {
+        if (shouldUseStreamFadeIn) {
+            applyStreamFadeIn(messageTextDom, formattedText, { bypassFadeIn });
+        } else {
+            messageTextDom.innerHTML = formattedText;
+        }
+    }
+
+    if (messageTimerDom instanceof HTMLElement) {
+        messageTimerDom.textContent = timePassed.timerValue;
+        messageTimerDom.title = timePassed.timerTitle;
+    }
+
+    return isFinal;
+}
+
+function getStreamingVisibleWriteBuffer() {
+    if (!streamingVisibleWriteBuffer) {
+        streamingVisibleWriteBuffer = createStreamWriteBuffer({
+            applyWrite: applyStreamingVisibleWrite,
+        });
+    }
+
+    return streamingVisibleWriteBuffer;
 }
 
 function updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessage }) {
@@ -4779,6 +4829,15 @@ class StreamingProcessor {
         }
     }
 
+    #queueStreamingVisibleWrite({ messageId, write, isFinal }) {
+        if (!isChatRenderLifecycleRolloutEnabled()) {
+            applyStreamingVisibleWrite(messageId, write, { isFinal });
+            return;
+        }
+
+        getStreamingVisibleWriteBuffer().queue(messageId, write, { isFinal });
+    }
+
     markUIGenStarted() {
         deactivateSendButtons();
     }
@@ -4883,16 +4942,6 @@ class StreamingProcessor {
                 });
                 currentTokenCount = outputTokens;
             }
-            if (shouldRefreshTokenCount) {
-                if (this.messageTokenCounterDom instanceof HTMLElement) {
-                    this.messageTokenCounterDom.textContent = `${currentTokenCount}t`;
-                }
-            }
-
-            if (!shouldReduceIntermediateStreamingWork) {
-                updateMessageMetaBadges(this.messageDom, chat[messageId]);
-            }
-
             if ((this.type == 'swipe' || this.type === 'continue') && Array.isArray(chat[messageId].swipes)) {
                 chat[messageId].swipes[chat[messageId].swipe_id] = processedText;
                 if (!shouldReduceIntermediateStreamingWork) {
@@ -4914,21 +4963,25 @@ class StreamingProcessor {
                 {},
                 false,
             );
-            if (this.messageTextDom instanceof HTMLElement) {
-                if (power_user.stream_fade_in) {
-                    applyStreamFadeIn(this.messageTextDom, formattedText, {
-                        bypassFadeIn: isIOSWebKit && power_user.ios_webkit_disable_stream_fade_in,
-                    });
-                } else {
-                    this.messageTextDom.innerHTML = formattedText;
-                }
-            }
-
             const timePassed = formatGenerationTimer(this.timeStarted, currentTime, currentTokenCount, this.reasoningHandler.getDuration(), this.timeToFirstToken);
-            if (this.messageTimerDom instanceof HTMLElement) {
-                this.messageTimerDom.textContent = timePassed.timerValue;
-                this.messageTimerDom.title = timePassed.timerTitle;
-            }
+            this.#queueStreamingVisibleWrite({
+                messageId,
+                write: {
+                    messageTextDom: this.messageTextDom,
+                    messageTimerDom: this.messageTimerDom,
+                    messageTokenCounterDom: this.messageTokenCounterDom,
+                    messageDom: this.messageDom,
+                    message: chat[messageId],
+                    formattedText,
+                    timePassed,
+                    currentTokenCount,
+                    shouldRefreshTokenCount,
+                    shouldUpdateMetaBadges: !shouldReduceIntermediateStreamingWork,
+                    shouldUseStreamFadeIn: power_user.stream_fade_in,
+                    bypassFadeIn: isIOSWebKit && power_user.ios_webkit_disable_stream_fade_in,
+                },
+                isFinal,
+            });
 
             if (!shouldReduceIntermediateStreamingWork) {
                 this.setFirstSwipe(messageId);
