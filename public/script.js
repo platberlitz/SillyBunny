@@ -335,6 +335,7 @@ import {
 } from './scripts/chat-render-lifecycle/index.js';
 import {
     resolveGenerationUiLockState,
+    resolveGenerationOutputBufferState,
     resolveGenerationUnblockState,
     resolveStopGenerationState,
 } from './scripts/generation-lifecycle/index.js';
@@ -5304,6 +5305,46 @@ function hideStopButton({ emitGenerationEnded = true } = {}) {
     }
 }
 
+async function shouldBufferMainGenerationOutput({ type, isStreaming = false } = {}) {
+    const eventData = {
+        type,
+        isStreaming: Boolean(isStreaming),
+        hasPostMainInterceptors: false,
+    };
+
+    await eventSource.emit(event_types.GENERATION_OUTPUT_BUFFERING_DECISION, eventData);
+    return resolveGenerationOutputBufferState({
+        type,
+        isStreaming,
+        hasPostMainInterceptors: Boolean(eventData.hasPostMainInterceptors),
+    }).shouldBuffer;
+}
+
+async function applyMainGenerationOutputInterceptors({ type, text, isStreaming = false } = {}) {
+    const outputState = resolveGenerationOutputBufferState({
+        type,
+        isStreaming,
+        hasPostMainInterceptors: true,
+    });
+
+    if (!outputState.canInterceptMainOutput) {
+        return { text, cancelled: false };
+    }
+
+    const eventData = {
+        type,
+        isStreaming: Boolean(isStreaming),
+        text: String(text ?? ''),
+        cancelled: false,
+    };
+
+    await eventSource.emit(event_types.MAIN_GENERATION_OUTPUT_READY, eventData);
+    return {
+        text: typeof eventData.text === 'string' ? eventData.text : String(text ?? ''),
+        cancelled: Boolean(eventData.cancelled),
+    };
+}
+
 class StreamingProcessor {
     /**
      * Creates a new streaming processor.
@@ -5688,6 +5729,62 @@ class StreamingProcessor {
      */
     async* nullStreamingGeneration() {
         throw new Error('Generation function for streaming is not hooked up');
+    }
+
+    async generateBuffered() {
+        const isImpersonate = this.type == 'impersonate';
+        const isContinue = this.type == 'continue';
+        this.stoppingStrings = getStoppingStrings(isImpersonate, isContinue, main_api);
+
+        try {
+            const timestamps = [];
+            for await (const { text, swipes, logprobs, toolCalls, state } of this.generator()) {
+                const now = Date.now();
+                timestamps.push(now);
+                if (!this.timeToFirstToken) {
+                    this.timeToFirstToken = now - this.createdAt.getTime();
+                }
+                if (this.isStopped || this.abortController.signal.aborted) {
+                    this.isStopped = true;
+                    this.isFinished = true;
+                    return this.result;
+                }
+
+                this.toolCalls = toolCalls;
+                this.result = text;
+                this.swipes = Array.from(swipes ?? []);
+                if (logprobs) {
+                    this.messageLogprobs.push(...(Array.isArray(logprobs) ? logprobs : [logprobs]));
+                }
+                this.pendingReasoning = typeof state?.reasoning === 'string' ? state.reasoning : null;
+                if (this.pendingReasoning !== null) {
+                    this.reasoningHandler.reasoning = getRegexedString(this.pendingReasoning, regex_placement.REASONING);
+                }
+                this.images = state?.images ?? [];
+                this.reasoningSignature = state?.signature ?? null;
+                this.reasoningTokens = state?.reasoning_tokens ?? 0;
+            }
+            const seconds = (timestamps[timestamps.length - 1] - timestamps[0]) / 1000;
+            console.warn(`Stream stats: ${timestamps.length} tokens, ${seconds.toFixed(2)} seconds, rate: ${Number(timestamps.length / seconds).toFixed(2)} TPS`);
+        } catch (err) {
+            const isCancelled = this.isCancelled || this.abortController.signal.aborted;
+            if (!this.isFinished && isCancelled) {
+                this.isStopped = true;
+                this.isFinished = true;
+                return this.result;
+            }
+
+            if (!this.isFinished) {
+                console.error(err);
+                this.abortController.abort();
+                this.isStopped = true;
+                this.isFinished = true;
+            }
+            return this.result;
+        }
+
+        this.isFinished = true;
+        return this.result;
     }
 
     async generate() {
@@ -7318,10 +7415,13 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                     activeStreamingProcessor.firstMessageText = '';
                 }
 
+                const shouldBufferOutput = await shouldBufferMainGenerationOutput({ type, isStreaming: true });
                 activeStreamingProcessor.generator = await sendStreamingRequest(type, generate_data, { jsonSchema, cacheScope: generate_data.cacheScope });
 
                 hideSwipeButtons();
-                let getMessage = await activeStreamingProcessor.generate();
+                let getMessage = shouldBufferOutput
+                    ? await activeStreamingProcessor.generateBuffered()
+                    : await activeStreamingProcessor.generate();
                 let messageChunk = cleanUpMessage({
                     getMessage: getMessage,
                     isImpersonate: isImpersonate,
@@ -7339,11 +7439,11 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 const isStreamFinished = !isStreamCancelled && activeStreamingProcessor.isFinished;
                 const isStreamWithToolCalls = Array.isArray(activeStreamingProcessor.toolCalls) && activeStreamingProcessor.toolCalls.length;
                 if (canPerformToolCalls && isStreamFinished && isStreamWithToolCalls) {
-                    const lastMessage = chat[chat.length - 1];
                     const hasToolCalls = ToolManager.hasToolCalls(activeStreamingProcessor.toolCalls);
-                    const shouldDeleteMessage = type !== 'swipe' && ['', '...'].includes(lastMessage?.mes) && !lastMessage?.extra?.reasoning && ['', '...'].includes(activeStreamingProcessor.result);
+                    const lastMessage = chat[chat.length - 1];
+                    const shouldDeleteMessage = !shouldBufferOutput && type !== 'swipe' && ['', '...'].includes(lastMessage?.mes) && !lastMessage?.extra?.reasoning && ['', '...'].includes(activeStreamingProcessor.result);
                     hasToolCalls && shouldDeleteMessage && await deleteLastMessage();
-                    if (hasToolCalls && !shouldDeleteMessage) {
+                    if (!shouldBufferOutput && hasToolCalls && !shouldDeleteMessage) {
                         await activeStreamingProcessor.finalizeIntermediaryMessage(activeStreamingProcessor.messageId, getMessage, { unlockUI: false });
                     }
                     const invocationResult = await ToolManager.invokeFunctionTools(activeStreamingProcessor.toolCalls, {
@@ -7369,6 +7469,55 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 }
 
                 if (isStreamFinished) {
+                    if (shouldBufferOutput) {
+                        const interceptResult = await applyMainGenerationOutputInterceptors({
+                            type,
+                            text: getMessage,
+                            isStreaming: true,
+                        });
+
+                        if (interceptResult.cancelled || activeStreamingProcessor.abortController.signal.aborted) {
+                            unblockGeneration(type, { emitGenerationEnded: false });
+                            clearStreamingProcessorIfCurrent(activeStreamingProcessor);
+                            return;
+                        }
+
+                        getMessage = interceptResult.text;
+                        messageChunk = cleanUpMessage({
+                            getMessage: getMessage,
+                            isImpersonate: isImpersonate,
+                            isContinue: isContinue,
+                            displayIncompleteSentences: false,
+                        });
+
+                        const saveReplyType = originalType !== 'continue' ? type : 'appendFinal';
+                        ({ type, getMessage } = await saveReply({
+                            type: saveReplyType,
+                            getMessage,
+                            swipes: activeStreamingProcessor.swipes,
+                            reasoning: activeStreamingProcessor.reasoningHandler.reasoning,
+                            imageUrls: activeStreamingProcessor.images,
+                            reasoningSignature: activeStreamingProcessor.reasoningSignature,
+                            reasoningTokens: activeStreamingProcessor.reasoningTokens,
+                        }));
+                        saveLogprobsForActiveMessage(activeStreamingProcessor.messageLogprobs.filter(Boolean), continue_mag);
+                        unblockGeneration(type);
+                        clearStreamingProcessorIfCurrent(activeStreamingProcessor);
+
+                        const isAborted = activeStreamingProcessor.abortController.signal.aborted;
+                        if (!isAborted && power_user.auto_swipe && generatedTextFiltered(getMessage)) {
+                            return await swipe(null, SWIPE_DIRECTION.RIGHT, { source: SWIPE_SOURCE.AUTO_SWIPE, repeated: true, forceMesId: chat.length - 1 });
+                        }
+
+                        await saveChatConditional();
+                        playMessageSound();
+                        triggerAutoContinue(messageChunk, isImpersonate);
+                        return Object.defineProperties(new String(getMessage), {
+                            'messageChunk': { value: messageChunk },
+                            'fromStream': { value: true },
+                        });
+                    }
+
                     await activeStreamingProcessor.onFinishStreaming(activeStreamingProcessor.messageId, getMessage);
                     clearStreamingProcessorIfCurrent(activeStreamingProcessor);
                     triggerAutoContinue(messageChunk, isImpersonate);
@@ -7460,6 +7609,26 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             isImpersonate: isImpersonate,
             isContinue: isContinue,
             displayIncompleteSentences: displayIncomplete,
+        });
+
+        const interceptResult = await applyMainGenerationOutputInterceptors({
+            type,
+            text: getMessage,
+            isStreaming: false,
+        });
+
+        if (interceptResult.cancelled || (abortController && abortController.signal.aborted)) {
+            unblockGeneration(type, { emitGenerationEnded: false });
+            streamingProcessor = null;
+            return;
+        }
+
+        getMessage = interceptResult.text;
+        messageChunk = cleanUpMessage({
+            getMessage: getMessage,
+            isImpersonate: isImpersonate,
+            isContinue: isContinue,
+            displayIncompleteSentences: false,
         });
 
         if (isImpersonate) {

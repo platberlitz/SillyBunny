@@ -144,6 +144,7 @@ const AGENT_PHASE_LABELS = {
 };
 const DEFAULT_PRE_PROCESS = {
     mode: 'inject',
+    interceptTiming: 'pre-generation',
     applyMode: 'replace',
     wrapPosition: 'after',
     wrapPrefix: '',
@@ -508,6 +509,13 @@ function isPreGenerationInterceptAgent(agent) {
     );
 }
 
+function isPostMainGenerationInterceptAgent(agent) {
+    return Boolean(
+        isPreGenerationInterceptAgent(agent) &&
+        getAgentPreProcess(agent).interceptTiming === 'post-main-generation',
+    );
+}
+
 function canPreviewPreGenerationPrompt(agent) {
     return Boolean(
         !isPathfinderAgent(agent) &&
@@ -531,7 +539,9 @@ async function previewPreGenerationPrompt(agent, promptOverride = null) {
         dynamicMacros: buildPromptDynamicMacros('', null, agent, 'normal'),
     });
     const previewNote = isPreGenerationInterceptAgent(agent)
-        ? 'Preview shows the agent instruction after macro substitution. At runtime, intercept mode also receives the assembled outgoing context and can rewrite it before the main model sees it.'
+        ? isPostMainGenerationInterceptAgent(agent)
+            ? 'Preview shows the agent instruction after macro substitution. At runtime, post-main intercept mode also receives the fresh assistant output and can rewrite it before it is shown or saved.'
+            : 'Preview shows the agent instruction after macro substitution. At runtime, intercept mode also receives the assembled outgoing context and can rewrite it before the main model sees it.'
         : 'Preview uses the current chat context with no generated assistant message yet. Random macros are evaluated now and may differ when the agent runs.';
     const previewHtml = $(
         `<div class="ica--prompt-preview">
@@ -1618,6 +1628,7 @@ function renderAgentList() {
             const promptTransformEnabled = hasPromptTransform(agent);
             const promptTransformLabel = getPromptTransformLabel(agent);
             const preInterceptEnabled = isPreGenerationInterceptAgent(agent);
+            const preInterceptLabel = isPostMainGenerationInterceptAgent(agent) ? 'post-main intercept' : 'pre intercept';
             const previewPromptButton = canPreviewPreGenerationPrompt(agent)
                 ? `<button type="button" class="ica--card-btn ica--btn-preview-prompt" title="Preview this pre-generation prompt after macro substitution" aria-label="${preInterceptEnabled ? 'Preview Instruction' : 'Preview Prompt'}"><i class="fa-solid fa-eye"></i></button>`
                 : '';
@@ -1646,7 +1657,7 @@ function renderAgentList() {
                     <div class="ica--card-desc">${escapeHtml(desc)}</div>
                     <div class="ica--card-meta">
                         ${agent.conditions.triggerProbability < 100 ? `<span class="ica--card-pill"><i class="fa-solid fa-dice fa-xs"></i> ${agent.conditions.triggerProbability}%</span>` : ''}
-                        ${preInterceptEnabled ? '<span class="ica--card-pill"><i class="fa-solid fa-shuffle fa-xs"></i> pre intercept</span>' : ''}
+                        ${preInterceptEnabled ? `<span class="ica--card-pill"><i class="fa-solid fa-shuffle fa-xs"></i> ${preInterceptLabel}</span>` : ''}
                         ${!preInterceptEnabled && agent.injection.position === 1 ? `<span class="ica--card-pill">depth ${agent.injection.depth}</span>` : ''}
                         ${promptTransformEnabled ? `<span class="ica--card-pill"><i class="fa-solid fa-robot fa-xs"></i> ${promptTransformLabel}</span>` : ''}
                         ${regexCount > 0 ? `<span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${regexCount} regex</span>` : ''}
@@ -1928,6 +1939,7 @@ async function openEditor(agentId = null) {
     editorEl.find('#ica--editor-scan').prop('checked', agent.injection.scan);
     const preProcess = getAgentPreProcess(agent);
     editorEl.find('#ica--editor-pre-mode').val(preProcess.mode);
+    editorEl.find('#ica--editor-pre-interceptTiming').val(preProcess.interceptTiming);
     editorEl.find('#ica--editor-pre-applyMode').val(preProcess.applyMode);
     editorEl.find('#ica--editor-pre-wrapPosition').val(preProcess.wrapPosition);
     editorEl.find('#ica--editor-pre-wrapPrefix').val(preProcess.wrapPrefix);
@@ -2200,6 +2212,9 @@ async function openEditor(agentId = null) {
             preProcess: {
                 ...getAgentPreProcess(agent),
                 mode: editorEl.find('#ica--editor-pre-mode').val()?.toString() || 'inject',
+                interceptTiming: editorEl.find('#ica--editor-pre-interceptTiming').val()?.toString() === 'post-main-generation'
+                    ? 'post-main-generation'
+                    : 'pre-generation',
             },
         };
         await previewPreGenerationPrompt(previewAgent, editorEl.find('#ica--editor-prompt').val()?.toString() || '');
@@ -2235,6 +2250,9 @@ async function openEditor(agentId = null) {
     agent.preProcess = {
         ...getAgentPreProcess(agent),
         mode: editorEl.find('#ica--editor-pre-mode').val()?.toString() === 'intercept' ? 'intercept' : 'inject',
+        interceptTiming: editorEl.find('#ica--editor-pre-interceptTiming').val()?.toString() === 'post-main-generation'
+            ? 'post-main-generation'
+            : 'pre-generation',
         applyMode: ['replace', 'wrap', 'patch'].includes(editorEl.find('#ica--editor-pre-applyMode').val()?.toString())
             ? editorEl.find('#ica--editor-pre-applyMode').val().toString()
             : 'replace',
@@ -3024,13 +3042,14 @@ function buildPromptTransformDiffMarkup(beforeText, afterText) {
 
 function getPreGenerationInterceptModeLabel(entry) {
     const mode = String(entry?.applyMode ?? 'replace');
+    const timing = entry?.timing === 'post-main-generation' ? 'post-main' : 'pre-gen';
     if (mode === 'wrap') {
-        return 'wrap';
+        return `${timing} wrap`;
     }
     if (mode === 'patch') {
-        return 'patch';
+        return `${timing} patch`;
     }
-    return 'replace';
+    return `${timing} replace`;
 }
 
 function parseChatInterceptSummaryMessages(value) {
@@ -3242,7 +3261,7 @@ function buildPreGenerationInterceptEntryMarkup(entry, i) {
 
     return `
         <div class="ica-transform-history-entry ica-preintercept-history-entry" data-index="${i}">
-            <h5>${escapeHtml(entry.agentName || 'Agent')} <small>(pre-gen ${escapeHtml(modeLabel)})</small></h5>
+            <h5>${escapeHtml(entry.agentName || 'Agent')} <small>(${escapeHtml(modeLabel)})</small></h5>
             <small>${escapeHtml(timestamp)}${timestamp ? ' · ' : ''}${escapeHtml(statusText)}</small>
             ${buildPreGenerationInterceptSummaryMarkup(entry)}
             <details class="ica-preintercept-raw">
@@ -3284,7 +3303,7 @@ async function openPromptTransformHistoryPopup(messageIndex) {
     }).join('');
 
     const html = $(`<div class="ica-transform-history">
-        ${preGenerationEntries ? `<section class="ica-transform-history-section"><h4>Pre-Generation Intercepts</h4>${preGenerationEntries}</section>` : ''}
+        ${preGenerationEntries ? `<section class="ica-transform-history-section"><h4>Generation Intercepts</h4>${preGenerationEntries}</section>` : ''}
         ${postGenerationEntries ? `<section class="ica-transform-history-section"><h4>Post-Generation Changes</h4>${postGenerationEntries}</section>` : ''}
     </div>`);
 

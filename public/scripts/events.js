@@ -55,6 +55,8 @@ export const event_types = {
     GROUP_CHAT_CREATED: 'group_chat_created',
     GENERATE_BEFORE_COMBINE_PROMPTS: 'generate_before_combine_prompts',
     GENERATE_AFTER_COMBINE_PROMPTS: 'generate_after_combine_prompts',
+    GENERATION_OUTPUT_BUFFERING_DECISION: 'generation_output_buffering_decision',
+    MAIN_GENERATION_OUTPUT_READY: 'main_generation_output_ready',
     GENERATE_AFTER_DATA: 'generate_after_data',
     GROUP_MEMBER_DRAFTED: 'group_member_drafted',
     GROUP_WRAPPER_STARTED: 'group_wrapper_started',

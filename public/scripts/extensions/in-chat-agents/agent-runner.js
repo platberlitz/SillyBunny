@@ -76,6 +76,8 @@ const DEFERRED_POST_PROCESSING_RETRY_MS = 50;
 const LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS = 30000;
 const MISSED_GENERATION_END_RECOVERY_MS = 200;
 const PATHFINDER_SUMMARIZE_TOOL_NAME = 'Pathfinder_Summarize';
+const PRE_GENERATION_INTERCEPT_TIMING = 'pre-generation';
+const POST_MAIN_GENERATION_INTERCEPT_TIMING = 'post-main-generation';
 
 /** @type {{ generationType: string, activeAgentIds: string[], chatId: string } | null} */
 let pendingGenerationSnapshot = null;
@@ -1771,6 +1773,17 @@ function getPreGenerationInterceptAgents(activeAgents) {
         !isToolAgent(agent) &&
         (agent.phase === 'pre' || agent.phase === 'both') &&
         agent.preProcess?.mode === 'intercept' &&
+        agent.preProcess?.interceptTiming !== POST_MAIN_GENERATION_INTERCEPT_TIMING &&
+        String(agent.prompt ?? '').trim(),
+    ).sort((a, b) => Number(a?.injection?.order ?? 100) - Number(b?.injection?.order ?? 100));
+}
+
+function getPostMainGenerationInterceptAgents(activeAgents) {
+    return activeAgents.filter(agent =>
+        !isToolAgent(agent) &&
+        (agent.phase === 'pre' || agent.phase === 'both') &&
+        agent.preProcess?.mode === 'intercept' &&
+        agent.preProcess?.interceptTiming === POST_MAIN_GENERATION_INTERCEPT_TIMING &&
         String(agent.prompt ?? '').trim(),
     ).sort((a, b) => Number(a?.injection?.order ?? 100) - Number(b?.injection?.order ?? 100));
 }
@@ -1843,13 +1856,17 @@ function showPromptTransformRunningToast(agent, mode, profileId = '', options = 
     const targetLabel = describePromptTransformTarget(profileId, profileId ? 'profile' : 'main');
     const metadata = getPromptTransformRunMetadata(agent, profileId);
     const cancelButtonClass = 'ica--toast-cancel-agent';
-    const kind = options?.kind === 'preIntercept' ? 'preIntercept' : 'postGen';
+    const kind = ['preIntercept', 'postMainIntercept'].includes(String(options?.kind))
+        ? String(options.kind)
+        : 'postGen';
     const applyMode = ['wrap', 'patch'].includes(String(options?.applyMode))
         ? String(options.applyMode)
         : 'replace';
     const runningLabel = kind === 'preIntercept'
         ? `Running pre-generation ${applyMode} intercept...`
-        : `Running ${modeLabel} via ${targetLabel}...`;
+        : kind === 'postMainIntercept'
+            ? `Running post-main ${applyMode} intercept...`
+            : `Running ${modeLabel} via ${targetLabel}...`;
     const messageHtml = `
         <div>${escapeToastHtml(runningLabel)}</div>
         <div>${escapeToastHtml(`Order ${metadata.order} | Model: ${metadata.modelLabel}`)}</div>
@@ -2254,7 +2271,20 @@ function buildPromptTransformMessages(agentPrompt, messageText, assistantName, g
     ];
 }
 
-function buildContextInterceptMessages(agentPrompt, contextText, generationType, contextFormat) {
+function buildContextInterceptMessages(agentPrompt, contextText, generationType, contextFormat, timing = PRE_GENERATION_INTERCEPT_TIMING) {
+    if (timing === POST_MAIN_GENERATION_INTERCEPT_TIMING) {
+        return [
+            {
+                role: 'system',
+                content: `${agentPrompt}\n\nYou are modifying the assistant response after the main model generated it, before it is shown or saved. Return only the final assistant response requested by the instructions above. Do not add commentary, labels, or code fences unless they are part of the response itself. If no changes are needed, return the original response verbatim.`,
+            },
+            {
+                role: 'user',
+                content: `Generation type: ${generationType}\n\nMain model output:\n<assistant_response>\n${contextText}\n</assistant_response>`,
+            },
+        ];
+    }
+
     const formatLabel = contextFormat === 'chat' ? 'JSON array of chat-completion messages' : 'plain text completion prompt';
 
     return [
@@ -2344,6 +2374,9 @@ function sanitizePreGenerationInterceptRunForStorage(result) {
         agentId: result.agentId,
         agentName: result.agentName,
         applyMode: result.applyMode,
+        timing: result.timing === POST_MAIN_GENERATION_INTERCEPT_TIMING
+            ? POST_MAIN_GENERATION_INTERCEPT_TIMING
+            : PRE_GENERATION_INTERCEPT_TIMING,
         contextFormat: result.contextFormat,
         status: result.status,
         changed: Boolean(result.changed),
@@ -3510,7 +3543,10 @@ async function runPromptTransformAgentsForText(promptTransformAgents, initialTex
     };
 }
 
-async function runContextInterceptAgent(agent, currentContextText, generationType, contextFormat) {
+async function runContextInterceptAgent(agent, currentContextText, generationType, contextFormat, options = {}) {
+    const timing = options.timing === POST_MAIN_GENERATION_INTERCEPT_TIMING
+        ? POST_MAIN_GENERATION_INTERCEPT_TIMING
+        : PRE_GENERATION_INTERCEPT_TIMING;
     const beforeText = normalizeContentText(currentContextText);
     const applyMode = ['wrap', 'patch'].includes(String(agent?.preProcess?.applyMode))
         ? String(agent.preProcess.applyMode)
@@ -3520,6 +3556,7 @@ async function runContextInterceptAgent(agent, currentContextText, generationTyp
         agentId: agent.id,
         agentName: agent.name,
         applyMode,
+        timing,
         contextFormat,
         changed: false,
         beforeText,
@@ -3541,10 +3578,13 @@ async function runContextInterceptAgent(agent, currentContextText, generationTyp
         };
     }
 
-    const promptMessages = buildContextInterceptMessages(expandedPrompt, currentContextText, generationType, contextFormat);
+    const promptMessages = buildContextInterceptMessages(expandedPrompt, currentContextText, generationType, contextFormat, timing);
     const cancelRevision = agentGenerationCancelRevision;
     const runningToast = shouldShowPreInterceptNotifications(agent)
-        ? showPromptTransformRunningToast(agent, applyMode, profileId, { kind: 'preIntercept', applyMode })
+        ? showPromptTransformRunningToast(agent, applyMode, profileId, {
+            kind: timing === POST_MAIN_GENERATION_INTERCEPT_TIMING ? 'postMainIntercept' : 'preIntercept',
+            applyMode,
+        })
         : null;
 
     try {
@@ -3641,6 +3681,7 @@ async function runPreGenerationInterceptorsOnText(initialContextText, generation
                 agentId: agent.id,
                 agentName: agent.name,
                 applyMode: ['wrap', 'patch'].includes(String(agent?.preProcess?.applyMode)) ? String(agent.preProcess.applyMode) : 'replace',
+                timing: PRE_GENERATION_INTERCEPT_TIMING,
                 contextFormat,
                 changed: false,
                 status: 'error',
@@ -3752,6 +3793,7 @@ async function runPreGenerationInterceptorsOnChat(initialChatMessages, generatio
                 agentId: agent.id,
                 agentName: agent.name,
                 applyMode: ['wrap', 'patch'].includes(String(agent?.preProcess?.applyMode)) ? String(agent.preProcess.applyMode) : 'replace',
+                timing: PRE_GENERATION_INTERCEPT_TIMING,
                 contextFormat: 'chat',
                 changed: false,
                 status: 'error',
@@ -3767,6 +3809,93 @@ async function runPreGenerationInterceptorsOnChat(initialChatMessages, generatio
     }
 
     return { chat: currentChatMessages, runs };
+}
+
+async function runPostMainGenerationInterceptorsOnText(initialOutputText, generationType) {
+    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
+        return { text: initialOutputText, runs: [], cancelled: false };
+    }
+
+    let currentOutputText = String(initialOutputText ?? '');
+    if (!currentOutputText.trim()) {
+        return { text: currentOutputText, runs: [], cancelled: false };
+    }
+
+    if (generationStopRequested) {
+        return { text: currentOutputText, runs: [], cancelled: true };
+    }
+
+    const activationSnapshot = getGenerationContextSnapshot(generationType);
+    const interceptAgents = getPostMainGenerationInterceptAgents(getSnapshotAgents(activationSnapshot));
+    if (interceptAgents.length === 0) {
+        return { text: currentOutputText, runs: [], cancelled: false };
+    }
+
+    const runs = [];
+    for (const agent of interceptAgents) {
+        if (generationStopRequested) {
+            return { text: currentOutputText, runs, cancelled: true };
+        }
+
+        try {
+            const result = await runContextInterceptAgent(
+                agent,
+                currentOutputText,
+                activationSnapshot.generationType,
+                'text',
+                { timing: POST_MAIN_GENERATION_INTERCEPT_TIMING },
+            );
+
+            if (generationStopRequested || result.status === 'cancelled') {
+                runs.push({ ...result, status: 'cancelled', changed: false, afterText: currentOutputText });
+                return { text: currentOutputText, runs, cancelled: true };
+            }
+
+            if (result.status !== 'changed') {
+                runs.push(result);
+                continue;
+            }
+
+            currentOutputText = applyContextInterceptText(currentOutputText, result.outputText, agent.preProcess);
+            result.afterText = currentOutputText;
+            result.changed = result.afterText !== result.beforeText;
+            result.status = result.changed ? 'changed' : 'unchanged';
+            runs.push(result);
+        } catch (error) {
+            console.warn(`[InChatAgents] Post-main intercept agent "${agent.name}" failed. Leaving generated output unchanged for this agent.`, error);
+            runs.push({
+                agentId: agent.id,
+                agentName: agent.name,
+                applyMode: ['wrap', 'patch'].includes(String(agent?.preProcess?.applyMode)) ? String(agent.preProcess.applyMode) : 'replace',
+                timing: POST_MAIN_GENERATION_INTERCEPT_TIMING,
+                contextFormat: 'text',
+                changed: false,
+                status: 'error',
+                error: error instanceof Error ? error.message : String(error),
+                beforeText: currentOutputText,
+                afterText: currentOutputText,
+                outputText: '',
+                profileId: '',
+                runner: 'error',
+                timestamp: new Date().toISOString(),
+            });
+
+            if (generationStopRequested) {
+                return { text: currentOutputText, runs, cancelled: true };
+            }
+        }
+    }
+
+    return { text: currentOutputText, runs, cancelled: false };
+}
+
+function hasPostMainGenerationInterceptors(generationType) {
+    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
+        return false;
+    }
+
+    const activationSnapshot = getGenerationContextSnapshot(generationType);
+    return getPostMainGenerationInterceptAgents(getSnapshotAgents(activationSnapshot)).length > 0;
 }
 
 async function onGenerateAfterCombinePrompts(eventData) {
@@ -3806,6 +3935,42 @@ async function onChatCompletionPromptReady(eventData) {
 
     originalChat.splice(0, originalChat.length, ...nextChat);
     eventData.chat = originalChat;
+}
+
+async function onGenerationOutputBufferingDecision(eventData) {
+    if (!eventData || eventData.dryRun || internalPromptTransformDepth > 0 || !isGenerationInProgress) {
+        return;
+    }
+
+    if (hasPostMainGenerationInterceptors(eventData.type ?? currentMainGenerationType)) {
+        eventData.hasPostMainInterceptors = true;
+    }
+}
+
+async function onMainGenerationOutputReady(eventData) {
+    if (!eventData || eventData.dryRun || internalPromptTransformDepth > 0) {
+        return;
+    }
+
+    if (generationStopRequested) {
+        eventData.cancelled = true;
+        return;
+    }
+
+    if (!isGenerationInProgress || typeof eventData.text !== 'string') {
+        return;
+    }
+
+    const generationType = eventData.type ?? currentMainGenerationType;
+    const result = await runPostMainGenerationInterceptorsOnText(eventData.text, generationType);
+    pendingPreGenerationInterceptRuns.push(...result.runs);
+
+    if (result.cancelled || generationStopRequested) {
+        eventData.cancelled = true;
+        return;
+    }
+
+    eventData.text = result.text;
 }
 
 async function onImpersonateReady(text = '') {
@@ -4047,6 +4212,14 @@ export function initAgentRunner() {
 
     if (event_types.CHAT_COMPLETION_PROMPT_READY) {
         eventSource.on(event_types.CHAT_COMPLETION_PROMPT_READY, onChatCompletionPromptReady);
+    }
+
+    if (event_types.GENERATION_OUTPUT_BUFFERING_DECISION) {
+        eventSource.on(event_types.GENERATION_OUTPUT_BUFFERING_DECISION, onGenerationOutputBufferingDecision);
+    }
+
+    if (event_types.MAIN_GENERATION_OUTPUT_READY) {
+        eventSource.on(event_types.MAIN_GENERATION_OUTPUT_READY, onMainGenerationOutputReady);
     }
 
     if (event_types.WORLDINFO_ENTRIES_LOADED) {
