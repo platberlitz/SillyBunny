@@ -20,6 +20,9 @@ import {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     resolveChatRenderLifecycleRollout,
 } from './rollout-guard.js';
+import {
+    renderMessagesInBatches,
+} from './render-batch.js';
 
 export {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
@@ -30,6 +33,7 @@ export {
     resolveChatBottomScrollAction,
     resolveChatScrollAction,
     restoreVisibleMessageAnchor,
+    renderMessagesInBatches,
     resolveChatRenderLifecycleRollout,
     runSettledFrames,
     settleVisibleMessageAnchor,
@@ -63,6 +67,9 @@ export function createChatRenderLifecycle() {
         rollout: {
             key: CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
             resolve: resolveChatRenderLifecycleRollout,
+        },
+        renderBatch: {
+            render: renderMessagesInBatches,
         },
     };
 }
