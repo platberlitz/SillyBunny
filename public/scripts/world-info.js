@@ -2164,7 +2164,9 @@ function openWorldInfoCharacterPanelTab() {
         return;
     }
 
-    $('#WIDrawerIcon').trigger('click');
+    if (!$('#WorldInfo').is(':visible')) {
+        $('#WIDrawerIcon').trigger('click');
+    }
 }
 
 function bindWorldInfoDesktopEditorPopoutShellSync() {
@@ -6134,9 +6136,7 @@ export async function importWorldInfo(file) {
  */
 export function openWorldInfoEditor(worldName) {
     console.log(`Opening lorebook for ${worldName}`);
-    if (!$('#WorldInfo').is(':visible')) {
-        openWorldInfoCharacterPanelTab();
-    }
+    openWorldInfoCharacterPanelTab();
     const index = world_names.indexOf(worldName);
     $('#world_editor_select').val(index).trigger('change');
 }
