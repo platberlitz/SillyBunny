@@ -3956,6 +3956,32 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     opacity: 0.72;
 }
 
+.sb-mobile-quick-action-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 0;
+}
+
+.sb-mobile-quick-action-icon-picker,
+.sb-mobile-quick-action-icon-preview {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    width: 30px;
+    min-height: 30px;
+    margin: 0;
+}
+
+.sb-mobile-quick-action-icon-preview {
+    border-radius: 9px;
+    border: 1px solid color-mix(in srgb, var(--sb-shell-border) 60%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
+    opacity: 0.82;
+}
+
 .sb-mobile-quick-action-add,
 .sb-mobile-quick-action-remove,
 .sb-mobile-quick-action-reset {
@@ -3970,6 +3996,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
 
 .sb-mobile-quick-action-search:focus-visible,
 .sb-mobile-quick-action-add:focus-visible,
+.sb-mobile-quick-action-icon-picker:focus-visible,
 .sb-mobile-quick-action-remove:focus-visible,
 .sb-mobile-quick-action-reset:focus-visible {
     outline: none;
@@ -3990,6 +4017,11 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     .sb-mobile-quick-action-reset,
     .sb-mobile-quick-action-add,
     .sb-mobile-quick-action-remove {
+        width: 100%;
+    }
+
+    .sb-mobile-quick-action-controls {
+        justify-content: flex-start;
         width: 100%;
     }
 }

@@ -1,5 +1,5 @@
 import { DEFAULT_SCROLL_EDGE_SETTLE_DELAYS, jumpScrollElementToEdge } from './chat-scroll-edges.js';
-import { flashHighlight } from './utils.js';
+import { flashHighlight, showFontAwesomePicker } from './utils.js';
 
 const SB_STORAGE_KEYS = Object.freeze({
     leftTab: 'sb-left-tab',
@@ -577,6 +577,8 @@ const SB_UNIVERSAL_SEARCH_EMPTY_HINT = 'Could not find query. Try a broader term
 const SB_UNIVERSAL_SEARCH_RESULT_LIMIT = 10;
 const SB_MOBILE_QUICK_ACTION_LIMIT = 12;
 const SB_MOBILE_QUICK_ACTION_LABEL_MAX_LENGTH = 36;
+const SB_MOBILE_QUICK_ACTION_ICON_FALLBACK = 'fa-bolt';
+const SB_FONT_AWESOME_STYLE_CLASSES = Object.freeze(new Set(['fa-solid', 'fa-regular', 'fa-brands']));
 const SB_MOBILE_NAV_LAYOUTS = Object.freeze(['horizontal', 'vertical']);
 const SB_MOBILE_DEFAULT_QUICK_ACTIONS = Object.freeze([
     { type: 'tab', shellKey: 'left', tabId: 'presets', icon: 'fa-sliders', label: 'Presets' },
@@ -961,6 +963,16 @@ function getMobileQuickActionTabConfig(shellKey, tabId) {
     ].find(tab => tab?.id === tabId) || null;
 }
 
+function normalizeFontAwesomeIcon(value, fallback = SB_MOBILE_QUICK_ACTION_ICON_FALLBACK) {
+    const fallbackIcon = clampText(fallback || SB_MOBILE_QUICK_ACTION_ICON_FALLBACK, 60);
+    const iconClass = String(value ?? '')
+        .trim()
+        .split(/\s+/)
+        .find(token => /^fa-[a-z0-9-]+$/i.test(token) && !SB_FONT_AWESOME_STYLE_CLASSES.has(token.toLowerCase()));
+
+    return clampText(iconClass?.toLowerCase() || fallbackIcon, 60);
+}
+
 function normalizeMobileQuickAction(value) {
     if (!value || typeof value !== 'object') {
         return null;
@@ -995,11 +1007,16 @@ function normalizeMobileQuickAction(value) {
         return null;
     }
 
+    const fallbackIcon = type === 'custom'
+        ? SB_MOBILE_QUICK_ACTION_ICON_FALLBACK
+        : type === 'shell'
+            ? getShellConfig(shellKey)?.proxyIcon || 'fa-bars'
+            : tabConfig?.icon || 'fa-bars';
     const action = {
         type,
         shellKey,
         tabId,
-        icon: clampText(value.icon || (type === 'custom' ? 'fa-bolt' : type === 'shell' ? getShellConfig(shellKey)?.proxyIcon || 'fa-bars' : tabConfig?.icon || 'fa-bars'), 60),
+        icon: normalizeFontAwesomeIcon(value.icon, fallbackIcon),
         label,
     };
 
@@ -1122,7 +1139,7 @@ function createMobileQuickActionFromMatch(match) {
         type: 'custom',
         shellKey: match?.shellKey,
         tabId: match?.tabId,
-        icon: 'fa-bolt',
+        icon: SB_MOBILE_QUICK_ACTION_ICON_FALLBACK,
         sectionLabel: match?.sectionLabel,
         displayText: match?.displayText,
         dedupeKey: match?.dedupeKey,
@@ -1166,6 +1183,35 @@ function addMobileQuickActionFromMatch(match) {
 
 function removeMobileQuickAction(actionKey) {
     setMobileQuickActions(sbState.mobileQuickActions.filter(action => getMobileQuickActionKey(action) !== actionKey));
+}
+
+function setMobileQuickActionIcon(actionKey, iconClass) {
+    setMobileQuickActions(sbState.mobileQuickActions.map(action => {
+        if (getMobileQuickActionKey(action) !== actionKey) {
+            return action;
+        }
+
+        return {
+            ...action,
+            icon: normalizeFontAwesomeIcon(iconClass),
+        };
+    }));
+}
+
+async function chooseMobileQuickActionIcon(actionKey) {
+    const action = sbState.mobileQuickActions.find(action => getMobileQuickActionKey(action) === actionKey);
+    const normalizedAction = normalizeMobileQuickAction(action);
+
+    if (!normalizedAction || normalizedAction.type !== 'custom') {
+        return;
+    }
+
+    const iconClass = await showFontAwesomePicker();
+    if (iconClass === null) {
+        return;
+    }
+
+    setMobileQuickActionIcon(actionKey, iconClass);
 }
 
 function resetMobileQuickActions() {
@@ -10189,6 +10235,46 @@ function getMobileQuickActionContextLabel(action) {
     return labels.join(' · ');
 }
 
+function createMobileQuickActionIconElement(iconClass) {
+    return createElement('i', {
+        className: `fa-solid ${normalizeFontAwesomeIcon(iconClass)}`,
+        attrs: {
+            'aria-hidden': 'true',
+        },
+    });
+}
+
+function createMobileQuickActionIconControl(action, actionKey) {
+    const normalizedAction = normalizeMobileQuickAction(action);
+    const iconClass = normalizedAction?.icon || SB_MOBILE_QUICK_ACTION_ICON_FALLBACK;
+
+    if (normalizedAction?.type === 'custom') {
+        const button = createElement('button', {
+            className: 'menu_button menu_button_icon sb-mobile-quick-action-icon-picker',
+            attrs: {
+                type: 'button',
+                title: `Choose icon for ${normalizedAction.label}`,
+                'aria-label': `Choose icon for ${normalizedAction.label}`,
+            },
+        });
+        button.appendChild(createMobileQuickActionIconElement(iconClass));
+        button.addEventListener('click', () => {
+            void chooseMobileQuickActionIcon(actionKey);
+        });
+        return button;
+    }
+
+    const preview = createElement('span', {
+        className: 'sb-mobile-quick-action-icon-preview',
+        attrs: {
+            title: normalizedAction ? `${normalizedAction.label} icon` : 'Quick Action icon',
+            'aria-hidden': 'true',
+        },
+    });
+    preview.appendChild(createMobileQuickActionIconElement(iconClass));
+    return preview;
+}
+
 function updateMobileQuickActionSettingsStatus() {
     const status = document.getElementById('sb-mobile-quick-action-status');
     if (status instanceof HTMLElement) {
@@ -10299,6 +10385,8 @@ function renderMobileQuickActionSettingsList() {
         const copy = createElement('span', { className: 'sb-mobile-quick-action-copy' });
         const title = createElement('strong', { text: action.label });
         const detail = createElement('small', { text: getMobileQuickActionContextLabel(action) });
+        const controls = createElement('span', { className: 'sb-mobile-quick-action-controls' });
+        const iconControl = createMobileQuickActionIconControl(action, actionKey);
         const removeButton = createElement('button', {
             className: 'menu_button sb-mobile-quick-action-remove',
             text: 'Remove',
@@ -10311,7 +10399,8 @@ function renderMobileQuickActionSettingsList() {
         removeButton.addEventListener('click', () => removeMobileQuickAction(actionKey));
 
         copy.append(title, detail);
-        row.append(copy, removeButton);
+        controls.append(iconControl, removeButton);
+        row.append(copy, controls);
         list.appendChild(row);
     }
 }
@@ -12054,7 +12143,7 @@ function createMobileShellRailButton(item, actionHandler, className = '') {
         attrs: buttonAttrs,
     });
     const icon = createElement('i', {
-        className: `fa-solid ${action.icon || 'fa-bolt'}`,
+        className: `fa-solid ${action.icon || SB_MOBILE_QUICK_ACTION_ICON_FALLBACK}`,
         attrs: {
             'aria-hidden': 'true',
         },
@@ -12397,7 +12486,7 @@ function createMobileQuickActionButton(item) {
         },
     });
     const icon = createElement('i', {
-        className: `fa-solid ${action.icon || 'fa-bolt'}`,
+        className: `fa-solid ${action.icon || SB_MOBILE_QUICK_ACTION_ICON_FALLBACK}`,
         attrs: {
             'aria-hidden': 'true',
         },
