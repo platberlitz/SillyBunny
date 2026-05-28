@@ -32,6 +32,10 @@ import {
 import {
     createDelegatedResizeObserver,
 } from './resize-observer.js';
+import {
+    createMobileViewportObserver,
+    MOBILE_VIEWPORT_SETTLE_DELAY_MS,
+} from './mobile-viewport.js';
 
 export {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
@@ -41,7 +45,9 @@ export {
     createMessageUpdateQueue,
     createDelegatedResizeObserver,
     createFrameWriteScheduler,
+    createMobileViewportObserver,
     createStreamWriteBuffer,
+    MOBILE_VIEWPORT_SETTLE_DELAY_MS,
     resolveChatBottomScrollAction,
     resolveChatScrollAction,
     restoreVisibleMessageAnchor,
@@ -91,6 +97,10 @@ export function createChatRenderLifecycle() {
         },
         resizeObserver: {
             create: createDelegatedResizeObserver,
+        },
+        mobileViewport: {
+            create: createMobileViewportObserver,
+            settleDelayMs: MOBILE_VIEWPORT_SETTLE_DELAY_MS,
         },
     };
 }
