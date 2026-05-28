@@ -1,5 +1,11 @@
 import { DEFAULT_SCROLL_EDGE_SETTLE_DELAYS, jumpScrollElementToEdge } from './chat-scroll-edges.js';
+import {
+    createMobileShellLifecycle,
+    MOBILE_SHELL_NAV_TOGGLE_ACTION,
+} from './mobile-shell-lifecycle/index.js';
 import { flashHighlight } from './utils.js';
+
+const sbMobileShellLifecycle = createMobileShellLifecycle();
 
 const SB_STORAGE_KEYS = Object.freeze({
     leftTab: 'sb-left-tab',
@@ -84,8 +90,6 @@ const SB_ACCOUNT_STORAGE_READY_MARKER = '__migrated';
 const SB_INLINE_DRAWER_CUSTOM_PERSISTENCE_SELECTOR = '.sb-openai-settings-drawer, .sb-openai-settings-subdrawer, [id$="prompt_manager_drawer"]';
 const SB_STORAGE_PREFIX = 'sb-';
 const SB_STORAGE_WRITE_DEBOUNCE_MS = 120;
-const SB_MOBILE_NAV_OPEN_GRACE_MS = 450;
-const SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX = 6;
 const SB_MOBILE_ACTION_DEBOUNCE_MS = 140;
 const SB_SHELL_FOCUSABLE_SELECTOR = [
     'a[href]',
@@ -5923,18 +5927,19 @@ function setMobileModalRootA11y(root, isActiveRoot) {
 
 function syncMobileModalState() {
     const activeRoots = getActiveMobileModalRoots();
-    const hasActiveMobileModal = activeRoots.length > 0;
     const activeRootSet = new Set(activeRoots);
-    const shouldInertTopBar = activeRoots.some(root => root.id !== 'sb-mobile-nav');
+    const modalState = sbMobileShellLifecycle.modal.resolveA11yState({
+        activeRootIds: activeRoots.map(root => root.id),
+    });
 
-    document.body?.classList.toggle('sb-mobile-modal-open', hasActiveMobileModal);
+    document.body?.classList.toggle('sb-mobile-modal-open', modalState.hasActiveMobileModal);
 
     for (const root of getMobileModalRootCandidates()) {
         setMobileModalRootA11y(root, activeRootSet.has(root));
     }
 
-    setElementInertForMobileModal(document.getElementById('sheld'), hasActiveMobileModal);
-    setElementInertForMobileModal(document.getElementById('top-bar'), shouldInertTopBar);
+    setElementInertForMobileModal(document.getElementById('sheld'), modalState.shouldInertShell);
+    setElementInertForMobileModal(document.getElementById('top-bar'), modalState.shouldInertTopBar);
 }
 
 function queueMobileModalStateSync() {
@@ -11681,10 +11686,13 @@ function buildShell(shellKey) {
     navWrapper.append(navScrollLeft, nav, navScrollRight);
 
     const scrollNavByPage = direction => {
-        nav.scrollBy({
-            left: direction * Math.max(nav.clientWidth * 0.72, 160),
-            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        const scrollRequest = sbMobileShellLifecycle.nav.resolvePageScroll({
+            direction,
+            clientWidth: nav.clientWidth,
+            prefersReducedMotion: prefersReducedMotion(),
         });
+
+        nav.scrollBy(scrollRequest);
     };
 
     let navTouchDrag = null;
@@ -11695,28 +11703,30 @@ function buildShell(shellKey) {
     };
 
     const finishNavTouchDrag = event => {
-        if (navTouchDrag?.dragging) {
-            suppressNavClickUntil = Date.now() + 350;
+        const dragEnd = sbMobileShellLifecycle.nav.resolveDragEnd({
+            dragState: navTouchDrag,
+            nowMs: Date.now(),
+        });
+
+        if (dragEnd.suppressClickUntil) {
+            suppressNavClickUntil = dragEnd.suppressClickUntil;
+        }
+
+        if (dragEnd.shouldStopPropagation) {
             event.stopPropagation();
         }
 
-        clearNavTouchDrag();
+        navTouchDrag = dragEnd.dragState;
     };
 
     const beginNavTouchDrag = event => {
         const touch = event.touches?.[0];
 
-        if (!isMobileViewport() || !touch) {
-            clearNavTouchDrag();
-            return;
-        }
-
-        navTouchDrag = {
-            x: touch.clientX,
-            y: touch.clientY,
+        navTouchDrag = sbMobileShellLifecycle.nav.createDragState({
+            isMobileViewport: isMobileViewport(),
+            touch,
             scrollLeft: nav.scrollLeft,
-            dragging: false,
-        };
+        });
     };
 
     const updateNavTouchDrag = event => {
@@ -11724,35 +11734,35 @@ function buildShell(shellKey) {
             return;
         }
 
-        const touch = event.touches?.[0];
+        const dragMove = sbMobileShellLifecycle.nav.resolveDragMove({
+            dragState: navTouchDrag,
+            touch: event.touches?.[0],
+        });
+        navTouchDrag = dragMove.dragState;
 
-        if (!touch) {
-            clearNavTouchDrag();
+        if (!navTouchDrag) {
             return;
         }
 
-        const deltaX = touch.clientX - navTouchDrag.x;
-        const deltaY = touch.clientY - navTouchDrag.y;
-
-        navTouchDrag.dragging = navTouchDrag.dragging
-            || Math.abs(deltaX) > SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX
-            || Math.abs(deltaY) > SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX;
-
-        if (!navTouchDrag.dragging) {
-            return;
-        }
-
-        if (event.cancelable) {
+        if (dragMove.shouldPreventDefault && event.cancelable) {
             event.preventDefault();
         }
 
-        event.stopPropagation();
-        nav.scrollLeft = navTouchDrag.scrollLeft - deltaX;
-        updateNavScrollIndicators();
+        if (dragMove.shouldStopPropagation) {
+            event.stopPropagation();
+        }
+
+        if (dragMove.nextScrollLeft !== null) {
+            nav.scrollLeft = dragMove.nextScrollLeft;
+            updateNavScrollIndicators();
+        }
     };
 
     const suppressClickAfterNavDrag = event => {
-        if (Date.now() >= suppressNavClickUntil) {
+        if (!sbMobileShellLifecycle.nav.shouldSuppressClick({
+            nowMs: Date.now(),
+            suppressClickUntil: suppressNavClickUntil,
+        })) {
             return;
         }
 
@@ -11761,8 +11771,12 @@ function buildShell(shellKey) {
     };
 
     const updateNavScrollIndicators = () => {
-        const canScrollLeft = nav.scrollLeft > 0;
-        const canScrollRight = Math.ceil(nav.scrollLeft + nav.clientWidth) < nav.scrollWidth;
+        const { canScrollLeft, canScrollRight } = sbMobileShellLifecycle.nav.resolveScrollIndicators({
+            scrollLeft: nav.scrollLeft,
+            clientWidth: nav.clientWidth,
+            scrollWidth: nav.scrollWidth,
+        });
+
         navWrapper.classList.toggle('sb-can-scroll-left', canScrollLeft);
         navWrapper.classList.toggle('sb-can-scroll-right', canScrollRight);
         navScrollLeft.disabled = !canScrollLeft;
@@ -12535,39 +12549,22 @@ function buildMobileNav() {
     ];
 
     document.addEventListener('click', event => {
-        if (!overlay.classList.contains('sb-nav-open')) {
-            return;
-        }
-
         const target = event.target;
         if (!(target instanceof HTMLElement)) {
             return;
         }
 
-        if (!event.isTrusted) {
-            return;
-        }
+        const shouldClose = sbMobileShellLifecycle.nav.shouldAutoClose({
+            isNavOpen: overlay.classList.contains('sb-nav-open'),
+            isTrusted: event.isTrusted,
+            elapsedSinceOpenedMs: performance.now() - sbState.mobileNav.lastOpenedAt,
+            isHamburgerTarget: Boolean(target.closest('#sb-hamburger')),
+            isInsideNav: Boolean(target.closest('#sb-mobile-nav')),
+            isAutoCloseArea: autoCloseSelectors.some(selector => target.matches(selector) || target.closest(selector)),
+        });
 
-        if (performance.now() - sbState.mobileNav.lastOpenedAt < SB_MOBILE_NAV_OPEN_GRACE_MS) {
-            return;
-        }
-
-        // Don't close if clicking the hamburger button itself
-        if (target.closest('#sb-hamburger')) {
-            return;
-        }
-
-        // Don't close if clicking inside the mobile nav
-        if (target.closest('#sb-mobile-nav')) {
-            return;
-        }
-
-        // Close if clicking any of the auto-close areas
-        for (const selector of autoCloseSelectors) {
-            if (target.matches(selector) || target.closest(selector)) {
-                closeMobileNav();
-                return;
-            }
+        if (shouldClose) {
+            closeMobileNav();
         }
     }, { passive: false });
 }
@@ -12575,51 +12572,54 @@ function buildMobileNav() {
 function setMobileNavOpenState(isOpen) {
     const overlay = ensureMobileNavReady();
     const button = document.getElementById('sb-hamburger');
-    const shouldOpen = Boolean(isOpen) && isMobileViewport();
 
     if (!(overlay instanceof HTMLElement) || !(button instanceof HTMLElement)) {
         return;
     }
 
-    if (shouldOpen) {
+    const wasOpen = !overlay.hidden && overlay.getAttribute('aria-hidden') === 'false';
+    const navState = sbMobileShellLifecycle.nav.resolveOpenState({
+        requestedOpen: isOpen,
+        isMobileViewport: isMobileViewport(),
+        wasOpen,
+        focusedInside: Boolean(document.activeElement && overlay.contains(document.activeElement)),
+    });
+
+    if (navState.shouldRecordOpenedAt) {
         sbState.mobileNav.lastOpenedAt = performance.now();
     }
 
-    const wasOpen = !overlay.hidden && overlay.getAttribute('aria-hidden') === 'false';
-
-    overlay.hidden = !shouldOpen;
-    overlay.classList.toggle('sb-nav-open', shouldOpen);
-    overlay.setAttribute('aria-hidden', String(!shouldOpen));
+    overlay.hidden = navState.overlayHidden;
+    overlay.classList.toggle('sb-nav-open', navState.shouldOpen);
+    overlay.setAttribute('aria-hidden', navState.overlayAriaHidden);
 
     if ('inert' in overlay) {
-        overlay.inert = !shouldOpen;
+        overlay.inert = navState.overlayInert;
     }
 
-    button.classList.toggle('is-open', shouldOpen);
-    button.setAttribute('aria-expanded', String(shouldOpen));
-    button.innerHTML = shouldOpen
+    button.classList.toggle('is-open', navState.shouldOpen);
+    button.setAttribute('aria-expanded', navState.buttonExpanded);
+    button.innerHTML = navState.buttonIcon === 'close'
         ? '<i class="fa-solid fa-xmark" aria-hidden="true"></i>'
         : '<i class="fa-solid fa-bars" aria-hidden="true"></i>';
     updateMobileNavButtonLabel();
 
     queueMobileModalStateSync();
 
-    if (shouldOpen) {
+    if (navState.shouldRefreshQuickActions) {
         refreshMobileNavQuickActions();
+    }
+
+    if (navState.shouldFocusTitle) {
         window.requestAnimationFrame(() => {
             overlay.querySelector('#sb-mobile-nav-title')?.focus?.({ preventScroll: true });
         });
-    } else if (wasOpen && document.activeElement && overlay.contains(document.activeElement)) {
+    } else if (navState.shouldRestoreButtonFocus) {
         button.focus({ preventScroll: true });
     }
 }
 
 function toggleMobileNav() {
-    if (sbState.mobileNav.replaceQuickActions && isMobileViewport()) {
-        activateMobileNavPageTarget(sbState.mobileNav.replacementTarget);
-        return;
-    }
-
     const overlay = ensureMobileNavReady();
 
     if (!(overlay instanceof HTMLElement)) {
@@ -12627,9 +12627,18 @@ function toggleMobileNav() {
     }
 
     const isOpen = !overlay.hidden && overlay.getAttribute('aria-hidden') === 'false';
+    const toggleIntent = sbMobileShellLifecycle.nav.resolveToggleIntent({
+        isMobileViewport: isMobileViewport(),
+        isReplacementEnabled: sbState.mobileNav.replaceQuickActions,
+        isOpen,
+    });
 
-    // If opening mobile nav, close any open shells first
-    if (!isOpen) {
+    if (toggleIntent.action === MOBILE_SHELL_NAV_TOGGLE_ACTION.ACTIVATE_PAGE_TARGET) {
+        activateMobileNavPageTarget(sbState.mobileNav.replacementTarget);
+        return;
+    }
+
+    if (toggleIntent.shouldCloseCompetingPanels) {
         closeShell('left');
         closeShell('right');
         closeCharacterPanel();
@@ -12637,7 +12646,7 @@ function toggleMobileNav() {
         setConnectionStripOpenState(false);
     }
 
-    setMobileNavOpenState(!isOpen);
+    setMobileNavOpenState(toggleIntent.action === MOBILE_SHELL_NAV_TOGGLE_ACTION.OPEN_NAV);
 }
 
 function closeMobileNav() {
