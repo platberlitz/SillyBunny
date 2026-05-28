@@ -4063,6 +4063,94 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     border-radius: var(--sb-radius-button, 14px) !important;
 }
 
+@media screen and (min-width: 769px) {
+    body.verticalChatLayout #chat {
+        min-height: 0;
+    }
+
+    body.verticalChatLayout #form_sheld {
+        flex: 0 0 auto;
+    }
+
+    body.verticalChatLayout #nonQRFormItems {
+        --sb-vertical-composer-action-size: clamp(26px, calc(var(--bottomFormBlockSize, 42px) * 0.72), 36px);
+        --sb-vertical-composer-send-width: calc(var(--sb-vertical-composer-action-size) * 1.45);
+        --sb-vertical-composer-icon-size: clamp(12px, calc(var(--bottomFormIconSize, 20px) * 0.62), 16px);
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        grid-template-rows: auto minmax(58px, auto) !important;
+        grid-template-areas:
+            'tools action'
+            'input input' !important;
+        align-items: center !important;
+        gap: 6px !important;
+        padding: 6px !important;
+        border-radius: 16px !important;
+        overflow: visible !important;
+    }
+
+    body.verticalChatLayout #leftSendForm,
+    body.verticalChatLayout #rightSendForm {
+        min-width: 0 !important;
+        gap: 4px !important;
+    }
+
+    body.verticalChatLayout #leftSendForm {
+        grid-area: tools !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        justify-content: flex-start !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+    }
+
+    body.verticalChatLayout #rightSendForm {
+        grid-area: action !important;
+        width: auto !important;
+        min-width: max-content !important;
+        max-width: max-content !important;
+        justify-self: end !important;
+        justify-content: flex-end !important;
+        overflow: visible !important;
+    }
+
+    body.verticalChatLayout #send_textarea {
+        grid-area: input !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        min-height: clamp(68px, 14dvh, 160px) !important;
+        max-height: min(42dvh, 24rem) !important;
+        align-self: stretch !important;
+        justify-self: stretch !important;
+        resize: vertical !important;
+        box-sizing: border-box !important;
+        font-size: var(--mainFontSize) !important;
+        line-height: 1.35 !important;
+    }
+
+    body.verticalChatLayout #leftSendForm > div,
+    body.verticalChatLayout #rightSendForm > div:not(.mes_stop),
+    body.verticalChatLayout #send_form .mes_stop {
+        width: var(--sb-vertical-composer-action-size) !important;
+        min-width: var(--sb-vertical-composer-action-size) !important;
+        max-width: var(--sb-vertical-composer-action-size) !important;
+        height: var(--sb-vertical-composer-action-size) !important;
+        min-height: var(--sb-vertical-composer-action-size) !important;
+        max-height: var(--sb-vertical-composer-action-size) !important;
+        flex: 0 0 var(--sb-vertical-composer-action-size) !important;
+        font-size: var(--sb-vertical-composer-icon-size) !important;
+    }
+
+    body.verticalChatLayout #send_but,
+    body.verticalChatLayout #send_form.sb-generating-controls #mes_stop {
+        width: var(--sb-vertical-composer-send-width) !important;
+        min-width: var(--sb-vertical-composer-send-width) !important;
+        max-width: var(--sb-vertical-composer-send-width) !important;
+        flex-basis: var(--sb-vertical-composer-send-width) !important;
+    }
+}
+
 @media screen and (min-width: 1001px) {
     #send_form #qig-input-btn {
         padding: 0 !important;
