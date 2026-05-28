@@ -93,6 +93,56 @@ describe('chat render lifecycle script wiring', () => {
         expect(lifecycleGateSource).toContain('scrollLoadedChatToBottom();');
     });
 
+    test('redisplayChat delegates selected messages to the guarded redisplay renderer', () => {
+        const redisplayChat = findExportedFunction('redisplayChat');
+        const source = getSource(redisplayChat);
+
+        expect(source).toContain('const messages = targetChat.slice(startIndex);');
+        expect(source).toContain('const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex });');
+        expect(source).toContain('applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });');
+        expect(source).toContain('refreshSwipeButtons(false, fade);');
+        expect(source).toContain('applyStylePins();');
+        expect(source).toContain('updateEditArrowClasses();');
+    });
+
+    test('redisplayChat keeps render-batch routing behind the lifecycle rollout guard', () => {
+        const renderRedisplayChatMessages = findFunctionDeclaration('renderRedisplayChatMessages');
+        const source = getSource(renderRedisplayChatMessages);
+
+        expect(source).toContain('const batchSize = getMobileChatRenderBatchSize(messages.length);');
+        expect(source).toContain('if (isChatRenderLifecycleRolloutEnabled())');
+        expect(source).toContain('return renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize });');
+        expect(source).toContain('return renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize });');
+    });
+
+    test('guard-on redisplayChat delegates batch mechanics to the lifecycle render batch helper', () => {
+        const renderRedisplayChatMessagesThroughLifecycle = findFunctionDeclaration('renderRedisplayChatMessagesThroughLifecycle');
+        const source = getSource(renderRedisplayChatMessagesThroughLifecycle);
+
+        expect(source).toContain('renderMessagesInBatches({');
+        expect(source).toContain('messages,');
+        expect(source).toContain('firstMessageId: startIndex');
+        expect(source).toContain('batchSize,');
+        expect(source).toContain('renderMessageElement: (message, messageId) => updateMessageElement(message, { messageId })');
+        expect(source).toContain('insertFragment: fragment => chatElement[0].appendChild(fragment)');
+        expect(source).toContain('waitForNextFrame,');
+        expect(source).toContain('markLastMessage: true');
+    });
+
+    test('guard-off redisplayChat keeps legacy inline batching', () => {
+        const renderRedisplayChatMessagesLegacy = findFunctionDeclaration('renderRedisplayChatMessagesLegacy');
+        const source = getSource(renderRedisplayChatMessagesLegacy);
+
+        expect(source).not.toContain('renderMessagesInBatches');
+        expect(source).toContain('const renderedMessageIds = lodash.range(startIndex, startIndex + messages.length, 1);');
+        expect(source).toContain('const fragment = document.createDocumentFragment();');
+        expect(source).toContain('const messageElement = updateMessageElement(message, { messageId });');
+        expect(source).toContain('newMessageElements.at(-1).classList.add(\'last_mes\');');
+        expect(source).toContain('chatElement[0].appendChild(fragment);');
+        expect(source).toContain('await waitForNextFrame();');
+        expect(source).toContain('return renderedMessageIds;');
+    });
+
     test('addOneMessage passes pre-mutation bottom state into lifecycle bottom scroll', () => {
         const addOneMessage = findExportedFunction('addOneMessage');
         expect(addOneMessage).toBeTruthy();
