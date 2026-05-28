@@ -27,12 +27,14 @@ import {
     normalizeAgentCategory,
     getAgentChatScopeLabel,
     getPromptTransformMode,
+    isPathfinderSubmoduleEnabled,
     findTemplateForAgentSnapshot,
     getRedundantBundledAgentDuplicateIds,
     reconcileScopedEnabledAgentIdsFromLegacyFlags,
     resolveConnectionProfile,
     setAgentEnabledForCurrentScope,
     setGlobalSettings,
+    setPathfinderSubmoduleEnabled,
     getGroups,
     getCustomGroups,
     loadBuiltinGroups,
@@ -44,6 +46,7 @@ import {
 import {
     cancelAgentGeneration,
     buildPromptDynamicMacros,
+    deactivatePathfinderRuntime,
     initAgentRunner,
     isAgentGenerationActive,
     onAgentGenerationStateChanged,
@@ -60,7 +63,7 @@ import {
     createDefaultRegexScript,
     normalizeRegexScript,
 } from './regex-scripts.js';
-import { initPathfinder } from './pathfinder-init.js';
+import { initPathfinder, teardownPathfinder } from './pathfinder-init.js';
 import { openPathfinderSettings, isPathfinderAgent } from './pathfinder-settings-ui.js';
 import { getPathfinderToolDefinitions } from './pathfinder/tool-definitions.js';
 import { buildFallbackPromptText, extractProfileResponseText } from './llm-utils.js';
@@ -3314,6 +3317,11 @@ function getPathfinderSettingsAgent() {
     return getAgents().find(isPathfinderAgent) ?? null;
 }
 
+function removePathfinderExtensionsHost() {
+    document.getElementById(PATHFINDER_EXTENSIONS_HOST_ID)?.remove();
+    pathfinderExtensionsMountPromise = null;
+}
+
 function ensurePathfinderExtensionsHost() {
     const parent = document.getElementById('extensions_settings2') ?? document.getElementById('extensions_settings');
     if (!parent) {
@@ -3341,6 +3349,11 @@ function ensurePathfinderExtensionsHost() {
 }
 
 async function mountPathfinderSettingsInExtensions() {
+    if (!isPathfinderSubmoduleEnabled()) {
+        removePathfinderExtensionsHost();
+        return null;
+    }
+
     const host = ensurePathfinderExtensionsHost();
     if (!host) {
         console.warn('[Pathfinder] Could not mount settings in Extensions drawer because #extensions_settings was not found.');
@@ -3361,6 +3374,11 @@ async function mountPathfinderSettingsInExtensions() {
     }
 
     const settingsPanel = await openPathfinderSettings(agent);
+    if (!isPathfinderSubmoduleEnabled()) {
+        removePathfinderExtensionsHost();
+        return null;
+    }
+
     if (!settingsPanel) {
         body.innerHTML = '<div class="pf--extensions-empty">Could not load Pathfinder settings.</div>';
         return host;
@@ -3374,6 +3392,11 @@ async function mountPathfinderSettingsInExtensions() {
 }
 
 function schedulePathfinderExtensionsMount() {
+    if (!isPathfinderSubmoduleEnabled()) {
+        removePathfinderExtensionsHost();
+        return Promise.resolve(null);
+    }
+
     pathfinderExtensionsMountPromise = mountPathfinderSettingsInExtensions()
         .catch(error => {
             console.warn('[Pathfinder] Failed to mount settings in Extensions drawer:', error);
@@ -3409,6 +3432,11 @@ function openPathfinderExtensionsDrawer(host) {
  * @param {Object} agent - The Pathfinder agent
  */
 async function openPathfinderEditor(agent) {
+    if (!isPathfinderSubmoduleEnabled()) {
+        toastr.warning('Pathfinder is disabled in In-Chat Agents settings.');
+        return;
+    }
+
     const existingHost = document.getElementById(PATHFINDER_EXTENSIONS_HOST_ID);
     if (existingHost) {
         const host = await (pathfinderExtensionsMountPromise ?? schedulePathfinderExtensionsMount());
@@ -3491,10 +3519,15 @@ function refreshConnectionProfileUi() {
 function populateGlobalNotificationToggle() {
     updateGlobalAgentToggle();
     populateSeparateRecentChatsToggle();
+    populatePathfinderSubmoduleToggle();
     $('#ica--promptTransformShowNotifications').prop(
         'checked',
         Boolean(getGlobalSettings().promptTransformShowNotifications),
     );
+}
+
+function populatePathfinderSubmoduleToggle() {
+    $('#ica--pathfinderSubmoduleEnabled').prop('checked', isPathfinderSubmoduleEnabled());
 }
 
 function populateGlobalExecutionModeDropdown() {
@@ -3836,9 +3869,11 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         toastr.success(`Updated ${migratedRegexPostDefaultsCount} bundled regex agent(s) to post-generation defaults.`);
     }
 
-    const migratedPathfinderToolCount = await migratePathfinderAgentToolsFromTemplate();
-    if (migratedPathfinderToolCount > 0) {
-        toastr.success(`Updated ${migratedPathfinderToolCount} Pathfinder agent(s) with default tool toggles.`);
+    if (isPathfinderSubmoduleEnabled()) {
+        const migratedPathfinderToolCount = await migratePathfinderAgentToolsFromTemplate();
+        if (migratedPathfinderToolCount > 0) {
+            toastr.success(`Updated ${migratedPathfinderToolCount} Pathfinder agent(s) with default tool toggles.`);
+        }
     }
 
     const migratedPromptTransformImpersonateCount = await migrateBundledPromptTransformImpersonateToSavedAgents();
@@ -3876,11 +3911,12 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         console.error('[InChatAgents] Agent runner initialization failed:', err);
     }
 
-    // Initialize Pathfinder (tool agent core)
-    try {
-        initPathfinder(getContext());
-    } catch (err) {
-        console.warn('[InChatAgents] Pathfinder initialization failed:', err);
+    if (isPathfinderSubmoduleEnabled()) {
+        try {
+            initPathfinder(getContext());
+        } catch (err) {
+            console.warn('[InChatAgents] Pathfinder initialization failed:', err);
+        }
     }
 
     // Sync any existing tool agents' tools with ToolManager
@@ -4049,6 +4085,34 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     $('#ica--promptTransformShowNotifications').on('change', function () {
         setGlobalSettings({ promptTransformShowNotifications: $(this).prop('checked') });
         persistExtensionState();
+    });
+    $('#ica--pathfinderSubmoduleEnabled').on('change', async function () {
+        const enabled = $(this).prop('checked');
+        setPathfinderSubmoduleEnabled(enabled);
+        persistExtensionState();
+        populatePathfinderSubmoduleToggle();
+
+        if (enabled) {
+            try {
+                const migratedPathfinderToolCount = await migratePathfinderAgentToolsFromTemplate();
+                if (migratedPathfinderToolCount > 0) {
+                    toastr.success(`Updated ${migratedPathfinderToolCount} Pathfinder agent(s) with default tool toggles.`);
+                }
+                initPathfinder(getContext());
+                schedulePathfinderExtensionsMount();
+                syncToolAgentRegistrations();
+                toastr.info('Pathfinder submodule enabled.');
+            } catch (err) {
+                console.warn('[InChatAgents] Failed to enable Pathfinder submodule:', err);
+                toastr.error('Could not enable Pathfinder.');
+            }
+            return;
+        }
+
+        teardownPathfinder();
+        deactivatePathfinderRuntime();
+        removePathfinderExtensionsHost();
+        toastr.info('Pathfinder submodule disabled.');
     });
     $('#ica--appendAgentsExecutionMode').on('change', function () {
         setGlobalSettings({ appendAgentsExecutionMode: this.value });

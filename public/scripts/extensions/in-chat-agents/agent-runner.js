@@ -27,6 +27,7 @@ import {
     getEnabledToolAgents,
     getGlobalSettings,
     getPromptTransformMode,
+    isPathfinderSubmoduleEnabled,
     saveAgent,
     isToolAgent,
     normalizePreProcessMaxTokens,
@@ -355,6 +356,10 @@ function isPathfinderToolAgent(agent) {
 }
 
 export function getPathfinderRuntimeAgent(agents = getEnabledToolAgents()) {
+    if (!isPathfinderSubmoduleEnabled()) {
+        return null;
+    }
+
     return agents.find(isPathfinderToolAgent) ?? null;
 }
 
@@ -399,6 +404,10 @@ function syncPathfinderRuntimeSettings(agent = getPathfinderRuntimeAgent()) {
 
 function getRegisterableAgentTools(agent) {
     if (isPathfinderToolAgent(agent)) {
+        if (!isPathfinderSubmoduleEnabled()) {
+            return [];
+        }
+
         const enabledTools = getPathfinderToolDefinitions()
             .filter(tool => isPathfinderToolEnabledForAgent(agent, tool.name));
 
@@ -425,6 +434,10 @@ export function getToolRecursionState() {
 }
 
 export async function syncPathfinderAgentLorebooksForCurrentChat(agent = getPathfinderRuntimeAgent(), { persist = false } = {}) {
+    if (!isPathfinderSubmoduleEnabled()) {
+        return false;
+    }
+
     if (!agent || !isPathfinderToolAgent(agent)) {
         return false;
     }
@@ -2746,10 +2759,27 @@ function scheduleMessageRefresh(messageIndex, expectedMessage) {
 
 function clearInChatAgentExtensionPrompts() {
     for (const key of Object.keys(extension_prompts)) {
-        if (key.startsWith(PROMPT_KEY_PREFIX) || PATHFINDER_RETRIEVAL_PROMPT_KEYS.includes(key) || key === PATHFINDER_AUTO_SUMMARY_PROMPT_KEY) {
+        if (key.startsWith(PROMPT_KEY_PREFIX)) {
             delete extension_prompts[key];
         }
     }
+    clearPathfinderExtensionPrompts();
+}
+
+function clearPathfinderExtensionPrompts() {
+    for (const key of Object.keys(extension_prompts)) {
+        if (PATHFINDER_RETRIEVAL_PROMPT_KEYS.includes(key) || key === PATHFINDER_AUTO_SUMMARY_PROMPT_KEY) {
+            delete extension_prompts[key];
+        }
+    }
+}
+
+export function deactivatePathfinderRuntime() {
+    clearPathfinderRetrievalToast();
+    abortActivePathfinderRetrieval('Pathfinder disabled.');
+    clearPathfinderExtensionPrompts();
+    toolRecursionDepth = 0;
+    syncToolAgentRegistrations();
 }
 
 function injectPreGenerationAgentPrompts(activeAgents, generationType) {

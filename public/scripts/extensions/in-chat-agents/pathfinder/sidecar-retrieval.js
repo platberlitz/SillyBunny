@@ -1,5 +1,6 @@
 import { chat, substituteParams } from '../../../../script.js';
 import { parseRegexFromString, world_info_logic, world_info_match_whole_words } from '../../../world-info.js';
+import { isPathfinderSubmoduleEnabled } from '../agent-store.js';
 import { getTree, findNodeById, getAllEntryUids, getSettings } from './tree-store.js';
 import { getReadableBooks, getEntryContent } from './pathfinder-tool-bridge.js';
 import { sidecarGenerate } from './llm-sidecar.js';
@@ -471,6 +472,10 @@ async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptType
 }
 
 export async function runSidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal = null) {
+    if (!isPathfinderSubmoduleEnabled()) {
+        return;
+    }
+
     const s = getSettings();
     if (!(s.sidecarEnabled || s.pipelineEnabled)) return;
 

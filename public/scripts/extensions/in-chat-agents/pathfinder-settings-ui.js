@@ -6,7 +6,7 @@ import { renderExtensionTemplateAsync, getContext } from '../../extensions.js';
 import { saveSettingsDebounced } from '../../../script.js';
 import { escapeHtml } from '../../utils.js';
 import { world_names, loadWorldInfo } from '../../world-info.js';
-import { isAgentEnabledForCurrentScope, persistAgentGlobalSettings, saveAgent, setAgentEnabledForCurrentScope } from './agent-store.js';
+import { isAgentEnabledForCurrentScope, isPathfinderSubmoduleEnabled, persistAgentGlobalSettings, saveAgent, setAgentEnabledForCurrentScope } from './agent-store.js';
 import {
     getPathfinderSettings,
     setPathfinderSettings,
@@ -221,6 +221,11 @@ async function syncAutoAttachedLorebooks(lorebooks, settings) {
  * @param {Object} agent - The Pathfinder agent object
  */
 export async function openPathfinderSettings(agent) {
+    if (!isPathfinderSubmoduleEnabled()) {
+        toastr.warning('Pathfinder is disabled in In-Chat Agents settings.');
+        return null;
+    }
+
     currentAgent = agent;
     const existingSettings = getPathfinderSettings();
     setPathfinderSettings({
