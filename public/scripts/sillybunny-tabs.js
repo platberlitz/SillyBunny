@@ -13146,7 +13146,11 @@ function reinitSelect2AfterShell() {
         }
     } else {
         // On desktop, reinitialize Select2 after DOM reparenting
-        const select2Defaults = { dropdownParent: $(document.body), minimumResultsForSearch: 0 };
+        const apiDropdownParent = $('#rm_api_block');
+        const select2Defaults = {
+            dropdownParent: apiDropdownParent.length ? apiDropdownParent : $(document.body),
+            minimumResultsForSearch: 0,
+        };
         const allSelectors = [...modelSelectors, '.openrouter_quantizations', '.openrouter_providers'];
         for (const selector of allSelectors) {
             const $el = $(selector);

@@ -2146,11 +2146,13 @@ input[type='range']::-moz-range-thumb {
     border-radius: var(--sb-radius-button);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 88%, transparent);
     box-shadow: 0 18px 32px color-mix(in srgb, var(--SmartThemeShadowColor) 18%, transparent);
-    overflow: visible;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .select2-container--default .select2-results {
     max-height: 300px;
+    overflow-x: hidden;
     overflow-y: auto;
 }
 

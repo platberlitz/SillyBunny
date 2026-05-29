@@ -463,7 +463,9 @@ export function initHorde() {
 
     // Not needed on mobile
     if (!isMobile()) {
+        const apiDropdownParent = $('#rm_api_block');
         $('#horde_model').select2({
+            dropdownParent: apiDropdownParent.length ? apiDropdownParent : $(document.body),
             width: '100%',
             placeholder: t`Select Horde models`,
             allowClear: true,
