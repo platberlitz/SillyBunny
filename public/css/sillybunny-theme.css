@@ -3165,6 +3165,65 @@ input[type='range']::-moz-range-thumb {
     }
 }
 
+@media (pointer: coarse) and (max-width: 1000px) {
+    #left-nav-panel.openDrawer {
+        --sb-mobile-range-label-width: clamp(5.75rem, 30vw, 7.25rem);
+        --sb-mobile-range-counter-width: 3.25rem;
+        --sb-mobile-range-gap: 10px;
+    }
+
+    .sb-sampling-control-card > :is(.alignitemscenter, .alignItemsCenter).flex-container:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers]:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container.flexFlowRow > div:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-multi-card > #contrastiveSearchBlock > .alignitemscenter:has(> input[type='range'].neo-range-slider),
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) {
+        grid-template-columns: minmax(var(--sb-mobile-range-label-width, 92px), 0.42fr) minmax(0, 1fr) minmax(var(--sb-mobile-range-counter-width, 52px), auto);
+        gap: var(--sb-mobile-range-gap, 10px);
+    }
+
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter),
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .range-block-range-and-counter) {
+        grid-template-columns: minmax(var(--sb-mobile-range-label-width, 92px), 0.42fr) minmax(0, 1fr);
+        gap: var(--sb-mobile-range-gap, 10px);
+    }
+
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) > .range-block-range-and-counter,
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .range-block-range-and-counter) > .range-block-range-and-counter {
+        grid-template-columns: minmax(0, 1fr) minmax(var(--sb-mobile-range-counter-width, 52px), auto);
+        gap: var(--sb-mobile-range-gap, 10px);
+    }
+
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .wide100p > #openai_max_tokens) {
+        grid-template-columns: minmax(var(--sb-mobile-range-label-width, 92px), 0.42fr) minmax(var(--sb-mobile-range-counter-width, 52px), auto);
+        gap: var(--sb-mobile-range-gap, 10px);
+    }
+
+    .sb-sampling-control-card input[type='range'].neo-range-slider,
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) > input[type='range'].neo-range-slider,
+    #left-nav-panel.openDrawer #range_block_openai input[type='range'] {
+        margin: 0 !important;
+        touch-action: pan-y;
+    }
+
+    .sb-sampling-control-card > :is(.alignitemscenter, .alignItemsCenter).flex-container:has(> input[type='range'].neo-range-slider) > :is(small, label),
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers]:has(> input[type='range'].neo-range-slider) > :is(small, label),
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) > .range-block-title,
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) > small,
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .range-block-range-and-counter) > .range-block-title,
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .wide100p > #openai_max_tokens) > .range-block-title {
+        min-height: 32px;
+    }
+}
+
 .sb-presets-advanced-formatting {
     margin-top: 12px;
 }
