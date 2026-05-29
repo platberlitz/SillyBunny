@@ -201,6 +201,13 @@ import {
     loadFileToDocument,
     getSanitizedFilename,
 } from './scripts/utils.js';
+import {
+    TOOLING_UI_HYDRATION_STATUS,
+    buildToolingCaptureFilename,
+    normalizeToolingCaptureRange,
+    resolveLazyToolingLibraryHydration,
+    resolveToolingAssetWait,
+} from './scripts/tooling-ui-hydration/index.js';
 import { debounce_timeout, GENERATION_TYPE_TRIGGERS, IGNORE_SYMBOL, inject_ids, MEDIA_DISPLAY, MEDIA_SOURCE, MEDIA_TYPE, OVERSWIPE_BEHAVIOR, SCROLL_BEHAVIOR, SWIPE_DIRECTION, SWIPE_SOURCE, SWIPE_STATE } from './scripts/constants.js';
 
 import { cancelDebouncedMetadataSave, doDailyExtensionUpdatesCheck, extension_settings, initExtensions, loadExtensionSettings, runGenerationInterceptors } from './scripts/extensions.js';
