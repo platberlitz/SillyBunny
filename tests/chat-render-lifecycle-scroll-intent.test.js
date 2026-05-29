@@ -69,6 +69,16 @@ describe('chat render lifecycle scroll intent', () => {
         })).toEqual(expect.objectContaining({ action: CHAT_SCROLL_ACTION.NONE }));
     });
 
+    test('stream progress defers bottom pinning during an active touch', () => {
+        expect(resolveChatScrollAction({
+            intent: CHAT_SCROLL_INTENT.STREAM_PROGRESS,
+            autoScrollEnabled: true,
+            isNearBottom: true,
+            isManualScrollSuppressed: true,
+            isTouchActive: true,
+        })).toEqual(expect.objectContaining({ action: CHAT_SCROLL_ACTION.DEFER_UNTIL_TOUCH_END }));
+    });
+
     test('initial load forces bottom regardless of auto-scroll preference', () => {
         expect(resolveChatScrollAction({
             intent: CHAT_SCROLL_INTENT.INITIAL_LOAD,

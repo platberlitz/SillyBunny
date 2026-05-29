@@ -382,21 +382,28 @@ describe('chat render lifecycle script wiring', () => {
         const source = getSource(onProgressStreaming.value);
 
         expect(source).toContain('const shouldUseMobileStreamingPin = !isImpersonate && shouldGuardMobileChatScroll();');
+        expect(source).toContain('const mobileStreamingScrollAction = shouldUseMobileStreamingPin ? resolveChatScrollAction({');
+        expect(source).toContain('isTouchActive: mobileChatTouchScrolling');
         expect(source).toContain('const shouldPinMobileBottom = shouldUseMobileStreamingPin && shouldPinMobileChatToBottom();');
-        expect(source).toContain('if (shouldPinMobileBottom && shouldPinMobileChatToBottom())');
+        expect(source).toContain('if (mobileStreamingScrollAction?.action === CHAT_SCROLL_ACTION.DEFER_UNTIL_TOUCH_END)');
+        expect(source).toContain('queueDeferredMobileStreamingBottomPin();');
+        expect(source).toContain('} else if (shouldPinMobileBottom && shouldPinMobileChatToBottom())');
         expect(source).toContain('scheduleMobileStreamingBottomPin({ isFinal });');
         expect(source).not.toContain('pinMobileChatToBottom({ waitForFrame: true, settle: isFinal });');
     });
 
     test('mobile streaming bottom pin scheduling coalesces smooth intermediate pins', () => {
-        expect(scriptSource).toContain('const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = 750;');
+        expect(scriptSource).toContain('const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = isIOSWebKitPlatform() ? 1000 : 750;');
         expect(scriptSource).toContain('let mobileStreamingBottomPinFrame = 0;');
         expect(scriptSource).toContain('let mobileStreamingBottomPinTimer = 0;');
+        expect(scriptSource).toContain('let deferredMobileStreamingBottomPin = false;');
 
         const requestFrame = findFunctionDeclaration('requestMobileStreamingBottomPinFrame');
         const requestFrameSource = getSource(requestFrame);
         expect(requestFrameSource).toContain('requestAnimationFrame(() =>');
         expect(requestFrameSource).toContain('const behavior = getMobileStreamingBottomPinBehavior({');
+        expect(requestFrameSource).toContain('if (mobileChatTouchScrolling)');
+        expect(requestFrameSource).toContain('queueDeferredMobileStreamingBottomPin();');
         expect(requestFrameSource).toContain('if (!shouldPinMobileChatToBottom())');
         expect(requestFrameSource).toContain('pinMobileChatToBottom({');
         expect(requestFrameSource).toContain('waitForFrame: false');

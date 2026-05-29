@@ -603,7 +603,7 @@ const MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS = 400;
 const MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS = 1400;
 const MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
 const MOBILE_CHAT_BOTTOM_PIN_MS = 1500;
-const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = 750;
+const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = isIOSWebKitPlatform() ? 1000 : 750;
 const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 24;
 const CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS = 250;
 const CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS = Object.freeze([80, 250, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS, 900, 1600, 2400]);
@@ -642,6 +642,7 @@ let mobileStreamingBottomPinFrame = 0;
 let mobileStreamingBottomPinTimer = 0;
 let mobileStreamingBottomPinSettle = false;
 let mobileStreamingBottomPinSmooth = false;
+let deferredMobileStreamingBottomPin = false;
 let lastMobileStreamingBottomPinAt = 0;
 let chatLoadBottomLockUntil = 0;
 let chatLoadBottomPinFrame = 0;
@@ -1931,6 +1932,10 @@ function markMobileChatManualScroll({ touchActive = false, suppressMs = MOBILE_C
     mobileChatBottomPinUntil = 0;
     clearMobileStreamingBottomPin();
 
+    if (!isChatScrolledNearBottom()) {
+        clearDeferredMobileStreamingBottomPin();
+    }
+
     if (touchActive) {
         mobileChatTouchScrolling = true;
     }
@@ -1947,6 +1952,7 @@ function releaseMobileChatTouchScroll() {
 
     mobileChatTouchScrolling = false;
     markMobileChatManualScroll();
+    flushDeferredMobileStreamingBottomPin();
 }
 
 function isMobileChatManualScrollSuppressionActive() {
@@ -1967,6 +1973,37 @@ function shouldSuppressMobileChatAutoScroll() {
     }
 
     return Date.now() < mobileChatManualScrollSuppressedUntil && !isChatScrolledNearBottom();
+}
+
+function queueDeferredMobileStreamingBottomPin() {
+    if (!shouldGuardMobileChatScroll()) {
+        return false;
+    }
+
+    deferredMobileStreamingBottomPin = true;
+    return true;
+}
+
+function clearDeferredMobileStreamingBottomPin() {
+    deferredMobileStreamingBottomPin = false;
+}
+
+function flushDeferredMobileStreamingBottomPin() {
+    if (!deferredMobileStreamingBottomPin) {
+        return false;
+    }
+
+    clearDeferredMobileStreamingBottomPin();
+
+    if (!shouldGuardMobileChatScroll() || mobileChatTouchScrolling) {
+        return false;
+    }
+
+    // The deferred pin already yielded to touch; allow one catch-up pin after release.
+    mobileChatManualScrollSuppressedUntil = 0;
+    requestMobileChatBottomPin({ requireNearBottom: false });
+    scheduleMobileStreamingBottomPin({ isFinal: true });
+    return true;
 }
 
 function requestMobileChatBottomPin({ requireNearBottom = true, durationMs = MOBILE_CHAT_BOTTOM_PIN_MS } = {}) {
@@ -2058,6 +2095,11 @@ function requestMobileStreamingBottomPinFrame({ isFinal = false } = {}) {
         mobileStreamingBottomPinSettle = false;
         mobileStreamingBottomPinSmooth = false;
 
+        if (mobileChatTouchScrolling) {
+            queueDeferredMobileStreamingBottomPin();
+            return;
+        }
+
         if (!shouldPinMobileChatToBottom()) {
             return;
         }
@@ -2105,6 +2147,7 @@ function resetMobileViewportScrollState() {
     mobileChatManualScrollSuppressedUntil = 0;
     mobileChatBottomPinUntil = 0;
     clearMobileStreamingBottomPin();
+    clearDeferredMobileStreamingBottomPin();
 }
 
 function getMobileViewportScrollHandler() {
@@ -2526,7 +2569,13 @@ function scrollStartedStreamingMessageThroughLifecycle() {
         autoScrollEnabled: power_user.auto_scroll_chat_to_bottom,
         isNearBottom: isChatScrolledNearBottom(),
         isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll(),
+        isTouchActive: mobileChatTouchScrolling,
     });
+
+    if (action.action === CHAT_SCROLL_ACTION.DEFER_UNTIL_TOUCH_END) {
+        queueDeferredMobileStreamingBottomPin();
+        return;
+    }
 
     if (shouldApplyChatBottomScrollAction(action)) {
         requestAnimationFrame(() => {
@@ -5424,6 +5473,13 @@ class StreamingProcessor {
         const isIOSWebKit = isIOSWebKitPlatform();
         const shouldReduceIntermediateStreamingWork = !isFinal && isIOSWebKit && power_user.ios_webkit_reduce_streaming_work;
         const shouldUseMobileStreamingPin = !isImpersonate && shouldGuardMobileChatScroll();
+        const mobileStreamingScrollAction = shouldUseMobileStreamingPin ? resolveChatScrollAction({
+            intent: CHAT_SCROLL_INTENT.STREAM_PROGRESS,
+            autoScrollEnabled: true,
+            isNearBottom: isChatScrolledNearBottom(),
+            isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll(),
+            isTouchActive: mobileChatTouchScrolling,
+        }) : null;
         const shouldPinMobileBottom = shouldUseMobileStreamingPin && shouldPinMobileChatToBottom();
 
         if (!isImpersonate && !isContinue && Array.isArray(this.swipes) && this.swipes.length > 0) {
@@ -5537,7 +5593,9 @@ class StreamingProcessor {
             }
         }
 
-        if (shouldPinMobileBottom && shouldPinMobileChatToBottom()) {
+        if (mobileStreamingScrollAction?.action === CHAT_SCROLL_ACTION.DEFER_UNTIL_TOUCH_END) {
+            queueDeferredMobileStreamingBottomPin();
+        } else if (shouldPinMobileBottom && shouldPinMobileChatToBottom()) {
             scheduleMobileStreamingBottomPin({ isFinal });
         } else if (!scrollLock && (!shouldUseMobileStreamingPin || !isMobileChatManualScrollSuppressionActive())) {
             scrollChatToBottom({

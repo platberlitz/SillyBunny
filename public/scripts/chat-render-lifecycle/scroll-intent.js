@@ -15,6 +15,7 @@ export const CHAT_SCROLL_ACTION = Object.freeze({
     PRESERVE_ANCHOR: 'preserve-anchor',
     FORCE_EDGE: 'force-edge',
     SUPPRESS_AUTO_SCROLL: 'suppress-auto-scroll',
+    DEFER_UNTIL_TOUCH_END: 'defer-until-touch-end',
 });
 
 function canPinBottom({ autoScrollEnabled, isNearBottom, isManualScrollSuppressed }) {
@@ -37,6 +38,7 @@ function preserveAnchorOrNone({ hasAnchor }, reason) {
  * @param {boolean} [options.isNearBottom=false] Whether the viewport is already near bottom.
  * @param {boolean} [options.hasAnchor=false] Whether an anchor is available for restoration.
  * @param {boolean} [options.isManualScrollSuppressed=false] Whether user scroll/touch suppression is active.
+ * @param {boolean} [options.isTouchActive=false] Whether the user is actively touching the scroll surface.
  * @param {string} [options.edge='bottom'] Forced scroll edge for explicit jumps.
  * @returns {{action: string, reason: string, edge?: string, force?: boolean}}
  */
@@ -46,6 +48,7 @@ export function resolveChatScrollAction({
     isNearBottom = false,
     hasAnchor = false,
     isManualScrollSuppressed = false,
+    isTouchActive = false,
     edge = 'bottom',
 } = {}) {
     switch (intent) {
@@ -71,8 +74,16 @@ export function resolveChatScrollAction({
                 ? { action: CHAT_SCROLL_ACTION.PIN_BOTTOM, reason: intent }
                 : { action: CHAT_SCROLL_ACTION.NONE, reason: `${intent}-not-pinned` };
 
-        case CHAT_SCROLL_INTENT.TAIL_APPEND:
         case CHAT_SCROLL_INTENT.STREAM_PROGRESS:
+            if (autoScrollEnabled && isNearBottom && isTouchActive) {
+                return { action: CHAT_SCROLL_ACTION.DEFER_UNTIL_TOUCH_END, reason: `${intent}-touch-active` };
+            }
+
+            return canPinBottom({ autoScrollEnabled, isNearBottom, isManualScrollSuppressed })
+                ? { action: CHAT_SCROLL_ACTION.PIN_BOTTOM, reason: intent }
+                : { action: CHAT_SCROLL_ACTION.NONE, reason: `${intent}-not-pinned` };
+
+        case CHAT_SCROLL_INTENT.TAIL_APPEND:
             return canPinBottom({ autoScrollEnabled, isNearBottom, isManualScrollSuppressed })
                 ? { action: CHAT_SCROLL_ACTION.PIN_BOTTOM, reason: intent }
                 : { action: CHAT_SCROLL_ACTION.NONE, reason: `${intent}-not-pinned` };
