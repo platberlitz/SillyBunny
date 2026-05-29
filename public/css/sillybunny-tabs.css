@@ -6291,26 +6291,22 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         display: none !important;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-frame,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-frame {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-frame {
         flex-direction: row;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-nav-wrapper,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-nav-wrapper {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-nav-wrapper {
         flex: 0 0 86px;
         width: 86px;
         height: 100%;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'][data-sb-desktop-nav-mode='icon-only'] .sb-shell-root-left.openDrawer .sb-shell-nav-wrapper,
-    :root[data-sb-desktop-nav-layout='vertical'][data-sb-desktop-nav-mode='icon-only'] .sb-shell-root-right.openDrawer .sb-shell-nav-wrapper {
-        flex-basis: 62px;
-        width: 62px;
+    :root[data-sb-desktop-nav-layout='vertical'][data-sb-desktop-nav-mode='icon-only'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-nav-wrapper {
+        flex-basis: calc((46px * var(--sb-desktop-button-scale)) + 16px);
+        width: calc((46px * var(--sb-desktop-button-scale)) + 16px);
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-nav,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-nav {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-nav {
         height: 100%;
         flex-direction: column;
         align-items: stretch;
@@ -6324,13 +6320,11 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         scroll-snap-type: none;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-rail-shortcuts,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-rail-shortcuts {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-rail-shortcuts {
         display: contents;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-rail-divider,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-rail-divider {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-rail-divider {
         display: block;
         width: calc(100% - 8px);
         height: 1px;
@@ -6350,8 +6344,7 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         display: none !important;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-tab,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-tab {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-tab {
         width: 100%;
         min-width: 0;
         max-width: 100%;
@@ -6365,20 +6358,17 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         white-space: normal;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-tab-mobile-rail-hidden,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-tab-mobile-rail-hidden {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-tab-mobile-rail-hidden {
         display: none;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-tab:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-selected='true'], [aria-current]),
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-tab:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-selected='true'], [aria-current]) {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-tab:is(.is-active, .active, .selected, .is-selected, .is-current, [aria-selected='true'], [aria-current]) {
         background: transparent;
         border-color: transparent;
         box-shadow: none;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-rail-action,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-rail-action {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-rail-action {
         width: calc(46px * var(--sb-desktop-button-scale));
         min-width: calc(46px * var(--sb-desktop-button-scale));
         max-width: calc(46px * var(--sb-desktop-button-scale));
@@ -6390,43 +6380,36 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
         box-shadow: none;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-tab i,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-tab i {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-tab i {
         width: 100%;
         flex-basis: auto;
         margin: 0;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-tab-copy,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-tab-copy {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-tab-copy {
         align-items: center;
         text-align: center;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-tab-copy strong,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-tab-copy strong {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-tab-copy strong {
         font-size: calc(var(--mainFontSize) * 0.66 * var(--sb-desktop-button-scale));
         white-space: normal;
         line-height: 1.1;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'][data-sb-desktop-nav-mode='icon-only'] .sb-shell-root-left.openDrawer .sb-shell-tab,
-    :root[data-sb-desktop-nav-layout='vertical'][data-sb-desktop-nav-mode='icon-only'] .sb-shell-root-right.openDrawer .sb-shell-tab {
+    :root[data-sb-desktop-nav-layout='vertical'][data-sb-desktop-nav-mode='icon-only'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-tab {
         width: calc(46px * var(--sb-desktop-button-scale));
         min-height: calc(46px * var(--sb-desktop-button-scale));
         align-self: center;
         padding: 0;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'][data-sb-desktop-nav-mode='icon-only'] .sb-shell-root-left.openDrawer .sb-shell-tab-copy,
-    :root[data-sb-desktop-nav-layout='vertical'][data-sb-desktop-nav-mode='icon-only'] .sb-shell-root-right.openDrawer .sb-shell-tab-copy,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-rail-action .sb-shell-tab-copy,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-rail-action .sb-shell-tab-copy {
+    :root[data-sb-desktop-nav-layout='vertical'][data-sb-desktop-nav-mode='icon-only'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-tab-copy,
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-rail-action .sb-shell-tab-copy {
         display: none;
     }
 
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-left.openDrawer .sb-shell-rail-empty,
-    :root[data-sb-desktop-nav-layout='vertical'] .sb-shell-root-right.openDrawer .sb-shell-rail-empty {
+    :root[data-sb-desktop-nav-layout='vertical'] :is(.sb-shell-root-left, .sb-shell-root-right).openDrawer .sb-shell-rail-empty {
         display: none;
     }
 }

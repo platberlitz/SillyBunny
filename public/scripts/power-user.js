@@ -1824,6 +1824,10 @@ export async function loadPowerUserSettings(settings, data) {
         delete power_user.import_card_tags;
     }
 
+    if (power_user.vertical_chat_layout !== undefined) {
+        delete power_user.vertical_chat_layout;
+    }
+
     if (power_user?.instruct?.derived === true) {
         power_user.instruct_derived = true;
         delete power_user.instruct.derived;
@@ -2001,7 +2005,6 @@ export async function loadPowerUserSettings(settings, data) {
     $(`#character_sort_order option[data-order="${power_user.sort_order}"][data-field="${power_user.sort_field}"]`).prop('selected', true);
     switchReducedMotion();
     switchCompactInputArea();
-    switchVerticalChatLayout();
     reloadMarkdownProcessor();
     await loadInstructMode(data);
     await loadContextSettings();
