@@ -605,7 +605,8 @@ const MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
 const MOBILE_CHAT_BOTTOM_PIN_MS = 1500;
 const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = 750;
 const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 24;
-const CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS = Object.freeze([80, 250, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS, 900]);
+const CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS = 250;
+const CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS = Object.freeze([80, 250, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS, 900, 1600, 2400]);
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 const SHOW_MORE_TOUCH_MOVE_CANCEL_PX = 12;
 const ENTITY_SELECTION_PULSE_CLEANUP_MS = 900;
@@ -642,6 +643,8 @@ let mobileStreamingBottomPinTimer = 0;
 let mobileStreamingBottomPinSettle = false;
 let mobileStreamingBottomPinSmooth = false;
 let lastMobileStreamingBottomPinAt = 0;
+let chatLoadBottomLockUntil = 0;
+let chatLoadBottomPinFrame = 0;
 export let abortStatusCheck = new AbortController();
 export let charDragDropHandler = null;
 export let chatDragDropHandler = null;
@@ -1871,6 +1874,55 @@ function isChatScrolledNearBottom(threshold = CHAT_SCROLL_BOTTOM_THRESHOLD_PX) {
     return Math.abs(element.scrollHeight - element.clientHeight - element.scrollTop) <= threshold;
 }
 
+function isChatLoadBottomLockActive() {
+    return Date.now() < chatLoadBottomLockUntil;
+}
+
+function clearChatLoadBottomLock() {
+    chatLoadBottomLockUntil = 0;
+
+    if (chatLoadBottomPinFrame) {
+        cancelAnimationFrame(chatLoadBottomPinFrame);
+        chatLoadBottomPinFrame = 0;
+    }
+}
+
+function pinChatLoadToBottom({ waitForFrame = false } = {}) {
+    if (!isChatLoadBottomLockActive()) {
+        return false;
+    }
+
+    const pin = () => {
+        if (!isChatLoadBottomLockActive()) {
+            return;
+        }
+
+        scrollLock = false;
+        scrollChatElementToBottom();
+    };
+
+    if (waitForFrame) {
+        if (!chatLoadBottomPinFrame) {
+            chatLoadBottomPinFrame = requestAnimationFrame(() => {
+                chatLoadBottomPinFrame = 0;
+                pin();
+            });
+        }
+
+        return true;
+    }
+
+    pin();
+    return true;
+}
+
+function beginChatLoadBottomLock({ durationMs = Math.max(...CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS) + CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS } = {}) {
+    chatLoadBottomLockUntil = Math.max(chatLoadBottomLockUntil, Date.now() + durationMs);
+    scrollLock = false;
+    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, chatLoadBottomLockUntil);
+    pinChatLoadToBottom();
+}
+
 function markMobileChatManualScroll({ touchActive = false, suppressMs = MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS } = {}) {
     if (!shouldGuardMobileChatScroll()) {
         return;
@@ -2126,6 +2178,7 @@ function routeShellWheelToChat(event) {
         return;
     }
 
+    clearChatLoadBottomLock();
     chatNode.scrollTop = nextScrollTop;
     event.preventDefault();
 }
@@ -2716,7 +2769,8 @@ export async function printMessages() {
         chatElement.append('<div id="show_more_messages">Show more messages</div>');
     }
 
-    await redisplayChat({ startIndex, fade: false });
+    beginChatLoadBottomLock();
+    await redisplayChat({ startIndex, fade: false, pinBottomDuringRender: true });
 
     // Wait for next frame to ensure batch rendering completes
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -2742,12 +2796,14 @@ function scrollLoadedChatToBottomThroughLifecycle() {
 function scrollLoadedChatToBottom() {
     // SillyBunny: previous-chat taps can leave the mobile manual-scroll guard active.
     const latestSettleDelay = Math.max(...CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS);
+    const bottomLockDurationMs = latestSettleDelay + CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS;
+    beginChatLoadBottomLock({ durationMs: bottomLockDurationMs });
     scrollLock = false;
-    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + latestSettleDelay + 50);
+    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, chatLoadBottomLockUntil);
 
     if (shouldGuardMobileChatScroll()) {
         mobileChatManualScrollSuppressedUntil = 0;
-        requestMobileChatBottomPin({ requireNearBottom: false, durationMs: latestSettleDelay + MOBILE_SEND_SCROLL_SETTLE_MS });
+        requestMobileChatBottomPin({ requireNearBottom: false, durationMs: bottomLockDurationMs + MOBILE_SEND_SCROLL_SETTLE_MS });
     }
 
     scrollChatToBottom({ force: true });
@@ -2755,7 +2811,7 @@ function scrollLoadedChatToBottom() {
 
     for (const delayMs of CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS) {
         setTimeout(() => {
-            if (Date.now() >= scrollLockImmunityUntil) {
+            if (!isChatLoadBottomLockActive()) {
                 return;
             }
 
@@ -2764,7 +2820,7 @@ function scrollLoadedChatToBottom() {
     }
 }
 
-async function renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize }) {
+async function renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize, pinBottomDuringRender }) {
     const renderedMessageIds = lodash.range(startIndex, startIndex + messages.length, 1);
     const shouldYieldBetweenBatches = batchSize < messages.length;
 
@@ -2789,6 +2845,10 @@ async function renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSi
         }
         chatElement[0].appendChild(fragment);
 
+        if (pinBottomDuringRender) {
+            beginChatLoadBottomLock();
+        }
+
         if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
             await waitForNextFrame();
         }
@@ -2797,7 +2857,7 @@ async function renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSi
     return renderedMessageIds;
 }
 
-async function renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize }) {
+async function renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize, pinBottomDuringRender }) {
     const { renderedMessageIds } = await renderMessagesInBatches({
         messages,
         firstMessageId: startIndex,
@@ -2806,19 +2866,20 @@ async function renderRedisplayChatMessagesThroughLifecycle({ messages, startInde
         insertFragment: fragment => chatElement[0].appendChild(fragment),
         waitForNextFrame,
         markLastMessage: true,
+        afterBatch: pinBottomDuringRender ? () => beginChatLoadBottomLock() : undefined,
     });
 
     return renderedMessageIds;
 }
 
-async function renderRedisplayChatMessages({ messages, startIndex }) {
+async function renderRedisplayChatMessages({ messages, startIndex, pinBottomDuringRender = false }) {
     const batchSize = getMobileChatRenderBatchSize(messages.length);
 
     if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.REDISPLAY_BATCH)) {
-        return renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize });
+        return renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize, pinBottomDuringRender });
     }
 
-    return renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize });
+    return renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize, pinBottomDuringRender });
 }
 
 /**
@@ -2827,8 +2888,9 @@ async function renderRedisplayChatMessages({ messages, startIndex }) {
  * @param {ChatMessage[]} [options.targetChat=chat] All messages in chat before startIndex will remain unchanged.
  * @param {Number} [options.startIndex=0] Everything including and after startIndex will be replaced.
  * @param {Boolean} [options.fade=true] When false, the swipe chevrons will not fade in.
+ * @param {Boolean} [options.pinBottomDuringRender=false] Keep initial chat loads at the newest rendered message while batches append.
  */
-export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = true } = {}) {
+export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = true, pinBottomDuringRender = false } = {}) {
     const messageElements = chatElement.find('.mes');
     messageElements.removeClass('last_mes');
 
@@ -2842,7 +2904,7 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
     const messages = targetChat.slice(startIndex);
 
     if (messages.length > 0) {
-        const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex });
+        const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex, pinBottomDuringRender });
 
         applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });
     }
@@ -2914,6 +2976,7 @@ export async function clearChat({ clearData = false } = {}) {
     cancelDebouncedChatSave();
     cancelDebouncedMetadataSave();
     closeMessageEditor();
+    clearChatLoadBottomLock();
     disposeChatMessageResizeObserver();
     resetMobileChatViewportLifecycle();
     extension_prompts = {};
@@ -14920,9 +14983,18 @@ jQuery(async function () {
 
     const chatElementScroll = document.getElementById('chat');
     const chatShellElement = document.getElementById('sheld');
-    const markMobileChatTouchScrollStart = () => markMobileChatManualScroll({ touchActive: true });
-    const markMobileChatTouchScrollMove = () => markMobileChatManualScroll();
-    const markMobileChatWheelScroll = () => markMobileChatManualScroll();
+    const markMobileChatTouchScrollStart = () => {
+        clearChatLoadBottomLock();
+        markMobileChatManualScroll({ touchActive: true });
+    };
+    const markMobileChatTouchScrollMove = () => {
+        clearChatLoadBottomLock();
+        markMobileChatManualScroll();
+    };
+    const markMobileChatWheelScroll = () => {
+        clearChatLoadBottomLock();
+        markMobileChatManualScroll();
+    };
     const markMobileViewportScroll = getMobileViewportScrollHandler();
 
     chatElementScroll.addEventListener('touchstart', markMobileChatTouchScrollStart, { passive: true });
@@ -14935,6 +15007,11 @@ jQuery(async function () {
 
     const chatScrollHandler = function () {
         refreshObservedChatMessageResizeViewportStates();
+
+        if (isChatLoadBottomLockActive() && !isChatScrolledNearBottom()) {
+            pinChatLoadToBottom();
+            return;
+        }
 
         if (power_user.waifuMode) {
             scrollLock = true;
