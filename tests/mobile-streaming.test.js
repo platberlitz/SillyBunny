@@ -1,4 +1,5 @@
 import {
+    getMobileStreamingBottomPinBehavior,
     getStreamingUpdateInterval,
     IOS_REASONING_RENDER_INTERVAL_MS,
     IOS_STREAMING_UPDATE_INTERVAL_MS,
@@ -59,6 +60,21 @@ describe('mobile streaming helpers', () => {
             iosWebKitDisableSmoothStreaming: true,
             navigatorRef: { platform: 'iPhone', maxTouchPoints: 1 },
         })).toBe(false);
+    });
+
+    test('uses instant streaming bottom pins on iOS WebKit', () => {
+        expect(getMobileStreamingBottomPinBehavior({
+            navigatorRef: { platform: 'Linux x86_64', maxTouchPoints: 1 },
+        })).toBe('smooth');
+
+        expect(getMobileStreamingBottomPinBehavior({
+            isFinal: true,
+            navigatorRef: { platform: 'Linux x86_64', maxTouchPoints: 1 },
+        })).toBe('auto');
+
+        expect(getMobileStreamingBottomPinBehavior({
+            navigatorRef: { platform: 'iPhone', maxTouchPoints: 1 },
+        })).toBe('auto');
     });
 
     test('skips repeated hidden live reasoning renders on reduced DOM platforms', () => {

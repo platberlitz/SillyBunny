@@ -314,7 +314,7 @@ import { onboardingExperimentalMacroEngine } from './scripts/macros/engine/Macro
 import { compressRequest, setRequestCompressionConfig } from './scripts/request-compression.js';
 import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker } from './scripts/swipe-picker.js';
 import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
-import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
+import { getMobileStreamingBottomPinBehavior, getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
 import {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     CHAT_RENDER_LIFECYCLE_ROUTE,
@@ -1949,6 +1949,10 @@ function releaseMobileChatTouchScroll() {
     markMobileChatManualScroll();
 }
 
+function isMobileChatManualScrollSuppressionActive() {
+    return shouldGuardMobileChatScroll() && (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil);
+}
+
 function shouldSuppressMobileChatAutoScroll() {
     if (!shouldGuardMobileChatScroll()) {
         return false;
@@ -1979,7 +1983,7 @@ function requestMobileChatBottomPin({ requireNearBottom = true, durationMs = MOB
 }
 
 function shouldPinMobileChatToBottom() {
-    if (!shouldGuardMobileChatScroll() || mobileChatTouchScrolling) {
+    if (!shouldGuardMobileChatScroll() || isMobileChatManualScrollSuppressionActive()) {
         return false;
     }
 
@@ -2047,7 +2051,10 @@ function requestMobileStreamingBottomPinFrame({ isFinal = false } = {}) {
     mobileStreamingBottomPinFrame = requestAnimationFrame(() => {
         mobileStreamingBottomPinFrame = 0;
         const shouldSettle = mobileStreamingBottomPinSettle;
-        const behavior = shouldSettle || !mobileStreamingBottomPinSmooth ? 'auto' : 'smooth';
+        const behavior = getMobileStreamingBottomPinBehavior({
+            isFinal: shouldSettle,
+            allowSmooth: mobileStreamingBottomPinSmooth,
+        });
         mobileStreamingBottomPinSettle = false;
         mobileStreamingBottomPinSmooth = false;
 
@@ -5416,7 +5423,8 @@ class StreamingProcessor {
         const isContinue = this.type == 'continue';
         const isIOSWebKit = isIOSWebKitPlatform();
         const shouldReduceIntermediateStreamingWork = !isFinal && isIOSWebKit && power_user.ios_webkit_reduce_streaming_work;
-        const shouldPinMobileBottom = !isImpersonate && shouldPinMobileChatToBottom();
+        const shouldUseMobileStreamingPin = !isImpersonate && shouldGuardMobileChatScroll();
+        const shouldPinMobileBottom = shouldUseMobileStreamingPin && shouldPinMobileChatToBottom();
 
         if (!isImpersonate && !isContinue && Array.isArray(this.swipes) && this.swipes.length > 0) {
             for (let i = 0; i < this.swipes.length; i++) {
@@ -5529,10 +5537,13 @@ class StreamingProcessor {
             }
         }
 
-        if (shouldPinMobileBottom) {
+        if (shouldPinMobileBottom && shouldPinMobileChatToBottom()) {
             scheduleMobileStreamingBottomPin({ isFinal });
-        } else if (!scrollLock) {
-            scrollChatToBottom({ waitForFrame: true });
+        } else if (!scrollLock && (!shouldUseMobileStreamingPin || !isMobileChatManualScrollSuppressionActive())) {
+            scrollChatToBottom({
+                waitForFrame: true,
+                isNearBottom: shouldUseMobileStreamingPin ? shouldPinMobileBottom : true,
+            });
         }
     }
 
