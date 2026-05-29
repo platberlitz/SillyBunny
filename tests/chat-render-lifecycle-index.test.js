@@ -4,9 +4,16 @@ import {
     CHAT_SCROLL_ACTION,
     CHAT_SCROLL_INTENT,
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
+    CHAT_RENDER_LIFECYCLE_ROUTE,
+    CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS,
     captureVisibleMessageAnchor,
     createChatRenderLifecycle,
+    createDelegatedResizeObserver,
+    createMessageUpdateQueue,
     createFrameWriteScheduler,
+    createMobileViewportObserver,
+    createStreamWriteBuffer,
+    MOBILE_VIEWPORT_SETTLE_DELAY_MS,
     resolveChatBottomScrollAction,
     resolveChatRenderLifecycleRollout,
     resolveChatScrollAction,
@@ -29,9 +36,25 @@ describe('chat render lifecycle index seam', () => {
         expect(typeof resolveChatScrollAction).toBe('function');
         expect(typeof resolveChatRenderLifecycleRollout).toBe('function');
         expect(typeof renderMessagesInBatches).toBe('function');
+        expect(typeof createMessageUpdateQueue).toBe('function');
+        expect(typeof createStreamWriteBuffer).toBe('function');
+        expect(typeof createDelegatedResizeObserver).toBe('function');
+        expect(typeof createMobileViewportObserver).toBe('function');
         expect(CHAT_SCROLL_INTENT.TAIL_APPEND).toBe('tail-append');
         expect(CHAT_SCROLL_ACTION.PIN_BOTTOM).toBe('pin-bottom');
         expect(CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY).toBe('sillybunny.chatRenderLifecycle.enabled');
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD).toBe('initial-load');
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.BOTTOM_SCROLL]).toBe(true);
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD]).toBe(true);
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.MEDIA_RESIZE]).toBe(true);
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.MESSAGE_UPDATE]).toBe(true);
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.MOBILE_VIEWPORT]).toBe(true);
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.REDISPLAY_BATCH]).toBe(true);
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.REPLACE_MESSAGE]).toBe(true);
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.SHOW_MORE_BATCH]).toBe(true);
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.STREAM_PROGRESS]).toBe(true);
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.STREAM_START]).toBe(true);
+        expect(MOBILE_VIEWPORT_SETTLE_DELAY_MS).toBe(180);
     });
 
     test('creates a pass-through lifecycle adapter without mutating runtime behavior', () => {
@@ -48,7 +71,14 @@ describe('chat render lifecycle index seam', () => {
         expect(lifecycle.scrollIntent.intent).toBe(CHAT_SCROLL_INTENT);
         expect(lifecycle.scrollIntent.action).toBe(CHAT_SCROLL_ACTION);
         expect(lifecycle.rollout.key).toBe(CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY);
+        expect(lifecycle.rollout.route).toBe(CHAT_RENDER_LIFECYCLE_ROUTE);
+        expect(lifecycle.rollout.routeDefaults).toBe(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS);
         expect(lifecycle.rollout.resolve).toBe(resolveChatRenderLifecycleRollout);
         expect(lifecycle.renderBatch.render).toBe(renderMessagesInBatches);
+        expect(lifecycle.streamBuffer.create).toBe(createStreamWriteBuffer);
+        expect(lifecycle.updateQueue.create).toBe(createMessageUpdateQueue);
+        expect(lifecycle.resizeObserver.create).toBe(createDelegatedResizeObserver);
+        expect(lifecycle.mobileViewport.create).toBe(createMobileViewportObserver);
+        expect(lifecycle.mobileViewport.settleDelayMs).toBe(MOBILE_VIEWPORT_SETTLE_DELAY_MS);
     });
 });

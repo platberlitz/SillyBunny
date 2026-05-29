@@ -37,6 +37,32 @@ This ledger tracks intentional SillyBunny divergence in upstream-origin files. I
 | Last reviewed | 2026-05-27 scroll function seam. |
 | Owner | Refactor integrator. |
 
+### `public/script.js` - generation lifecycle
+| Field | Value |
+| --- | --- |
+| Area | Generation lifecycle. |
+| Divergence reason | SillyBunny generation flow needs explicit UI lock, stop, and unblock decisions while preserving provider calls, prompt assembly, token accounting, and persistence in the existing generation path. |
+| Target seam | `public/scripts/generation-lifecycle/`. |
+| Adapter shape | Keep exported generation functions in `public/script.js`; delegate send-button lock state, stop-generation request state, and unblock cleanup decisions to the lifecycle module. |
+| Protecting tests | `tests/generation-lifecycle.test.js`, `tests/generation-lifecycle-wiring.test.js`, existing export-surface coverage. |
+| Validation | `npm run test:unit --prefix tests -- generation-lifecycle.test.js generation-lifecycle-wiring.test.js`, `npm run lint --prefix tests -- generation-lifecycle.test.js generation-lifecycle-wiring.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
+| Rollback path | Revert lifecycle calls in `public/script.js` while keeping existing provider and prompt paths intact. |
+| Last reviewed | 2026-05-28 generation lifecycle wiring. |
+| Owner | Refactor integrator. |
+
+### `public/script.js` - tooling UI hydration
+| Field | Value |
+| --- | --- |
+| Area | Screenshot/image-gen/tooling UI hydration. |
+| Divergence reason | SillyBunny message screenshots need deterministic range normalization, filename generation, asset wait timing, and lazy `html2canvas` loading without expanding upstream-facing call-site logic. |
+| Target seam | `public/scripts/tooling-ui-hydration/`. |
+| Adapter shape | Keep message screenshot UI and DOM capture in `public/script.js`; delegate capture range, filename, asset wait, and lazy library load decisions to the lifecycle module. |
+| Protecting tests | `tests/tooling-ui-hydration.test.js`, `tests/tooling-ui-hydration-wiring.test.js`, existing export-surface coverage. |
+| Validation | `npm run test:unit --prefix tests -- tooling-ui-hydration.test.js tooling-ui-hydration-wiring.test.js`, `npm run lint --prefix tests -- tooling-ui-hydration.test.js tooling-ui-hydration-wiring.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
+| Rollback path | Revert helper calls in `public/script.js` while leaving screenshot DOM construction and download behavior intact. |
+| Last reviewed | 2026-05-28 tooling UI hydration wiring. |
+| Owner | Refactor integrator. |
+
 ### `public/style.css` - message containment and scroll anchoring
 | Field | Value |
 | --- | --- |
@@ -53,14 +79,14 @@ This ledger tracks intentional SillyBunny divergence in upstream-origin files. I
 ### `public/scripts/sillybunny-tabs.js` - shell chat controls
 | Field | Value |
 | --- | --- |
-| Area | Mobile shell and chat navigation. |
-| Divergence reason | SillyBunny shell owns top/bottom navigation, chat controls, drawers, and mobile actions that interact with chat scroll behavior. |
-| Target seam | `public/scripts/chat-render-lifecycle/` for chat scroll requests; future mobile shell lifecycle module for drawer/nav/viewport behavior. |
-| Adapter shape | Shell code should request lifecycle actions instead of owning chat scroll math. |
-| Protecting tests | Future shell smoke checks for drawer/tab/preset/chat-scroll behavior. |
-| Validation | Pending lifecycle adapter implementation. |
+| Area | Mobile shell, chat navigation, and preset/API sync. |
+| Divergence reason | SillyBunny shell owns top/bottom navigation, chat controls, drawers, mobile actions, and mirrored connection-profile controls that interact with chat and API state. |
+| Target seam | `public/scripts/chat-render-lifecycle/` for chat scroll requests; `public/scripts/mobile-shell-lifecycle/` for drawer/nav/viewport behavior; `public/scripts/preset-api-sync-lifecycle/` for active API and connection-profile mirror decisions. |
+| Adapter shape | Shell code keeps DOM wiring and requests lifecycle decisions for nav drag, page scroll, overlay open/close, auto-close, modal inert policy, active API connect-button lookup, and connection-profile mirror state. |
+| Protecting tests | `tests/mobile-shell-lifecycle.test.js`, `tests/mobile-shell-lifecycle-wiring.test.js`, `tests/preset-api-sync-lifecycle.test.js`, `tests/preset-api-sync-lifecycle-wiring.test.js`, future shell smoke checks for drawer/tab/preset/chat-scroll behavior. |
+| Validation | `npm run test:unit --prefix tests -- mobile-shell-lifecycle.test.js mobile-shell-lifecycle-wiring.test.js`, `npm run lint --prefix tests -- mobile-shell-lifecycle.test.js mobile-shell-lifecycle-wiring.test.js`, `npm run test:unit --prefix tests -- preset-api-sync-lifecycle.test.js preset-api-sync-lifecycle-wiring.test.js`, `npm run lint --prefix tests -- preset-api-sync-lifecycle.test.js preset-api-sync-lifecycle-wiring.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
 | Rollback path | Keep shell calls narrow so a bad adapter route can be reverted without removing shell UI. |
-| Last reviewed | 2026-05-26 refactor plan. |
+| Last reviewed | 2026-05-28 preset/API sync lifecycle wiring. |
 | Owner | Refactor integrator and mobile shell owner. |
 
 ### `public/scripts/mobile-streaming.js` - platform streaming policy
@@ -76,14 +102,36 @@ This ledger tracks intentional SillyBunny divergence in upstream-origin files. I
 | Last reviewed | 2026-05-26 refactor plan. |
 | Owner | Refactor integrator. |
 
+### `public/scripts/extensions.js` - extension boot lifecycle
+| Field | Value |
+| --- | --- |
+| Area | Extension boot. |
+| Divergence reason | SillyBunny extension boot needs duplicate manifest protection, deterministic activation ordering, dependency/module gating, disabled dependency handling, and client-version checks while preserving the existing extension runtime loading hooks. |
+| Target seam | `public/scripts/extension-boot-lifecycle/`. |
+| Adapter shape | Extension runtime keeps fetch/script/style/hook behavior and delegates manifest registration, dedupe keys, activation ordering, and activation eligibility decisions to the lifecycle module. |
+| Protecting tests | `tests/extension-boot-lifecycle.test.js`, `tests/extension-boot-lifecycle-wiring.test.js`, `tests/extensions-disable.test.js`. |
+| Validation | `npm run test:unit --prefix tests -- extension-boot-lifecycle.test.js extension-boot-lifecycle-wiring.test.js extensions-disable.test.js`, `npm run lint --prefix tests -- extension-boot-lifecycle.test.js extension-boot-lifecycle-wiring.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
+| Rollback path | Revert helper calls in `extensions.js` while leaving extension settings and runtime load paths unchanged. |
+| Last reviewed | 2026-05-28 extension boot lifecycle wiring. |
+| Owner | Refactor integrator and extension runtime owner. |
+
+### `public/scripts/PromptManager.js` - prompt manager lifecycle
+| Field | Value |
+| --- | --- |
+| Area | Prompt manager lifecycle. |
+| Divergence reason | SillyBunny Prompt Manager needs explicit render gating, generation-active waiting, dry-run/live render selection, and scroll restoration while keeping prompt assembly, token counting, and DOM rendering in the existing class. |
+| Target seam | `public/scripts/prompt-manager-lifecycle/`. |
+| Adapter shape | PromptManager keeps prompt/render implementation and delegates render gating, render mode, and scroll-restore decisions to the lifecycle module. |
+| Protecting tests | `tests/prompt-manager-lifecycle.test.js`, `tests/prompt-manager-lifecycle-wiring.test.js`. |
+| Validation | `npm run test:unit --prefix tests -- prompt-manager-lifecycle.test.js prompt-manager-lifecycle-wiring.test.js`, `npm run lint --prefix tests -- prompt-manager-lifecycle.test.js prompt-manager-lifecycle-wiring.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
+| Rollback path | Revert lifecycle calls in `PromptManager.js` while leaving prompt data and service settings untouched. |
+| Last reviewed | 2026-05-28 prompt manager lifecycle wiring. |
+| Owner | Refactor integrator and prompt manager owner. |
+
 ## Candidate Entries To Add Later
 | File or area | Add entry when |
 | --- | --- |
 | Core settings modules | Preset/API sync refactor starts. |
-| Generation lifecycle code | Streaming/generation event ordering refactor starts. |
-| Extension boot code | Lazy hydration or boot manifest work starts. |
-| Prompt manager code | Heavy prompt preview/render scheduling starts. |
-| Screenshot/image-gen UI code | Lazy loading of non-active tooling begins. |
 
 ## Review Checklist
 - Does the upstream-origin file contain only adapter wiring and concise comments?

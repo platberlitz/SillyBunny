@@ -79,6 +79,19 @@
             <strong>Choose How Pathfinder Works</strong>
         </div>
 
+        <div class="pf--mode-selector-row">
+            <label class="pf--setting-label" for="pf--mode-selector">
+                <i class="fa-solid fa-route"></i>
+                <span>Mode</span>
+            </label>
+            <select id="pf--mode-selector" class="text_pole" aria-label="Pathfinder mode">
+                <option value="off">Off</option>
+                <option value="tool">Tool</option>
+                <option value="pipeline">Pipeline</option>
+                <option value="both">Both</option>
+            </select>
+        </div>
+
         <!-- Warning banner when both modes enabled -->
         <div id="pf--dual-mode-warning" class="pf--dual-mode-warning" style="display: none;">
             <i class="fa-solid fa-triangle-exclamation"></i>
@@ -792,6 +805,37 @@
 }
 
 /* Mode Cards */
+.pf--mode-selector-row {
+    display: grid;
+    grid-template-columns: max-content minmax(160px, 260px);
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: color-mix(in srgb, var(--pf-surface-strong) 90%, var(--pf-accent) 6%);
+    border: 1px solid color-mix(in srgb, var(--pf-border) 80%, transparent);
+    border-radius: var(--pf-radius-md);
+}
+
+.pf--mode-selector-row .pf--setting-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--pf-text);
+}
+
+.pf--mode-selector-row .pf--setting-label i {
+    color: var(--pf-accent);
+}
+
+#pf--mode-selector {
+    width: 100%;
+    min-width: 0;
+}
+
 .pf--mode-cards {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1153,6 +1197,11 @@
 @media (max-width: 600px) {
     .pf--settings {
         max-height: calc(100dvh - 120px);
+    }
+
+    .pf--mode-selector-row {
+        grid-template-columns: 1fr;
+        align-items: stretch;
     }
 
     .pf--mode-cards {

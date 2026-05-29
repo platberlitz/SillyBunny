@@ -2,9 +2,12 @@
 import { expect, test } from '@playwright/test';
 import {
     getChatScrollSnapshot,
+    getRedisplayCompatibilitySnapshot,
     getRenderedMessageIds,
+    growMessageBlockAboveViewport,
     installSwipeCandidate,
     installSyntheticLongChat,
+    markFirstRenderedMessageEditing,
     markManualMobileScroll,
     openReadyChat,
     scrollMessageNearTop,
@@ -26,6 +29,22 @@ test.describe('issue 167 chat scroll regressions', () => {
         expect(snapshot.lastMesId).toBe('95');
         expect(snapshot.lastVisibleMesId).toBe('95');
         expect(snapshot.bottomDelta).toBeLessThanOrEqual(16);
+    });
+
+    test('redisplay keeps render follow-up hooks applied after batched render', async ({ page }) => {
+        await installSyntheticLongChat(page, { messageCount: 36, visibleCount: 12 });
+        await markFirstRenderedMessageEditing(page);
+        await page.evaluate(async () => window.SillyTavern.getContext().redisplayChat({ startIndex: 24, fade: false }));
+
+        const snapshot = await getRedisplayCompatibilitySnapshot(page);
+
+        expect(snapshot.renderedMessageIds).toEqual(Array.from({ length: 12 }, (_, index) => String(24 + index)));
+        expect(snapshot.lastMessageId).toBe('35');
+        expect(snapshot.lastMessageClassCount).toBe(1);
+        expect(snapshot.fadeClassCount).toBe(0);
+        expect(snapshot.stylePinsCount).toBe(0);
+        expect(snapshot.firstEditUpDisabled).toBe(true);
+        expect(snapshot.firstEditDownDisabled).toBe(false);
     });
 
     test('show more preserves the first visible message anchor', async ({ page }) => {
@@ -69,6 +88,20 @@ test.describe('issue 167 chat scroll regressions', () => {
         expect(after.firstVisibleMesId).toBe(before.firstVisibleMesId);
         expect(Math.abs(after.firstVisibleOffsetTop - before.firstVisibleOffsetTop)).toBeLessThanOrEqual(8);
         await expect(page.locator(`.mes[mesid="${swipeMessageId}"] .mes_text`)).toContainText(`issue 167 replacement swipe ${swipeMessageId}`);
+    });
+
+    test('late media resize above the viewport keeps the current message anchored', async ({ page }) => {
+        await installSyntheticLongChat(page, { messageCount: 72, visibleCount: 72 });
+
+        await scrollMessageNearTop(page, 48, 24);
+
+        const before = await getChatScrollSnapshot(page);
+        await growMessageBlockAboveViewport(page, 12, { height: 460 });
+        const after = await getChatScrollSnapshot(page);
+
+        expect(after.firstVisibleMesId).toBe(before.firstVisibleMesId);
+        expect(Math.abs(after.firstVisibleOffsetTop - before.firstVisibleOffsetTop)).toBeLessThanOrEqual(8);
+        expect(after.scrollTop).toBeGreaterThan(before.scrollTop + 300);
     });
 });
 
