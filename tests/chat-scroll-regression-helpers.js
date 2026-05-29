@@ -352,3 +352,24 @@ export async function markManualMobileScroll(page, scrollTop) {
     }, scrollTop);
     await waitForAnimationFrames(page, 2);
 }
+
+export async function growMessageBlockAboveViewport(page, messageId, { height = 420 } = {}) {
+    await page.evaluate(({ targetMessageId, nextHeight }) => {
+        const chat = document.querySelector('#chat');
+        const message = chat.querySelector(`.mes[mesid="${targetMessageId}"]`);
+        const messageText = message?.querySelector('.mes_text');
+
+        if (!(messageText instanceof HTMLElement)) {
+            throw new Error(`Could not find message text for message ${targetMessageId}.`);
+        }
+
+        const lateMedia = document.createElement('div');
+        lateMedia.className = 'issue-167-late-media';
+        lateMedia.style.height = `${nextHeight}px`;
+        lateMedia.style.margin = '8px 0';
+        lateMedia.style.width = '100%';
+
+        messageText.prepend(lateMedia);
+    }, { targetMessageId: String(messageId), nextHeight: height });
+    await waitForAnimationFrames(page, 10);
+}

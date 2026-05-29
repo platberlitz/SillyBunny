@@ -4,6 +4,7 @@ import {
     getChatScrollSnapshot,
     getRedisplayCompatibilitySnapshot,
     getRenderedMessageIds,
+    growMessageBlockAboveViewport,
     installSwipeCandidate,
     installSyntheticLongChat,
     markFirstRenderedMessageEditing,
@@ -87,6 +88,20 @@ test.describe('issue 167 chat scroll regressions', () => {
         expect(after.firstVisibleMesId).toBe(before.firstVisibleMesId);
         expect(Math.abs(after.firstVisibleOffsetTop - before.firstVisibleOffsetTop)).toBeLessThanOrEqual(8);
         await expect(page.locator(`.mes[mesid="${swipeMessageId}"] .mes_text`)).toContainText(`issue 167 replacement swipe ${swipeMessageId}`);
+    });
+
+    test('late media resize above the viewport keeps the current message anchored', async ({ page }) => {
+        await installSyntheticLongChat(page, { messageCount: 72, visibleCount: 72 });
+
+        await scrollMessageNearTop(page, 48, 24);
+
+        const before = await getChatScrollSnapshot(page);
+        await growMessageBlockAboveViewport(page, 12, { height: 460 });
+        const after = await getChatScrollSnapshot(page);
+
+        expect(after.firstVisibleMesId).toBe(before.firstVisibleMesId);
+        expect(Math.abs(after.firstVisibleOffsetTop - before.firstVisibleOffsetTop)).toBeLessThanOrEqual(8);
+        expect(after.scrollTop).toBeGreaterThan(before.scrollTop + 300);
     });
 });
 

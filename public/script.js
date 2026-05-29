@@ -313,6 +313,7 @@ import {
     CHAT_SCROLL_ACTION,
     CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
+    createDelegatedResizeObserver,
     createMessageUpdateQueue,
     createStreamWriteBuffer,
     renderMessagesInBatches,
@@ -602,6 +603,8 @@ let pendingMobileMessageUpdateTimer = 0;
 let messageUpdateQueue = null;
 let mobileMessageUpdateQueue = null;
 let streamingVisibleWriteBuffer = null;
+let chatMessageResizeObserver = null;
+const chatMessageResizeStates = new Map();
 
 let dialogueResolve = null;
 let dialogueCloseStop = false;
@@ -2055,6 +2058,169 @@ function getStreamingVisibleWriteBuffer() {
     return streamingVisibleWriteBuffer;
 }
 
+function getObservedElementHeight(element, entry = null) {
+    return Number(entry?.contentRect?.height ?? element?.getBoundingClientRect?.().height ?? 0);
+}
+
+function captureChatMessageResizeViewportState() {
+    return {
+        anchor: captureVisibleChatMessageAnchor(),
+        isNearBottom: isChatScrolledNearBottom(),
+    };
+}
+
+function captureChatMessageResizeState(element, entry = null) {
+    return {
+        ...captureChatMessageResizeViewportState(),
+        blockHeight: getObservedElementHeight(element, entry),
+    };
+}
+
+function refreshChatMessageResizeState(element, metadata, entry = null) {
+    if (!metadata) {
+        return;
+    }
+
+    Object.assign(metadata, captureChatMessageResizeState(element, entry));
+}
+
+function refreshObservedChatMessageResizeViewportStates() {
+    if (chatMessageResizeStates.size === 0) {
+        return;
+    }
+
+    const viewportState = captureChatMessageResizeViewportState();
+
+    for (const [element, metadata] of chatMessageResizeStates) {
+        if (!element.isConnected) {
+            unobserveChatMessageResizeBlock(element);
+            continue;
+        }
+
+        Object.assign(metadata, viewportState);
+    }
+}
+
+async function applyChatMessageResizeAction(element, entry, metadata) {
+    if (!isChatRenderLifecycleRolloutEnabled()) {
+        return;
+    }
+
+    const nextHeight = getObservedElementHeight(element, entry);
+    const resizeState = metadata ?? captureChatMessageResizeState(element, entry);
+    const previousHeight = Number(resizeState.blockHeight ?? nextHeight);
+
+    if (Math.abs(nextHeight - previousHeight) < 1) {
+        refreshChatMessageResizeState(element, metadata, entry);
+        return;
+    }
+
+    const action = resolveChatScrollAction({
+        intent: CHAT_SCROLL_INTENT.MEDIA_RESIZE,
+        autoScrollEnabled: power_user.auto_scroll_chat_to_bottom,
+        isNearBottom: Boolean(resizeState.isNearBottom),
+        hasAnchor: Boolean(resizeState.anchor),
+        isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll(),
+    });
+
+    if (shouldApplyChatBottomScrollAction(action)) {
+        requestAnimationFrame(() => {
+            scrollChatElementToBottom();
+            refreshChatMessageResizeState(element, metadata, entry);
+        });
+        return;
+    }
+
+    if (action.action === CHAT_SCROLL_ACTION.PRESERVE_ANCHOR) {
+        await settleVisibleChatMessageAnchor(resizeState.anchor);
+    }
+
+    refreshChatMessageResizeState(element, metadata, entry);
+}
+
+function onChatMessageResize(element, entry, metadata) {
+    if (!element?.isConnected) {
+        unobserveChatMessageResizeBlock(element);
+        return;
+    }
+
+    void applyChatMessageResizeAction(element, entry, metadata);
+}
+
+function getChatMessageResizeObserver() {
+    if (!chatMessageResizeObserver) {
+        chatMessageResizeObserver = createDelegatedResizeObserver({
+            onResize: onChatMessageResize,
+        });
+    }
+
+    return chatMessageResizeObserver;
+}
+
+function canObserveChatMessageResize() {
+    return typeof globalThis.ResizeObserver === 'function';
+}
+
+function getMessageBlockElement(messageElement) {
+    const element = messageElement?.jquery ? messageElement[0] : messageElement;
+
+    if (!(element instanceof HTMLElement)) {
+        return null;
+    }
+
+    return element.matches('.mes_block') ? element : element.querySelector('.mes_block');
+}
+
+function unobserveChatMessageResizeBlock(messageBlock) {
+    if (messageBlock instanceof HTMLElement) {
+        chatMessageResizeObserver?.unobserve(messageBlock);
+        chatMessageResizeStates.delete(messageBlock);
+    }
+}
+
+function observeChatMessageResize(messageElement) {
+    if (!isChatRenderLifecycleRolloutEnabled() || !canObserveChatMessageResize()) {
+        return;
+    }
+
+    const messageBlock = getMessageBlockElement(messageElement);
+
+    if (!(messageBlock instanceof HTMLElement)) {
+        return;
+    }
+
+    requestAnimationFrame(() => {
+        if (!isChatRenderLifecycleRolloutEnabled() || !messageBlock.isConnected) {
+            return;
+        }
+
+        const observer = getChatMessageResizeObserver();
+        unobserveChatMessageResizeBlock(messageBlock);
+
+        const metadata = captureChatMessageResizeState(messageBlock);
+        if (observer.observe(messageBlock, metadata)) {
+            chatMessageResizeStates.set(messageBlock, metadata);
+        }
+    });
+}
+
+function unobserveChatMessageResize(messageElement) {
+    if (messageElement?.jquery && typeof messageElement.toArray === 'function') {
+        messageElement.toArray().forEach(unobserveChatMessageResize);
+        return;
+    }
+
+    const messageBlock = getMessageBlockElement(messageElement);
+
+    unobserveChatMessageResizeBlock(messageBlock);
+}
+
+function disposeChatMessageResizeObserver() {
+    chatMessageResizeObserver?.dispose();
+    chatMessageResizeObserver = null;
+    chatMessageResizeStates.clear();
+}
+
 function updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessage }) {
     const queue = getMessageUpdateQueue();
     queue.queue(messageId, message, { rerenderMessage });
@@ -2426,7 +2592,9 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
     messageElements.removeClass('last_mes');
 
     //Remove messages after index.
-    messageElements.filter(`.mes[mesid="${startIndex}"]`).nextAll('.mes').addBack().remove();
+    const removedMessageElements = messageElements.filter(`.mes[mesid="${startIndex}"]`).nextAll('.mes').addBack();
+    unobserveChatMessageResize(removedMessageElements);
+    removedMessageElements.remove();
 
     const t1 = performance.now();
 
@@ -2505,6 +2673,7 @@ export async function clearChat({ clearData = false } = {}) {
     cancelDebouncedChatSave();
     cancelDebouncedMetadataSave();
     closeMessageEditor();
+    disposeChatMessageResizeObserver();
     extension_prompts = {};
     if (is_delete_mode) {
         $('#dialogue_del_mes_cancel').trigger('click');
@@ -2525,7 +2694,9 @@ export async function clearChat({ clearData = false } = {}) {
 export async function deleteLastMessage() {
     deleteItemizedPromptForMessage(chat.length - 1);
     chat.length = chat.length - 1;
-    chatElement.children('.mes').last().remove();
+    const messageElement = chatElement.children('.mes').last();
+    unobserveChatMessageResize(messageElement);
+    messageElement.remove();
     await eventSource.emit(event_types.MESSAGE_DELETED, chat.length);
 }
 
@@ -2574,6 +2745,7 @@ export async function deleteMessage(id, swipeDeletionIndex = undefined, askConfi
     }
 
     chat.splice(id, 1);
+    unobserveChatMessageResize(messageElement);
     messageElement.remove();
 
     chat_metadata.tainted = true;
@@ -3783,6 +3955,7 @@ export function updateMessageElement(mes, { messageId = chat.length - 1, message
         updateSwipeCounter(messageId, { message: mes, messageElement });
     }
 
+    observeChatMessageResize(messageElement);
     return messageElement;
 }
 
@@ -14478,6 +14651,8 @@ jQuery(async function () {
     window.visualViewport?.addEventListener('resize', markMobileViewportScroll, { passive: true });
 
     const chatScrollHandler = function () {
+        refreshObservedChatMessageResizeViewportStates();
+
         if (power_user.waifuMode) {
             scrollLock = true;
             return;
@@ -15747,6 +15922,7 @@ jQuery(async function () {
     });
 
     $(window).on('beforeunload', () => {
+        disposeChatMessageResizeObserver();
         cancelTtsPlay();
         if (streamingProcessor) {
             console.log('Page reloaded. Aborting streaming...');
