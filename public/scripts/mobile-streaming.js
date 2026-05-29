@@ -22,6 +22,28 @@ export function isSmoothStreamingEffectivelyEnabled({
 }
 
 /**
+ * Resolves the scroll behavior for mobile streaming bottom pins.
+ * Native smooth scrolling can keep running after an iOS touch gesture starts,
+ * which makes streaming fight manual/momentum scroll and visibly snap.
+ * @param {object} [options]
+ * @param {boolean} [options.isFinal] Whether this is the final streaming pin
+ * @param {boolean} [options.allowSmooth] Whether the scheduler requested a smooth intermediate pin
+ * @param {Navigator} [options.navigatorRef] Navigator-like object
+ * @returns {'auto'|'smooth'}
+ */
+export function getMobileStreamingBottomPinBehavior({
+    isFinal = false,
+    allowSmooth = true,
+    navigatorRef = globalThis.navigator,
+} = {}) {
+    if (isFinal || !allowSmooth || isIOSWebKitPlatform(navigatorRef)) {
+        return 'auto';
+    }
+
+    return 'smooth';
+}
+
+/**
  * Checks whether live streaming DOM work should be reduced for the current browser.
  * @param {Navigator} [navigatorRef] Navigator-like object
  * @param {object} [options]

@@ -381,7 +381,9 @@ describe('chat render lifecycle script wiring', () => {
             && node.key?.name === 'onProgressStreaming');
         const source = getSource(onProgressStreaming.value);
 
-        expect(source).toContain('const shouldPinMobileBottom = !isImpersonate && shouldPinMobileChatToBottom();');
+        expect(source).toContain('const shouldUseMobileStreamingPin = !isImpersonate && shouldGuardMobileChatScroll();');
+        expect(source).toContain('const shouldPinMobileBottom = shouldUseMobileStreamingPin && shouldPinMobileChatToBottom();');
+        expect(source).toContain('if (shouldPinMobileBottom && shouldPinMobileChatToBottom())');
         expect(source).toContain('scheduleMobileStreamingBottomPin({ isFinal });');
         expect(source).not.toContain('pinMobileChatToBottom({ waitForFrame: true, settle: isFinal });');
     });
@@ -394,7 +396,7 @@ describe('chat render lifecycle script wiring', () => {
         const requestFrame = findFunctionDeclaration('requestMobileStreamingBottomPinFrame');
         const requestFrameSource = getSource(requestFrame);
         expect(requestFrameSource).toContain('requestAnimationFrame(() =>');
-        expect(requestFrameSource).toContain('const behavior = shouldSettle || !mobileStreamingBottomPinSmooth ? \'auto\' : \'smooth\';');
+        expect(requestFrameSource).toContain('const behavior = getMobileStreamingBottomPinBehavior({');
         expect(requestFrameSource).toContain('if (!shouldPinMobileChatToBottom())');
         expect(requestFrameSource).toContain('pinMobileChatToBottom({');
         expect(requestFrameSource).toContain('waitForFrame: false');
