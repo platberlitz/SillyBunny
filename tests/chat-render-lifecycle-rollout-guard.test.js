@@ -41,14 +41,17 @@ describe('chat render lifecycle rollout guard', () => {
         });
     });
 
-    test('keeps every lifecycle route disabled by default until route-specific flips', () => {
+    test('enables only proven lifecycle routes by default', () => {
         expect(Object.keys(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS).sort()).toEqual(
             Object.values(CHAT_RENDER_LIFECYCLE_ROUTE).sort(),
         );
-        expect(Object.values(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS)).toEqual(
-            expect.arrayContaining([false]),
-        );
-        expect(Object.values(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS).every(value => value === false)).toBe(true);
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.BOTTOM_SCROLL]).toBe(true);
+
+        const disabledRoutes = Object.entries(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS)
+            .filter(([route]) => route !== CHAT_RENDER_LIFECYCLE_ROUTE.BOTTOM_SCROLL)
+            .map(([, enabled]) => enabled);
+
+        expect(disabledRoutes.every(value => value === false)).toBe(true);
     });
 
     test('storage override enables lifecycle routing', () => {
