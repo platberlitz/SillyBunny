@@ -41,7 +41,7 @@ describe('OpenAI proxy preset wiring', () => {
         const setProxyPresetSource = getFunctionSource('setProxyPreset');
         const proxyUpdateIndex = setProxyPresetSource.indexOf('oai_settings.reverse_proxy = normalizedPreset.url;');
         const passwordUpdateIndex = setProxyPresetSource.indexOf('oai_settings.proxy_password = normalizedPreset.password;');
-        const sourceChangeIndex = setProxyPresetSource.indexOf("$('#chat_completion_source').val(normalizedPreset.source).trigger('change');");
+        const sourceChangeIndex = setProxyPresetSource.indexOf('$(\'#chat_completion_source\').val(normalizedPreset.source).trigger(\'change\');');
 
         expect(proxyUpdateIndex).toBeGreaterThanOrEqual(0);
         expect(passwordUpdateIndex).toBeGreaterThan(proxyUpdateIndex);
