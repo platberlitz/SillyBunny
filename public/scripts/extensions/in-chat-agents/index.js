@@ -52,6 +52,7 @@ import {
     onAgentGenerationStateChanged,
     getPreGenerationInterceptHistoryForMessage,
     getPromptTransformHistoryForMessage,
+    refreshRegexSnapshotsForAgent,
     runAgentOnMessage,
     syncToolAgentRegistrations,
     undoPromptTransform,
@@ -210,6 +211,7 @@ function sortAgentsByOrder(agentList = []) {
 async function toggleAgentEnabled(agent) {
     setAgentEnabledForCurrentScope(agent, !isAgentEnabledForCurrentScope(agent));
     await saveAgent(agent);
+    refreshRegexSnapshotsForAgent(agent.id);
     persistExtensionState();
     syncToolAgentRegistrations();
     renderAgentList();
@@ -2282,6 +2284,7 @@ async function openEditor(agentId = null) {
     }
 
     await saveAgent(agent);
+    refreshRegexSnapshotsForAgent(agent.id);
     renderAgentList();
 }
 

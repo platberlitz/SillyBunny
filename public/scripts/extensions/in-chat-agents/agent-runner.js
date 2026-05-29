@@ -1601,6 +1601,113 @@ function ensureMessageRegexSnapshot(messageIndex, generationType, activationSnap
     return true;
 }
 
+function isRegexRefreshAgentCandidate(agent, generationType, { respectGenerationTypes = true } = {}) {
+    if (!agent || getAgentRegexScripts(agent).length === 0) {
+        return false;
+    }
+
+    if (!respectGenerationTypes) {
+        return true;
+    }
+
+    const normalizedGenerationType = normalizeGenerationType(generationType);
+    const generationTypes = agent.conditions?.generationTypes;
+    return !Array.isArray(generationTypes)
+        || generationTypes.length === 0
+        || generationTypes.includes(normalizedGenerationType);
+}
+
+function getRegexSnapshotRefreshAgents(message, agentId, generationType, { includeForcedAgent = false, respectGenerationTypes = true } = {}) {
+    const enabledAgentsById = new Map(getEnabledAgents().map(agent => [agent.id, agent]));
+    const previousSnapshot = getAgentExtraValue(message, MESSAGE_EXTRA_KEY);
+    const agentIds = new Set(Array.isArray(previousSnapshot?.activeAgentIds) ? previousSnapshot.activeAgentIds : []);
+
+    if (agentId) {
+        agentIds.add(agentId);
+    }
+
+    const refreshAgents = [];
+    for (const id of agentIds) {
+        let agent = enabledAgentsById.get(id);
+
+        if (!agent && includeForcedAgent && id === agentId) {
+            agent = getAgentById(id);
+        }
+
+        if (isRegexRefreshAgentCandidate(agent, generationType, { respectGenerationTypes })) {
+            refreshAgents.push(agent);
+        }
+    }
+
+    return refreshAgents;
+}
+
+function refreshRegexSnapshotForAgentOnMessage(agentId, messageIndex, options = {}) {
+    const {
+        generationType = 'normal',
+        includeForcedAgent = false,
+        refresh = true,
+        respectGenerationTypes = true,
+        save = true,
+        markPendingSave = !save,
+    } = options;
+    const normalizedGenerationType = normalizeGenerationType(generationType);
+    if (!isAssistantPostProcessingGenerationType(normalizedGenerationType)) {
+        return false;
+    }
+
+    const numericMessageIndex = Number(messageIndex);
+    if (!Number.isInteger(numericMessageIndex)) {
+        return false;
+    }
+
+    const message = chat[numericMessageIndex];
+    if (!message || message.is_user || message.is_system) {
+        return false;
+    }
+
+    const activeAgents = getRegexSnapshotRefreshAgents(message, agentId, normalizedGenerationType, {
+        includeForcedAgent,
+        respectGenerationTypes,
+    });
+
+    if (!updateMessageRegexSnapshot(message, activeAgents, normalizedGenerationType)) {
+        return false;
+    }
+
+    if (save) {
+        pendingRegexSnapshotSaves.delete(message);
+        saveChatDebounced();
+    } else if (markPendingSave) {
+        pendingRegexSnapshotSaves.add(message);
+    }
+
+    if (refresh) {
+        scheduleMessageRefresh(numericMessageIndex, message);
+    }
+
+    return true;
+}
+
+export function refreshRegexSnapshotsForAgent(agentId, { generationType = 'normal' } = {}) {
+    let refreshed = 0;
+    for (let messageIndex = 0; messageIndex < chat.length; messageIndex++) {
+        if (refreshRegexSnapshotForAgentOnMessage(agentId, messageIndex, {
+            generationType,
+            markPendingSave: false,
+            save: false,
+        })) {
+            refreshed++;
+        }
+    }
+
+    if (refreshed > 0) {
+        saveChatDebounced();
+    }
+
+    return refreshed;
+}
+
 function resolveAgentConnectionProfile(agent) {
     return resolveConnectionProfile(agent?.connectionProfile);
 }
@@ -3929,6 +4036,13 @@ async function executeManualAgentRun(agentId, messageIndex, cancelRevision = age
     }
 
     const generationType = 'normal';
+    const regexSnapshotChanged = refreshRegexSnapshotForAgentOnMessage(agent.id, messageIndex, {
+        generationType,
+        includeForcedAgent: true,
+        markPendingSave: false,
+        respectGenerationTypes: false,
+        save: false,
+    });
     const result = await runPromptTransformAgent(agent, message, generationType, null, messageIndex, {
         applyToMessage: false,
     });
@@ -3941,7 +4055,8 @@ async function executeManualAgentRun(agentId, messageIndex, cancelRevision = age
         await syncPromptTransformMessageStateAsync(message, messageIndex);
     }
 
-    if (updatePromptTransformRuns(message, [result])) {
+    const promptTransformRunsChanged = updatePromptTransformRuns(message, [result]);
+    if (regexSnapshotChanged || promptTransformRunsChanged) {
         saveChatDebounced();
     }
 
@@ -3951,7 +4066,7 @@ async function executeManualAgentRun(agentId, messageIndex, cancelRevision = age
         saveChatDebounced();
     }
 
-    if (result.changed) {
+    if (result.changed || regexSnapshotChanged) {
         scheduleMessageRefresh(messageIndex, message);
     }
 
