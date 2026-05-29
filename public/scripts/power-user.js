@@ -279,7 +279,6 @@ export const power_user = {
     chat_display: chat_styles.DEFAULT,
     toastr_position: defaultToastPosition,
     chat_width: 100,
-    vertical_chat_layout: false,
     never_resize_avatars: false,
     show_card_avatar_urls: false,
     play_message_sound: false,
@@ -677,12 +676,6 @@ function switchReducedMotion() {
 function switchCompactInputArea() {
     $('#send_form').toggleClass('compact', power_user.compact_input_area);
     $('#compact_input_area').prop('checked', power_user.compact_input_area);
-}
-
-function switchVerticalChatLayout() {
-    $('body').toggleClass('verticalChatLayout', power_user.vertical_chat_layout);
-    $('#vertical_chat_layout').prop('checked', power_user.vertical_chat_layout);
-    scrollChatToBottom();
 }
 
 function switchSwipeNumAllMessages() {
@@ -1821,10 +1814,6 @@ export async function loadPowerUserSettings(settings, data) {
         power_user.chat_width = 100;
     }
 
-    if (typeof power_user.vertical_chat_layout !== 'boolean') {
-        power_user.vertical_chat_layout = false;
-    }
-
     if (power_user.tokenizer === tokenizers.LEGACY) {
         power_user.tokenizer = tokenizers.GPT2;
     }
@@ -1931,7 +1920,6 @@ export async function loadPowerUserSettings(settings, data) {
 
     $(`#toastr_position option[value=${power_user.toastr_position}]`).prop('selected', true).trigger('change');
     $('#chat_width_slider').val(power_user.chat_width);
-    $('#vertical_chat_layout').prop('checked', power_user.vertical_chat_layout);
     $('#token_padding').val(power_user.token_padding);
     $('#aux_field').val(power_user.aux_field);
     $('#tag_import_setting').val(power_user.tag_import_setting);
@@ -4395,12 +4383,6 @@ jQuery(async () => {
     $('#compact_input_area').on('input', function () {
         power_user.compact_input_area = !!$(this).prop('checked');
         switchCompactInputArea();
-        saveSettingsDebounced();
-    });
-
-    $('#vertical_chat_layout').on('input', function () {
-        power_user.vertical_chat_layout = !!$(this).prop('checked');
-        switchVerticalChatLayout();
         saveSettingsDebounced();
     });
 
