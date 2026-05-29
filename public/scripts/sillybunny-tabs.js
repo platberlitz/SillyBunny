@@ -741,6 +741,7 @@ const sbState = {
         secondaryRow: null,
         scrollTopButton: null,
         scrollBottomButton: null,
+        managerButton: null,
         massDeleteButton: null,
         autoNameButton: null,
         secondaryOpen: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.bottomChatSecondaryOpen), true),
@@ -13256,6 +13257,7 @@ function buildBottomChatBar() {
 
     const topBtn = createBottomChatButton({ icon: 'fa-arrow-up', title: 'Go to top of chat' }, scrollCurrentChatToTop);
     const bottomBtn = createBottomChatButton({ icon: 'fa-arrow-down', title: 'Go to bottom of chat' }, scrollCurrentChatToBottom);
+    const chatManagerBtn = createBottomChatButton({ icon: 'fa-address-book', title: 'View chat files' }, handleChatManagerClick);
     const newBtn = createBottomChatButton({ icon: 'fa-plus', title: 'New chat' }, handleNewChat);
     const massDeleteBtn = createBottomChatButton({ icon: 'fa-list-check', title: 'Mass delete chats' }, () => { void handleMassDeleteChats(); });
     const autoNameBtn = createBottomChatButton({ icon: 'fa-wand-magic-sparkles', title: 'Ask the LLM to name this chat' }, () => { void handleAutoNameChat(); });
@@ -13263,7 +13265,7 @@ function buildBottomChatBar() {
     const deleteBtn = createBottomChatButton({ icon: 'fa-trash', title: 'Delete chat' }, () => { void handleDeleteChat(); });
 
     navCluster.append(topBtn, bottomBtn);
-    managementCluster.append(newBtn, massDeleteBtn, autoNameBtn, renameBtn, searchToggleBtn, deleteBtn);
+    managementCluster.append(chatManagerBtn, newBtn, massDeleteBtn, autoNameBtn, renameBtn, searchToggleBtn, deleteBtn);
     secondaryRow.append(managementCluster);
     container.append(personaBubble, chatSelect, search.field, navCluster, collapseToggleBtn, secondaryRow);
 
@@ -13279,6 +13281,7 @@ function buildBottomChatBar() {
         secondaryRow,
         scrollTopButton: topBtn,
         scrollBottomButton: bottomBtn,
+        managerButton: chatManagerBtn,
         massDeleteButton: massDeleteBtn,
         autoNameButton: autoNameBtn,
     });
@@ -13324,6 +13327,7 @@ async function refreshBottomChatSelect() {
     setButtonDisabled(sbState.bottomChatBar?.searchToggleButton, !chatContext.hasChat);
     setButtonDisabled(sbState.bottomChatBar?.scrollTopButton, !chatContext.hasChat);
     setButtonDisabled(sbState.bottomChatBar?.scrollBottomButton, !chatContext.hasChat);
+    setButtonDisabled(sbState.bottomChatBar?.managerButton, !chatContext.canBrowseChats);
     setButtonDisabled(sbState.bottomChatBar?.massDeleteButton, !chatContext.canBrowseChats);
     setButtonDisabled(sbState.bottomChatBar?.autoNameButton, !chatContext.hasChat);
 
