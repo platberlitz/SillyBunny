@@ -3,8 +3,10 @@ import {
     applyLegacyVectorEnabledSetting,
     bindVectorEnabledSettingsStore,
     coerceVectorBoolean,
+    getPersistableVectorSettings,
     getVectorEnabledState,
     normalizeVectorEnabledOptions,
+    stripLegacyVectorEnabledSetting,
 } from '../public/scripts/extensions/vectors/settings-utils.js';
 
 describe('vector settings utilities', () => {
@@ -33,6 +35,27 @@ describe('vector settings utilities', () => {
         applyLegacyVectorEnabledSetting(settings, { enabled: false });
 
         expect(settings.enabled_chats).toBe(true);
+    });
+
+    test('strips deprecated runtime enabled flag after migration', () => {
+        const settings = { enabled: false, enabled_chats: true };
+
+        stripLegacyVectorEnabledSetting(settings);
+
+        expect(settings).toEqual({ enabled_chats: true });
+    });
+
+    test('omits stale legacy enabled values when persisting vector settings', () => {
+        expect(getPersistableVectorSettings({
+            enabled: false,
+            enabled_chats: true,
+            enabled_files: false,
+            enabled_world_info: false,
+        })).toEqual({
+            enabled_chats: true,
+            enabled_files: false,
+            enabled_world_info: false,
+        });
     });
 
     test('normalizes extension-facing RAG enable options', () => {
@@ -104,5 +127,37 @@ describe('vector settings utilities', () => {
 
         store.enabled = false;
         expect(settings.enabled_chats).toBe(false);
+    });
+
+    test('stale legacy enabled=false does not override chat RAG during persistence', () => {
+        const settings = {
+            enabled: false,
+            enabled_chats: true,
+            enabled_files: false,
+            enabled_world_info: false,
+        };
+        const store = {};
+
+        bindVectorEnabledSettingsStore(settings, store);
+        Object.assign(store, getPersistableVectorSettings(settings));
+
+        expect(settings.enabled_chats).toBe(true);
+        expect(store.enabled).toBe(true);
+    });
+
+    test('stale legacy enabled=true does not block disabling chat RAG during persistence', () => {
+        const settings = {
+            enabled: true,
+            enabled_chats: false,
+            enabled_files: false,
+            enabled_world_info: false,
+        };
+        const store = {};
+
+        bindVectorEnabledSettingsStore(settings, store);
+        Object.assign(store, getPersistableVectorSettings(settings));
+
+        expect(settings.enabled_chats).toBe(false);
+        expect(store.enabled).toBe(false);
     });
 });
