@@ -47,6 +47,28 @@ export function applyLegacyVectorEnabledSetting(settings, savedSettings = {}) {
 }
 
 /**
+ * Removes the deprecated runtime `enabled` flag after migration so stale values
+ * cannot overwrite the scoped enable flags through the compatibility setter.
+ * @param {Record<string, any>} settings Runtime vector settings.
+ * @returns {Record<string, any>} Mutated runtime settings.
+ */
+export function stripLegacyVectorEnabledSetting(settings) {
+    delete settings.enabled;
+    return settings;
+}
+
+/**
+ * Gets vector settings that are safe to copy into the saved settings store.
+ * @param {Record<string, any>} settings Runtime vector settings.
+ * @returns {Record<string, any>} Persistable settings without deprecated runtime aliases.
+ */
+export function getPersistableVectorSettings(settings) {
+    const persistableSettings = { ...settings };
+    stripLegacyVectorEnabledSetting(persistableSettings);
+    return persistableSettings;
+}
+
+/**
  * Normalizes extension-facing RAG enable options to the internal vector flags.
  * @param {unknown} options Enable options.
  * @returns {Partial<{enabled_chats: boolean, enabled_files: boolean, enabled_world_info: boolean}>}

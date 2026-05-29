@@ -36,7 +36,7 @@ import { commonEnumProviders } from '../../slash-commands/SlashCommandCommonEnum
 import { slashCommandReturnHelper } from '../../slash-commands/SlashCommandReturnHelper.js';
 import { generateWebLlmChatPrompt, isWebLlmSupported } from '../shared.js';
 import { WebLlmVectorProvider } from './webllm.js';
-import { applyLegacyVectorEnabledSetting, bindVectorEnabledSettingsStore, getVectorEnabledState, normalizeVectorEnabledOptions } from './settings-utils.js';
+import { applyLegacyVectorEnabledSetting, bindVectorEnabledSettingsStore, getPersistableVectorSettings, getVectorEnabledState, normalizeVectorEnabledOptions, stripLegacyVectorEnabledSetting } from './settings-utils.js';
 import { removeReasoningFromString } from '../../reasoning.js';
 import { oai_settings } from '../../openai.js';
 
@@ -929,7 +929,7 @@ function bindVectorSettingsStore() {
 
 function persistVectorSettings({ save = true, updateUi = true } = {}) {
     const store = ensureVectorSettingsStore();
-    Object.assign(store, settings);
+    Object.assign(store, getPersistableVectorSettings(settings));
     bindVectorSettingsStore();
 
     if (updateUi) {
@@ -1854,11 +1854,12 @@ export async function init() {
     if (settings.enabled) {
         settings.enabled_chats = true;
     }
+    stripLegacyVectorEnabledSetting(settings);
 
     // Migrate from TensorFlow to Transformers
     settings.source = settings.source !== 'local' ? settings.source : 'transformers';
     settings.summary_source = settings.summary_source === 'extras' ? 'main' : settings.summary_source;
-    Object.assign(savedVectorSettings, settings);
+    Object.assign(savedVectorSettings, getPersistableVectorSettings(settings));
     bindVectorSettingsStore();
     const template = await renderExtensionTemplateAsync(MODULE_NAME, 'settings');
     $('#vectors_container').append(template);
