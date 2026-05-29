@@ -93,12 +93,14 @@ beforeAll(async () => {
         normalizeAgentCategory: jest.fn(value => value),
         getAgentChatScopeLabel: jest.fn(() => 'Individual chat'),
         getPromptTransformMode: jest.fn(() => 'rewrite'),
+        isPathfinderSubmoduleEnabled: jest.fn(() => false),
         findTemplateForAgentSnapshot: jest.fn(() => null),
         getRedundantBundledAgentDuplicateIds: jest.fn(() => []),
         reconcileScopedEnabledAgentIdsFromLegacyFlags: jest.fn(() => false),
         resolveConnectionProfile: jest.fn(value => value ?? ''),
         setAgentEnabledForCurrentScope: jest.fn(),
         setGlobalSettings: jest.fn(),
+        setPathfinderSubmoduleEnabled: jest.fn(),
         getGroups: jest.fn(() => []),
         getCustomGroups: jest.fn(() => []),
         loadBuiltinGroups: jest.fn(),
@@ -111,6 +113,7 @@ beforeAll(async () => {
     await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/agent-runner.js', () => ({
         cancelAgentGeneration: jest.fn(),
         buildPromptDynamicMacros: jest.fn(() => ({})),
+        deactivatePathfinderRuntime: jest.fn(),
         initAgentRunner: jest.fn(),
         isAgentGenerationActive: jest.fn(() => false),
         onAgentGenerationStateChanged: jest.fn(),
@@ -140,6 +143,7 @@ beforeAll(async () => {
 
     await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder-init.js', () => ({
         initPathfinder: jest.fn(),
+        teardownPathfinder: jest.fn(),
     }));
 
     await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder-settings-ui.js', () => ({
