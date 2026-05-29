@@ -515,18 +515,28 @@ describe('chat render lifecycle script wiring', () => {
     });
 
     test('guard-on message resize resolves media-resize intent through lifecycle scroll rules', () => {
+        const isActiveStreamingMessageResizeBlock = findFunctionDeclaration('isActiveStreamingMessageResizeBlock');
+        const streamingResizeSource = getSource(isActiveStreamingMessageResizeBlock);
+
+        expect(streamingResizeSource).toContain('!streamingProcessor || streamingProcessor.isFinished');
+        expect(streamingResizeSource).toContain('const streamingMessageId = Number(streamingProcessor.messageId);');
+        expect(streamingResizeSource).toContain('element?.closest?.(\'.mes\')');
+        expect(streamingResizeSource).toContain('messageElement?.getAttribute(\'mesid\')');
+
         const applyChatMessageResizeAction = findFunctionDeclaration('applyChatMessageResizeAction');
         const source = getSource(applyChatMessageResizeAction);
 
         expect(source).toContain('if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MEDIA_RESIZE))');
         expect(source).toContain('const resizeState = metadata ?? captureChatMessageResizeState(element, entry);');
+        expect(source).toContain('if (isActiveStreamingMessageResizeBlock(element))');
+        expect(source).toContain('refreshChatMessageResizeState(element, metadata, entry);');
         expect(source).toContain('intent: CHAT_SCROLL_INTENT.MEDIA_RESIZE');
         expect(source).toContain('autoScrollEnabled: power_user.auto_scroll_chat_to_bottom');
         expect(source).toContain('isNearBottom: Boolean(resizeState.isNearBottom)');
         expect(source).toContain('hasAnchor: Boolean(resizeState.anchor)');
         expect(source).toContain('isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll()');
         expect(source).toContain('shouldApplyChatBottomScrollAction(action)');
-        expect(source).toContain('scrollChatElementToBottom();');
+        expect(source).toContain('scrollChatToBottom({ waitForFrame: true, isNearBottom: true });');
         expect(source).toContain('action.action === CHAT_SCROLL_ACTION.PRESERVE_ANCHOR');
         expect(source).toContain('await settleVisibleChatMessageAnchor(resizeState.anchor);');
         expect(source).toContain('refreshChatMessageResizeState(element, metadata, entry);');

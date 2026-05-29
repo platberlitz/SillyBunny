@@ -2389,6 +2389,18 @@ function refreshObservedChatMessageResizeViewportStates() {
     }
 }
 
+function isActiveStreamingMessageResizeBlock(element) {
+    if (!streamingProcessor || streamingProcessor.isFinished) {
+        return false;
+    }
+
+    const streamingMessageId = Number(streamingProcessor.messageId);
+    const messageElement = element?.closest?.('.mes');
+    const resizeMessageId = messageElement?.getAttribute('mesid');
+
+    return Number.isInteger(streamingMessageId) && resizeMessageId !== null && Number(resizeMessageId) === streamingMessageId;
+}
+
 async function applyChatMessageResizeAction(element, entry, metadata) {
     if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MEDIA_RESIZE)) {
         return;
@@ -2403,6 +2415,12 @@ async function applyChatMessageResizeAction(element, entry, metadata) {
         return;
     }
 
+    // SillyBunny: streaming progress owns the live message's scroll lane; skip resize scrolls for that block.
+    if (isActiveStreamingMessageResizeBlock(element)) {
+        refreshChatMessageResizeState(element, metadata, entry);
+        return;
+    }
+
     const action = resolveChatScrollAction({
         intent: CHAT_SCROLL_INTENT.MEDIA_RESIZE,
         autoScrollEnabled: power_user.auto_scroll_chat_to_bottom,
@@ -2412,10 +2430,9 @@ async function applyChatMessageResizeAction(element, entry, metadata) {
     });
 
     if (shouldApplyChatBottomScrollAction(action)) {
-        requestAnimationFrame(() => {
-            scrollChatElementToBottom();
-            refreshChatMessageResizeState(element, metadata, entry);
-        });
+        // SillyBunny: coalesce media resize pins with the shared bottom-scroll rAF lane.
+        scrollChatToBottom({ waitForFrame: true, isNearBottom: true });
+        requestAnimationFrame(() => refreshChatMessageResizeState(element, metadata, entry));
         return;
     }
 
