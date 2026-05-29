@@ -577,6 +577,8 @@ describe('chat render lifecycle script wiring', () => {
         expect(scriptSource).toContain('refreshObservedChatMessageResizeViewportStates();');
         expect(scriptSource).toContain('markMobileChatManualScroll({ touchMoved: mobileChatTouchScrolling || isIOSWebKitPlatform() });');
         expect(scriptSource).toContain('const canReleaseUserScrollLock = canReleaseMobileChatUserScrollLock();');
+        expect(scriptSource).toContain('User scroll-away must win even during immunity; immunity only protects programmatic bottom-lock release.');
+        expect(scriptSource.indexOf('if (!scrollLock && !scrollIsAtBottom)')).toBeLessThan(scriptSource.indexOf('if (Date.now() < scrollLockImmunityUntil)'));
         expect(scriptSource).toContain('if (scrollLock && scrollIsAtBottom && canReleaseUserScrollLock)');
     });
 

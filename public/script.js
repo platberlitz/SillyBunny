@@ -15379,12 +15379,17 @@ jQuery(async function () {
             markMobileChatManualScroll({ touchMoved: mobileChatTouchScrolling || isIOSWebKitPlatform() });
         }
 
+        const scrollIsAtBottom = isChatScrolledNearBottom();
+        const canReleaseUserScrollLock = canReleaseMobileChatUserScrollLock();
+
+        // User scroll-away must win even during immunity; immunity only protects programmatic bottom-lock release.
+        if (!scrollLock && !scrollIsAtBottom) {
+            scrollLock = true;
+        }
+
         if (Date.now() < scrollLockImmunityUntil) {
             return;
         }
-
-        const scrollIsAtBottom = isChatScrolledNearBottom();
-        const canReleaseUserScrollLock = canReleaseMobileChatUserScrollLock();
 
         if (scrollIsAtBottom && canReleaseUserScrollLock) {
             releaseMobileChatUserScrollLockIfAtBottom();
@@ -15395,10 +15400,7 @@ jQuery(async function () {
             scrollLock = false;
         }
 
-        // Cancel autoscroll if the user scrolls up
-        if (!scrollLock && !scrollIsAtBottom) {
-            scrollLock = true;
-        }
+        // Scroll-away cancellation happens before the immunity return above.
     };
     chatElementScroll.addEventListener('scroll', chatScrollHandler, { passive: true });
 
