@@ -2156,6 +2156,16 @@ function appendOpenAIModelEntry($container, entry, favoriteValues = new Set()) {
     }
 }
 
+function getApiSelect2DropdownParent() {
+    const apiDropdownParent = $('#rm_api_block');
+    return apiDropdownParent.length ? apiDropdownParent : $(document.body);
+}
+
+function getPromptManagerSelect2DropdownParent() {
+    const promptManagerPopup = $('#completion_prompt_manager_popup');
+    return promptManagerPopup.length ? promptManagerPopup : getApiSelect2DropdownParent();
+}
+
 function initOpenAIModelSearch() {
     const $modelSelect = $('#model_openai_select');
 
@@ -2168,6 +2178,7 @@ function initOpenAIModelSearch() {
     }
 
     $modelSelect.select2({
+        dropdownParent: getApiSelect2DropdownParent(),
         placeholder: t`Select a model`,
         searchInputPlaceholder: t`Search models...`,
         searchInputCssClass: 'text_pole',
@@ -9401,6 +9412,7 @@ export function initOpenAI() {
 
     if (!isMobile()) {
         $('#model_openai_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9408,6 +9420,7 @@ export function initOpenAI() {
             matcher: textValueMatcher,
         });
         $('#model_openrouter_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9416,6 +9429,7 @@ export function initOpenAI() {
             matcher: textValueMatcher,
         });
         $('#model_aimlapi_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9423,6 +9437,7 @@ export function initOpenAI() {
             templateResult: getAimlapiModelTemplate,
         });
         $('#model_electronhub_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9431,6 +9446,7 @@ export function initOpenAI() {
             matcher: textValueMatcher,
         });
         $('#model_chutes_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9439,6 +9455,7 @@ export function initOpenAI() {
             matcher: textValueMatcher,
         });
         $('#model_nanogpt_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9447,6 +9464,7 @@ export function initOpenAI() {
             matcher: textValueMatcher,
         });
         $('#model_workers_ai_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9454,6 +9472,7 @@ export function initOpenAI() {
             matcher: textValueMatcher,
         });
         $('#completion_prompt_manager_popup_entry_form_injection_trigger').select2({
+            dropdownParent: getPromptManagerSelect2DropdownParent(),
             placeholder: t`All types (default)`,
             width: '100%',
             closeOnSelect: false,

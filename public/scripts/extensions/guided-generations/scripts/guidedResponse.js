@@ -76,6 +76,12 @@ async function guidedResponse() {
     } finally {
         textarea.value = getPreviousImpersonateInput();
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+        try {
+            await getContext().executeSlashCommandsWithOptions('/flushinject instruct');
+        } catch (error) {
+            console.warn('[GuidedGenerations][Response] Could not flush guided response injection:', error);
+        }
     }
 }
 

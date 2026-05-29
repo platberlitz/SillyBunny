@@ -592,6 +592,66 @@ h3:not(.popup h3):not(#chat h3) {
     transform: none;
 }
 
+.sb-boolean-radio-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    gap: 6px;
+    width: 100%;
+    padding: 4px;
+    border: 1px solid color-mix(in srgb, var(--sb-shell-border) 74%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
+    box-sizing: border-box;
+}
+
+.sb-boolean-radio-option {
+    position: relative;
+    min-height: var(--sb-control-min-height);
+    padding: 0;
+    cursor: pointer;
+}
+
+.sb-boolean-radio-option > input[type="radio"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.sb-boolean-radio-option > span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: var(--sb-control-min-height);
+    padding: 7px 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    text-align: center;
+    background: transparent;
+    color: var(--SmartThemeBodyColor);
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+    box-sizing: border-box;
+}
+
+.sb-boolean-radio-option > input[type="radio"]:checked + span {
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) 46%, transparent);
+    background: color-mix(in srgb, var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) 20%, transparent);
+    color: var(--SmartThemeQuoteColor);
+}
+
+.sb-boolean-radio-option > input[type="radio"]:focus-visible + span {
+    outline: 2px solid var(--sb-focus-ring);
+    outline-offset: 2px;
+}
+
+.sb-boolean-radio-option:hover > input[type="radio"]:not(:checked) + span {
+    border-color: color-mix(in srgb, var(--sb-shell-border) 88%, transparent);
+    background: var(--sb-button-hover);
+}
+
 .floating_prompt_radio_group label {
     min-height: var(--sb-control-min-height);
     font-size: var(--sb-type-control);
@@ -2086,11 +2146,13 @@ input[type='range']::-moz-range-thumb {
     border-radius: var(--sb-radius-button);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 88%, transparent);
     box-shadow: 0 18px 32px color-mix(in srgb, var(--SmartThemeShadowColor) 18%, transparent);
-    overflow: visible;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .select2-container--default .select2-results {
     max-height: 300px;
+    overflow-x: hidden;
     overflow-y: auto;
 }
 
@@ -3100,6 +3162,65 @@ input[type='range']::-moz-range-thumb {
 
     #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .wide100p > #openai_max_tokens) {
         grid-template-columns: minmax(72px, 0.32fr) minmax(46px, auto);
+    }
+}
+
+@media (pointer: coarse) and (max-width: 1000px) {
+    #left-nav-panel.openDrawer {
+        --sb-mobile-range-label-width: clamp(5.75rem, 30vw, 7.25rem);
+        --sb-mobile-range-counter-width: 3.25rem;
+        --sb-mobile-range-gap: 10px;
+    }
+
+    .sb-sampling-control-card > :is(.alignitemscenter, .alignItemsCenter).flex-container:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers]:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-multi-card > :is(
+        #adaptive_p_block,
+        #smoothingBlock,
+        #xtc_block,
+        #dryBlock,
+        #dynatemp_block_ooba,
+        #mirostat_block_ooba,
+        #beamSearchBlock,
+        #contrastiveSearchBlock
+    ) > .flex-container.flexFlowRow > div:has(> input[type='range'].neo-range-slider),
+    .sb-sampling-multi-card > #contrastiveSearchBlock > .alignitemscenter:has(> input[type='range'].neo-range-slider),
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) {
+        grid-template-columns: minmax(var(--sb-mobile-range-label-width, 92px), 0.42fr) minmax(0, 1fr) minmax(var(--sb-mobile-range-counter-width, 52px), auto);
+        gap: var(--sb-mobile-range-gap, 10px);
+    }
+
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter),
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .range-block-range-and-counter) {
+        grid-template-columns: minmax(var(--sb-mobile-range-label-width, 92px), 0.42fr) minmax(0, 1fr);
+        gap: var(--sb-mobile-range-gap, 10px);
+    }
+
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) > .range-block-range-and-counter,
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .range-block-range-and-counter) > .range-block-range-and-counter {
+        grid-template-columns: minmax(0, 1fr) minmax(var(--sb-mobile-range-counter-width, 52px), auto);
+        gap: var(--sb-mobile-range-gap, 10px);
+    }
+
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .wide100p > #openai_max_tokens) {
+        grid-template-columns: minmax(var(--sb-mobile-range-label-width, 92px), 0.42fr) minmax(var(--sb-mobile-range-counter-width, 52px), auto);
+        gap: var(--sb-mobile-range-gap, 10px);
+    }
+
+    .sb-sampling-control-card input[type='range'].neo-range-slider,
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) > input[type='range'].neo-range-slider,
+    #left-nav-panel.openDrawer #range_block_openai input[type='range'] {
+        margin: 0 !important;
+        touch-action: pan-y;
+    }
+
+    .sb-sampling-control-card > :is(.alignitemscenter, .alignItemsCenter).flex-container:has(> input[type='range'].neo-range-slider) > :is(small, label),
+    .sb-sampling-control-card.sb-sampling-textgen-card:not(.sb-sampling-large-card):not(.sb-sampling-multi-card) > [data-tg-samplers]:has(> input[type='range'].neo-range-slider) > :is(small, label),
+    .sb-sampling-control-card > .range-block:has(> .range-block-range-and-counter) > .range-block-title,
+    #left-nav-panel.openDrawer :is(#amount_gen_block, #max_context_block) > small,
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .range-block-range-and-counter) > .range-block-title,
+    #left-nav-panel.openDrawer #range_block_openai > .range-block:has(> .wide100p > #openai_max_tokens) > .range-block-title {
+        min-height: 32px;
     }
 }
 

@@ -1365,8 +1365,12 @@ export function initTextGenModels() {
         }));
     }
 
-    // SillyBunny keeps searchable Select2 controls available on mobile too.
-    const select2Defaults = { dropdownParent: $(document.body), minimumResultsForSearch: 0 };
+    // Keep API Select2 dropdowns inside the scrolling API drawer so they move with the control.
+    const apiDropdownParent = $('#rm_api_block');
+    const select2Defaults = {
+        dropdownParent: apiDropdownParent.length ? apiDropdownParent : $(document.body),
+        minimumResultsForSearch: 0,
+    };
     $('#mancer_model').select2({
         ...select2Defaults,
         placeholder: t`Select a model`,

@@ -839,6 +839,7 @@
         max-height: 100%;
         overflow: auto;
         overscroll-behavior: contain;
+        scrollbar-gutter: stable;
         padding-right: 4px;
     }
 
