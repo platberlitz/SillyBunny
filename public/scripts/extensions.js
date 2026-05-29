@@ -3,13 +3,20 @@ import { DOMPurify, Popper } from '../lib.js';
 import { eventSource, event_types, saveSettings, saveSettingsDebounced, getRequestHeaders, animation_duration, CLIENT_VERSION } from '../script.js';
 import { POPUP_RESULT, POPUP_TYPE, Popup, callGenericPopup } from './popup.js';
 import { renderTemplate, renderTemplateAsync } from './templates.js';
-import { delay, deleteValueByPath, equalsIgnoreCaseAndAccents, escapeHtml, isSubsetOf, sanitizeSelector, setValueByPath, versionCompare } from './utils.js';
+import { delay, deleteValueByPath, equalsIgnoreCaseAndAccents, escapeHtml, sanitizeSelector, setValueByPath, versionCompare } from './utils.js';
 import { isAdmin } from './user.js';
 import { addLocaleData, getCurrentLocale, t } from './i18n.js';
 import { debounce_timeout } from './constants.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { SimpleMutex } from './util/SimpleMutex.js';
 import { loadStylesheetAsync, prefetchAsset } from './dynamic-styles.js';
+import {
+    EXTENSION_BOOT_ACTIVATION_ACTION,
+    normalizeExtensionBootId,
+    resolveExtensionActivationState,
+    resolveExtensionManifestRegistration,
+    sortExtensionBootEntries,
+} from './extension-boot-lifecycle/index.js';
 
 export {
     getApiUrl,
@@ -954,13 +961,16 @@ async function getManifests(names) {
             continue;
         }
 
-        const manifestKey = getExtensionDedupKey(result.name);
-        if (loadedManifestKeys.has(manifestKey)) {
+        const registrationState = resolveExtensionManifestRegistration({
+            name: result.name,
+            existingKeys: loadedManifestKeys,
+        });
+        if (!registrationState.shouldRegister) {
             console.warn(`[Extensions] Skipping duplicate manifest entry for "${result.name}"`);
             continue;
         }
 
-        loadedManifestKeys.add(manifestKey);
+        loadedManifestKeys.add(registrationState.dedupeKey);
         obj[result.name] = result.manifest;
     }
 
@@ -974,7 +984,7 @@ async function getManifests(names) {
 async function activateExtensions() {
     extensionLoadErrors.clear();
     const clientVersion = CLIENT_VERSION.split(':')[1].replace(/^v/, '');
-    const extensions = Object.entries(manifests).sort((a, b) => sortManifestsByOrder(a[1], b[1]));
+    const extensions = sortExtensionBootEntries(Object.entries(manifests));
     const extensionNames = extensions.map(x => x[0]);
     const promises = [];
 
@@ -982,57 +992,41 @@ async function activateExtensions() {
         const name = entry[0];
         const manifest = entry[1];
         const extensionKey = getExtensionDedupKey(name);
-        const extrasRequirements = manifest.requires;
         const extensionDependencies = manifest.dependencies;
         const minClientVersion = manifest.minimum_client_version;
         const displayName = manifest.display_name || name;
+        const isDisabled = isExtensionDisabled(name);
+        const clientVersionMeetsMinimum = minClientVersion === undefined
+            || versionCompare(clientVersion, minClientVersion, { mapSillyBunnyToSillyTavern: true });
+        const disabledDependencyNames = Array.isArray(extensionDependencies)
+            ? extensionDependencies.filter(dep => isExtensionDisabled(dep))
+            : [];
+        const activationState = resolveExtensionActivationState({
+            name,
+            manifest,
+            availableModules: modules,
+            availableExtensionNames: extensionNames,
+            disabledDependencyNames,
+            clientVersionMeetsMinimum,
+            isDisabled,
+            isActive: activeExtensions.has(name),
+            isDedupeActive: activeExtensionDedupKeys.has(extensionKey),
+            isDedupeActivating: activatingExtensionDedupKeys.has(extensionKey),
+        });
 
-        if (activeExtensions.has(name) || activeExtensionDedupKeys.has(extensionKey) || activatingExtensionDedupKeys.has(extensionKey)) {
+        if (activationState.invalidRequires) {
+            console.warn(`Extension ${name}: manifest.json 'requires' field is not an array. Loading allowed, but any intended requirements were not verified to exist.`);
+        }
+
+        if (activationState.invalidDependencies) {
+            console.warn(`Extension ${name}: manifest.json 'dependencies' field is not an array. Loading allowed, but any intended requirements were not verified to exist.`);
+        }
+
+        if (activationState.shouldSkip) {
             continue;
         }
-        // Client version requirement: pass if 'minimum_client_version' is undefined or null.
-        let meetsClientMinimumVersion = true;
-        if (minClientVersion !== undefined) {
-            meetsClientMinimumVersion = versionCompare(clientVersion, minClientVersion, { mapSillyBunnyToSillyTavern: true });
-        }
 
-        // Module requirements: pass if 'requires' is undefined, null, or not an array; check subset if it's an array
-        let meetsModuleRequirements = true;
-        let missingModules = [];
-        if (extrasRequirements !== undefined) {
-            if (Array.isArray(extrasRequirements)) {
-                meetsModuleRequirements = isSubsetOf(modules, extrasRequirements);
-                missingModules = extrasRequirements.filter(req => !modules.includes(req));
-            } else {
-                console.warn(`Extension ${name}: manifest.json 'requires' field is not an array. Loading allowed, but any intended requirements were not verified to exist.`);
-            }
-        }
-
-        // Extension dependencies: pass if 'dependencies' is undefined or not an array; check subset and disabled status if it's an array
-        let meetsExtensionDeps = true;
-        let missingDependencies = [];
-        let disabledDependencies = [];
-        if (extensionDependencies !== undefined) {
-            if (Array.isArray(extensionDependencies)) {
-                // Check if all dependencies exist
-                meetsExtensionDeps = isSubsetOf(extensionNames, extensionDependencies);
-                missingDependencies = extensionDependencies.filter(dep => !extensionNames.includes(dep));
-                // Check for disabled dependencies
-                if (meetsExtensionDeps) {
-                    disabledDependencies = extensionDependencies.filter(dep => isExtensionDisabled(dep));
-                    if (disabledDependencies.length > 0) {
-                        // Fail if any dependencies are disabled
-                        meetsExtensionDeps = false;
-                    }
-                }
-            } else {
-                console.warn(`Extension ${name}: manifest.json 'dependencies' field is not an array. Loading allowed, but any intended requirements were not verified to exist.`);
-            }
-        }
-
-        const isDisabled = isExtensionDisabled(name);
-
-        if (meetsModuleRequirements && meetsExtensionDeps && meetsClientMinimumVersion && !isDisabled) {
+        if (activationState.shouldActivate) {
             const activateExtension = async () => {
                 console.debug('Activating extension', name);
                 activatingExtensionDedupKeys.add(extensionKey);
@@ -1054,9 +1048,7 @@ async function activateExtensions() {
                     });
             };
 
-            const hasDependencies = Array.isArray(extensionDependencies) && extensionDependencies.length > 0;
-
-            if (hasDependencies) {
+            if (activationState.shouldWaitForDependencyActivations) {
                 await Promise.allSettled(promises);
                 try {
                     await activateExtension();
@@ -1068,18 +1060,16 @@ async function activateExtensions() {
                     console.error('Could not activate extension', name, error);
                 }));
             }
-        } else if (!meetsModuleRequirements && !isDisabled) {
-            console.warn(t`Extension "${name}" did not load. Missing required Extras module(s): "${missingModules.join(', ')}"`);
-            extensionLoadErrors.add(t`Extension "${displayName}" did not load. Missing required Extras module(s): "${missingModules.join(', ')}"`);
-        } else if (!meetsExtensionDeps && !isDisabled) {
-            if (disabledDependencies.length > 0) {
-                console.warn(t`Extension "${name}" did not load. Required extensions exist but are disabled: "${disabledDependencies.join(', ')}". Enable them first, then reload.`);
-                extensionLoadErrors.add(t`Extension "${displayName}" did not load. Required extensions exist but are disabled: "${disabledDependencies.join(', ')}". Enable them first, then reload.`);
-            } else {
-                console.warn(t`Extension "${name}" did not load. Missing required extensions: "${missingDependencies.join(', ')}"`);
-                extensionLoadErrors.add(t`Extension "${displayName}" did not load. Missing required extensions: "${missingDependencies.join(', ')}"`);
-            }
-        } else if (!meetsClientMinimumVersion && !isDisabled) {
+        } else if (activationState.action === EXTENSION_BOOT_ACTIVATION_ACTION.MISSING_MODULES) {
+            console.warn(t`Extension "${name}" did not load. Missing required Extras module(s): "${activationState.missingModules.join(', ')}"`);
+            extensionLoadErrors.add(t`Extension "${displayName}" did not load. Missing required Extras module(s): "${activationState.missingModules.join(', ')}"`);
+        } else if (activationState.action === EXTENSION_BOOT_ACTIVATION_ACTION.DISABLED_DEPENDENCIES) {
+            console.warn(t`Extension "${name}" did not load. Required extensions exist but are disabled: "${activationState.disabledDependencies.join(', ')}". Enable them first, then reload.`);
+            extensionLoadErrors.add(t`Extension "${displayName}" did not load. Required extensions exist but are disabled: "${activationState.disabledDependencies.join(', ')}". Enable them first, then reload.`);
+        } else if (activationState.action === EXTENSION_BOOT_ACTIVATION_ACTION.MISSING_DEPENDENCIES) {
+            console.warn(t`Extension "${name}" did not load. Missing required extensions: "${activationState.missingDependencies.join(', ')}"`);
+            extensionLoadErrors.add(t`Extension "${displayName}" did not load. Missing required extensions: "${activationState.missingDependencies.join(', ')}"`);
+        } else if (activationState.action === EXTENSION_BOOT_ACTIVATION_ACTION.CLIENT_VERSION_UNSUPPORTED) {
             console.warn(t`Extension "${name}" did not load. Requires ST client version ${minClientVersion}, but current version is ${clientVersion}.`);
             extensionLoadErrors.add(t`Extension "${displayName}" did not load. Requires ST client version ${minClientVersion}, but current version is ${clientVersion}.`);
         }
@@ -1399,10 +1389,7 @@ function generateExtensionHtml(name, manifest, isActive, isDisabled, isExternal,
 }
 
 function getExtensionDedupKey(name) {
-    return String(name || '')
-        .replace(/^third-party\//i, '')
-        .trim()
-        .toLowerCase();
+    return normalizeExtensionBootId(name);
 }
 
 /**
