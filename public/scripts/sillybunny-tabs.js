@@ -3,9 +3,11 @@ import {
     createMobileShellLifecycle,
     MOBILE_SHELL_NAV_TOGGLE_ACTION,
 } from './mobile-shell-lifecycle/index.js';
+import { createPresetApiSyncLifecycle } from './preset-api-sync-lifecycle/index.js';
 import { flashHighlight } from './utils.js';
 
 const sbMobileShellLifecycle = createMobileShellLifecycle();
+const sbPresetApiSyncLifecycle = createPresetApiSyncLifecycle();
 
 const SB_STORAGE_KEYS = Object.freeze({
     leftTab: 'sb-left-tab',
@@ -4820,12 +4822,15 @@ function syncConnectionProfileSelection(value) {
         return;
     }
 
-    const nextValue = String(value ?? '').trim();
-    if (!nextValue || sourceSelect.value === nextValue) {
+    const syncState = sbPresetApiSyncLifecycle.connectionProfiles.resolveSelectionSync({
+        requestedValue: value,
+        currentValue: sourceSelect.value,
+    });
+    if (!syncState.shouldSync) {
         return;
     }
 
-    sourceSelect.value = nextValue;
+    sourceSelect.value = syncState.nextValue;
     sourceSelect.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
@@ -4849,25 +4854,16 @@ function setConnectionStripOpenState(shouldOpen) {
 
 function getCurrentMainApiValue() {
     const mainApiSelect = document.getElementById('main_api');
-
-    if (mainApiSelect instanceof HTMLSelectElement && mainApiSelect.value) {
-        return String(mainApiSelect.value).trim().toLowerCase();
-    }
-
     const context = getSillyTavernContext();
-    return String(context?.mainApi ?? '').trim().toLowerCase();
+
+    return sbPresetApiSyncLifecycle.api.resolveMainValue({
+        selectValue: mainApiSelect instanceof HTMLSelectElement ? mainApiSelect.value : '',
+        contextMainApi: context?.mainApi,
+    });
 }
 
 function resolveActiveApiConnectButton() {
-    const selectorMap = {
-        kobold: '#api_button',
-        koboldhorde: '#api_button',
-        horde: '#api_button',
-        novel: '#api_button_novel',
-        openai: '#api_button_openai',
-        textgenerationwebui: '#api_button_textgenerationwebui',
-    };
-    const selector = selectorMap[getCurrentMainApiValue()];
+    const selector = sbPresetApiSyncLifecycle.api.resolveConnectButtonSelector(getCurrentMainApiValue());
 
     if (!selector) {
         return null;
@@ -5585,22 +5581,30 @@ async function refreshChatbarState() {
 
     const connectionProfilesSource = document.getElementById('connection_profiles');
     const hasConnectionProfiles = connectionProfilesSource instanceof HTMLSelectElement;
+    const connectionMirrorState = sbPresetApiSyncLifecycle.connectionProfiles.resolveMirrorState({
+        hasConnectionProfiles,
+        isConnectionStripOpen: isConnectionStripOpen(),
+        hasActiveConnectButton: hasConnectionProfiles && Boolean(resolveActiveApiConnectButton()),
+    });
 
     if (desktopRefs) {
-        desktopRefs.toggleConnectionButton.hidden = !hasConnectionProfiles;
-        desktopRefs.connectionStrip.hidden = !hasConnectionProfiles || !isConnectionStripOpen();
+        desktopRefs.toggleConnectionButton.hidden = !connectionMirrorState.shouldShowToggle;
+        desktopRefs.connectionStrip.hidden = !connectionMirrorState.shouldShowDesktopStrip;
     }
 
-    if (!hasConnectionProfiles) {
+    if (connectionMirrorState.shouldCloseDesktopStrip) {
         setConnectionStripOpenState(false);
+    }
+
+    if (connectionMirrorState.shouldClearMirrors) {
         if (desktopRefs) {
             desktopRefs.connectionSelect.replaceChildren();
             desktopRefs.connectionStatus.textContent = '';
-            setButtonDisabled(desktopRefs.connectionConnectButton, true);
+            setButtonDisabled(desktopRefs.connectionConnectButton, connectionMirrorState.shouldDisableConnectButton);
         }
 
         if (mobileRefs?.connectionSection instanceof HTMLElement) {
-            mobileRefs.connectionSection.hidden = true;
+            mobileRefs.connectionSection.hidden = !connectionMirrorState.shouldShowMobileSection;
             mobileRefs.connectionSelect.replaceChildren();
             mobileRefs.connectionStatus.textContent = '';
         }
@@ -5610,11 +5614,11 @@ async function refreshChatbarState() {
             desktopRefs.connectionSelect.innerHTML = optionsMarkup;
             desktopRefs.connectionSelect.value = connectionProfilesSource.value;
             desktopRefs.connectionStatus.textContent = connectionStatusText;
-            setButtonDisabled(desktopRefs.connectionConnectButton, !resolveActiveApiConnectButton());
+            setButtonDisabled(desktopRefs.connectionConnectButton, connectionMirrorState.shouldDisableConnectButton);
         }
 
         if (mobileRefs?.connectionSection instanceof HTMLElement) {
-            mobileRefs.connectionSection.hidden = false;
+            mobileRefs.connectionSection.hidden = !connectionMirrorState.shouldShowMobileSection;
             mobileRefs.connectionSelect.innerHTML = optionsMarkup;
             mobileRefs.connectionSelect.value = connectionProfilesSource.value;
             mobileRefs.connectionStatus.textContent = connectionStatusText;

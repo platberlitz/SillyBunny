@@ -53,14 +53,14 @@ This ledger tracks intentional SillyBunny divergence in upstream-origin files. I
 ### `public/scripts/sillybunny-tabs.js` - shell chat controls
 | Field | Value |
 | --- | --- |
-| Area | Mobile shell and chat navigation. |
-| Divergence reason | SillyBunny shell owns top/bottom navigation, chat controls, drawers, and mobile actions that interact with chat scroll behavior. |
-| Target seam | `public/scripts/chat-render-lifecycle/` for chat scroll requests; `public/scripts/mobile-shell-lifecycle/` for drawer/nav/viewport behavior. |
-| Adapter shape | Shell code keeps DOM wiring and requests mobile shell lifecycle decisions for nav drag, page scroll, overlay open/close, auto-close, and modal inert policy. |
-| Protecting tests | `tests/mobile-shell-lifecycle.test.js`, `tests/mobile-shell-lifecycle-wiring.test.js`, future shell smoke checks for drawer/tab/preset/chat-scroll behavior. |
-| Validation | `npm run test:unit --prefix tests -- mobile-shell-lifecycle.test.js mobile-shell-lifecycle-wiring.test.js`, `npm run lint --prefix tests -- mobile-shell-lifecycle.test.js mobile-shell-lifecycle-wiring.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
+| Area | Mobile shell, chat navigation, and preset/API sync. |
+| Divergence reason | SillyBunny shell owns top/bottom navigation, chat controls, drawers, mobile actions, and mirrored connection-profile controls that interact with chat and API state. |
+| Target seam | `public/scripts/chat-render-lifecycle/` for chat scroll requests; `public/scripts/mobile-shell-lifecycle/` for drawer/nav/viewport behavior; `public/scripts/preset-api-sync-lifecycle/` for active API and connection-profile mirror decisions. |
+| Adapter shape | Shell code keeps DOM wiring and requests lifecycle decisions for nav drag, page scroll, overlay open/close, auto-close, modal inert policy, active API connect-button lookup, and connection-profile mirror state. |
+| Protecting tests | `tests/mobile-shell-lifecycle.test.js`, `tests/mobile-shell-lifecycle-wiring.test.js`, `tests/preset-api-sync-lifecycle.test.js`, `tests/preset-api-sync-lifecycle-wiring.test.js`, future shell smoke checks for drawer/tab/preset/chat-scroll behavior. |
+| Validation | `npm run test:unit --prefix tests -- mobile-shell-lifecycle.test.js mobile-shell-lifecycle-wiring.test.js`, `npm run lint --prefix tests -- mobile-shell-lifecycle.test.js mobile-shell-lifecycle-wiring.test.js`, `npm run test:unit --prefix tests -- preset-api-sync-lifecycle.test.js preset-api-sync-lifecycle-wiring.test.js`, `npm run lint --prefix tests -- preset-api-sync-lifecycle.test.js preset-api-sync-lifecycle-wiring.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
 | Rollback path | Keep shell calls narrow so a bad adapter route can be reverted without removing shell UI. |
-| Last reviewed | 2026-05-28 mobile shell lifecycle wiring. |
+| Last reviewed | 2026-05-28 preset/API sync lifecycle wiring. |
 | Owner | Refactor integrator and mobile shell owner. |
 
 ### `public/scripts/mobile-streaming.js` - platform streaming policy
