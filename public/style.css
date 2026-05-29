@@ -943,10 +943,6 @@ body .panelControlBar {
     flex-direction: column;
     z-index: 30;
     flex-grow: 1;
-}
-
-/* macOS browser scroll anchoring fights chat scroll preservation during message loads. */
-body.is-macos #chat {
     overflow-anchor: none;
 }
 

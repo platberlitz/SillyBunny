@@ -79,6 +79,8 @@ describe('chat render lifecycle script wiring', () => {
         const printMessages = findExportedFunction('printMessages');
         const source = getSource(printMessages);
 
+        expect(source).toContain('beginChatLoadBottomLock();');
+        expect(source).toContain('await redisplayChat({ startIndex, fade: false, pinBottomDuringRender: true });');
         expect(source).toContain('scrollLoadedChatToBottomThroughLifecycle();');
         expect(source).toContain('delay(debounce_timeout.short).then(() => scrollOnMediaLoad({ force: true }));');
 
@@ -98,7 +100,7 @@ describe('chat render lifecycle script wiring', () => {
         const source = getSource(redisplayChat);
 
         expect(source).toContain('const messages = targetChat.slice(startIndex);');
-        expect(source).toContain('const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex });');
+        expect(source).toContain('const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex, pinBottomDuringRender });');
         expect(source).toContain('applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });');
         expect(source).toContain('refreshSwipeButtons(false, fade);');
         expect(source).toContain('applyStylePins();');
@@ -111,8 +113,8 @@ describe('chat render lifecycle script wiring', () => {
 
         expect(source).toContain('const batchSize = getMobileChatRenderBatchSize(messages.length);');
         expect(source).toContain('if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.REDISPLAY_BATCH))');
-        expect(source).toContain('return renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize });');
-        expect(source).toContain('return renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize });');
+        expect(source).toContain('return renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize, pinBottomDuringRender });');
+        expect(source).toContain('return renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize, pinBottomDuringRender });');
     });
 
     test('guard-on redisplayChat delegates batch mechanics to the lifecycle render batch helper', () => {
@@ -127,6 +129,7 @@ describe('chat render lifecycle script wiring', () => {
         expect(source).toContain('insertFragment: fragment => chatElement[0].appendChild(fragment)');
         expect(source).toContain('waitForNextFrame,');
         expect(source).toContain('markLastMessage: true');
+        expect(source).toContain('afterBatch: pinBottomDuringRender ? () => beginChatLoadBottomLock() : undefined');
     });
 
     test('guard-off redisplayChat keeps legacy inline batching', () => {
@@ -139,6 +142,8 @@ describe('chat render lifecycle script wiring', () => {
         expect(source).toContain('const messageElement = updateMessageElement(message, { messageId });');
         expect(source).toContain('newMessageElements.at(-1).classList.add(\'last_mes\');');
         expect(source).toContain('chatElement[0].appendChild(fragment);');
+        expect(source).toContain('if (pinBottomDuringRender)');
+        expect(source).toContain('beginChatLoadBottomLock();');
         expect(source).toContain('await waitForNextFrame();');
         expect(source).toContain('return renderedMessageIds;');
     });
@@ -371,6 +376,37 @@ describe('chat render lifecycle script wiring', () => {
         expect(source).toContain('isFinal,');
     });
 
+    test('streaming progress throttles mobile bottom pins through the streaming scheduler', () => {
+        const onProgressStreaming = findNode(scriptAst, node => node.type === 'MethodDefinition'
+            && node.key?.name === 'onProgressStreaming');
+        const source = getSource(onProgressStreaming.value);
+
+        expect(source).toContain('const shouldPinMobileBottom = !isImpersonate && shouldPinMobileChatToBottom();');
+        expect(source).toContain('scheduleMobileStreamingBottomPin({ isFinal });');
+        expect(source).not.toContain('pinMobileChatToBottom({ waitForFrame: true, settle: isFinal });');
+    });
+
+    test('mobile streaming bottom pin scheduling coalesces smooth intermediate pins', () => {
+        expect(scriptSource).toContain('const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = 750;');
+        expect(scriptSource).toContain('let mobileStreamingBottomPinFrame = 0;');
+        expect(scriptSource).toContain('let mobileStreamingBottomPinTimer = 0;');
+
+        const requestFrame = findFunctionDeclaration('requestMobileStreamingBottomPinFrame');
+        const requestFrameSource = getSource(requestFrame);
+        expect(requestFrameSource).toContain('requestAnimationFrame(() =>');
+        expect(requestFrameSource).toContain('const behavior = shouldSettle || !mobileStreamingBottomPinSmooth ? \'auto\' : \'smooth\';');
+        expect(requestFrameSource).toContain('if (!shouldPinMobileChatToBottom())');
+        expect(requestFrameSource).toContain('pinMobileChatToBottom({');
+        expect(requestFrameSource).toContain('waitForFrame: false');
+        expect(requestFrameSource).toContain('behavior,');
+
+        const scheduler = findFunctionDeclaration('scheduleMobileStreamingBottomPin');
+        const schedulerSource = getSource(scheduler);
+        expect(schedulerSource).toContain('clearMobileStreamingBottomPinTimer();');
+        expect(schedulerSource).toContain('elapsed >= MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS');
+        expect(schedulerSource).toContain('mobileStreamingBottomPinTimer = setTimeout(() =>');
+    });
+
     test('guard-on streaming progress delegates visible DOM writes to the lifecycle stream buffer', () => {
         expect(scriptSource).toContain('createStreamWriteBuffer,');
 
@@ -551,7 +587,43 @@ describe('chat render lifecycle script wiring', () => {
 
         const initSource = scriptSource.slice(scriptSource.indexOf('const chatElementScroll = document.getElementById(\'chat\');'));
         expect(initSource).toContain('const markMobileViewportScroll = getMobileViewportScrollHandler();');
+        expect(initSource).toContain('const chatShellElement = document.getElementById(\'sheld\');');
+        expect(initSource).toContain('chatShellElement?.addEventListener(\'wheel\', routeShellWheelToChat, { passive: false });');
         expect(initSource).toContain('setupMobileChatViewportObserver(markMobileViewportScroll);');
+    });
+
+    test('initial chat load keeps bottom pin settling across late layout passes', () => {
+        expect(scriptSource).toContain('const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 24;');
+        expect(scriptSource).toContain('const CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS = 250;');
+        expect(scriptSource).toContain('const CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS = Object.freeze([80, 250, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS, 900, 1600, 2400]);');
+        expect(scriptSource).toContain('history.scrollRestoration = \'manual\';');
+
+        const beginChatLoadBottomLock = findFunctionDeclaration('beginChatLoadBottomLock');
+        const lockSource = getSource(beginChatLoadBottomLock);
+        expect(lockSource).toContain('chatLoadBottomLockUntil = Math.max(chatLoadBottomLockUntil, Date.now() + durationMs);');
+        expect(lockSource).toContain('scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, chatLoadBottomLockUntil);');
+        expect(lockSource).toContain('pinChatLoadToBottom();');
+
+        const pinChatLoadToBottom = findFunctionDeclaration('pinChatLoadToBottom');
+        const pinSource = getSource(pinChatLoadToBottom);
+        expect(pinSource).toContain('if (!isChatLoadBottomLockActive())');
+        expect(pinSource).toContain('scrollChatElementToBottom();');
+
+        const scrollLoadedChatToBottom = findFunctionDeclaration('scrollLoadedChatToBottom');
+        const source = getSource(scrollLoadedChatToBottom);
+        expect(source).toContain('const latestSettleDelay = Math.max(...CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS);');
+        expect(source).toContain('const bottomLockDurationMs = latestSettleDelay + CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS;');
+        expect(source).toContain('beginChatLoadBottomLock({ durationMs: bottomLockDurationMs });');
+        expect(source).toContain('scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, chatLoadBottomLockUntil);');
+        expect(source).toContain('requestMobileChatBottomPin({ requireNearBottom: false, durationMs: bottomLockDurationMs + MOBILE_SEND_SCROLL_SETTLE_MS });');
+        expect(source).toContain('for (const delayMs of CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS)');
+        expect(source).toContain('if (!isChatLoadBottomLockActive())');
+        expect(source).toContain('scrollChatToBottom({ waitForFrame: true, force: true });');
+
+        const initSource = scriptSource.slice(scriptSource.indexOf('const chatElementScroll = document.getElementById(\'chat\');'));
+        expect(initSource).toContain('clearChatLoadBottomLock();');
+        expect(initSource).toContain('if (isChatLoadBottomLockActive() && !isChatScrolledNearBottom())');
+        expect(initSource).toContain('pinChatLoadToBottom();');
     });
 
     test('mobile viewport lifecycle route preserves existing scroll suppression policy', () => {

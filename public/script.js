@@ -201,6 +201,13 @@ import {
     loadFileToDocument,
     getSanitizedFilename,
 } from './scripts/utils.js';
+import {
+    TOOLING_UI_HYDRATION_STATUS,
+    buildToolingCaptureFilename,
+    normalizeToolingCaptureRange,
+    resolveLazyToolingLibraryHydration,
+    resolveToolingAssetWait,
+} from './scripts/tooling-ui-hydration/index.js';
 import { debounce_timeout, GENERATION_TYPE_TRIGGERS, IGNORE_SYMBOL, inject_ids, MEDIA_DISPLAY, MEDIA_SOURCE, MEDIA_TYPE, OVERSWIPE_BEHAVIOR, SCROLL_BEHAVIOR, SWIPE_DIRECTION, SWIPE_SOURCE, SWIPE_STATE } from './scripts/constants.js';
 
 import { cancelDebouncedMetadataSave, doDailyExtensionUpdatesCheck, extension_settings, initExtensions, loadExtensionSettings, runGenerationInterceptors } from './scripts/extensions.js';
@@ -596,7 +603,10 @@ const MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS = 400;
 const MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS = 1400;
 const MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
 const MOBILE_CHAT_BOTTOM_PIN_MS = 1500;
-const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 8;
+const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = 750;
+const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 24;
+const CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS = 250;
+const CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS = Object.freeze([80, 250, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS, 900, 1600, 2400]);
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 const SHOW_MORE_TOUCH_MOVE_CANCEL_PX = 12;
 const ENTITY_SELECTION_PULSE_CLEANUP_MS = 900;
@@ -628,9 +638,24 @@ let scrollLockImmunityUntil = 0;
 let mobileChatTouchScrolling = false;
 let mobileChatManualScrollSuppressedUntil = 0;
 let mobileChatBottomPinUntil = 0;
+let mobileStreamingBottomPinFrame = 0;
+let mobileStreamingBottomPinTimer = 0;
+let mobileStreamingBottomPinSettle = false;
+let mobileStreamingBottomPinSmooth = false;
+let lastMobileStreamingBottomPinAt = 0;
+let chatLoadBottomLockUntil = 0;
+let chatLoadBottomPinFrame = 0;
 export let abortStatusCheck = new AbortController();
 export let charDragDropHandler = null;
 export let chatDragDropHandler = null;
+
+try {
+    if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+    }
+} catch {
+    // Ignore browsers that deny access to history state during early startup.
+}
 
 /** @type {debounce_timeout} The debounce timeout used for chat/settings save. debounce_timeout.long: 1.000 ms */
 export const DEFAULT_SAVE_EDIT_TIMEOUT = debounce_timeout.relaxed;
@@ -1849,12 +1874,62 @@ function isChatScrolledNearBottom(threshold = CHAT_SCROLL_BOTTOM_THRESHOLD_PX) {
     return Math.abs(element.scrollHeight - element.clientHeight - element.scrollTop) <= threshold;
 }
 
+function isChatLoadBottomLockActive() {
+    return Date.now() < chatLoadBottomLockUntil;
+}
+
+function clearChatLoadBottomLock() {
+    chatLoadBottomLockUntil = 0;
+
+    if (chatLoadBottomPinFrame) {
+        cancelAnimationFrame(chatLoadBottomPinFrame);
+        chatLoadBottomPinFrame = 0;
+    }
+}
+
+function pinChatLoadToBottom({ waitForFrame = false } = {}) {
+    if (!isChatLoadBottomLockActive()) {
+        return false;
+    }
+
+    const pin = () => {
+        if (!isChatLoadBottomLockActive()) {
+            return;
+        }
+
+        scrollLock = false;
+        scrollChatElementToBottom();
+    };
+
+    if (waitForFrame) {
+        if (!chatLoadBottomPinFrame) {
+            chatLoadBottomPinFrame = requestAnimationFrame(() => {
+                chatLoadBottomPinFrame = 0;
+                pin();
+            });
+        }
+
+        return true;
+    }
+
+    pin();
+    return true;
+}
+
+function beginChatLoadBottomLock({ durationMs = Math.max(...CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS) + CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS } = {}) {
+    chatLoadBottomLockUntil = Math.max(chatLoadBottomLockUntil, Date.now() + durationMs);
+    scrollLock = false;
+    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, chatLoadBottomLockUntil);
+    pinChatLoadToBottom();
+}
+
 function markMobileChatManualScroll({ touchActive = false, suppressMs = MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS } = {}) {
     if (!shouldGuardMobileChatScroll()) {
         return;
     }
 
     mobileChatBottomPinUntil = 0;
+    clearMobileStreamingBottomPin();
 
     if (touchActive) {
         mobileChatTouchScrolling = true;
@@ -1911,7 +1986,7 @@ function shouldPinMobileChatToBottom() {
     return Date.now() < mobileChatBottomPinUntil || isChatScrolledNearBottom();
 }
 
-function pinMobileChatToBottom({ waitForFrame = true, settle = false } = {}) {
+function pinMobileChatToBottom({ waitForFrame = true, settle = false, immediate = true, behavior = 'auto' } = {}) {
     if (!shouldGuardMobileChatScroll()) {
         return;
     }
@@ -1922,13 +1997,12 @@ function pinMobileChatToBottom({ waitForFrame = true, settle = false } = {}) {
     scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
 
     const pin = () => {
-        const element = chatElement[0];
-        if (element) {
-            element.scrollTop = element.scrollHeight;
-        }
+        scrollChatElementToBottom({ behavior });
     };
 
-    pin();
+    if (immediate) {
+        pin();
+    }
 
     if (waitForFrame) {
         requestAnimationFrame(pin);
@@ -1943,10 +2017,87 @@ function pinMobileChatToBottom({ waitForFrame = true, settle = false } = {}) {
     }
 }
 
+function clearMobileStreamingBottomPinTimer() {
+    if (mobileStreamingBottomPinTimer) {
+        clearTimeout(mobileStreamingBottomPinTimer);
+        mobileStreamingBottomPinTimer = 0;
+    }
+}
+
+function clearMobileStreamingBottomPin() {
+    clearMobileStreamingBottomPinTimer();
+
+    if (mobileStreamingBottomPinFrame) {
+        cancelAnimationFrame(mobileStreamingBottomPinFrame);
+        mobileStreamingBottomPinFrame = 0;
+    }
+
+    mobileStreamingBottomPinSettle = false;
+    mobileStreamingBottomPinSmooth = false;
+}
+
+function requestMobileStreamingBottomPinFrame({ isFinal = false } = {}) {
+    mobileStreamingBottomPinSettle = mobileStreamingBottomPinSettle || isFinal;
+    mobileStreamingBottomPinSmooth = mobileStreamingBottomPinSmooth || !isFinal;
+
+    if (mobileStreamingBottomPinFrame) {
+        return;
+    }
+
+    mobileStreamingBottomPinFrame = requestAnimationFrame(() => {
+        mobileStreamingBottomPinFrame = 0;
+        const shouldSettle = mobileStreamingBottomPinSettle;
+        const behavior = shouldSettle || !mobileStreamingBottomPinSmooth ? 'auto' : 'smooth';
+        mobileStreamingBottomPinSettle = false;
+        mobileStreamingBottomPinSmooth = false;
+
+        if (!shouldPinMobileChatToBottom()) {
+            return;
+        }
+
+        lastMobileStreamingBottomPinAt = Date.now();
+        pinMobileChatToBottom({
+            waitForFrame: false,
+            settle: shouldSettle,
+            behavior,
+        });
+    });
+}
+
+function scheduleMobileStreamingBottomPin({ isFinal = false } = {}) {
+    if (!shouldGuardMobileChatScroll()) {
+        return false;
+    }
+
+    if (isFinal) {
+        clearMobileStreamingBottomPinTimer();
+        requestMobileStreamingBottomPinFrame({ isFinal: true });
+        return true;
+    }
+
+    const now = Date.now();
+    const elapsed = now - lastMobileStreamingBottomPinAt;
+
+    if (elapsed >= MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS) {
+        requestMobileStreamingBottomPinFrame();
+        return true;
+    }
+
+    if (!mobileStreamingBottomPinTimer) {
+        mobileStreamingBottomPinTimer = setTimeout(() => {
+            mobileStreamingBottomPinTimer = 0;
+            requestMobileStreamingBottomPinFrame();
+        }, MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS - elapsed);
+    }
+
+    return false;
+}
+
 function resetMobileViewportScrollState() {
     mobileChatTouchScrolling = false;
     mobileChatManualScrollSuppressedUntil = 0;
     mobileChatBottomPinUntil = 0;
+    clearMobileStreamingBottomPin();
 }
 
 function getMobileViewportScrollHandler() {
@@ -1955,6 +2106,81 @@ function getMobileViewportScrollHandler() {
             markMobileChatManualScroll({ suppressMs: MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS });
         }
     };
+}
+
+function isVerticallyScrollableElement(element) {
+    if (!(element instanceof HTMLElement)) {
+        return false;
+    }
+
+    const style = getComputedStyle(element);
+    const canScrollY = style.overflowY === 'auto' || style.overflowY === 'scroll' || style.overflowY === 'overlay';
+
+    return canScrollY && element.scrollHeight - element.clientHeight > 1;
+}
+
+function hasScrollableWheelTarget(target, boundaryElement) {
+    if (!(target instanceof Element)) {
+        return false;
+    }
+
+    const chatNode = chatElement[0];
+
+    for (let element = target; element && element !== boundaryElement; element = element.parentElement) {
+        if (element === chatNode || isVerticallyScrollableElement(element)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function getWheelDeltaYPixels(event, scrollElement) {
+    if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+        return event.deltaY * scrollElement.clientHeight;
+    }
+
+    if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+        return event.deltaY * 16;
+    }
+
+    return event.deltaY;
+}
+
+function routeShellWheelToChat(event) {
+    const chatNode = chatElement[0];
+
+    if (!(chatNode instanceof HTMLElement) || event.defaultPrevented || event.ctrlKey || event.metaKey) {
+        return;
+    }
+
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
+        return;
+    }
+
+    if (event.target instanceof Node && chatNode.contains(event.target)) {
+        return;
+    }
+
+    if (hasScrollableWheelTarget(event.target, event.currentTarget)) {
+        return;
+    }
+
+    const maxScrollTop = Math.max(0, chatNode.scrollHeight - chatNode.clientHeight);
+    if (maxScrollTop <= 0) {
+        return;
+    }
+
+    const currentScrollTop = chatNode.scrollTop;
+    const nextScrollTop = clamp(currentScrollTop + getWheelDeltaYPixels(event, chatNode), 0, maxScrollTop);
+
+    if (Math.abs(nextScrollTop - currentScrollTop) < 1) {
+        return;
+    }
+
+    clearChatLoadBottomLock();
+    chatNode.scrollTop = nextScrollTop;
+    event.preventDefault();
 }
 
 function disposeMobileChatViewportObserver() {
@@ -2543,7 +2769,8 @@ export async function printMessages() {
         chatElement.append('<div id="show_more_messages">Show more messages</div>');
     }
 
-    await redisplayChat({ startIndex, fade: false });
+    beginChatLoadBottomLock();
+    await redisplayChat({ startIndex, fade: false, pinBottomDuringRender: true });
 
     // Wait for next frame to ensure batch rendering completes
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -2568,17 +2795,32 @@ function scrollLoadedChatToBottomThroughLifecycle() {
 
 function scrollLoadedChatToBottom() {
     // SillyBunny: previous-chat taps can leave the mobile manual-scroll guard active.
+    const latestSettleDelay = Math.max(...CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS);
+    const bottomLockDurationMs = latestSettleDelay + CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS;
+    beginChatLoadBottomLock({ durationMs: bottomLockDurationMs });
+    scrollLock = false;
+    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, chatLoadBottomLockUntil);
+
+    if (shouldGuardMobileChatScroll()) {
+        mobileChatManualScrollSuppressedUntil = 0;
+        requestMobileChatBottomPin({ requireNearBottom: false, durationMs: bottomLockDurationMs + MOBILE_SEND_SCROLL_SETTLE_MS });
+    }
+
     scrollChatToBottom({ force: true });
     scrollChatToBottom({ waitForFrame: true, force: true });
 
-    if (shouldGuardMobileChatScroll()) {
+    for (const delayMs of CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS) {
         setTimeout(() => {
+            if (!isChatLoadBottomLockActive()) {
+                return;
+            }
+
             scrollChatToBottom({ waitForFrame: true, force: true });
-        }, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS);
+        }, delayMs);
     }
 }
 
-async function renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize }) {
+async function renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize, pinBottomDuringRender }) {
     const renderedMessageIds = lodash.range(startIndex, startIndex + messages.length, 1);
     const shouldYieldBetweenBatches = batchSize < messages.length;
 
@@ -2603,6 +2845,10 @@ async function renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSi
         }
         chatElement[0].appendChild(fragment);
 
+        if (pinBottomDuringRender) {
+            beginChatLoadBottomLock();
+        }
+
         if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
             await waitForNextFrame();
         }
@@ -2611,7 +2857,7 @@ async function renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSi
     return renderedMessageIds;
 }
 
-async function renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize }) {
+async function renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize, pinBottomDuringRender }) {
     const { renderedMessageIds } = await renderMessagesInBatches({
         messages,
         firstMessageId: startIndex,
@@ -2620,19 +2866,20 @@ async function renderRedisplayChatMessagesThroughLifecycle({ messages, startInde
         insertFragment: fragment => chatElement[0].appendChild(fragment),
         waitForNextFrame,
         markLastMessage: true,
+        afterBatch: pinBottomDuringRender ? () => beginChatLoadBottomLock() : undefined,
     });
 
     return renderedMessageIds;
 }
 
-async function renderRedisplayChatMessages({ messages, startIndex }) {
+async function renderRedisplayChatMessages({ messages, startIndex, pinBottomDuringRender = false }) {
     const batchSize = getMobileChatRenderBatchSize(messages.length);
 
     if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.REDISPLAY_BATCH)) {
-        return renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize });
+        return renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize, pinBottomDuringRender });
     }
 
-    return renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize });
+    return renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize, pinBottomDuringRender });
 }
 
 /**
@@ -2641,8 +2888,9 @@ async function renderRedisplayChatMessages({ messages, startIndex }) {
  * @param {ChatMessage[]} [options.targetChat=chat] All messages in chat before startIndex will remain unchanged.
  * @param {Number} [options.startIndex=0] Everything including and after startIndex will be replaced.
  * @param {Boolean} [options.fade=true] When false, the swipe chevrons will not fade in.
+ * @param {Boolean} [options.pinBottomDuringRender=false] Keep initial chat loads at the newest rendered message while batches append.
  */
-export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = true } = {}) {
+export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = true, pinBottomDuringRender = false } = {}) {
     const messageElements = chatElement.find('.mes');
     messageElements.removeClass('last_mes');
 
@@ -2656,7 +2904,7 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
     const messages = targetChat.slice(startIndex);
 
     if (messages.length > 0) {
-        const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex });
+        const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex, pinBottomDuringRender });
 
         applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });
     }
@@ -2728,6 +2976,7 @@ export async function clearChat({ clearData = false } = {}) {
     cancelDebouncedChatSave();
     cancelDebouncedMetadataSave();
     closeMessageEditor();
+    clearChatLoadBottomLock();
     disposeChatMessageResizeObserver();
     resetMobileChatViewportLifecycle();
     extension_prompts = {};
@@ -4191,7 +4440,7 @@ function formatGenerationTimer(gen_started, gen_finished, tokenCount, reasoningD
 
 let requestId = null;
 
-function scrollChatElementToBottom() {
+function scrollChatElementToBottom({ behavior = 'auto' } = {}) {
     let position = chatElement[0].scrollHeight;
 
     if (power_user.waifuMode) {
@@ -4200,6 +4449,12 @@ function scrollChatElementToBottom() {
             const lastMessagePosition = lastMessage.position().top;
             position = chatElement.scrollTop() + lastMessagePosition;
         }
+    }
+
+    const element = chatElement[0];
+    if (behavior === 'smooth' && typeof element?.scrollTo === 'function') {
+        element.scrollTo({ top: position, behavior });
+        return;
     }
 
     chatElement.scrollTop(position);
@@ -5271,7 +5526,7 @@ class StreamingProcessor {
         }
 
         if (shouldPinMobileBottom) {
-            pinMobileChatToBottom({ waitForFrame: true, settle: isFinal });
+            scheduleMobileStreamingBottomPin({ isFinal });
         } else if (!scrollLock) {
             scrollChatToBottom({ waitForFrame: true });
         }
@@ -14727,9 +14982,19 @@ jQuery(async function () {
     }
 
     const chatElementScroll = document.getElementById('chat');
-    const markMobileChatTouchScrollStart = () => markMobileChatManualScroll({ touchActive: true });
-    const markMobileChatTouchScrollMove = () => markMobileChatManualScroll();
-    const markMobileChatWheelScroll = () => markMobileChatManualScroll();
+    const chatShellElement = document.getElementById('sheld');
+    const markMobileChatTouchScrollStart = () => {
+        clearChatLoadBottomLock();
+        markMobileChatManualScroll({ touchActive: true });
+    };
+    const markMobileChatTouchScrollMove = () => {
+        clearChatLoadBottomLock();
+        markMobileChatManualScroll();
+    };
+    const markMobileChatWheelScroll = () => {
+        clearChatLoadBottomLock();
+        markMobileChatManualScroll();
+    };
     const markMobileViewportScroll = getMobileViewportScrollHandler();
 
     chatElementScroll.addEventListener('touchstart', markMobileChatTouchScrollStart, { passive: true });
@@ -14737,10 +15002,16 @@ jQuery(async function () {
     chatElementScroll.addEventListener('touchend', releaseMobileChatTouchScroll, { passive: true });
     chatElementScroll.addEventListener('touchcancel', releaseMobileChatTouchScroll, { passive: true });
     chatElementScroll.addEventListener('wheel', markMobileChatWheelScroll, { passive: true });
+    chatShellElement?.addEventListener('wheel', routeShellWheelToChat, { passive: false });
     setupMobileChatViewportObserver(markMobileViewportScroll);
 
     const chatScrollHandler = function () {
         refreshObservedChatMessageResizeViewportStates();
+
+        if (isChatLoadBottomLockActive() && !isChatScrolledNearBottom()) {
+            pinChatLoadToBottom();
+            return;
+        }
 
         if (power_user.waifuMode) {
             scrollLock = true;
@@ -14755,7 +15026,7 @@ jQuery(async function () {
             return;
         }
 
-        const scrollIsAtBottom = isChatScrolledNearBottom(5);
+        const scrollIsAtBottom = isChatScrolledNearBottom();
 
         // Resume autoscroll if the user scrolls to the bottom
         if (scrollLock && scrollIsAtBottom) {
