@@ -45,7 +45,7 @@ describe('chat render lifecycle index seam', () => {
         expect(CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY).toBe('sillybunny.chatRenderLifecycle.enabled');
         expect(CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD).toBe('initial-load');
         expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.BOTTOM_SCROLL]).toBe(true);
-        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD]).toBe(false);
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD]).toBe(true);
         expect(MOBILE_VIEWPORT_SETTLE_DELAY_MS).toBe(180);
     });
 

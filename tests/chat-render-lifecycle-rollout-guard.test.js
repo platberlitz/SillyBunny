@@ -46,9 +46,13 @@ describe('chat render lifecycle rollout guard', () => {
             Object.values(CHAT_RENDER_LIFECYCLE_ROUTE).sort(),
         );
         expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.BOTTOM_SCROLL]).toBe(true);
+        expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD]).toBe(true);
 
         const disabledRoutes = Object.entries(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS)
-            .filter(([route]) => route !== CHAT_RENDER_LIFECYCLE_ROUTE.BOTTOM_SCROLL)
+            .filter(([route]) => ![
+                CHAT_RENDER_LIFECYCLE_ROUTE.BOTTOM_SCROLL,
+                CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD,
+            ].includes(route))
             .map(([, enabled]) => enabled);
 
         expect(disabledRoutes.every(value => value === false)).toBe(true);
