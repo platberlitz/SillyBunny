@@ -18,6 +18,8 @@ import {
 } from './scroll-intent.js';
 import {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
+    CHAT_RENDER_LIFECYCLE_ROUTE,
+    CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS,
     resolveChatRenderLifecycleRollout,
 } from './rollout-guard.js';
 import {
@@ -39,6 +41,8 @@ import {
 
 export {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
+    CHAT_RENDER_LIFECYCLE_ROUTE,
+    CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS,
     CHAT_SCROLL_ACTION,
     CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
@@ -84,6 +88,8 @@ export function createChatRenderLifecycle() {
         },
         rollout: {
             key: CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
+            route: CHAT_RENDER_LIFECYCLE_ROUTE,
+            routeDefaults: CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS,
             resolve: resolveChatRenderLifecycleRollout,
         },
         renderBatch: {

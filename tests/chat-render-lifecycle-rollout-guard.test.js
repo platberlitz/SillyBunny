@@ -2,6 +2,8 @@ import { describe, expect, test } from '@jest/globals';
 
 import {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
+    CHAT_RENDER_LIFECYCLE_ROUTE,
+    CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS,
     resolveChatRenderLifecycleRollout,
 } from '../public/scripts/chat-render-lifecycle/rollout-guard.js';
 
@@ -24,6 +26,29 @@ describe('chat render lifecycle rollout guard', () => {
             enabled: true,
             source: 'default',
         });
+    });
+
+    test('uses route defaults when explicit overrides are absent', () => {
+        expect(resolveChatRenderLifecycleRollout({
+            route: CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD,
+            routeDefaults: {
+                ...CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS,
+                [CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD]: true,
+            },
+        })).toEqual({
+            enabled: true,
+            source: 'default',
+        });
+    });
+
+    test('keeps every lifecycle route disabled by default until route-specific flips', () => {
+        expect(Object.keys(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS).sort()).toEqual(
+            Object.values(CHAT_RENDER_LIFECYCLE_ROUTE).sort(),
+        );
+        expect(Object.values(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS)).toEqual(
+            expect.arrayContaining([false]),
+        );
+        expect(Object.values(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS).every(value => value === false)).toBe(true);
     });
 
     test('storage override enables lifecycle routing', () => {
