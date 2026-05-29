@@ -127,6 +127,8 @@ let toolRecursionDepth = 0;
 const processedPostProcessingRuns = new WeakMap();
 const processedPostProcessingRunsByIndex = new Map();
 const postProcessingInFlightKeys = new Set();
+const stoppedStreamingMessageIndexes = new Set();
+let stoppedGenerationRunId = -1;
 
 function escapeToastHtml(value) {
     return String(value ?? '')
@@ -625,16 +627,31 @@ function isMainGenerationStillActive() {
 }
 
 function wasStreamingMessageStopped(messageIndex) {
+    const numericMessageIndex = Number(messageIndex);
+    if (!Number.isInteger(numericMessageIndex)) {
+        return false;
+    }
+
+    if (stoppedStreamingMessageIndexes.has(numericMessageIndex)) {
+        return true;
+    }
+
     const liveStreamingProcessor = getStreamingTarget(messageIndex);
     if (!liveStreamingProcessor) {
         return false;
     }
 
-    return Boolean(
+    const isStopped = Boolean(
         generationStopRequested ||
         liveStreamingProcessor.isStopped ||
         liveStreamingProcessor.abortController?.signal?.aborted,
     );
+
+    if (isStopped) {
+        stoppedStreamingMessageIndexes.add(numericMessageIndex);
+    }
+
+    return isStopped;
 }
 
 function clearDeferredPostProcessing(messageIndex = null) {
@@ -993,6 +1010,7 @@ function deferPostProcessing(messageIndex, generationType, activationSnapshot = 
         generationType: snapshot.generationType,
         message: chat[numericMessageIndex] ?? null,
         activationSnapshot: snapshot,
+        wasStreamingStopped: wasStreamingMessageStopped(numericMessageIndex),
     });
 
     if (!isGenerationInProgress) {
@@ -1068,14 +1086,14 @@ function scheduleDeferredPostProcessingFlush(delayMs = 0) {
                 continue;
             }
 
+            if (pendingMessage.wasStreamingStopped || wasStreamingMessageStopped(pendingMessage.messageIndex)) {
+                deferredPostProcessingQueue.delete(pendingMessage.messageIndex);
+                continue;
+            }
+
             if (isStreamingMessageStillActive(pendingMessage.messageIndex)) {
                 scheduleDeferredPostProcessingFlush(DEFERRED_POST_PROCESSING_RETRY_MS);
                 return;
-            }
-
-            if (wasStreamingMessageStopped(pendingMessage.messageIndex)) {
-                deferredPostProcessingQueue.delete(pendingMessage.messageIndex);
-                continue;
             }
 
             deferredPostProcessingQueue.delete(pendingMessage.messageIndex);
@@ -1452,6 +1470,10 @@ function queueLatestAssistantPostProcessingFromSnapshot() {
     const message = chat[messageIndex];
     if (!isGenerationAssistantCandidate(messageIndex, message)) {
         return { queued: false, retry: true };
+    }
+
+    if (wasStreamingMessageStopped(messageIndex)) {
+        return { queued: false, retry: false };
     }
 
     const runKey = getPostProcessingRunKey(message, activationSnapshot.generationType, activationSnapshot);
@@ -2831,6 +2853,8 @@ function onGenerationStarted(generationType, _options, dryRun) {
     generationStartedAt = Date.now();
     lastMainGenerationEndedAt = 0;
     postProcessingGenerationRunId++;
+    stoppedGenerationRunId = -1;
+    stoppedStreamingMessageIndexes.clear();
     clearLatestAssistantPostProcessingFallback();
     clearPostGenerationRecoveryCheck();
     clearMissedGenerationEndRecoveryCheck();
@@ -2857,6 +2881,18 @@ function onGenerationStarted(generationType, _options, dryRun) {
 
 function onGenerationEnded() {
     if (internalPromptTransformDepth > 0) {
+        return;
+    }
+
+    if (stoppedGenerationRunId === postProcessingGenerationRunId) {
+        isGenerationInProgress = false;
+        lastMainGenerationEndedAt = Date.now();
+        toolSyncDuringGeneration = false;
+        clearLatestAssistantPostProcessingFallback();
+        clearPostGenerationRecoveryCheck();
+        clearMissedGenerationEndRecoveryCheck();
+        clearDeferredPostProcessing();
+        clearAllPromptTransformRunningToasts();
         return;
     }
 
@@ -2888,6 +2924,11 @@ function onGenerationStopped() {
     }
 
     generationStopRequested = true;
+    stoppedGenerationRunId = postProcessingGenerationRunId;
+    const stoppedMessageIndex = Number(streamingProcessor?.messageId);
+    if (Number.isInteger(stoppedMessageIndex) && stoppedMessageIndex >= 0) {
+        stoppedStreamingMessageIndexes.add(stoppedMessageIndex);
+    }
     isGenerationInProgress = false;
     lastMainGenerationEndedAt = Date.now();
     clearLatestAssistantPostProcessingFallback();
@@ -3203,13 +3244,13 @@ async function onMessageReceived(messageIndex, generationType) {
 
     ensureMessageRegexSnapshot(numericMessageIndex, generationType);
 
-    if (isStreamingMessageStillActive(numericMessageIndex)) {
-        deferPostProcessing(numericMessageIndex, generationType);
+    if (generationStopRequested || wasStreamingMessageStopped(numericMessageIndex)) {
+        clearDeferredPostProcessing(numericMessageIndex);
         return;
     }
 
-    if (wasStreamingMessageStopped(numericMessageIndex)) {
-        clearDeferredPostProcessing(numericMessageIndex);
+    if (isStreamingMessageStillActive(numericMessageIndex)) {
+        deferPostProcessing(numericMessageIndex, generationType);
         return;
     }
 

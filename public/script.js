@@ -5379,8 +5379,12 @@ class StreamingProcessor {
         deactivateSendButtons();
     }
 
-    markUIGenStopped() {
-        unblockGeneration();
+    markUIGenStopped({ emitGenerationEnded = true, emitGenerationStopped = false } = {}) {
+        if (emitGenerationStopped) {
+            eventSource.emit(event_types.GENERATION_STOPPED);
+        }
+
+        unblockGeneration(this.type, { emitGenerationEnded });
     }
 
     async onStartStreaming(text) {
@@ -5618,7 +5622,7 @@ class StreamingProcessor {
         this.isStopped = true;
         this.isFinished = true;
 
-        this.markUIGenStopped();
+        this.markUIGenStopped({ emitGenerationEnded: false, emitGenerationStopped: true });
 
         const noEmitTypes = ['swipe', 'impersonate', 'continue'];
         if (!noEmitTypes.includes(this.type)) {
@@ -7503,7 +7507,8 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             toastr.error(exception.error.message, t`Text generation error`, { timeOut: 10000, extendedTimeOut: 20000 });
         }
 
-        unblockGeneration(type);
+        eventSource.emit(event_types.GENERATION_STOPPED);
+        unblockGeneration(type, { emitGenerationEnded: false });
         console.log(exception);
         streamingProcessor = null;
         throw exception;
