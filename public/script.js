@@ -2016,6 +2016,96 @@ function insertShowMoreFragment(referenceNode, fragment) {
     }
 }
 
+async function renderShowMoreMessagesLegacy({
+    messages,
+    firstId,
+    batchSize,
+    insertionReference,
+    anchor,
+    shouldPreserveScroll,
+}) {
+    const shouldYieldBetweenBatches = batchSize < messages.length;
+
+    for (let offset = 0; offset < messages.length; offset += batchSize) {
+        const fragment = document.createDocumentFragment();
+        const batch = messages.slice(offset, offset + batchSize);
+
+        batch.forEach((message, id) => {
+            const messageElement = updateMessageElement(message, { messageId: firstId + offset + id });
+            if (messageElement[0]) {
+                fragment.appendChild(messageElement[0]);
+            }
+        });
+
+        // Fallback to chatElement if the button isn't where it's expected to be.
+        insertShowMoreFragment(insertionReference, fragment);
+
+        if (shouldPreserveScroll) {
+            restoreVisibleChatMessageAnchor(anchor);
+        }
+
+        if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
+            await waitForNextFrame();
+            if (shouldPreserveScroll) {
+                restoreVisibleChatMessageAnchor(anchor);
+            }
+        }
+    }
+}
+
+async function renderShowMoreMessagesThroughLifecycle({
+    messages,
+    firstId,
+    batchSize,
+    insertionReference,
+    anchor,
+    shouldPreserveScroll,
+}) {
+    const restoreAnchorIfNeeded = () => {
+        if (shouldPreserveScroll) {
+            restoreVisibleChatMessageAnchor(anchor);
+        }
+    };
+
+    await renderMessagesInBatches({
+        messages,
+        firstMessageId: firstId,
+        batchSize,
+        renderMessageElement: (message, messageId) => updateMessageElement(message, { messageId }),
+        insertFragment: fragment => insertShowMoreFragment(insertionReference, fragment),
+        waitForNextFrame: async () => {
+            await waitForNextFrame();
+            restoreAnchorIfNeeded();
+        },
+        afterBatch: restoreAnchorIfNeeded,
+    });
+}
+
+async function renderShowMoreMessages({
+    messages,
+    firstId,
+    insertionReference,
+    anchor,
+    shouldPreserveScroll,
+}) {
+    const batchSize = getMobileChatRenderBatchSize(messages.length);
+    const renderOptions = {
+        messages,
+        firstId,
+        batchSize,
+        insertionReference,
+        anchor,
+        shouldPreserveScroll,
+    };
+
+    if (isChatRenderLifecycleRolloutEnabled()) {
+        await renderShowMoreMessagesThroughLifecycle(renderOptions);
+        return;
+    }
+
+    await renderShowMoreMessagesLegacy(renderOptions);
+}
+
 export async function showMoreMessages(messagesToLoad = null) {
     if (isLoadingMoreMessages) {
         return;
@@ -2040,8 +2130,6 @@ export async function showMoreMessages(messagesToLoad = null) {
 
         const firstId = clamp(messageId - count, 0, Infinity);
         const messages = chat.slice(firstId, messageId);
-        const batchSize = getMobileChatRenderBatchSize(messages.length);
-        const shouldYieldBetweenBatches = batchSize < messages.length;
         const insertionReference = showMoreButtonElement instanceof HTMLElement
             ? showMoreButtonElement.nextSibling
             : chatElement[0]?.firstChild ?? null;
@@ -2052,31 +2140,13 @@ export async function showMoreMessages(messagesToLoad = null) {
             showMoreButtonElement.setAttribute('aria-busy', 'true');
         }
 
-        for (let offset = 0; offset < messages.length; offset += batchSize) {
-            const fragment = document.createDocumentFragment();
-            const batch = messages.slice(offset, offset + batchSize);
-
-            batch.forEach((message, id) => {
-                const messageElement = updateMessageElement(message, { messageId: firstId + offset + id });
-                if (messageElement[0]) {
-                    fragment.appendChild(messageElement[0]);
-                }
-            });
-
-            // Fallback to chatElement if the button isn't where it's expected to be.
-            insertShowMoreFragment(insertionReference, fragment);
-
-            if (shouldPreserveScroll) {
-                restoreVisibleChatMessageAnchor(anchor);
-            }
-
-            if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
-                await waitForNextFrame();
-                if (shouldPreserveScroll) {
-                    restoreVisibleChatMessageAnchor(anchor);
-                }
-            }
-        }
+        await renderShowMoreMessages({
+            messages,
+            firstId,
+            insertionReference,
+            anchor,
+            shouldPreserveScroll,
+        });
 
         refreshSwipeButtons();
 
