@@ -332,13 +332,6 @@ import {
     resolveStopGenerationState,
 } from './scripts/generation-lifecycle/index.js';
 import {
-    TOOLING_UI_HYDRATION_STATUS,
-    buildToolingCaptureFilename,
-    normalizeToolingCaptureRange,
-    resolveLazyToolingLibraryHydration,
-    resolveToolingAssetWait,
-} from './scripts/tooling-ui-hydration/index.js';
-import {
     CARD_SCRIPT_MARKER_TAG,
     buildCardScriptToastKey,
     forgetAllCardScripts,

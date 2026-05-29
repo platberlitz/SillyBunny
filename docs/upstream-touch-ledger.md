@@ -50,19 +50,6 @@ This ledger tracks intentional SillyBunny divergence in upstream-origin files. I
 | Last reviewed | 2026-05-28 generation lifecycle wiring. |
 | Owner | Refactor integrator. |
 
-### `public/script.js` - tooling UI hydration
-| Field | Value |
-| --- | --- |
-| Area | Screenshot/image-gen/tooling UI hydration. |
-| Divergence reason | SillyBunny message screenshots need deterministic range normalization, filename generation, asset wait timing, and lazy `html2canvas` loading without expanding upstream-facing call-site logic. |
-| Target seam | `public/scripts/tooling-ui-hydration/`. |
-| Adapter shape | Keep message screenshot UI and DOM capture in `public/script.js`; delegate capture range, filename, asset wait, and lazy library load decisions to the lifecycle module. |
-| Protecting tests | `tests/tooling-ui-hydration.test.js`, `tests/tooling-ui-hydration-wiring.test.js`, existing export-surface coverage. |
-| Validation | `npm run test:unit --prefix tests -- tooling-ui-hydration.test.js tooling-ui-hydration-wiring.test.js`, `npm run lint --prefix tests -- tooling-ui-hydration.test.js tooling-ui-hydration-wiring.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
-| Rollback path | Revert helper calls in `public/script.js` while leaving screenshot DOM construction and download behavior intact. |
-| Last reviewed | 2026-05-28 tooling UI hydration wiring. |
-| Owner | Refactor integrator. |
-
 ### `public/style.css` - message containment and scroll anchoring
 | Field | Value |
 | --- | --- |
@@ -132,6 +119,7 @@ This ledger tracks intentional SillyBunny divergence in upstream-origin files. I
 | File or area | Add entry when |
 | --- | --- |
 | Core settings modules | Preset/API sync refactor starts. |
+| Screenshot/image-gen UI code | Lazy loading of non-active tooling begins. |
 
 ## Review Checklist
 - Does the upstream-origin file contain only adapter wiring and concise comments?
