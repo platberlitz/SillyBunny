@@ -637,6 +637,7 @@ let scrollLock = false;
 let scrollLockImmunityUntil = 0;
 let mobileChatTouchScrolling = false;
 let mobileChatTouchGestureMoved = false;
+let mobileChatUserScrollLocked = false;
 let mobileChatManualScrollSuppressedUntil = 0;
 let mobileChatBottomPinUntil = 0;
 let mobileStreamingBottomPinFrame = 0;
@@ -1945,6 +1946,8 @@ function markMobileChatManualScroll({ touchActive = false, touchMoved = false, s
 
     if (touchMoved) {
         mobileChatTouchGestureMoved = true;
+        mobileChatUserScrollLocked = true;
+        scrollLock = true;
         clearDeferredMobileStreamingBottomPin();
     }
 
@@ -1989,6 +1992,10 @@ function shouldYieldMobileChatScrollToActiveGesture() {
         return true;
     }
 
+    if (mobileChatUserScrollLocked) {
+        return true;
+    }
+
     return isIOSWebKitPlatform() && isMobileChatManualScrollSuppressionWindowActive();
 }
 
@@ -1997,12 +2004,12 @@ function shouldSuppressMobileChatAutoScroll() {
         return false;
     }
 
-    if (Date.now() < mobileChatBottomPinUntil) {
-        return false;
+    if (mobileChatTouchScrolling || mobileChatUserScrollLocked) {
+        return true;
     }
 
-    if (mobileChatTouchScrolling) {
-        return true;
+    if (Date.now() < mobileChatBottomPinUntil) {
+        return false;
     }
 
     const isManualSuppressionActive = isMobileChatManualScrollSuppressionWindowActive();
@@ -2025,7 +2032,7 @@ function queueDeferredMobileStreamingBottomPin() {
         return false;
     }
 
-    if (mobileChatTouchGestureMoved) {
+    if (mobileChatTouchGestureMoved || mobileChatUserScrollLocked) {
         return false;
     }
 
@@ -2109,7 +2116,7 @@ function requestMobileChatBottomPin({ requireNearBottom = true, durationMs = MOB
 }
 
 function shouldPinMobileChatToBottom() {
-    if (!shouldGuardMobileChatScroll() || isMobileChatManualScrollSuppressionActive()) {
+    if (!shouldGuardMobileChatScroll() || isMobileChatManualScrollSuppressionActive() || mobileChatUserScrollLocked || scrollLock) {
         return false;
     }
 
@@ -2238,6 +2245,7 @@ function scheduleMobileStreamingBottomPin({ isFinal = false } = {}) {
 function resetMobileViewportScrollState() {
     mobileChatTouchScrolling = false;
     mobileChatTouchGestureMoved = false;
+    mobileChatUserScrollLocked = false;
     mobileChatManualScrollSuppressedUntil = 0;
     mobileChatBottomPinUntil = 0;
     clearMobileStreamingBottomPin();
@@ -2435,6 +2443,28 @@ function getMobileMessageUpdateQueue() {
     return mobileMessageUpdateQueue;
 }
 
+function captureMobileStreamingScrollTop() {
+    const element = chatElement[0];
+
+    if (!element || !shouldGuardMobileChatScroll() || !shouldSuppressMobileChatAutoScroll()) {
+        return null;
+    }
+
+    return element.scrollTop;
+}
+
+function restoreMobileStreamingScrollTop(scrollTop) {
+    const element = chatElement[0];
+
+    if (!element || typeof scrollTop !== 'number' || !shouldGuardMobileChatScroll() || !shouldSuppressMobileChatAutoScroll()) {
+        return;
+    }
+
+    if (Math.abs(element.scrollTop - scrollTop) > 0.5) {
+        element.scrollTop = scrollTop;
+    }
+}
+
 function applyStreamingVisibleWrite(messageId, {
     messageTextDom,
     messageTimerDom,
@@ -2449,6 +2479,8 @@ function applyStreamingVisibleWrite(messageId, {
     shouldUseStreamFadeIn,
     bypassFadeIn,
 }, { isFinal = false } = {}) {
+    const preservedMobileScrollTop = captureMobileStreamingScrollTop();
+
     if (shouldRefreshTokenCount && messageTokenCounterDom instanceof HTMLElement) {
         messageTokenCounterDom.textContent = `${currentTokenCount}t`;
     }
@@ -2469,6 +2501,8 @@ function applyStreamingVisibleWrite(messageId, {
         messageTimerDom.textContent = timePassed.timerValue;
         messageTimerDom.title = timePassed.timerTitle;
     }
+
+    restoreMobileStreamingScrollTop(preservedMobileScrollTop);
 
     return isFinal;
 }
@@ -15205,6 +15239,11 @@ jQuery(async function () {
         }
 
         const scrollIsAtBottom = isChatScrolledNearBottom();
+
+        if (scrollIsAtBottom) {
+            mobileChatUserScrollLocked = false;
+            mobileChatTouchGestureMoved = false;
+        }
 
         // Resume autoscroll if the user scrolls to the bottom
         if (scrollLock && scrollIsAtBottom) {

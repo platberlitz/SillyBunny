@@ -397,11 +397,13 @@ describe('chat render lifecycle script wiring', () => {
         expect(scriptSource).toContain('let mobileStreamingBottomPinFrame = 0;');
         expect(scriptSource).toContain('let mobileStreamingBottomPinTimer = 0;');
         expect(scriptSource).toContain('let mobileChatTouchGestureMoved = false;');
+        expect(scriptSource).toContain('let mobileChatUserScrollLocked = false;');
         expect(scriptSource).toContain('let deferredMobileStreamingBottomPin = false;');
         expect(scriptSource).toContain('let deferredMobileStreamingBottomPinTimer = 0;');
         expect(scriptSource).toContain('function shouldYieldMobileChatScrollToActiveGesture()');
         expect(scriptSource).toContain('scheduleDeferredMobileStreamingBottomPinFlush();');
         expect(scriptSource).toContain('markMobileChatManualScroll({ touchMoved: true });');
+        expect(scriptSource).toContain('mobileChatUserScrollLocked = true;');
 
         const requestFrame = findFunctionDeclaration('requestMobileStreamingBottomPinFrame');
         const requestFrameSource = getSource(requestFrame);
@@ -433,11 +435,13 @@ describe('chat render lifecycle script wiring', () => {
         const applyStreamingVisibleWrite = findFunctionDeclaration('applyStreamingVisibleWrite');
         const applySource = getSource(applyStreamingVisibleWrite);
 
+        expect(applySource).toContain('const preservedMobileScrollTop = captureMobileStreamingScrollTop();');
         expect(applySource).toContain('applyStreamFadeIn(messageTextDom, formattedText,');
         expect(applySource).toContain('messageTextDom.innerHTML = formattedText;');
         expect(applySource).toContain('messageTokenCounterDom.textContent = `${currentTokenCount}t`;');
         expect(applySource).toContain('messageTimerDom.textContent = timePassed.timerValue;');
         expect(applySource).toContain('messageTimerDom.title = timePassed.timerTitle;');
+        expect(applySource).toContain('restoreMobileStreamingScrollTop(preservedMobileScrollTop);');
 
         const queueStreamingVisibleWrite = findNode(scriptAst, node => node.type === 'MethodDefinition'
             && node.key?.name === 'queueStreamingVisibleWrite');
@@ -652,6 +656,7 @@ describe('chat render lifecycle script wiring', () => {
 
         expect(resetSource).toContain('mobileChatTouchScrolling = false;');
         expect(resetSource).toContain('mobileChatTouchGestureMoved = false;');
+        expect(resetSource).toContain('mobileChatUserScrollLocked = false;');
         expect(resetSource).toContain('mobileChatManualScrollSuppressedUntil = 0;');
         expect(resetSource).toContain('mobileChatBottomPinUntil = 0;');
     });
