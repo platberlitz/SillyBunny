@@ -1130,6 +1130,74 @@ describe('in-chat agent post-processing runner', () => {
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
     });
 
+    test('refreshes existing regex snapshots when an agent regex changes', async () => {
+        useRegexOnlyAgent();
+
+        const { initAgentRunner, refreshRegexSnapshotsForAgent } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: '[STATUS|ready]',
+            is_user: false,
+            is_system: false,
+            extra: {
+                inChatAgents: {
+                    activeAgentIds: ['agent-regex-only'],
+                    generationType: 'normal',
+                    regexScripts: [{
+                        ...enabledAgents[0].regexScripts[0],
+                        replaceString: '<div class="status old">$1</div>',
+                    }],
+                    edited: false,
+                },
+            },
+        });
+        chat[0].swipes = [chat[0].mes];
+        chat[0].swipe_id = 0;
+        chat[0].swipe_info = [{ extra: structuredClone(chat[0].extra) }];
+
+        enabledAgents[0].regexScripts[0].replaceString = '<div class="status new">$1</div>';
+
+        expect(refreshRegexSnapshotsForAgent('agent-regex-only')).toBe(1);
+
+        expect(chat[0].extra.inChatAgents.regexScripts[0].replaceString).toBe('<div class="status new">$1</div>');
+        expect(chat[0].swipe_info[0].extra.inChatAgents.regexScripts[0].replaceString).toBe('<div class="status new">$1</div>');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        await new Promise(resolve => setTimeout(resolve, 5));
+        expect(saveChat).toHaveBeenCalledTimes(1);
+    });
+
+    test('manual regex-only agent runs snapshot and refresh the target message', async () => {
+        useRegexOnlyAgent();
+
+        const { initAgentRunner, runAgentOnMessage } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: '[STATUS|ready]',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        const result = await runAgentOnMessage('agent-regex-only', 0);
+
+        expect(result.status).toBe('skipped-empty-prompt');
+        expect(chat[0].extra.inChatAgents).toEqual({
+            activeAgentIds: ['agent-regex-only'],
+            generationType: 'normal',
+            regexScripts: enabledAgents[0].regexScripts,
+            edited: false,
+        });
+        expect(saveChatDebounced).toHaveBeenCalled();
+
+        await new Promise(resolve => setTimeout(resolve, 5));
+        expect(saveChat).toHaveBeenCalledTimes(1);
+    });
+
     test('snapshots regex-only agents on streamed tokens before final message events', async () => {
         useRegexOnlyAgent();
 
