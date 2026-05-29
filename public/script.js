@@ -638,6 +638,7 @@ let scrollLockImmunityUntil = 0;
 let mobileChatTouchScrolling = false;
 let mobileChatTouchGestureMoved = false;
 let mobileChatUserScrollLocked = false;
+let mobileChatManualScrollVersion = 0;
 let mobileChatManualScrollSuppressedUntil = 0;
 let mobileChatBottomPinUntil = 0;
 let mobileStreamingBottomPinFrame = 0;
@@ -1945,6 +1946,7 @@ function markMobileChatManualScroll({ touchActive = false, touchMoved = false, s
     }
 
     if (touchMoved) {
+        mobileChatManualScrollVersion += 1;
         mobileChatTouchGestureMoved = true;
         mobileChatUserScrollLocked = true;
         scrollLock = true;
@@ -2246,6 +2248,7 @@ function resetMobileViewportScrollState() {
     mobileChatTouchScrolling = false;
     mobileChatTouchGestureMoved = false;
     mobileChatUserScrollLocked = false;
+    mobileChatManualScrollVersion += 1;
     mobileChatManualScrollSuppressedUntil = 0;
     mobileChatBottomPinUntil = 0;
     clearMobileStreamingBottomPin();
@@ -2443,26 +2446,37 @@ function getMobileMessageUpdateQueue() {
     return mobileMessageUpdateQueue;
 }
 
-function captureMobileStreamingScrollTop() {
-    const element = chatElement[0];
-
-    if (!element || !shouldGuardMobileChatScroll() || !shouldSuppressMobileChatAutoScroll()) {
+function captureMobileStreamingScrollAnchor() {
+    if (!shouldGuardMobileChatScroll() || !shouldSuppressMobileChatAutoScroll()) {
         return null;
     }
 
-    return element.scrollTop;
+    const anchor = captureVisibleChatMessageAnchor();
+    if (!anchor) {
+        return null;
+    }
+
+    return {
+        anchor,
+        version: mobileChatManualScrollVersion,
+    };
 }
 
-function restoreMobileStreamingScrollTop(scrollTop) {
-    const element = chatElement[0];
+function restoreMobileStreamingScrollAnchor(snapshot) {
+    if (!snapshot?.anchor || snapshot.version !== mobileChatManualScrollVersion || !shouldGuardMobileChatScroll() || !shouldSuppressMobileChatAutoScroll()) {
+        return false;
+    }
 
-    if (!element || typeof scrollTop !== 'number' || !shouldGuardMobileChatScroll() || !shouldSuppressMobileChatAutoScroll()) {
+    restoreVisibleChatMessageAnchor(snapshot.anchor);
+    return true;
+}
+
+function settleMobileStreamingScrollAnchor(snapshot) {
+    if (!restoreMobileStreamingScrollAnchor(snapshot)) {
         return;
     }
 
-    if (Math.abs(element.scrollTop - scrollTop) > 0.5) {
-        element.scrollTop = scrollTop;
-    }
+    requestAnimationFrame(() => restoreMobileStreamingScrollAnchor(snapshot));
 }
 
 function applyStreamingVisibleWrite(messageId, {
@@ -2479,7 +2493,7 @@ function applyStreamingVisibleWrite(messageId, {
     shouldUseStreamFadeIn,
     bypassFadeIn,
 }, { isFinal = false } = {}) {
-    const preservedMobileScrollTop = captureMobileStreamingScrollTop();
+    const preservedMobileScrollAnchor = captureMobileStreamingScrollAnchor();
 
     if (shouldRefreshTokenCount && messageTokenCounterDom instanceof HTMLElement) {
         messageTokenCounterDom.textContent = `${currentTokenCount}t`;
@@ -2502,7 +2516,7 @@ function applyStreamingVisibleWrite(messageId, {
         messageTimerDom.title = timePassed.timerTitle;
     }
 
-    restoreMobileStreamingScrollTop(preservedMobileScrollTop);
+    settleMobileStreamingScrollAnchor(preservedMobileScrollAnchor);
 
     return isFinal;
 }
@@ -15231,7 +15245,7 @@ jQuery(async function () {
         }
 
         if (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil) {
-            markMobileChatManualScroll({ touchMoved: mobileChatTouchScrolling });
+            markMobileChatManualScroll({ touchMoved: mobileChatTouchScrolling || isIOSWebKitPlatform() });
         }
 
         if (Date.now() < scrollLockImmunityUntil) {
