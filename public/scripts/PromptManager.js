@@ -15,6 +15,10 @@ import { isMobile } from './RossAscends-mods.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { getPromptDisplayTokenCounts } from './prompt-token-counts.js';
 import { getRenderedMarkerPrompt } from './prompt-manager-marker-preview.js';
+import {
+    resolvePromptManagerRenderState,
+    resolvePromptManagerScrollRestore,
+} from './prompt-manager-lifecycle/index.js';
 
 function debouncePromise(func, delay) {
     let timeoutId;
@@ -1154,14 +1158,17 @@ class PromptManager {
      * @param {number} scrollPosition - The scroll position to set
      */
     #setScrollPosition(scrollPosition) {
-        if (scrollPosition === undefined || scrollPosition === null) return;
+        const restoreState = resolvePromptManagerScrollRestore({ scrollPosition });
+        if (!restoreState.shouldRestore) return;
         const container = document.getElementById(this.configuration.prefix + 'prompt_manager')
             ?.closest('.sb-shell-panel-scroller, .scrollableInner');
         if (!container) return;
-        container.scrollTo(0, scrollPosition);
+        container.scrollTo(0, restoreState.scrollPosition);
         // Defer a second restore to handle the reflow that occurs when renderPromptManager
         // clears innerHTML; the browser may reset scrollTop before content is re-added.
-        requestAnimationFrame(() => container.scrollTo(0, scrollPosition));
+        if (restoreState.shouldRestoreAfterAnimationFrame) {
+            requestAnimationFrame(() => container.scrollTo(0, restoreState.scrollPosition));
+        }
     }
 
     /**
@@ -1170,13 +1177,29 @@ class PromptManager {
      * @param afterTryGenerate - Whether a dry run should be attempted before rendering
      */
     render(afterTryGenerate = true) {
-        if (main_api !== 'openai') return;
-
-        if ('character' === this.configuration.promptOrder.strategy && null === this.activeCharacter) return;
+        const renderState = resolvePromptManagerRenderState({
+            mainApi: main_api,
+            promptOrderStrategy: this.configuration.promptOrder.strategy,
+            hasActiveCharacter: this.activeCharacter !== null,
+            afterTryGenerate,
+            isSendPressed: is_send_press,
+            isGroupGenerating: is_group_generating,
+        });
+        if (!renderState.shouldRender && !renderState.shouldWaitForGeneration) return;
         this.error = null;
 
         waitUntilCondition(() => !is_send_press && !is_group_generating, 1024 * 1024, 100).then(async () => {
-            if (true === afterTryGenerate) {
+            const readyRenderState = resolvePromptManagerRenderState({
+                mainApi: main_api,
+                promptOrderStrategy: this.configuration.promptOrder.strategy,
+                hasActiveCharacter: this.activeCharacter !== null,
+                afterTryGenerate,
+            });
+            if (!readyRenderState.shouldRender) {
+                return;
+            }
+
+            if (readyRenderState.shouldRunDryGenerate) {
                 // Executed during dry-run for determining context composition
                 this.profileStart('filling context');
                 this.tryGenerate().finally(async () => {
