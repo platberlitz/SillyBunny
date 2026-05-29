@@ -383,7 +383,7 @@ describe('chat render lifecycle script wiring', () => {
 
         expect(source).toContain('const shouldUseMobileStreamingPin = !isImpersonate && shouldGuardMobileChatScroll();');
         expect(source).toContain('const mobileStreamingScrollAction = shouldUseMobileStreamingPin ? resolveChatScrollAction({');
-        expect(source).toContain('isTouchActive: mobileChatTouchScrolling');
+        expect(source).toContain('isTouchActive: shouldYieldMobileChatScrollToActiveGesture()');
         expect(source).toContain('const shouldPinMobileBottom = shouldUseMobileStreamingPin && shouldPinMobileChatToBottom();');
         expect(source).toContain('if (mobileStreamingScrollAction?.action === CHAT_SCROLL_ACTION.DEFER_UNTIL_TOUCH_END)');
         expect(source).toContain('queueDeferredMobileStreamingBottomPin();');
@@ -397,12 +397,15 @@ describe('chat render lifecycle script wiring', () => {
         expect(scriptSource).toContain('let mobileStreamingBottomPinFrame = 0;');
         expect(scriptSource).toContain('let mobileStreamingBottomPinTimer = 0;');
         expect(scriptSource).toContain('let deferredMobileStreamingBottomPin = false;');
+        expect(scriptSource).toContain('let deferredMobileStreamingBottomPinTimer = 0;');
+        expect(scriptSource).toContain('function shouldYieldMobileChatScrollToActiveGesture()');
+        expect(scriptSource).toContain('scheduleDeferredMobileStreamingBottomPinFlush();');
 
         const requestFrame = findFunctionDeclaration('requestMobileStreamingBottomPinFrame');
         const requestFrameSource = getSource(requestFrame);
         expect(requestFrameSource).toContain('requestAnimationFrame(() =>');
         expect(requestFrameSource).toContain('const behavior = getMobileStreamingBottomPinBehavior({');
-        expect(requestFrameSource).toContain('if (mobileChatTouchScrolling)');
+        expect(requestFrameSource).toContain('if (shouldYieldMobileChatScrollToActiveGesture())');
         expect(requestFrameSource).toContain('queueDeferredMobileStreamingBottomPin();');
         expect(requestFrameSource).toContain('if (!shouldPinMobileChatToBottom())');
         expect(requestFrameSource).toContain('pinMobileChatToBottom({');
