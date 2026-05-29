@@ -371,6 +371,37 @@ describe('chat render lifecycle script wiring', () => {
         expect(source).toContain('isFinal,');
     });
 
+    test('streaming progress throttles mobile bottom pins through the streaming scheduler', () => {
+        const onProgressStreaming = findNode(scriptAst, node => node.type === 'MethodDefinition'
+            && node.key?.name === 'onProgressStreaming');
+        const source = getSource(onProgressStreaming.value);
+
+        expect(source).toContain('const shouldPinMobileBottom = !isImpersonate && shouldPinMobileChatToBottom();');
+        expect(source).toContain('scheduleMobileStreamingBottomPin({ isFinal });');
+        expect(source).not.toContain('pinMobileChatToBottom({ waitForFrame: true, settle: isFinal });');
+    });
+
+    test('mobile streaming bottom pin scheduling coalesces smooth intermediate pins', () => {
+        expect(scriptSource).toContain('const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = 750;');
+        expect(scriptSource).toContain('let mobileStreamingBottomPinFrame = 0;');
+        expect(scriptSource).toContain('let mobileStreamingBottomPinTimer = 0;');
+
+        const requestFrame = findFunctionDeclaration('requestMobileStreamingBottomPinFrame');
+        const requestFrameSource = getSource(requestFrame);
+        expect(requestFrameSource).toContain('requestAnimationFrame(() =>');
+        expect(requestFrameSource).toContain('const behavior = shouldSettle || !mobileStreamingBottomPinSmooth ? \'auto\' : \'smooth\';');
+        expect(requestFrameSource).toContain('if (!shouldPinMobileChatToBottom())');
+        expect(requestFrameSource).toContain('pinMobileChatToBottom({');
+        expect(requestFrameSource).toContain('waitForFrame: false');
+        expect(requestFrameSource).toContain('behavior,');
+
+        const scheduler = findFunctionDeclaration('scheduleMobileStreamingBottomPin');
+        const schedulerSource = getSource(scheduler);
+        expect(schedulerSource).toContain('clearMobileStreamingBottomPinTimer();');
+        expect(schedulerSource).toContain('elapsed >= MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS');
+        expect(schedulerSource).toContain('mobileStreamingBottomPinTimer = setTimeout(() =>');
+    });
+
     test('guard-on streaming progress delegates visible DOM writes to the lifecycle stream buffer', () => {
         expect(scriptSource).toContain('createStreamWriteBuffer,');
 
@@ -551,7 +582,23 @@ describe('chat render lifecycle script wiring', () => {
 
         const initSource = scriptSource.slice(scriptSource.indexOf('const chatElementScroll = document.getElementById(\'chat\');'));
         expect(initSource).toContain('const markMobileViewportScroll = getMobileViewportScrollHandler();');
+        expect(initSource).toContain('const chatShellElement = document.getElementById(\'sheld\');');
+        expect(initSource).toContain('chatShellElement?.addEventListener(\'wheel\', routeShellWheelToChat, { passive: false });');
         expect(initSource).toContain('setupMobileChatViewportObserver(markMobileViewportScroll);');
+    });
+
+    test('initial chat load keeps bottom pin settling across late layout passes', () => {
+        expect(scriptSource).toContain('const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 24;');
+        expect(scriptSource).toContain('const CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS = Object.freeze([80, 250, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS, 900]);');
+        expect(scriptSource).toContain('history.scrollRestoration = \'manual\';');
+
+        const scrollLoadedChatToBottom = findFunctionDeclaration('scrollLoadedChatToBottom');
+        const source = getSource(scrollLoadedChatToBottom);
+        expect(source).toContain('const latestSettleDelay = Math.max(...CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS);');
+        expect(source).toContain('scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + latestSettleDelay + 50);');
+        expect(source).toContain('requestMobileChatBottomPin({ requireNearBottom: false, durationMs: latestSettleDelay + MOBILE_SEND_SCROLL_SETTLE_MS });');
+        expect(source).toContain('for (const delayMs of CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS)');
+        expect(source).toContain('scrollChatToBottom({ waitForFrame: true, force: true });');
     });
 
     test('mobile viewport lifecycle route preserves existing scroll suppression policy', () => {

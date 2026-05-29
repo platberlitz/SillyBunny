@@ -596,7 +596,9 @@ const MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS = 400;
 const MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS = 1400;
 const MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
 const MOBILE_CHAT_BOTTOM_PIN_MS = 1500;
-const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 8;
+const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = 750;
+const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 24;
+const CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS = Object.freeze([80, 250, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS, 900]);
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 const SHOW_MORE_TOUCH_MOVE_CANCEL_PX = 12;
 const ENTITY_SELECTION_PULSE_CLEANUP_MS = 900;
@@ -628,9 +630,22 @@ let scrollLockImmunityUntil = 0;
 let mobileChatTouchScrolling = false;
 let mobileChatManualScrollSuppressedUntil = 0;
 let mobileChatBottomPinUntil = 0;
+let mobileStreamingBottomPinFrame = 0;
+let mobileStreamingBottomPinTimer = 0;
+let mobileStreamingBottomPinSettle = false;
+let mobileStreamingBottomPinSmooth = false;
+let lastMobileStreamingBottomPinAt = 0;
 export let abortStatusCheck = new AbortController();
 export let charDragDropHandler = null;
 export let chatDragDropHandler = null;
+
+try {
+    if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+    }
+} catch {
+    // Ignore browsers that deny access to history state during early startup.
+}
 
 /** @type {debounce_timeout} The debounce timeout used for chat/settings save. debounce_timeout.long: 1.000 ms */
 export const DEFAULT_SAVE_EDIT_TIMEOUT = debounce_timeout.relaxed;
@@ -1855,6 +1870,7 @@ function markMobileChatManualScroll({ touchActive = false, suppressMs = MOBILE_C
     }
 
     mobileChatBottomPinUntil = 0;
+    clearMobileStreamingBottomPin();
 
     if (touchActive) {
         mobileChatTouchScrolling = true;
@@ -1911,7 +1927,7 @@ function shouldPinMobileChatToBottom() {
     return Date.now() < mobileChatBottomPinUntil || isChatScrolledNearBottom();
 }
 
-function pinMobileChatToBottom({ waitForFrame = true, settle = false } = {}) {
+function pinMobileChatToBottom({ waitForFrame = true, settle = false, immediate = true, behavior = 'auto' } = {}) {
     if (!shouldGuardMobileChatScroll()) {
         return;
     }
@@ -1922,13 +1938,12 @@ function pinMobileChatToBottom({ waitForFrame = true, settle = false } = {}) {
     scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
 
     const pin = () => {
-        const element = chatElement[0];
-        if (element) {
-            element.scrollTop = element.scrollHeight;
-        }
+        scrollChatElementToBottom({ behavior });
     };
 
-    pin();
+    if (immediate) {
+        pin();
+    }
 
     if (waitForFrame) {
         requestAnimationFrame(pin);
@@ -1943,10 +1958,87 @@ function pinMobileChatToBottom({ waitForFrame = true, settle = false } = {}) {
     }
 }
 
+function clearMobileStreamingBottomPinTimer() {
+    if (mobileStreamingBottomPinTimer) {
+        clearTimeout(mobileStreamingBottomPinTimer);
+        mobileStreamingBottomPinTimer = 0;
+    }
+}
+
+function clearMobileStreamingBottomPin() {
+    clearMobileStreamingBottomPinTimer();
+
+    if (mobileStreamingBottomPinFrame) {
+        cancelAnimationFrame(mobileStreamingBottomPinFrame);
+        mobileStreamingBottomPinFrame = 0;
+    }
+
+    mobileStreamingBottomPinSettle = false;
+    mobileStreamingBottomPinSmooth = false;
+}
+
+function requestMobileStreamingBottomPinFrame({ isFinal = false } = {}) {
+    mobileStreamingBottomPinSettle = mobileStreamingBottomPinSettle || isFinal;
+    mobileStreamingBottomPinSmooth = mobileStreamingBottomPinSmooth || !isFinal;
+
+    if (mobileStreamingBottomPinFrame) {
+        return;
+    }
+
+    mobileStreamingBottomPinFrame = requestAnimationFrame(() => {
+        mobileStreamingBottomPinFrame = 0;
+        const shouldSettle = mobileStreamingBottomPinSettle;
+        const behavior = shouldSettle || !mobileStreamingBottomPinSmooth ? 'auto' : 'smooth';
+        mobileStreamingBottomPinSettle = false;
+        mobileStreamingBottomPinSmooth = false;
+
+        if (!shouldPinMobileChatToBottom()) {
+            return;
+        }
+
+        lastMobileStreamingBottomPinAt = Date.now();
+        pinMobileChatToBottom({
+            waitForFrame: false,
+            settle: shouldSettle,
+            behavior,
+        });
+    });
+}
+
+function scheduleMobileStreamingBottomPin({ isFinal = false } = {}) {
+    if (!shouldGuardMobileChatScroll()) {
+        return false;
+    }
+
+    if (isFinal) {
+        clearMobileStreamingBottomPinTimer();
+        requestMobileStreamingBottomPinFrame({ isFinal: true });
+        return true;
+    }
+
+    const now = Date.now();
+    const elapsed = now - lastMobileStreamingBottomPinAt;
+
+    if (elapsed >= MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS) {
+        requestMobileStreamingBottomPinFrame();
+        return true;
+    }
+
+    if (!mobileStreamingBottomPinTimer) {
+        mobileStreamingBottomPinTimer = setTimeout(() => {
+            mobileStreamingBottomPinTimer = 0;
+            requestMobileStreamingBottomPinFrame();
+        }, MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS - elapsed);
+    }
+
+    return false;
+}
+
 function resetMobileViewportScrollState() {
     mobileChatTouchScrolling = false;
     mobileChatManualScrollSuppressedUntil = 0;
     mobileChatBottomPinUntil = 0;
+    clearMobileStreamingBottomPin();
 }
 
 function getMobileViewportScrollHandler() {
@@ -1955,6 +2047,80 @@ function getMobileViewportScrollHandler() {
             markMobileChatManualScroll({ suppressMs: MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS });
         }
     };
+}
+
+function isVerticallyScrollableElement(element) {
+    if (!(element instanceof HTMLElement)) {
+        return false;
+    }
+
+    const style = getComputedStyle(element);
+    const canScrollY = style.overflowY === 'auto' || style.overflowY === 'scroll' || style.overflowY === 'overlay';
+
+    return canScrollY && element.scrollHeight - element.clientHeight > 1;
+}
+
+function hasScrollableWheelTarget(target, boundaryElement) {
+    if (!(target instanceof Element)) {
+        return false;
+    }
+
+    const chatNode = chatElement[0];
+
+    for (let element = target; element && element !== boundaryElement; element = element.parentElement) {
+        if (element === chatNode || isVerticallyScrollableElement(element)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function getWheelDeltaYPixels(event, scrollElement) {
+    if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+        return event.deltaY * scrollElement.clientHeight;
+    }
+
+    if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+        return event.deltaY * 16;
+    }
+
+    return event.deltaY;
+}
+
+function routeShellWheelToChat(event) {
+    const chatNode = chatElement[0];
+
+    if (!(chatNode instanceof HTMLElement) || event.defaultPrevented || event.ctrlKey || event.metaKey) {
+        return;
+    }
+
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
+        return;
+    }
+
+    if (event.target instanceof Node && chatNode.contains(event.target)) {
+        return;
+    }
+
+    if (hasScrollableWheelTarget(event.target, event.currentTarget)) {
+        return;
+    }
+
+    const maxScrollTop = Math.max(0, chatNode.scrollHeight - chatNode.clientHeight);
+    if (maxScrollTop <= 0) {
+        return;
+    }
+
+    const currentScrollTop = chatNode.scrollTop;
+    const nextScrollTop = clamp(currentScrollTop + getWheelDeltaYPixels(event, chatNode), 0, maxScrollTop);
+
+    if (Math.abs(nextScrollTop - currentScrollTop) < 1) {
+        return;
+    }
+
+    chatNode.scrollTop = nextScrollTop;
+    event.preventDefault();
 }
 
 function disposeMobileChatViewportObserver() {
@@ -2568,13 +2734,26 @@ function scrollLoadedChatToBottomThroughLifecycle() {
 
 function scrollLoadedChatToBottom() {
     // SillyBunny: previous-chat taps can leave the mobile manual-scroll guard active.
+    const latestSettleDelay = Math.max(...CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS);
+    scrollLock = false;
+    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + latestSettleDelay + 50);
+
+    if (shouldGuardMobileChatScroll()) {
+        mobileChatManualScrollSuppressedUntil = 0;
+        requestMobileChatBottomPin({ requireNearBottom: false, durationMs: latestSettleDelay + MOBILE_SEND_SCROLL_SETTLE_MS });
+    }
+
     scrollChatToBottom({ force: true });
     scrollChatToBottom({ waitForFrame: true, force: true });
 
-    if (shouldGuardMobileChatScroll()) {
+    for (const delayMs of CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS) {
         setTimeout(() => {
+            if (Date.now() >= scrollLockImmunityUntil) {
+                return;
+            }
+
             scrollChatToBottom({ waitForFrame: true, force: true });
-        }, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS);
+        }, delayMs);
     }
 }
 
@@ -4191,7 +4370,7 @@ function formatGenerationTimer(gen_started, gen_finished, tokenCount, reasoningD
 
 let requestId = null;
 
-function scrollChatElementToBottom() {
+function scrollChatElementToBottom({ behavior = 'auto' } = {}) {
     let position = chatElement[0].scrollHeight;
 
     if (power_user.waifuMode) {
@@ -4200,6 +4379,12 @@ function scrollChatElementToBottom() {
             const lastMessagePosition = lastMessage.position().top;
             position = chatElement.scrollTop() + lastMessagePosition;
         }
+    }
+
+    const element = chatElement[0];
+    if (behavior === 'smooth' && typeof element?.scrollTo === 'function') {
+        element.scrollTo({ top: position, behavior });
+        return;
     }
 
     chatElement.scrollTop(position);
@@ -5271,7 +5456,7 @@ class StreamingProcessor {
         }
 
         if (shouldPinMobileBottom) {
-            pinMobileChatToBottom({ waitForFrame: true, settle: isFinal });
+            scheduleMobileStreamingBottomPin({ isFinal });
         } else if (!scrollLock) {
             scrollChatToBottom({ waitForFrame: true });
         }
@@ -14727,6 +14912,7 @@ jQuery(async function () {
     }
 
     const chatElementScroll = document.getElementById('chat');
+    const chatShellElement = document.getElementById('sheld');
     const markMobileChatTouchScrollStart = () => markMobileChatManualScroll({ touchActive: true });
     const markMobileChatTouchScrollMove = () => markMobileChatManualScroll();
     const markMobileChatWheelScroll = () => markMobileChatManualScroll();
@@ -14737,6 +14923,7 @@ jQuery(async function () {
     chatElementScroll.addEventListener('touchend', releaseMobileChatTouchScroll, { passive: true });
     chatElementScroll.addEventListener('touchcancel', releaseMobileChatTouchScroll, { passive: true });
     chatElementScroll.addEventListener('wheel', markMobileChatWheelScroll, { passive: true });
+    chatShellElement?.addEventListener('wheel', routeShellWheelToChat, { passive: false });
     setupMobileChatViewportObserver(markMobileViewportScroll);
 
     const chatScrollHandler = function () {
@@ -14755,7 +14942,7 @@ jQuery(async function () {
             return;
         }
 
-        const scrollIsAtBottom = isChatScrolledNearBottom(5);
+        const scrollIsAtBottom = isChatScrolledNearBottom();
 
         // Resume autoscroll if the user scrolls to the bottom
         if (scrollLock && scrollIsAtBottom) {
