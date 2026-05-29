@@ -2010,6 +2010,26 @@ function updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessag
     queue.flush();
 }
 
+function scrollStartedStreamingMessageThroughLifecycle() {
+    if (!isChatRenderLifecycleRolloutEnabled()) {
+        scrollChatToBottom({ waitForFrame: true });
+        return;
+    }
+
+    const action = resolveChatScrollAction({
+        intent: CHAT_SCROLL_INTENT.STREAM_PROGRESS,
+        autoScrollEnabled: power_user.auto_scroll_chat_to_bottom,
+        isNearBottom: isChatScrolledNearBottom(),
+        isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll(),
+    });
+
+    if (shouldApplyChatBottomScrollAction(action)) {
+        requestAnimationFrame(() => {
+            scrollChatElementToBottom();
+        });
+    }
+}
+
 function flushPendingMobileMessageUpdates() {
     pendingMobileMessageUpdateFrame = 0;
     pendingMobileMessageUpdateTimer = 0;
@@ -4787,7 +4807,7 @@ class StreamingProcessor {
         hideSwipeButtons({ hideCounters: true });
         scrollLock = false;
         scrollLockImmunityUntil = Date.now() + 500;
-        scrollChatToBottom({ waitForFrame: true });
+        scrollStartedStreamingMessageThroughLifecycle();
         return messageId;
     }
 

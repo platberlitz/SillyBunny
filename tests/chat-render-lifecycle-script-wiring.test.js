@@ -317,4 +317,31 @@ describe('chat render lifecycle script wiring', () => {
         expect(queueSource).toContain('pendingMobileMessageUpdateTimer = window.setTimeout(() =>');
         expect(queueSource).toContain('pendingMobileMessageUpdateFrame = requestAnimationFrame(flushPendingMobileMessageUpdates);');
     });
+
+    test('streaming start keeps viewport routing behind the lifecycle rollout guard', () => {
+        const onStartStreaming = findNode(scriptAst, node => node.type === 'MethodDefinition'
+            && node.key?.name === 'onStartStreaming');
+        const source = getSource(onStartStreaming.value);
+
+        expect(source).toContain('hideSwipeButtons({ hideCounters: true });');
+        expect(source).toContain('scrollLock = false;');
+        expect(source).toContain('scrollLockImmunityUntil = Date.now() + 500;');
+        expect(source).toContain('scrollStartedStreamingMessageThroughLifecycle();');
+        expect(source).not.toContain('scrollChatToBottom({ waitForFrame: true });');
+    });
+
+    test('guard-on streaming start resolves viewport intent through lifecycle scroll rules', () => {
+        const scrollStartedStreamingMessageThroughLifecycle = findFunctionDeclaration('scrollStartedStreamingMessageThroughLifecycle');
+        const source = getSource(scrollStartedStreamingMessageThroughLifecycle);
+
+        expect(source).toContain('if (!isChatRenderLifecycleRolloutEnabled())');
+        expect(source).toContain('scrollChatToBottom({ waitForFrame: true });');
+        expect(source).toContain('resolveChatScrollAction({');
+        expect(source).toContain('intent: CHAT_SCROLL_INTENT.STREAM_PROGRESS');
+        expect(source).toContain('autoScrollEnabled: power_user.auto_scroll_chat_to_bottom');
+        expect(source).toContain('isNearBottom: isChatScrolledNearBottom()');
+        expect(source).toContain('isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll()');
+        expect(source).toContain('shouldApplyChatBottomScrollAction(action)');
+        expect(source).toContain('scrollChatElementToBottom();');
+    });
 });
