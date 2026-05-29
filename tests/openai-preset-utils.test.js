@@ -2,7 +2,9 @@ import { describe, expect, test } from '@jest/globals';
 import {
     buildChatCompletionPreset,
     buildChatCompletionPresetForSave,
+    buildReverseProxyPresetForSave,
     getChatCompletionConnectionPresetKeys,
+    normalizeReverseProxyPreset,
     shouldIncludeConnectionFieldsInPreset,
 } from '../public/scripts/openai-preset-utils.js';
 
@@ -108,6 +110,61 @@ describe('Chat Completion preset utilities', () => {
             assistant_prefill: '',
             custom_url: 'http://127.0.0.1:8080/v1',
             prompts: [{ identifier: 'main', content: 'Prompt after edit' }],
+        });
+    });
+
+    test('normalizes legacy reverse proxy presets without source bindings', () => {
+        expect(normalizeReverseProxyPreset({
+            name: 'Legacy proxy',
+            url: 'https://proxy.example/v1',
+            password: 'secret',
+        }, { supportedSources: ['makersuite'] })).toEqual({
+            name: 'Legacy proxy',
+            url: 'https://proxy.example/v1',
+            password: 'secret',
+            source: '',
+        });
+    });
+
+    test('saves supported reverse proxy source bindings', () => {
+        expect(buildReverseProxyPresetForSave({
+            name: 'Gemini proxy',
+            url: 'https://proxy.example/google',
+            password: 'secret',
+            source: 'makersuite',
+        }, { supportedSources: ['openai', 'makersuite'] })).toEqual({
+            name: 'Gemini proxy',
+            url: 'https://proxy.example/google',
+            password: 'secret',
+            source: 'makersuite',
+        });
+    });
+
+    test('ignores unsupported reverse proxy source bindings', () => {
+        expect(buildReverseProxyPresetForSave({
+            name: 'Unsupported proxy',
+            url: 'https://proxy.example/v1',
+            password: '',
+            source: 'custom',
+        }, { supportedSources: ['openai', 'makersuite'] })).toEqual({
+            name: 'Unsupported proxy',
+            url: 'https://proxy.example/v1',
+            password: '',
+            source: '',
+        });
+    });
+
+    test('does not source-bind the None reverse proxy preset', () => {
+        expect(buildReverseProxyPresetForSave({
+            name: 'None',
+            url: '',
+            password: '',
+            source: 'makersuite',
+        }, { supportedSources: ['makersuite'] })).toEqual({
+            name: 'None',
+            url: '',
+            password: '',
+            source: '',
         });
     });
 });
