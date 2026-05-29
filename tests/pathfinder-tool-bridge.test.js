@@ -4,6 +4,10 @@ import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globa
 
 let mockSettings;
 
+await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/agent-store.js', () => ({
+    isPathfinderSubmoduleEnabled: jest.fn(() => true),
+}));
+
 await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/tree-store.js', () => ({
     getSettings: jest.fn(() => mockSettings),
     getTree: jest.fn(() => null),
