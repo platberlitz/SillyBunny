@@ -263,4 +263,32 @@ describe('chat render lifecycle script wiring', () => {
             name: 'messageElement',
         }));
     });
+
+    test('updateMessageBlock keeps lifecycle update routing behind the rollout guard', () => {
+        const updateMessageBlock = findExportedFunction('updateMessageBlock');
+        const source = getSource(updateMessageBlock);
+
+        expect(source).toContain('if (shouldDeferMobileMessageUpdates())');
+        expect(source).toContain('queueMobileMessageBlockUpdate(messageId, message, { rerenderMessage });');
+        expect(source).toContain('if (isChatRenderLifecycleRolloutEnabled())');
+        expect(source).toContain('updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessage });');
+        expect(source).toContain('applyMessageBlockUpdate(messageId, message, { rerenderMessage });');
+    });
+
+    test('guard-on updateMessageBlock delegates queue mechanics to the lifecycle update queue helper', () => {
+        expect(scriptSource).toContain('createMessageUpdateQueue,');
+
+        const getMessageUpdateQueue = findFunctionDeclaration('getMessageUpdateQueue');
+        const getQueueSource = getSource(getMessageUpdateQueue);
+
+        expect(getQueueSource).toContain('createMessageUpdateQueue({');
+        expect(getQueueSource).toContain('applyUpdate: applyMessageBlockUpdate');
+
+        const updateMessageBlockThroughLifecycle = findFunctionDeclaration('updateMessageBlockThroughLifecycle');
+        const lifecycleSource = getSource(updateMessageBlockThroughLifecycle);
+
+        expect(lifecycleSource).toContain('const queue = getMessageUpdateQueue();');
+        expect(lifecycleSource).toContain('queue.queue(messageId, message, { rerenderMessage });');
+        expect(lifecycleSource).toContain('queue.flush();');
+    });
 });
