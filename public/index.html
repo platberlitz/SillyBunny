@@ -5275,10 +5275,6 @@
                                     <input id="compact_input_area" type="checkbox" />
                                     <small data-i18n="Compact Input Area (Mobile)">Compact Input Area</small><i class="fa-solid fa-mobile-screen-button"></i>
                                 </label>
-                                <label for="vertical_chat_layout" class="checkbox_label" title="Use a taller mobile-style chat composer on desktop and tablet widths. No effect on phone-size layouts.">
-                                    <input id="vertical_chat_layout" type="checkbox" />
-                                    <small>Vertical Chat Layout</small><i class="fa-solid fa-desktop"></i><i class="fa-solid fa-tablet-screen-button"></i>
-                                </label>
                                 <label for="show_swipe_num_all_messages" class="checkbox_label" title="Display swipe numbers for all messages, not just the last." data-i18n="[title]Display swipe numbers for all messages, not just the last.">
                                     <input id="show_swipe_num_all_messages" type="checkbox" />
                                     <small data-i18n="Swipe # for All Messages">Swipe # for All Messages</small>
@@ -5721,7 +5717,16 @@
                                 </div>
                             </div>
                             </div>
-                            <div class="inline-drawer wide100p flexFlowColumn sb-settings-subdrawer" id="MobileSection">
+                            <div class="inline-drawer wide100p flexFlowColumn sb-settings-subdrawer sb-desktop-setting" id="DesktopSection">
+                                <div class="inline-drawer-toggle inline-drawer-header userSettingsInnerExpandable">
+                                    <b><i class="fa-solid fa-desktop"></i> <span data-i18n="Desktop">Desktop</span></b>
+                                    <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
+                                </div>
+                                <div class="inline-drawer-content flex-container flexFlowColumn sb-settings-subdrawer-body" style="display:none">
+                                    <div id="sb-desktop-settings-outlet" class="flex-container flexFlowColumn"></div>
+                                </div>
+                            </div>
+                            <div class="inline-drawer wide100p flexFlowColumn sb-settings-subdrawer sb-mobile-setting" id="MobileSection">
                                 <div class="inline-drawer-toggle inline-drawer-header userSettingsInnerExpandable">
                                     <b><i class="fa-solid fa-mobile-screen-button"></i> <span data-i18n="Mobile">Mobile</span></b>
                                     <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>

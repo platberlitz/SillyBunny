@@ -29,7 +29,15 @@ const SB_STORAGE_KEYS = Object.freeze({
     shortcutRight: 'sb-shortcut-right',
     bottomBarScale: 'sb-bottom-bar-scale',
     bottomChatSecondaryOpen: 'sb-bottom-chat-secondary-open',
+    desktopButtonScale: 'sb-desktop-button-scale',
     mobileButtonScale: 'sb-mobile-button-scale',
+    desktopNavLayout: 'sb-desktop-nav-layout',
+    desktopNavIconOnly: 'sb-desktop-nav-icon-only',
+    desktopNavShowCustomize: 'sb-desktop-nav-show-customize',
+    desktopNavShowQuickActions: 'sb-desktop-nav-show-quick-actions',
+    desktopNavReplaceQuickActions: 'sb-desktop-nav-replace-quick-actions',
+    desktopNavReplacementTarget: 'sb-desktop-nav-replacement-target',
+    desktopQuickActions: 'sb-desktop-quick-actions-v2',
     mobileNavLayout: 'sb-mobile-nav-layout',
     mobileNavIconOnly: 'sb-mobile-nav-icon-only',
     mobileNavShowCustomize: 'sb-mobile-nav-show-customize',
@@ -594,6 +602,9 @@ const SB_MOBILE_DEFAULT_QUICK_ACTIONS = Object.freeze([
     { type: 'tab', shellKey: 'characters', tabId: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
     { type: 'tab', shellKey: 'left', tabId: 'agents', icon: 'fa-robot', label: 'Agents' },
 ]);
+const SB_DESKTOP_DEFAULT_QUICK_ACTIONS = Object.freeze([
+    { type: 'tab', shellKey: 'characters', tabId: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
+]);
 const SB_MOBILE_RAIL_CUSTOMIZE_ACTIONS = Object.freeze([
     { type: 'tab', shellKey: 'left', tabId: 'presets', icon: 'fa-sliders', label: 'Presets' },
     { type: 'tab', shellKey: 'left', tabId: 'api', icon: 'fa-plug', label: 'API' },
@@ -634,6 +645,7 @@ const sbState = {
     surfaceTransparency: normalizeSurfaceTransparency(safeGetItem(SB_STORAGE_KEYS.surfaceTransparency)),
     compactMode: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), false),
     bottomBarScale: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.bottomBarScale)),
+    desktopButtonScale: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.desktopButtonScale)),
     mobileButtonScale: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.mobileButtonScale)),
     topbarScale: {
         desktop: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.topbarScaleDesktop)),
@@ -694,6 +706,15 @@ const sbState = {
         replaceQuickActions: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavReplaceQuickActions), false),
         replacementTarget: normalizeMobileNavReplacementTarget(safeGetItem(SB_STORAGE_KEYS.mobileNavReplacementTarget)),
     },
+    desktopNav: {
+        layout: normalizeMobileNavLayout(safeGetItem(SB_STORAGE_KEYS.desktopNavLayout)),
+        iconOnly: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavIconOnly), true),
+        showCustomize: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavShowCustomize), true),
+        showQuickActions: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavShowQuickActions), false),
+        replaceQuickActions: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavReplaceQuickActions), false),
+        replacementTarget: normalizeMobileNavReplacementTarget(safeGetItem(SB_STORAGE_KEYS.desktopNavReplacementTarget)),
+    },
+    desktopQuickActions: [],
     mobileQuickActions: [],
     chatbar: {
         desktop: null,
@@ -865,8 +886,20 @@ function normalizeMobileNavLayout(value) {
     return SB_MOBILE_NAV_LAYOUTS.includes(normalizedValue) ? normalizedValue : 'vertical';
 }
 
-function getMobileNavCustomizeLocationLabel() {
-    return sbState.mobileNav.layout === 'horizontal'
+function getNavState(mode) {
+    return mode === 'desktop' ? sbState.desktopNav : sbState.mobileNav;
+}
+
+function getQuickActionState(mode) {
+    return mode === 'desktop' ? sbState.desktopQuickActions : sbState.mobileQuickActions;
+}
+
+function getActiveShellRailMode() {
+    return isMobileViewport() ? 'mobile' : 'desktop';
+}
+
+function getMobileNavCustomizeLocationLabel(mode = 'mobile') {
+    return getNavState(mode).layout === 'horizontal'
         ? 'Show Workspace and Customize buttons in top bar'
         : 'Show Workspace and Customize buttons in side rail';
 }
@@ -882,6 +915,17 @@ function getMobileNavReplacementTargetConfig(target = sbState.mobileNav.replacem
     const normalizedTarget = normalizeMobileNavReplacementTarget(target);
     return SB_MOBILE_NAV_PAGE_TARGETS.find(item => item.value === normalizedTarget)
         ?? SB_MOBILE_NAV_PAGE_TARGETS[0];
+}
+
+function createNavReplacementQuickAction(target) {
+    const config = getMobileNavReplacementTargetConfig(target);
+    return normalizeMobileQuickAction({
+        type: 'tab',
+        shellKey: config.shellKey,
+        tabId: config.tabId,
+        icon: config.icon,
+        label: config.label,
+    });
 }
 
 function normalizeShellSize(value) {
@@ -1070,6 +1114,10 @@ function getDefaultMobileQuickActions() {
     return normalizeMobileQuickActionList(SB_MOBILE_DEFAULT_QUICK_ACTIONS);
 }
 
+function getDefaultDesktopQuickActions() {
+    return normalizeMobileQuickActionList(SB_DESKTOP_DEFAULT_QUICK_ACTIONS);
+}
+
 function migrateLegacyMobileQuickAction(action) {
     if (!action || typeof action !== 'object') {
         return action;
@@ -1123,8 +1171,23 @@ function loadMobileQuickActions() {
     return nextActions;
 }
 
+function loadDesktopQuickActions() {
+    const storedActions = parseMobileQuickActionStorage(safeGetItem(SB_STORAGE_KEYS.desktopQuickActions));
+    if (storedActions) {
+        return storedActions;
+    }
+
+    const nextActions = getDefaultDesktopQuickActions();
+    safeSetItem(SB_STORAGE_KEYS.desktopQuickActions, JSON.stringify(nextActions));
+    return nextActions;
+}
+
 function saveMobileQuickActions() {
     safeSetItem(SB_STORAGE_KEYS.mobileQuickActions, JSON.stringify(sbState.mobileQuickActions));
+}
+
+function saveDesktopQuickActions() {
+    safeSetItem(SB_STORAGE_KEYS.desktopQuickActions, JSON.stringify(sbState.desktopQuickActions));
 }
 
 function getMobileQuickActionKey(action) {
@@ -1156,44 +1219,68 @@ function createMobileQuickActionFromMatch(match) {
     return normalizedMatch;
 }
 
-function setMobileQuickActions(actions, { persist = true } = {}) {
-    sbState.mobileQuickActions = normalizeMobileQuickActionList(actions);
+function setQuickActionsForMode(mode, actions, { persist = true } = {}) {
+    const normalizedActions = normalizeMobileQuickActionList(actions);
+
+    if (mode === 'desktop') {
+        sbState.desktopQuickActions = normalizedActions;
+
+        if (persist) {
+            saveDesktopQuickActions();
+        }
+
+        renderMobileQuickActionSettingsList('desktop');
+        refreshMobileQuickActionSearchResults('desktop');
+        syncMobileShellRailActions();
+        return;
+    }
+
+    sbState.mobileQuickActions = normalizedActions;
 
     if (persist) {
         saveMobileQuickActions();
     }
 
-    renderMobileQuickActionSettingsList();
-    refreshMobileQuickActionSearchResults();
+    renderMobileQuickActionSettingsList('mobile');
+    refreshMobileQuickActionSearchResults('mobile');
     refreshMobileNavQuickActions();
     syncMobileShellRailActions();
 }
 
-function addMobileQuickActionFromMatch(match) {
+function setMobileQuickActions(actions, options = {}) {
+    setQuickActionsForMode('mobile', actions, options);
+}
+
+function setDesktopQuickActions(actions, options = {}) {
+    setQuickActionsForMode('desktop', actions, options);
+}
+
+function addQuickActionFromMatch(mode, match) {
     const action = createMobileQuickActionFromMatch(match);
     if (!action) {
         return false;
     }
 
-    if (sbState.mobileQuickActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT) {
+    const currentActions = getQuickActionState(mode);
+    if (currentActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT) {
         return false;
     }
 
     const actionKey = getMobileQuickActionKey(action);
-    if (sbState.mobileQuickActions.some(existingAction => getMobileQuickActionKey(existingAction) === actionKey)) {
+    if (currentActions.some(existingAction => getMobileQuickActionKey(existingAction) === actionKey)) {
         return false;
     }
 
-    setMobileQuickActions([...sbState.mobileQuickActions, action]);
+    setQuickActionsForMode(mode, [...currentActions, action]);
     return true;
 }
 
-function removeMobileQuickAction(actionKey) {
-    setMobileQuickActions(sbState.mobileQuickActions.filter(action => getMobileQuickActionKey(action) !== actionKey));
+function removeQuickAction(mode, actionKey) {
+    setQuickActionsForMode(mode, getQuickActionState(mode).filter(action => getMobileQuickActionKey(action) !== actionKey));
 }
 
-function setMobileQuickActionIcon(actionKey, iconClass) {
-    setMobileQuickActions(sbState.mobileQuickActions.map(action => {
+function setQuickActionIcon(mode, actionKey, iconClass) {
+    setQuickActionsForMode(mode, getQuickActionState(mode).map(action => {
         if (getMobileQuickActionKey(action) !== actionKey) {
             return action;
         }
@@ -1205,8 +1292,8 @@ function setMobileQuickActionIcon(actionKey, iconClass) {
     }));
 }
 
-async function chooseMobileQuickActionIcon(actionKey) {
-    const action = sbState.mobileQuickActions.find(action => getMobileQuickActionKey(action) === actionKey);
+async function chooseQuickActionIcon(mode, actionKey) {
+    const action = getQuickActionState(mode).find(action => getMobileQuickActionKey(action) === actionKey);
     const normalizedAction = normalizeMobileQuickAction(action);
 
     if (!normalizedAction || normalizedAction.type !== 'custom') {
@@ -1218,11 +1305,15 @@ async function chooseMobileQuickActionIcon(actionKey) {
         return;
     }
 
-    setMobileQuickActionIcon(actionKey, iconClass);
+    setQuickActionIcon(mode, actionKey, iconClass);
 }
 
 function resetMobileQuickActions() {
     setMobileQuickActions(getDefaultMobileQuickActions());
+}
+
+function resetDesktopQuickActions() {
+    setDesktopQuickActions(getDefaultDesktopQuickActions());
 }
 
 function normalizeTopbarScale(value) {
@@ -1257,6 +1348,10 @@ function seedTopbarScaleDefaults() {
         safeSetItem(SB_STORAGE_KEYS.bottomBarScale, String(SB_TOPBAR_SCALE.defaultValue));
     }
 
+    if (safeGetItem(SB_STORAGE_KEYS.desktopButtonScale) === null) {
+        safeSetItem(SB_STORAGE_KEYS.desktopButtonScale, String(SB_TOPBAR_SCALE.defaultValue));
+    }
+
     if (safeGetItem(SB_STORAGE_KEYS.mobileButtonScale) === null) {
         safeSetItem(SB_STORAGE_KEYS.mobileButtonScale, String(SB_TOPBAR_SCALE.defaultValue));
     }
@@ -1266,6 +1361,7 @@ function restorePersistedTopbarState() {
     sbState.topbarScale.desktop = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.topbarScaleDesktop));
     sbState.topbarScale.mobile = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.topbarScaleMobile));
     sbState.bottomBarScale = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.bottomBarScale));
+    sbState.desktopButtonScale = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.desktopButtonScale));
     sbState.mobileButtonScale = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.mobileButtonScale));
     sbState.frontendIcon = normalizeFrontendIcon(safeGetItem(SB_STORAGE_KEYS.frontendIcon));
     sbState.topbarLabel.desktopParts = safeGetItem(SB_STORAGE_KEYS.topbarLabelDesktopParts) === null
@@ -1284,6 +1380,13 @@ function restorePersistedTopbarState() {
     sbState.mobileNav.showQuickActions = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowQuickActions), sbState.mobileNav.showQuickActions);
     sbState.mobileNav.replaceQuickActions = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavReplaceQuickActions), sbState.mobileNav.replaceQuickActions);
     sbState.mobileNav.replacementTarget = normalizeMobileNavReplacementTarget(safeGetItem(SB_STORAGE_KEYS.mobileNavReplacementTarget));
+    sbState.desktopNav.layout = normalizeMobileNavLayout(safeGetItem(SB_STORAGE_KEYS.desktopNavLayout));
+    sbState.desktopNav.iconOnly = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavIconOnly), sbState.desktopNav.iconOnly);
+    sbState.desktopNav.showCustomize = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavShowCustomize), sbState.desktopNav.showCustomize);
+    sbState.desktopNav.showQuickActions = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavShowQuickActions), sbState.desktopNav.showQuickActions);
+    sbState.desktopNav.replaceQuickActions = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavReplaceQuickActions), sbState.desktopNav.replaceQuickActions);
+    sbState.desktopNav.replacementTarget = normalizeMobileNavReplacementTarget(safeGetItem(SB_STORAGE_KEYS.desktopNavReplacementTarget));
+    sbState.desktopQuickActions = loadDesktopQuickActions();
     sbState.mobileQuickActions = loadMobileQuickActions();
     sbState.characterDrawer.rightLocked = normalizeStoredBoolean(
         getPersistentStorageItem(SB_STORAGE_KEYS.characterDrawerRightLocked),
@@ -1373,6 +1476,20 @@ function setBottomBarScale(value, { persist = true } = {}) {
     updateThemePickerUi();
 }
 
+function setDesktopButtonScale(value, { persist = true } = {}) {
+    const nextScale = normalizeTopbarScale(value);
+    const scaleFactor = Number((nextScale / 100).toFixed(2)).toString();
+
+    sbState.desktopButtonScale = nextScale;
+    document.documentElement.style.setProperty('--sb-desktop-button-scale', scaleFactor);
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopButtonScale, String(nextScale));
+    }
+
+    updateThemePickerUi();
+}
+
 function setMobileButtonScale(value, { persist = true } = {}) {
     const nextScale = normalizeTopbarScale(value);
     const scaleFactor = Number((nextScale / 100).toFixed(2)).toString();
@@ -1394,6 +1511,15 @@ function applyMobileNavPreferences() {
     document.documentElement.dataset.sbMobileNavCustomize = sbState.mobileNav.showCustomize ? 'shown' : 'hidden';
     document.documentElement.dataset.sbMobileNavQuickActions = quickActionsShown ? 'shown' : 'hidden';
     document.documentElement.dataset.sbMobileNavReplacement = sbState.mobileNav.replaceQuickActions ? 'shown' : 'hidden';
+}
+
+function applyDesktopNavPreferences() {
+    const quickActionsShown = sbState.desktopNav.showQuickActions;
+    document.documentElement.dataset.sbDesktopNavLayout = sbState.desktopNav.layout;
+    document.documentElement.dataset.sbDesktopNavMode = sbState.desktopNav.iconOnly ? 'icon-only' : 'labeled';
+    document.documentElement.dataset.sbDesktopNavCustomize = sbState.desktopNav.showCustomize ? 'shown' : 'hidden';
+    document.documentElement.dataset.sbDesktopNavQuickActions = quickActionsShown ? 'shown' : 'hidden';
+    document.documentElement.dataset.sbDesktopNavReplacement = sbState.desktopNav.replaceQuickActions ? 'shown' : 'hidden';
 }
 
 function setMobileNavLayout(layout, { persist = true } = {}) {
@@ -1472,6 +1598,82 @@ function setMobileNavReplacementTarget(target, { persist = true } = {}) {
     }
 
     updateMobileNavButtonLabel();
+    updateThemePickerUi();
+}
+
+function setDesktopNavLayout(layout, { persist = true } = {}) {
+    const nextLayout = normalizeMobileNavLayout(layout);
+    sbState.desktopNav.layout = nextLayout;
+    applyDesktopNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopNavLayout, nextLayout);
+    }
+
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setDesktopNavIconOnly(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.desktopNav.iconOnly = nextEnabled;
+    applyDesktopNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopNavIconOnly, String(nextEnabled));
+    }
+
+    updateThemePickerUi();
+}
+
+function setDesktopNavShowCustomize(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.desktopNav.showCustomize = nextEnabled;
+    applyDesktopNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopNavShowCustomize, String(nextEnabled));
+    }
+
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setDesktopNavShowQuickActions(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.desktopNav.showQuickActions = nextEnabled;
+    applyDesktopNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopNavShowQuickActions, String(nextEnabled));
+    }
+
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setDesktopNavReplaceQuickActions(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.desktopNav.replaceQuickActions = nextEnabled;
+    applyDesktopNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopNavReplaceQuickActions, String(nextEnabled));
+    }
+
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setDesktopNavReplacementTarget(target, { persist = true } = {}) {
+    const nextTarget = normalizeMobileNavReplacementTarget(target);
+    sbState.desktopNav.replacementTarget = nextTarget;
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopNavReplacementTarget, nextTarget);
+    }
+
+    syncMobileShellRailActions();
     updateThemePickerUi();
 }
 
@@ -10258,7 +10460,7 @@ function createMobileQuickActionIconElement(iconClass) {
     });
 }
 
-function createMobileQuickActionIconControl(action, actionKey) {
+function createMobileQuickActionIconControl(action, actionKey, mode = 'mobile') {
     const normalizedAction = normalizeMobileQuickAction(action);
     const iconClass = normalizedAction?.icon || SB_MOBILE_QUICK_ACTION_ICON_FALLBACK;
 
@@ -10273,7 +10475,7 @@ function createMobileQuickActionIconControl(action, actionKey) {
         });
         button.appendChild(createMobileQuickActionIconElement(iconClass));
         button.addEventListener('click', () => {
-            void chooseMobileQuickActionIcon(actionKey);
+            void chooseQuickActionIcon(mode, actionKey);
         });
         return button;
     }
@@ -10289,34 +10491,39 @@ function createMobileQuickActionIconControl(action, actionKey) {
     return preview;
 }
 
-function updateMobileQuickActionSettingsStatus() {
-    const status = document.getElementById('sb-mobile-quick-action-status');
+function updateMobileQuickActionSettingsStatus(mode = 'mobile') {
+    const currentActions = getQuickActionState(mode);
+    const status = document.getElementById(`sb-${mode}-quick-action-status`);
     if (status instanceof HTMLElement) {
-        status.textContent = `${sbState.mobileQuickActions.length}/${SB_MOBILE_QUICK_ACTION_LIMIT} selected. This list replaces the mobile quick shortcuts.`;
+        status.textContent = mode === 'desktop'
+            ? `${currentActions.length}/${SB_MOBILE_QUICK_ACTION_LIMIT} selected. This list controls the desktop side rail shortcuts.`
+            : `${currentActions.length}/${SB_MOBILE_QUICK_ACTION_LIMIT} selected. This list replaces the mobile quick shortcuts.`;
     }
 
-    const resetButton = document.getElementById('sb-mobile-quick-action-reset');
+    const resetButton = document.getElementById(`sb-${mode}-quick-action-reset`);
     if (resetButton instanceof HTMLButtonElement) {
-        const currentKeys = sbState.mobileQuickActions.map(getMobileQuickActionKey);
-        const defaultKeys = getDefaultMobileQuickActions().map(getMobileQuickActionKey);
+        const currentKeys = currentActions.map(getMobileQuickActionKey);
+        const defaultKeys = (mode === 'desktop' ? getDefaultDesktopQuickActions() : getDefaultMobileQuickActions()).map(getMobileQuickActionKey);
         resetButton.disabled = currentKeys.length === defaultKeys.length
             && currentKeys.every((key, index) => key === defaultKeys[index]);
     }
 }
 
-function refreshMobileQuickActionSearchResults() {
-    const searchInput = document.getElementById('sb-mobile-quick-action-search');
-    const results = document.getElementById('sb-mobile-quick-action-results');
+function refreshMobileQuickActionSearchResults(mode = 'mobile') {
+    const searchInput = document.getElementById(`sb-${mode}-quick-action-search`);
+    const results = document.getElementById(`sb-${mode}-quick-action-results`);
 
     if (searchInput instanceof HTMLInputElement && results instanceof HTMLElement) {
-        renderMobileQuickActionResults(searchInput.value, results);
+        renderMobileQuickActionResults(searchInput.value, results, mode);
     }
 }
 
-function renderMobileQuickActionResults(query, resultsElement) {
+function renderMobileQuickActionResults(query, resultsElement, mode = 'mobile') {
     if (!(resultsElement instanceof HTMLElement)) {
         return;
     }
+
+    const modeLabel = mode === 'desktop' ? 'desktop' : 'mobile';
 
     resultsElement.replaceChildren();
 
@@ -10338,7 +10545,8 @@ function renderMobileQuickActionResults(query, resultsElement) {
         return;
     }
 
-    const currentKeys = new Set(sbState.mobileQuickActions.map(getMobileQuickActionKey));
+    const currentActions = getQuickActionState(mode);
+    const currentKeys = new Set(currentActions.map(getMobileQuickActionKey));
     for (const match of matches) {
         const action = createMobileQuickActionFromMatch(match);
         if (!action) {
@@ -10347,7 +10555,7 @@ function renderMobileQuickActionResults(query, resultsElement) {
 
         const actionKey = getMobileQuickActionKey(action);
         const isAdded = currentKeys.has(actionKey);
-        const isFull = sbState.mobileQuickActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT;
+        const isFull = currentActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT;
         const buttonText = isAdded ? 'Added' : isFull ? 'Full' : 'Add';
         const row = createElement('div', { className: 'sb-mobile-quick-action-result' });
         const copy = createElement('span', { className: 'sb-mobile-quick-action-copy' });
@@ -10361,13 +10569,13 @@ function renderMobileQuickActionResults(query, resultsElement) {
             attrs: {
                 type: 'button',
                 'aria-label': isAdded
-                    ? `${action.label} is already in mobile Quick Actions`
-                    : `Add ${action.label} to mobile Quick Actions`,
+                    ? `${action.label} is already in ${modeLabel} Quick Actions`
+                    : `Add ${action.label} to ${modeLabel} Quick Actions`,
             },
         });
 
         button.disabled = isAdded || isFull;
-        button.addEventListener('click', () => addMobileQuickActionFromMatch(match));
+        button.addEventListener('click', () => addQuickActionFromMatch(mode, match));
 
         copy.append(title, detail);
         row.append(copy, button);
@@ -10375,42 +10583,45 @@ function renderMobileQuickActionResults(query, resultsElement) {
     }
 }
 
-function renderMobileQuickActionSettingsList() {
-    updateMobileQuickActionSettingsStatus();
+function renderMobileQuickActionSettingsList(mode = 'mobile') {
+    updateMobileQuickActionSettingsStatus(mode);
 
-    const list = document.getElementById('sb-mobile-quick-action-list');
+    const list = document.getElementById(`sb-${mode}-quick-action-list`);
     if (!(list instanceof HTMLElement)) {
         return;
     }
 
+    const modeLabel = mode === 'desktop' ? 'desktop' : 'mobile';
+    const currentActions = getQuickActionState(mode);
+
     list.replaceChildren();
 
-    if (!sbState.mobileQuickActions.length) {
+    if (!currentActions.length) {
         list.appendChild(createElement('div', {
             className: 'sb-mobile-quick-action-empty',
-            text: 'No mobile Quick Actions selected. Add one from search or reset to defaults.',
+            text: `No ${modeLabel} Quick Actions selected. Add one from search or reset to defaults.`,
         }));
         return;
     }
 
-    for (const action of sbState.mobileQuickActions) {
+    for (const action of currentActions) {
         const actionKey = getMobileQuickActionKey(action);
         const row = createElement('div', { className: 'sb-mobile-quick-action-current' });
         const copy = createElement('span', { className: 'sb-mobile-quick-action-copy' });
         const title = createElement('strong', { text: action.label });
         const detail = createElement('small', { text: getMobileQuickActionContextLabel(action) });
         const controls = createElement('span', { className: 'sb-mobile-quick-action-controls' });
-        const iconControl = createMobileQuickActionIconControl(action, actionKey);
+        const iconControl = createMobileQuickActionIconControl(action, actionKey, mode);
         const removeButton = createElement('button', {
             className: 'menu_button sb-mobile-quick-action-remove',
             text: 'Remove',
             attrs: {
                 type: 'button',
-                'aria-label': `Remove ${action.label} from mobile Quick Actions`,
+                'aria-label': `Remove ${action.label} from ${modeLabel} Quick Actions`,
             },
         });
 
-        removeButton.addEventListener('click', () => removeMobileQuickAction(actionKey));
+        removeButton.addEventListener('click', () => removeQuickAction(mode, actionKey));
 
         copy.append(title, detail);
         controls.append(iconControl, removeButton);
@@ -10419,19 +10630,24 @@ function renderMobileQuickActionSettingsList() {
     }
 }
 
-function createMobileQuickActionSettingsGroup() {
+function createMobileQuickActionSettingsGroup(mode = 'mobile') {
+    const isDesktop = mode === 'desktop';
+    const modeTitle = isDesktop ? 'Desktop' : 'Mobile';
+    const modeLabel = isDesktop ? 'desktop' : 'mobile';
     const group = createElement('section', {
-        className: 'sb-theme-slider-group sb-mobile-quick-actions-group',
+        className: `sb-theme-slider-group sb-mobile-quick-actions-group sb-${mode}-quick-actions-group`,
     });
     const header = createElement('div', { className: 'sb-mobile-quick-action-header' });
     const heading = createElement('div', { className: 'sb-mobile-quick-action-heading' });
-    const title = createElement('strong', { text: 'Mobile Quick Actions' });
+    const title = createElement('strong', { text: `${modeTitle} Quick Actions` });
     const description = createElement('p', {
         className: 'sb-theme-slider-caption',
-        text: 'Choose the shortcuts shown in the mobile quick drawer. Defaults can be removed or restored.',
+        text: isDesktop
+            ? 'Choose the shortcuts shown below Customize in the desktop side rail. Defaults can be removed or restored.'
+            : 'Choose the shortcuts shown in the mobile quick drawer. Defaults can be removed or restored.',
     });
     const resetButton = createElement('button', {
-        id: 'sb-mobile-quick-action-reset',
+        id: `sb-${mode}-quick-action-reset`,
         className: 'menu_button sb-mobile-quick-action-reset',
         text: 'Reset to defaults',
         attrs: {
@@ -10440,60 +10656,62 @@ function createMobileQuickActionSettingsGroup() {
     });
 
     const searchInput = createElement('input', {
-        id: 'sb-mobile-quick-action-search',
+        id: `sb-${mode}-quick-action-search`,
         className: 'text_pole sb-mobile-quick-action-search',
         attrs: {
             type: 'search',
             placeholder: 'Search settings or extensions...',
             autocomplete: 'off',
-            'aria-label': 'Search settings and extensions to add as mobile Quick Actions',
+            'aria-label': `Search settings and extensions to add as ${modeLabel} Quick Actions`,
         },
     });
     const results = createElement('div', {
-        id: 'sb-mobile-quick-action-results',
+        id: `sb-${mode}-quick-action-results`,
         className: 'sb-mobile-quick-action-results',
     });
     const list = createElement('div', {
-        id: 'sb-mobile-quick-action-list',
+        id: `sb-${mode}-quick-action-list`,
         className: 'sb-mobile-quick-action-list',
     });
     const status = createElement('p', {
-        id: 'sb-mobile-quick-action-status',
+        id: `sb-${mode}-quick-action-status`,
         className: 'sb-theme-slider-caption',
     });
 
     heading.append(title, description);
     header.append(heading, resetButton);
 
-    resetButton.addEventListener('click', resetMobileQuickActions);
+    resetButton.addEventListener('click', isDesktop ? resetDesktopQuickActions : resetMobileQuickActions);
 
     searchInput.addEventListener('input', event => {
         const input = event.currentTarget;
-        renderMobileQuickActionResults(input instanceof HTMLInputElement ? input.value : '', results);
+        renderMobileQuickActionResults(input instanceof HTMLInputElement ? input.value : '', results, mode);
     });
 
     group.append(header, searchInput, results, list, status);
-    renderMobileQuickActionResults('', results);
+    renderMobileQuickActionResults('', results, mode);
 
-    window.requestAnimationFrame(renderMobileQuickActionSettingsList);
+    window.requestAnimationFrame(() => renderMobileQuickActionSettingsList(mode));
     return group;
 }
 
-function createCompactModeSettingsGroup() {
+function createCompactModeSettingsGroup(mode = 'mobile') {
+    const inputId = mode === 'desktop' ? 'sb-desktop-compact-mode-input' : 'sb-mobile-compact-mode-input';
     const group = createElement('section', {
         className: 'sb-theme-slider-group sb-compact-mode-group',
     });
     const label = createElement('label', {
         className: 'sb-compact-mode-option',
         attrs: {
-            for: 'sb-compact-mode-input',
+            for: inputId,
         },
     });
     const checkbox = createElement('input', {
-        id: 'sb-compact-mode-input',
+        id: inputId,
         className: 'sb-compact-mode-checkbox',
         attrs: {
             type: 'checkbox',
+            'data-sb-compact-mode-input': mode,
         },
     });
     const copy = createElement('span', { className: 'sb-compact-mode-copy' });
@@ -10572,60 +10790,63 @@ function createMobileNavDivider(label = '') {
     return divider;
 }
 
-function createMobileNavLayoutSettingsGroup() {
+function createNavigationSettingsGroup(mode = 'mobile') {
+    const isDesktop = mode === 'desktop';
+    const modeTitle = isDesktop ? 'Desktop' : 'Mobile';
+    const modePrefix = isDesktop ? 'desktop' : 'mobile';
     const group = createElement('section', {
-        className: 'sb-theme-slider-group sb-mobile-nav-layout-group',
+        className: `sb-theme-slider-group sb-mobile-nav-layout-group sb-${modePrefix}-nav-layout-group`,
     });
     const header = createElement('div', { className: 'sb-mobile-nav-settings-header' });
-    const title = createElement('strong', { text: 'Mobile Navigation' });
+    const title = createElement('strong', { text: `${modeTitle} Navigation` });
     const layoutGrid = createElement('div', {
         className: 'sb-mobile-nav-choice-grid',
         attrs: {
             role: 'radiogroup',
-            'aria-label': 'Mobile navigation layout',
+            'aria-label': `${modeTitle} navigation layout`,
         },
     });
     const iconOnlyChoice = createMobileNavChoice({
-        id: 'sb-mobile-nav-icon-only-input',
+        id: `sb-${modePrefix}-nav-icon-only-input`,
         type: 'checkbox',
         value: 'icon-only',
         label: 'Icons only in shell tabs',
         icon: 'fa-icons',
-        onChange: input => setMobileNavIconOnly(input.checked),
+        onChange: input => isDesktop ? setDesktopNavIconOnly(input.checked) : setMobileNavIconOnly(input.checked),
     });
     const showCustomizeChoice = createMobileNavChoice({
-        id: 'sb-mobile-nav-show-customize-input',
+        id: `sb-${modePrefix}-nav-show-customize-input`,
         type: 'checkbox',
         value: 'show-customize',
-        label: getMobileNavCustomizeLocationLabel(),
+        label: getMobileNavCustomizeLocationLabel(mode),
         icon: 'fa-sliders',
-        onChange: input => setMobileNavShowCustomize(input.checked),
+        onChange: input => isDesktop ? setDesktopNavShowCustomize(input.checked) : setMobileNavShowCustomize(input.checked),
     });
     const showQuickActionsChoice = createMobileNavChoice({
-        id: 'sb-mobile-nav-show-quick-actions-input',
+        id: `sb-${modePrefix}-nav-show-quick-actions-input`,
         type: 'checkbox',
         value: 'show-quick-actions',
         label: 'Show Custom Quick Actions below Customize',
         icon: 'fa-bolt',
-        onChange: input => setMobileNavShowQuickActions(input.checked),
+        onChange: input => isDesktop ? setDesktopNavShowQuickActions(input.checked) : setMobileNavShowQuickActions(input.checked),
     });
     const replaceQuickActionsChoice = createMobileNavChoice({
-        id: 'sb-mobile-nav-replace-quick-actions-input',
+        id: `sb-${modePrefix}-nav-replace-quick-actions-input`,
         type: 'checkbox',
         value: 'replace-quick-actions',
         label: 'Use a chosen page instead of Quick Actions',
         icon: 'fa-map-location-dot',
-        onChange: input => setMobileNavReplaceQuickActions(input.checked),
+        onChange: input => isDesktop ? setDesktopNavReplaceQuickActions(input.checked) : setMobileNavReplaceQuickActions(input.checked),
     });
     const replacementField = createElement('label', {
         className: 'sb-mobile-nav-replacement-field',
         attrs: {
-            for: 'sb-mobile-nav-replacement-select',
+            for: `sb-${modePrefix}-nav-replacement-select`,
         },
     });
     const replacementLabel = createElement('span', { text: 'Replacement page' });
     const replacementSelect = createElement('select', {
-        id: 'sb-mobile-nav-replacement-select',
+        id: `sb-${modePrefix}-nav-replacement-select`,
         className: 'text_pole sb-mobile-nav-replacement-select',
     });
 
@@ -10641,25 +10862,30 @@ function createMobileNavLayoutSettingsGroup() {
 
     replacementSelect.addEventListener('change', event => {
         const select = event.currentTarget;
-        setMobileNavReplacementTarget(select instanceof HTMLSelectElement ? select.value : '');
+        const nextValue = select instanceof HTMLSelectElement ? select.value : '';
+        if (isDesktop) {
+            setDesktopNavReplacementTarget(nextValue);
+        } else {
+            setMobileNavReplacementTarget(nextValue);
+        }
     });
 
     layoutGrid.append(
         createMobileNavChoice({
-            id: 'sb-mobile-nav-layout-horizontal',
-            name: 'sb-mobile-nav-layout',
+            id: `sb-${modePrefix}-nav-layout-horizontal`,
+            name: `sb-${modePrefix}-nav-layout`,
             value: 'horizontal',
             label: 'Horizontal top bar',
             icon: 'fa-grip-lines',
-            onChange: input => setMobileNavLayout(input.value),
+            onChange: input => isDesktop ? setDesktopNavLayout(input.value) : setMobileNavLayout(input.value),
         }),
         createMobileNavChoice({
-            id: 'sb-mobile-nav-layout-vertical',
-            name: 'sb-mobile-nav-layout',
+            id: `sb-${modePrefix}-nav-layout-vertical`,
+            name: `sb-${modePrefix}-nav-layout`,
             value: 'vertical',
             label: 'Vertical side rail',
             icon: 'fa-table-columns',
-            onChange: input => setMobileNavLayout(input.value),
+            onChange: input => isDesktop ? setDesktopNavLayout(input.value) : setMobileNavLayout(input.value),
         }),
     );
 
@@ -10676,6 +10902,14 @@ function createMobileNavLayoutSettingsGroup() {
         replacementField,
     );
     return group;
+}
+
+function createMobileNavLayoutSettingsGroup() {
+    return createNavigationSettingsGroup('mobile');
+}
+
+function createDesktopNavLayoutSettingsGroup() {
+    return createNavigationSettingsGroup('desktop');
 }
 
 function createFrontendIconSettingsGroup() {
@@ -10863,6 +11097,19 @@ function injectThemePicker() {
         caption: 'Resize the bottom chat bar, send form, and action buttons without editing CSS.',
         onInput: nextValue => setBottomBarScale(nextValue),
     });
+    const desktopButtonSliderGroup = createThemeSliderGroup({
+        title: 'Desktop Button Size',
+        valueId: 'sb-desktop-button-scale-value',
+        inputId: 'sb-desktop-button-scale-input',
+        value: sbState.desktopButtonScale,
+        min: SB_TOPBAR_SCALE.min,
+        max: SB_TOPBAR_SCALE.max,
+        step: SB_TOPBAR_SCALE.step,
+        ariaLabel: 'Desktop button size',
+        caption: 'Increase or decrease the desktop top bar and shell navigation buttons without changing mobile controls.',
+        onInput: nextValue => setDesktopButtonScale(nextValue),
+        className: 'sb-desktop-setting',
+    });
     const mobileButtonSliderGroup = createThemeSliderGroup({
         title: 'Mobile Button Size',
         valueId: 'sb-mobile-button-scale-value',
@@ -10877,12 +11124,17 @@ function injectThemePicker() {
         className: 'sb-mobile-only-setting',
     });
     const topbarLabelSettingsGroup = createTopbarLabelSettingsGroup();
+    const desktopNavLayoutSettingsGroup = createDesktopNavLayoutSettingsGroup();
     const mobileNavLayoutSettingsGroup = createMobileNavLayoutSettingsGroup();
+    const desktopSettingsDivider = createMobileNavDivider();
     const mobileSettingsDivider = createMobileNavDivider();
-    const compactModeSettingsGroup = createCompactModeSettingsGroup();
+    const desktopCompactModeSettingsGroup = createCompactModeSettingsGroup('desktop');
+    const mobileCompactModeSettingsGroup = createCompactModeSettingsGroup('mobile');
     const frontendIconSettingsGroup = createFrontendIconSettingsGroup();
     const shortcutSettingsGroup = createShortcutSettingsGroup();
+    const desktopQuickActionSettingsGroup = createMobileQuickActionSettingsGroup('desktop');
     const mobileQuickActionSettingsGroup = createMobileQuickActionSettingsGroup();
+    const desktopSettingsOutlet = document.getElementById('sb-desktop-settings-outlet');
     const mobileSettingsOutlet = document.getElementById('sb-mobile-settings-outlet');
     header.append(title, description);
 
@@ -10907,23 +11159,43 @@ function injectThemePicker() {
     getMessageStyleSelect()?.addEventListener('change', updateThemePickerUi);
     document.addEventListener('sb:chat-style-updated', updateThemePickerUi);
 
+    if (desktopSettingsOutlet instanceof HTMLElement) {
+        desktopSettingsOutlet.replaceChildren(
+            desktopNavLayoutSettingsGroup,
+            desktopSettingsDivider,
+            desktopButtonSliderGroup,
+            desktopCompactModeSettingsGroup,
+            desktopQuickActionSettingsGroup,
+        );
+    }
+
     if (mobileSettingsOutlet instanceof HTMLElement) {
         mobileSettingsOutlet.replaceChildren(
             mobileNavLayoutSettingsGroup,
             mobileSettingsDivider,
             mobileButtonSliderGroup,
-            compactModeSettingsGroup,
+            mobileCompactModeSettingsGroup,
             mobileQuickActionSettingsGroup,
         );
     }
 
     card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
+    if (!(desktopSettingsOutlet instanceof HTMLElement)) {
+        card.append(
+            desktopNavLayoutSettingsGroup,
+            desktopSettingsDivider,
+            desktopButtonSliderGroup,
+            desktopCompactModeSettingsGroup,
+            desktopQuickActionSettingsGroup,
+        );
+    }
+
     if (!(mobileSettingsOutlet instanceof HTMLElement)) {
         card.append(
             mobileNavLayoutSettingsGroup,
             mobileSettingsDivider,
             mobileButtonSliderGroup,
-            compactModeSettingsGroup,
+            mobileCompactModeSettingsGroup,
             mobileQuickActionSettingsGroup,
         );
     }
@@ -10938,10 +11210,16 @@ function updateThemePickerUi() {
     const desktopTopbarScaleValue = document.getElementById('sb-topbar-scale-desktop-value');
     const bottomBarScaleInput = document.getElementById('sb-bottom-bar-scale-input');
     const bottomBarScaleValue = document.getElementById('sb-bottom-bar-scale-value');
+    const desktopButtonScaleInput = document.getElementById('sb-desktop-button-scale-input');
+    const desktopButtonScaleValue = document.getElementById('sb-desktop-button-scale-value');
     const mobileButtonScaleInput = document.getElementById('sb-mobile-button-scale-input');
     const mobileButtonScaleValue = document.getElementById('sb-mobile-button-scale-value');
     const customTextInput = document.getElementById('sb-topbar-custom-text-input');
-    const compactModeInput = document.getElementById('sb-compact-mode-input');
+    const desktopNavIconOnlyInput = document.getElementById('sb-desktop-nav-icon-only-input');
+    const desktopNavShowCustomizeInput = document.getElementById('sb-desktop-nav-show-customize-input');
+    const desktopNavShowQuickActionsInput = document.getElementById('sb-desktop-nav-show-quick-actions-input');
+    const desktopNavReplaceQuickActionsInput = document.getElementById('sb-desktop-nav-replace-quick-actions-input');
+    const desktopNavReplacementSelect = document.getElementById('sb-desktop-nav-replacement-select');
     const mobileNavIconOnlyInput = document.getElementById('sb-mobile-nav-icon-only-input');
     const mobileNavShowCustomizeInput = document.getElementById('sb-mobile-nav-show-customize-input');
     const mobileNavShowQuickActionsInput = document.getElementById('sb-mobile-nav-show-quick-actions-input');
@@ -10989,6 +11267,14 @@ function updateThemePickerUi() {
         bottomBarScaleValue.textContent = formatTopbarScale(sbState.bottomBarScale);
     }
 
+    if (desktopButtonScaleInput instanceof HTMLInputElement) {
+        desktopButtonScaleInput.value = String(sbState.desktopButtonScale);
+    }
+
+    if (desktopButtonScaleValue instanceof HTMLElement) {
+        desktopButtonScaleValue.textContent = formatTopbarScale(sbState.desktopButtonScale);
+    }
+
     if (mobileButtonScaleInput instanceof HTMLInputElement) {
         mobileButtonScaleInput.value = String(sbState.mobileButtonScale);
     }
@@ -11016,9 +11302,23 @@ function updateThemePickerUi() {
         customTextInput.value = sbState.topbarLabel.customText;
     }
 
-    if (compactModeInput instanceof HTMLInputElement) {
-        compactModeInput.checked = sbState.compactMode;
-        compactModeInput.closest('.sb-compact-mode-option')?.classList.toggle('is-selected', sbState.compactMode);
+    for (const input of document.querySelectorAll('[data-sb-compact-mode-input]')) {
+        if (!(input instanceof HTMLInputElement)) {
+            continue;
+        }
+
+        input.checked = sbState.compactMode;
+        input.closest('.sb-compact-mode-option')?.classList.toggle('is-selected', sbState.compactMode);
+    }
+
+    for (const input of document.querySelectorAll('input[name="sb-desktop-nav-layout"]')) {
+        if (!(input instanceof HTMLInputElement)) {
+            continue;
+        }
+
+        const isChecked = input.value === sbState.desktopNav.layout;
+        input.checked = isChecked;
+        input.closest('.sb-mobile-nav-choice')?.classList.toggle('is-selected', isChecked);
     }
 
     for (const input of document.querySelectorAll('input[name="sb-mobile-nav-layout"]')) {
@@ -11029,6 +11329,45 @@ function updateThemePickerUi() {
         const isChecked = input.value === sbState.mobileNav.layout;
         input.checked = isChecked;
         input.closest('.sb-mobile-nav-choice')?.classList.toggle('is-selected', isChecked);
+    }
+
+    if (desktopNavIconOnlyInput instanceof HTMLInputElement) {
+        desktopNavIconOnlyInput.checked = sbState.desktopNav.iconOnly;
+        const choice = desktopNavIconOnlyInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.desktopNav.iconOnly);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (desktopNavShowCustomizeInput instanceof HTMLInputElement) {
+        desktopNavShowCustomizeInput.checked = sbState.desktopNav.showCustomize;
+        desktopNavShowCustomizeInput.disabled = false;
+        const choice = desktopNavShowCustomizeInput.closest('.sb-mobile-nav-choice');
+        const label = choice?.querySelector('.sb-mobile-nav-choice-copy > strong');
+        if (label instanceof HTMLElement) {
+            label.textContent = getMobileNavCustomizeLocationLabel('desktop');
+        }
+        choice?.classList.toggle('is-selected', sbState.desktopNav.showCustomize);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (desktopNavShowQuickActionsInput instanceof HTMLInputElement) {
+        desktopNavShowQuickActionsInput.checked = sbState.desktopNav.showQuickActions;
+        desktopNavShowQuickActionsInput.disabled = false;
+        const choice = desktopNavShowQuickActionsInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.desktopNav.showQuickActions);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (desktopNavReplaceQuickActionsInput instanceof HTMLInputElement) {
+        desktopNavReplaceQuickActionsInput.checked = sbState.desktopNav.replaceQuickActions;
+        const choice = desktopNavReplaceQuickActionsInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.desktopNav.replaceQuickActions);
+    }
+
+    if (desktopNavReplacementSelect instanceof HTMLSelectElement) {
+        desktopNavReplacementSelect.value = normalizeMobileNavReplacementTarget(sbState.desktopNav.replacementTarget);
+        desktopNavReplacementSelect.disabled = !sbState.desktopNav.replaceQuickActions;
+        desktopNavReplacementSelect.closest('.sb-mobile-nav-replacement-field')?.classList.toggle('is-disabled', !sbState.desktopNav.replaceQuickActions);
     }
 
     if (mobileNavIconOnlyInput instanceof HTMLInputElement) {
@@ -11086,7 +11425,7 @@ function createSearchIndex(tabState, { includeThemeCard = false } = {}) {
     const entries = [];
     const seen = new Set();
     const excludedSelector = includeThemeCard
-        ? '.sb-search-result, .sb-legacy-search-hidden, .sb-mobile-quick-actions-group'
+        ? '.sb-search-result, .sb-legacy-search-hidden, .sb-mobile-quick-actions-group, .sb-desktop-quick-actions-group'
         : '.sb-search-result, .sb-theme-card, .sb-legacy-search-hidden';
 
     for (const element of searchRoot.querySelectorAll(SB_SEARCH_TARGET_SELECTOR)) {
@@ -11388,7 +11727,9 @@ function activateMobileNavAction(action) {
         return;
     }
 
-    closeMobileNav();
+    if (isMobileViewport()) {
+        closeMobileNav();
+    }
 
     if (normalizedAction.type === 'custom') {
         activateMobileQuickAction(normalizedAction);
@@ -11960,7 +12301,9 @@ function buildShell(shellKey) {
 
         if (isOpen) {
             shellState.lastOpenedAt = performance.now();
-            closeMobileNav();
+            if (isMobileViewport()) {
+                closeMobileNav();
+            }
             const activeTab = shellState.tabs.get(shellState.activeTabId);
             activeTab?.onActivate?.();
             dispatchShellTabActivated(shellKey, activeTab);
@@ -12058,6 +12401,8 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
             role: 'tab',
             tabindex: '-1',
             'aria-selected': 'false',
+            'aria-label': tabConfig.label,
+            title: tabConfig.label,
             'data-sb-tab': tabConfig.id,
         },
     });
@@ -12075,7 +12420,7 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
     });
 
     button.addEventListener('keydown', event => {
-        const buttons = Array.from(shellState.nav.querySelectorAll('.sb-shell-tab')).filter(
+        const buttons = Array.from(shellState.nav.querySelectorAll('.sb-shell-tab[data-sb-tab]')).filter(
             item => item instanceof HTMLElement && !item.classList.contains('sb-shell-tab-mobile-rail-hidden'),
         );
         const currentIndex = buttons.indexOf(button);
@@ -12247,7 +12592,10 @@ function syncMobileShellRailTabVisibility(shellState, currentShellKey, hideCusto
 
 function syncMobileShellRailActions(shellKey = null) {
     const shellKeys = shellKey ? [shellKey] : ['left', 'right'];
-    const hasVerticalRail = isMobileViewport() && sbState.mobileNav.layout === 'vertical';
+    const railMode = getActiveShellRailMode();
+    const navState = getNavState(railMode);
+    const hasVerticalRail = navState.layout === 'vertical';
+    const railQuickActionState = getQuickActionState(railMode);
 
     for (const currentShellKey of shellKeys) {
         const shellState = getShellState(currentShellKey);
@@ -12256,7 +12604,7 @@ function syncMobileShellRailActions(shellKey = null) {
         }
 
         shellState.nav.querySelectorAll('.sb-shell-rail-shortcuts').forEach(element => element.remove());
-        const showCustomize = hasVerticalRail && sbState.mobileNav.showCustomize;
+        const showCustomize = hasVerticalRail && navState.showCustomize;
         const shouldHideCustomizeTabs = showCustomize;
         syncMobileShellRailTabVisibility(shellState, currentShellKey, shouldHideCustomizeTabs);
 
@@ -12272,10 +12620,15 @@ function syncMobileShellRailActions(shellKey = null) {
             continue;
         }
 
-        const builtInRailActionKeys = new Set(SB_MOBILE_RAIL_CUSTOMIZE_ACTIONS.map(getMobileQuickActionKey));
-        const railQuickActions = sbState.mobileQuickActions.filter(
-            action => !builtInRailActionKeys.has(getMobileQuickActionKey(action)),
-        );
+        const builtInRailActionKeys = showCustomize
+            ? new Set(SB_MOBILE_RAIL_CUSTOMIZE_ACTIONS.map(getMobileQuickActionKey))
+            : new Set();
+        const replacementAction = railMode === 'desktop' && navState.replaceQuickActions
+            ? createNavReplacementQuickAction(navState.replacementTarget)
+            : null;
+        const railQuickActions = replacementAction
+            ? [replacementAction]
+            : railQuickActionState.filter(action => !builtInRailActionKeys.has(getMobileQuickActionKey(action)));
         const createQuickActionsGroup = () => {
             const quickActionsGroup = createElement('div', {
                 className: 'sb-shell-rail-group sb-shell-rail-group-quick-actions',
@@ -12312,7 +12665,7 @@ function syncMobileShellRailActions(shellKey = null) {
             shellState.nav.prepend(beforeBlock);
         }
 
-        if (sbState.mobileNav.showQuickActions) {
+        if (navState.showQuickActions && railQuickActions.length > 0) {
             const afterBlock = createRailBlock('after');
             afterBlock.append(
                 createMobileShellRailDivider('Quick Actions'),
@@ -13778,7 +14131,9 @@ function initAll() {
     setTopbarScale('desktop', sbState.topbarScale.desktop, { persist: false });
     setTopbarScale('mobile', sbState.topbarScale.mobile, { persist: false });
     setBottomBarScale(sbState.bottomBarScale, { persist: false });
+    setDesktopButtonScale(sbState.desktopButtonScale, { persist: false });
     setMobileButtonScale(sbState.mobileButtonScale, { persist: false });
+    applyDesktopNavPreferences();
     applyMobileNavPreferences();
     bindComposerControlPlacement();
     initChatAvatarVariables();
@@ -13863,6 +14218,9 @@ function initAll() {
         setMobileButtonScale(value) {
             setMobileButtonScale(value);
         },
+        setDesktopButtonScale(value) {
+            setDesktopButtonScale(value);
+        },
         setCompactMode(value) {
             setCompactMode(value);
         },
@@ -13901,6 +14259,9 @@ function initAll() {
         },
         getMobileButtonScale() {
             return sbState.mobileButtonScale;
+        },
+        getDesktopButtonScale() {
+            return sbState.desktopButtonScale;
         },
         getCompactMode() {
             return sbState.compactMode;
