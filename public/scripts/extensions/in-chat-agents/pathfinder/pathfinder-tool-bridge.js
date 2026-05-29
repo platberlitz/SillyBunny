@@ -1,3 +1,4 @@
+import { isPathfinderSubmoduleEnabled } from '../agent-store.js';
 import { getSettings, getTree, isLorebookEnabled, canReadBook, canWriteBook, canDeleteBook } from './tree-store.js';
 
 const CHAT_LOREBOOK_METADATA_KEY = 'world_info';
@@ -31,6 +32,10 @@ export const CONFIRMABLE_TOOLS = new Set([
 ]);
 
 export function getActiveTunnelVisionBooks() {
+    if (!isPathfinderSubmoduleEnabled()) {
+        return [];
+    }
+
     const s = getSettings();
     const books = Array.isArray(s.enabledLorebooks)
         ? s.enabledLorebooks.filter(b => isLorebookEnabled(b))

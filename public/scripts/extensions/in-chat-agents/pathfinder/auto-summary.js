@@ -2,21 +2,48 @@ import { getSettings, normalizeAutoSummaryInterval } from './tree-store.js';
 import { getActiveTunnelVisionBooks } from './pathfinder-tool-bridge.js';
 
 let autoSummaryCount = 0;
+let autoSummaryEventSource = null;
+let autoSummaryEventTypes = null;
+let autoSummaryMessageReceivedHandler = null;
+let autoSummaryMessageSentHandler = null;
 
 export function initAutoSummary(eventSource, eventTypes) {
+    deinitAutoSummary();
     autoSummaryCount = 0;
 
-    eventSource.on(eventTypes.MESSAGE_RECEIVED, () => {
+    autoSummaryEventSource = eventSource;
+    autoSummaryEventTypes = eventTypes;
+    autoSummaryMessageReceivedHandler = () => {
         const s = getSettings();
         if (!s.autoSummary) return;
         autoSummaryCount++;
-    });
+    };
 
-    eventSource.on(eventTypes.MESSAGE_SENT, () => {
+    autoSummaryMessageSentHandler = () => {
         const s = getSettings();
         if (!s.autoSummary) return;
         autoSummaryCount++;
-    });
+    };
+
+    eventSource.on(eventTypes.MESSAGE_RECEIVED, autoSummaryMessageReceivedHandler);
+    eventSource.on(eventTypes.MESSAGE_SENT, autoSummaryMessageSentHandler);
+}
+
+export function deinitAutoSummary() {
+    if (autoSummaryEventSource && autoSummaryEventTypes) {
+        if (autoSummaryMessageReceivedHandler) {
+            autoSummaryEventSource.removeListener(autoSummaryEventTypes.MESSAGE_RECEIVED, autoSummaryMessageReceivedHandler);
+        }
+        if (autoSummaryMessageSentHandler) {
+            autoSummaryEventSource.removeListener(autoSummaryEventTypes.MESSAGE_SENT, autoSummaryMessageSentHandler);
+        }
+    }
+
+    autoSummaryEventSource = null;
+    autoSummaryEventTypes = null;
+    autoSummaryMessageReceivedHandler = null;
+    autoSummaryMessageSentHandler = null;
+    autoSummaryCount = 0;
 }
 
 export function markAutoSummaryComplete() {

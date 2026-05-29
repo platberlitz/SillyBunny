@@ -1,8 +1,10 @@
 import { getSettings, setSettings, isLorebookEnabled, setLorebookEnabled } from './pathfinder/tree-store.js';
 import { initEntryManagerAPIs } from './pathfinder/entry-manager.js';
 import { initActivityFeed } from './pathfinder/activity-feed.js';
-import { initAutoSummary } from './pathfinder/auto-summary.js';
-import { initCommands } from './pathfinder/commands.js';
+import { isPathfinderSubmoduleEnabled } from './agent-store.js';
+import { unregisterToolAction, unregisterToolFormatter } from './tool-action-registry.js';
+import { deinitAutoSummary, initAutoSummary } from './pathfinder/auto-summary.js';
+import { initCommands, removeCommands } from './pathfinder/commands.js';
 import { getPathfinderToolDefinitions } from './pathfinder/tool-definitions.js';
 
 import { registerActions as registerSearchActions } from './pathfinder/tools/search.js';
@@ -23,10 +25,7 @@ import { getDefaultPrompts, getDefaultPipelines } from './pathfinder/prompts/def
 
 let initialized = false;
 
-export function initPathfinder(context) {
-    if (initialized) return;
-    initialized = true;
-
+function registerPathfinderToolActions() {
     registerSearchActions();
     registerRememberActions();
     registerUpdateActions();
@@ -35,6 +34,29 @@ export function initPathfinder(context) {
     registerReorganizeActions();
     registerMergeSplitActions();
     registerNotebookActions();
+}
+
+function unregisterPathfinderToolActions() {
+    for (const tool of getPathfinderToolDefinitions()) {
+        if (tool?.actionKey) {
+            unregisterToolAction(tool.actionKey);
+        }
+        if (tool?.formatMessageKey) {
+            unregisterToolFormatter(tool.formatMessageKey);
+        }
+    }
+}
+
+export function initPathfinder(context) {
+    if (!isPathfinderSubmoduleEnabled()) {
+        teardownPathfinder();
+        return;
+    }
+
+    if (initialized) return;
+    initialized = true;
+
+    registerPathfinderToolActions();
 
     initActivityFeed();
 
@@ -58,6 +80,18 @@ export function initPathfinder(context) {
     }
 
     console.info('[Pathfinder] Initialized with 8 tools and predictive pipeline system.');
+}
+
+export function teardownPathfinder() {
+    if (!initialized) {
+        return;
+    }
+
+    unregisterPathfinderToolActions();
+    deinitAutoSummary();
+    removeCommands();
+    initialized = false;
+    console.info('[Pathfinder] Disabled and unregistered.');
 }
 
 export async function buildPathfinderTree(bookName, bookData, useLLM = false, llmGenerate = null) {

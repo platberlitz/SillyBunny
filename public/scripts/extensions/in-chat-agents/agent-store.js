@@ -122,6 +122,7 @@ function createDefaultScopedEnabledAgentIds() {
 /** Global settings for the In-Chat Agents extension. */
 let globalSettings = {
     enabled: true,
+    pathfinderEnabled: true,
     separateRecentChats: false,
     enabledAgentIdsByChatType: createDefaultScopedEnabledAgentIds(),
     scopedEnabledAgentIdsInitialized: false,
@@ -132,7 +133,7 @@ let globalSettings = {
 
 /**
  * Returns the global settings.
- * @returns {{ enabled: boolean, separateRecentChats: boolean, enabledAgentIdsByChatType: Record<string, string[]>, scopedEnabledAgentIdsInitialized: boolean, connectionProfile: string, promptTransformShowNotifications: boolean, appendAgentsExecutionMode: 'parallel'|'sequential' }}
+ * @returns {{ enabled: boolean, pathfinderEnabled: boolean, separateRecentChats: boolean, enabledAgentIdsByChatType: Record<string, string[]>, scopedEnabledAgentIdsInitialized: boolean, connectionProfile: string, promptTransformShowNotifications: boolean, appendAgentsExecutionMode: 'parallel'|'sequential' }}
  */
 export function getGlobalSettings() {
     return globalSettings;
@@ -148,6 +149,7 @@ export function setGlobalSettings(update) {
     }
 
     Object.assign(globalSettings, update);
+    globalSettings.pathfinderEnabled = globalSettings.pathfinderEnabled !== false;
     globalSettings.enabledAgentIdsByChatType = normalizeScopedEnabledAgentIds(globalSettings.enabledAgentIdsByChatType);
 
     if (!globalSettings.scopedEnabledAgentIdsInitialized) {
@@ -428,6 +430,14 @@ export const PATHFINDER_TEMPLATE_ID = 'tpl-pathfinder';
 
 export function areAgentsGloballyEnabled() {
     return globalSettings.enabled !== false;
+}
+
+export function isPathfinderSubmoduleEnabled() {
+    return globalSettings.pathfinderEnabled !== false;
+}
+
+export function setPathfinderSubmoduleEnabled(enabled) {
+    setGlobalSettings({ pathfinderEnabled: enabled !== false });
 }
 
 function getAgentTemplateName(value) {
