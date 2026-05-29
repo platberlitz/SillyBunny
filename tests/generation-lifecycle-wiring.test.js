@@ -82,4 +82,9 @@ describe('generation lifecycle wiring', () => {
         expect(unblockSource).toContain('unblockState.shouldFlushEphemeralState');
         expect(unblockSource).not.toContain('type === \'quiet\' && streamingProcessor && !streamingProcessor.isFinished');
     });
+
+    test('routes provider-error cleanup through stopped lifecycle semantics', () => {
+        expect(scriptSource).toContain('this.markUIGenStopped({ emitGenerationEnded: false, emitGenerationStopped: true });');
+        expect(scriptSource).toContain('eventSource.emit(event_types.GENERATION_STOPPED);\n        unblockGeneration(type, { emitGenerationEnded: false });');
+    });
 });

@@ -1212,6 +1212,45 @@ describe('in-chat agent post-processing runner', () => {
         expect(saveChatDebounced).toHaveBeenCalledTimes(2);
     });
 
+    test('does not run post-processing for provider-stopped streaming messages', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: 'Partial provider error output',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        Object.assign(streamingProcessor, {
+            messageId: 0,
+            type: 'normal',
+            isFinished: true,
+            isStopped: true,
+            abortController: { signal: { aborted: true } },
+        });
+
+        await eventSource.emit(eventTypes.GENERATION_STOPPED);
+        delete document.body.dataset.generating;
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        Object.assign(streamingProcessor, {
+            messageId: -1,
+            isStopped: false,
+            abortController: { signal: { aborted: false } },
+        });
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Partial provider error output');
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+    });
+
     test('handles non-stream mobile order where generation ends before the body flag clears', async () => {
         useAppendPostAgent();
 
