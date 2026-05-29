@@ -402,10 +402,13 @@ describe('chat render lifecycle script wiring', () => {
         expect(scriptSource).toContain('let deferredMobileStreamingBottomPin = false;');
         expect(scriptSource).toContain('let deferredMobileStreamingBottomPinTimer = 0;');
         expect(scriptSource).toContain('function shouldYieldMobileChatScrollToActiveGesture()');
+        expect(scriptSource).toContain('function canReleaseMobileChatUserScrollLock()');
+        expect(scriptSource).toContain('function releaseMobileChatUserScrollLockIfAtBottom()');
         expect(scriptSource).toContain('scheduleDeferredMobileStreamingBottomPinFlush();');
         expect(scriptSource).toContain('markMobileChatManualScroll({ touchMoved: true });');
         expect(scriptSource).toContain('mobileChatUserScrollLocked = true;');
         expect(scriptSource).toContain('mobileChatManualScrollVersion += 1;');
+        expect(scriptSource).toContain('releaseMobileChatUserScrollLockIfAtBottom();');
 
         const requestFrame = findFunctionDeclaration('requestMobileStreamingBottomPinFrame');
         const requestFrameSource = getSource(requestFrame);
@@ -439,6 +442,7 @@ describe('chat render lifecycle script wiring', () => {
 
         expect(scriptSource).toContain('function captureMobileStreamingScrollAnchor()');
         expect(scriptSource).toContain('function settleMobileStreamingScrollAnchor(snapshot)');
+        expect(scriptSource).toContain('shouldYieldMobileChatScrollToActiveGesture() || !shouldSuppressMobileChatAutoScroll()');
         expect(applySource).toContain('const preservedMobileScrollAnchor = captureMobileStreamingScrollAnchor();');
         expect(applySource).toContain('applyStreamFadeIn(messageTextDom, formattedText,');
         expect(applySource).toContain('messageTextDom.innerHTML = formattedText;');
@@ -565,6 +569,8 @@ describe('chat render lifecycle script wiring', () => {
         expect(scriptSource).toContain('const chatScrollHandler = function () {');
         expect(scriptSource).toContain('refreshObservedChatMessageResizeViewportStates();');
         expect(scriptSource).toContain('markMobileChatManualScroll({ touchMoved: mobileChatTouchScrolling || isIOSWebKitPlatform() });');
+        expect(scriptSource).toContain('const canReleaseUserScrollLock = canReleaseMobileChatUserScrollLock();');
+        expect(scriptSource).toContain('if (scrollLock && scrollIsAtBottom && canReleaseUserScrollLock)');
     });
 
     test('message resize observer cleans up on chat removal paths', () => {

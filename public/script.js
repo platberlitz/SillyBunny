@@ -2001,6 +2001,20 @@ function shouldYieldMobileChatScrollToActiveGesture() {
     return isIOSWebKitPlatform() && isMobileChatManualScrollSuppressionWindowActive();
 }
 
+function canReleaseMobileChatUserScrollLock() {
+    return !mobileChatTouchScrolling && !isMobileChatManualScrollSuppressionWindowActive();
+}
+
+function releaseMobileChatUserScrollLockIfAtBottom() {
+    if (!shouldGuardMobileChatScroll() || !mobileChatUserScrollLocked || !canReleaseMobileChatUserScrollLock() || !isChatScrolledNearBottom()) {
+        return false;
+    }
+
+    mobileChatUserScrollLocked = false;
+    mobileChatTouchGestureMoved = false;
+    return true;
+}
+
 function shouldSuppressMobileChatAutoScroll() {
     if (!shouldGuardMobileChatScroll()) {
         return false;
@@ -2118,6 +2132,8 @@ function requestMobileChatBottomPin({ requireNearBottom = true, durationMs = MOB
 }
 
 function shouldPinMobileChatToBottom() {
+    releaseMobileChatUserScrollLockIfAtBottom();
+
     if (!shouldGuardMobileChatScroll() || isMobileChatManualScrollSuppressionActive() || mobileChatUserScrollLocked || scrollLock) {
         return false;
     }
@@ -2447,7 +2463,7 @@ function getMobileMessageUpdateQueue() {
 }
 
 function captureMobileStreamingScrollAnchor() {
-    if (!shouldGuardMobileChatScroll() || !shouldSuppressMobileChatAutoScroll()) {
+    if (!shouldGuardMobileChatScroll() || shouldYieldMobileChatScrollToActiveGesture() || !shouldSuppressMobileChatAutoScroll()) {
         return null;
     }
 
@@ -2463,7 +2479,7 @@ function captureMobileStreamingScrollAnchor() {
 }
 
 function restoreMobileStreamingScrollAnchor(snapshot) {
-    if (!snapshot?.anchor || snapshot.version !== mobileChatManualScrollVersion || !shouldGuardMobileChatScroll() || !shouldSuppressMobileChatAutoScroll()) {
+    if (!snapshot?.anchor || snapshot.version !== mobileChatManualScrollVersion || !shouldGuardMobileChatScroll() || shouldYieldMobileChatScrollToActiveGesture() || !shouldSuppressMobileChatAutoScroll()) {
         return false;
     }
 
@@ -15253,14 +15269,14 @@ jQuery(async function () {
         }
 
         const scrollIsAtBottom = isChatScrolledNearBottom();
+        const canReleaseUserScrollLock = canReleaseMobileChatUserScrollLock();
 
-        if (scrollIsAtBottom) {
-            mobileChatUserScrollLocked = false;
-            mobileChatTouchGestureMoved = false;
+        if (scrollIsAtBottom && canReleaseUserScrollLock) {
+            releaseMobileChatUserScrollLockIfAtBottom();
         }
 
         // Resume autoscroll if the user scrolls to the bottom
-        if (scrollLock && scrollIsAtBottom) {
+        if (scrollLock && scrollIsAtBottom && canReleaseUserScrollLock) {
             scrollLock = false;
         }
 
