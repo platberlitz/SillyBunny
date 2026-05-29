@@ -314,7 +314,7 @@ import { onboardingExperimentalMacroEngine } from './scripts/macros/engine/Macro
 import { compressRequest, setRequestCompressionConfig } from './scripts/request-compression.js';
 import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker } from './scripts/swipe-picker.js';
 import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
-import { getMobileStreamingBottomPinBehavior, getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
+import { getMobileStreamingBottomPinBehavior, getStreamingUpdateInterval, IOS_STREAMING_UPDATE_INTERVAL_MS } from './scripts/mobile-streaming.js';
 import {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     CHAT_RENDER_LIFECYCLE_ROUTE,
@@ -603,7 +603,7 @@ const MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS = 400;
 const MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS = 1400;
 const MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
 const MOBILE_CHAT_BOTTOM_PIN_MS = 1500;
-const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = isIOSWebKitPlatform() ? 1000 : 750;
+const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = isIOSWebKitPlatform() ? IOS_STREAMING_UPDATE_INTERVAL_MS : 750;
 const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 24;
 const CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS = 250;
 const CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS = Object.freeze([80, 250, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS, 900, 1600, 2400]);
@@ -636,6 +636,7 @@ let fav_ch_checked = false;
 let scrollLock = false;
 let scrollLockImmunityUntil = 0;
 let mobileChatTouchScrolling = false;
+let mobileChatTouchGestureMoved = false;
 let mobileChatManualScrollSuppressedUntil = 0;
 let mobileChatBottomPinUntil = 0;
 let mobileStreamingBottomPinFrame = 0;
@@ -1925,7 +1926,7 @@ function beginChatLoadBottomLock({ durationMs = Math.max(...CHAT_LOAD_SCROLL_SET
     pinChatLoadToBottom();
 }
 
-function markMobileChatManualScroll({ touchActive = false, suppressMs = MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS } = {}) {
+function markMobileChatManualScroll({ touchActive = false, touchMoved = false, suppressMs = MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS } = {}) {
     if (!shouldGuardMobileChatScroll()) {
         return;
     }
@@ -1939,6 +1940,12 @@ function markMobileChatManualScroll({ touchActive = false, suppressMs = MOBILE_C
 
     if (touchActive) {
         mobileChatTouchScrolling = true;
+        mobileChatTouchGestureMoved = false;
+    }
+
+    if (touchMoved) {
+        mobileChatTouchGestureMoved = true;
+        clearDeferredMobileStreamingBottomPin();
     }
 
     mobileChatManualScrollSuppressedUntil = Math.max(mobileChatManualScrollSuppressedUntil, Date.now() + suppressMs);
@@ -1956,6 +1963,12 @@ function releaseMobileChatTouchScroll() {
 
     mobileChatTouchScrolling = false;
     markMobileChatManualScroll();
+
+    if (mobileChatTouchGestureMoved) {
+        clearDeferredMobileStreamingBottomPin();
+        return;
+    }
+
     scheduleDeferredMobileStreamingBottomPinFlush();
 }
 
@@ -2009,6 +2022,10 @@ function clearDeferredMobileStreamingBottomPinTimer() {
 
 function queueDeferredMobileStreamingBottomPin() {
     if (!shouldGuardMobileChatScroll()) {
+        return false;
+    }
+
+    if (mobileChatTouchGestureMoved) {
         return false;
     }
 
@@ -2220,6 +2237,7 @@ function scheduleMobileStreamingBottomPin({ isFinal = false } = {}) {
 
 function resetMobileViewportScrollState() {
     mobileChatTouchScrolling = false;
+    mobileChatTouchGestureMoved = false;
     mobileChatManualScrollSuppressedUntil = 0;
     mobileChatBottomPinUntil = 0;
     clearMobileStreamingBottomPin();
@@ -15149,7 +15167,7 @@ jQuery(async function () {
     };
     const markMobileChatTouchScrollMove = () => {
         clearChatLoadBottomLock();
-        markMobileChatManualScroll();
+        markMobileChatManualScroll({ touchMoved: true });
     };
     const markMobileChatWheelScroll = () => {
         clearChatLoadBottomLock();
@@ -15179,7 +15197,7 @@ jQuery(async function () {
         }
 
         if (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil) {
-            markMobileChatManualScroll();
+            markMobileChatManualScroll({ touchMoved: mobileChatTouchScrolling });
         }
 
         if (Date.now() < scrollLockImmunityUntil) {

@@ -393,13 +393,15 @@ describe('chat render lifecycle script wiring', () => {
     });
 
     test('mobile streaming bottom pin scheduling coalesces smooth intermediate pins', () => {
-        expect(scriptSource).toContain('const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = isIOSWebKitPlatform() ? 1000 : 750;');
+        expect(scriptSource).toContain('const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = isIOSWebKitPlatform() ? IOS_STREAMING_UPDATE_INTERVAL_MS : 750;');
         expect(scriptSource).toContain('let mobileStreamingBottomPinFrame = 0;');
         expect(scriptSource).toContain('let mobileStreamingBottomPinTimer = 0;');
+        expect(scriptSource).toContain('let mobileChatTouchGestureMoved = false;');
         expect(scriptSource).toContain('let deferredMobileStreamingBottomPin = false;');
         expect(scriptSource).toContain('let deferredMobileStreamingBottomPinTimer = 0;');
         expect(scriptSource).toContain('function shouldYieldMobileChatScrollToActiveGesture()');
         expect(scriptSource).toContain('scheduleDeferredMobileStreamingBottomPinFlush();');
+        expect(scriptSource).toContain('markMobileChatManualScroll({ touchMoved: true });');
 
         const requestFrame = findFunctionDeclaration('requestMobileStreamingBottomPinFrame');
         const requestFrameSource = getSource(requestFrame);
@@ -649,6 +651,7 @@ describe('chat render lifecycle script wiring', () => {
         const resetSource = getSource(resetMobileViewportScrollState);
 
         expect(resetSource).toContain('mobileChatTouchScrolling = false;');
+        expect(resetSource).toContain('mobileChatTouchGestureMoved = false;');
         expect(resetSource).toContain('mobileChatManualScrollSuppressedUntil = 0;');
         expect(resetSource).toContain('mobileChatBottomPinUntil = 0;');
     });
