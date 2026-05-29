@@ -260,6 +260,7 @@ describe('in-chat agent post-processing runner', () => {
             getEnabledToolAgents: jest.fn(() => []),
             getGlobalSettings: jest.fn(() => globalSettings),
             getPromptTransformMode: jest.fn(agent => agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite'),
+            isPathfinderSubmoduleEnabled: jest.fn(() => true),
             saveAgent: jest.fn(async () => {}),
             isToolAgent: jest.fn(() => false),
             normalizePreProcessMaxTokens: jest.fn(value => Number.isFinite(Number(value)) ? Math.max(16, Math.min(16000, Number(value))) : 8192),
