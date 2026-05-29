@@ -109,15 +109,17 @@ describe('Guided Generations steering commands', () => {
         }));
     });
 
-    test('guided response injects guidance before triggering generation', async () => {
+    test('guided response injects guidance only for the awaited generation', async () => {
         const { guidedResponse } = await import('../public/scripts/extensions/guided-generations/scripts/guidedResponse.js');
 
         await guidedResponse();
 
-        expect(context.executeSlashCommandsWithOptions).toHaveBeenCalledTimes(1);
+        expect(context.executeSlashCommandsWithOptions).toHaveBeenCalledTimes(2);
         const command = context.executeSlashCommandsWithOptions.mock.calls[0][0];
         expect(command).toContain('/inject id=instruct position=chat ephemeral=true scan=true depth=2 role=assistant GUIDE: aim for a colder, suspicious reply|');
         expect(command).toContain('/trigger await=true|');
+        expect(context.executeSlashCommandsWithOptions).toHaveBeenLastCalledWith('/flushinject instruct');
+        expect(context.chatMetadata.script_injects.instruct).toBeUndefined();
         expect(textarea.value).toBe('aim for a colder, suspicious reply');
         expect(textarea.dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: 'input' }));
     });
