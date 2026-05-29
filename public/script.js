@@ -647,6 +647,8 @@ let mobileStreamingBottomPinSettle = false;
 let mobileStreamingBottomPinSmooth = false;
 let deferredMobileStreamingBottomPin = false;
 let deferredMobileStreamingBottomPinTimer = 0;
+const deferredMobileStreamingVisibleWrites = new Map();
+let deferredMobileStreamingVisibleWriteTimer = 0;
 let lastMobileStreamingBottomPinAt = 0;
 let chatLoadBottomLockUntil = 0;
 let chatLoadBottomPinFrame = 0;
@@ -1957,6 +1959,9 @@ function markMobileChatManualScroll({ touchActive = false, touchMoved = false, s
     if (deferredMobileStreamingBottomPin && !mobileChatTouchScrolling) {
         scheduleDeferredMobileStreamingBottomPinFlush();
     }
+    if (deferredMobileStreamingVisibleWrites.size > 0 && !mobileChatTouchScrolling) {
+        scheduleDeferredMobileStreamingVisibleWriteFlush();
+    }
     scrollLockImmunityUntil = 0;
 }
 
@@ -1968,6 +1973,7 @@ function releaseMobileChatTouchScroll() {
 
     mobileChatTouchScrolling = false;
     markMobileChatManualScroll();
+    scheduleDeferredMobileStreamingVisibleWriteFlush();
 
     if (mobileChatTouchGestureMoved) {
         clearDeferredMobileStreamingBottomPin();
@@ -2012,6 +2018,7 @@ function releaseMobileChatUserScrollLockIfAtBottom() {
 
     mobileChatUserScrollLocked = false;
     mobileChatTouchGestureMoved = false;
+    flushDeferredMobileStreamingVisibleWrites();
     return true;
 }
 
@@ -2269,6 +2276,7 @@ function resetMobileViewportScrollState() {
     mobileChatBottomPinUntil = 0;
     clearMobileStreamingBottomPin();
     clearDeferredMobileStreamingBottomPin();
+    clearDeferredMobileStreamingVisibleWrites();
 }
 
 function getMobileViewportScrollHandler() {
@@ -2462,6 +2470,96 @@ function getMobileMessageUpdateQueue() {
     return mobileMessageUpdateQueue;
 }
 
+function shouldDeferMobileStreamingVisibleWrite() {
+    return shouldYieldMobileChatScrollToActiveGesture();
+}
+
+function clearDeferredMobileStreamingVisibleWriteTimer() {
+    if (deferredMobileStreamingVisibleWriteTimer) {
+        clearTimeout(deferredMobileStreamingVisibleWriteTimer);
+        deferredMobileStreamingVisibleWriteTimer = 0;
+    }
+}
+
+function clearDeferredMobileStreamingVisibleWrites() {
+    clearDeferredMobileStreamingVisibleWriteTimer();
+    deferredMobileStreamingVisibleWrites.clear();
+}
+
+function flushDeferredMobileStreamingVisibleWrites() {
+    if (deferredMobileStreamingVisibleWrites.size === 0) {
+        return 0;
+    }
+
+    if (shouldDeferMobileStreamingVisibleWrite()) {
+        scheduleDeferredMobileStreamingVisibleWriteFlush();
+        return 0;
+    }
+
+    clearDeferredMobileStreamingVisibleWriteTimer();
+    const writes = [...deferredMobileStreamingVisibleWrites.entries()];
+    deferredMobileStreamingVisibleWrites.clear();
+
+    for (const [messageId, { write, options }] of writes) {
+        applyStreamingVisibleWrite(messageId, write, options);
+    }
+
+    return writes.length;
+}
+
+function scheduleDeferredMobileStreamingVisibleWriteFlush() {
+    if (deferredMobileStreamingVisibleWrites.size === 0) {
+        return false;
+    }
+
+    clearDeferredMobileStreamingVisibleWriteTimer();
+
+    if (!shouldGuardMobileChatScroll()) {
+        flushDeferredMobileStreamingVisibleWrites();
+        return true;
+    }
+
+    if (mobileChatTouchScrolling) {
+        return true;
+    }
+
+    if (mobileChatUserScrollLocked) {
+        const delayMs = Math.max(0, mobileChatManualScrollSuppressedUntil - Date.now());
+        if (delayMs <= 0) {
+            releaseMobileChatUserScrollLockIfAtBottom();
+            return true;
+        }
+
+        deferredMobileStreamingVisibleWriteTimer = setTimeout(() => {
+            deferredMobileStreamingVisibleWriteTimer = 0;
+            releaseMobileChatUserScrollLockIfAtBottom();
+        }, delayMs);
+        return true;
+    }
+
+    const delayMs = isIOSWebKitPlatform() ? Math.max(0, mobileChatManualScrollSuppressedUntil - Date.now()) : 0;
+    if (delayMs <= 0) {
+        flushDeferredMobileStreamingVisibleWrites();
+        return true;
+    }
+
+    deferredMobileStreamingVisibleWriteTimer = setTimeout(() => {
+        deferredMobileStreamingVisibleWriteTimer = 0;
+        flushDeferredMobileStreamingVisibleWrites();
+    }, delayMs);
+    return true;
+}
+
+function queueDeferredMobileStreamingVisibleWrite(messageId, write, options) {
+    if (!shouldDeferMobileStreamingVisibleWrite()) {
+        return false;
+    }
+
+    deferredMobileStreamingVisibleWrites.set(messageId, { write, options });
+    scheduleDeferredMobileStreamingVisibleWriteFlush();
+    return true;
+}
+
 function captureMobileStreamingScrollAnchor() {
     if (!shouldGuardMobileChatScroll() || shouldYieldMobileChatScrollToActiveGesture() || !shouldSuppressMobileChatAutoScroll()) {
         return null;
@@ -2509,6 +2607,23 @@ function applyStreamingVisibleWrite(messageId, {
     shouldUseStreamFadeIn,
     bypassFadeIn,
 }, { isFinal = false } = {}) {
+    if (queueDeferredMobileStreamingVisibleWrite(messageId, {
+        messageTextDom,
+        messageTimerDom,
+        messageTokenCounterDom,
+        messageDom,
+        message,
+        formattedText,
+        timePassed,
+        currentTokenCount,
+        shouldRefreshTokenCount,
+        shouldUpdateMetaBadges,
+        shouldUseStreamFadeIn,
+        bypassFadeIn,
+    }, { isFinal })) {
+        return isFinal;
+    }
+
     const preservedMobileScrollAnchor = captureMobileStreamingScrollAnchor();
 
     if (shouldRefreshTokenCount && messageTokenCounterDom instanceof HTMLElement) {
