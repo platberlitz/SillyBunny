@@ -23,12 +23,16 @@ import {
 import {
     renderMessagesInBatches,
 } from './render-batch.js';
+import {
+    createMessageUpdateQueue,
+} from './update-queue.js';
 
 export {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     CHAT_SCROLL_ACTION,
     CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
+    createMessageUpdateQueue,
     createFrameWriteScheduler,
     resolveChatBottomScrollAction,
     resolveChatScrollAction,
@@ -70,6 +74,9 @@ export function createChatRenderLifecycle() {
         },
         renderBatch: {
             render: renderMessagesInBatches,
+        },
+        updateQueue: {
+            create: createMessageUpdateQueue,
         },
     };
 }
