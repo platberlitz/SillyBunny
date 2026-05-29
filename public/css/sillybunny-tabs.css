@@ -3969,13 +3969,22 @@ body #right-nav-panel #HotSwapWrapper .hotswap > :is(.avatar, .character_select,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 30px;
-    width: 30px;
-    min-height: 30px;
     margin: 0;
 }
 
+.sb-mobile-quick-action-icon-picker {
+    min-width: var(--sb-mobile-touch-target, 44px);
+    width: var(--sb-mobile-touch-target, 44px);
+    min-height: var(--sb-mobile-touch-target, 44px);
+    height: var(--sb-mobile-touch-target, 44px);
+    touch-action: manipulation;
+}
+
 .sb-mobile-quick-action-icon-preview {
+    min-width: 30px;
+    width: 30px;
+    min-height: 30px;
+    height: 30px;
     border-radius: 9px;
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 60%, transparent);
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);

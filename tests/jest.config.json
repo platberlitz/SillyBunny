@@ -1,5 +1,8 @@
 {
     "verbose": true,
     "transform": {},
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+        "^/scripts/(.*)$": "<rootDir>/../public/scripts/$1"
+    }
 }
