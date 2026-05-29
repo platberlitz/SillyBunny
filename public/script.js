@@ -310,6 +310,7 @@ import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-
 import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
 import {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
+    CHAT_SCROLL_ACTION,
     CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
     createMessageUpdateQueue,
@@ -2078,6 +2079,58 @@ function scrollStartedStreamingMessageThroughLifecycle() {
             scrollChatElementToBottom();
         });
     }
+}
+
+function getSwipeReplacementViewportUpdate({ isLastMessageSwipe, useLifecycleRoute }) {
+    if (!useLifecycleRoute || !isChatRenderLifecycleRolloutEnabled()) {
+        const anchor = isLastMessageSwipe && !isChatScrolledNearBottom()
+            ? captureVisibleChatMessageAnchor()
+            : null;
+
+        return {
+            action: null,
+            anchor,
+            scrollWithAddOneMessage: isLastMessageSwipe && !anchor,
+        };
+    }
+
+    const isNearBottom = isChatScrolledNearBottom();
+    const anchor = !isNearBottom ? captureVisibleChatMessageAnchor() : null;
+    const action = resolveChatScrollAction({
+        intent: CHAT_SCROLL_INTENT.REPLACE_MESSAGE,
+        autoScrollEnabled: power_user.auto_scroll_chat_to_bottom,
+        isNearBottom,
+        hasAnchor: Boolean(anchor),
+        isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll(),
+    });
+
+    return {
+        action,
+        anchor,
+        scrollWithAddOneMessage: false,
+    };
+}
+
+function shouldSettleSwipeReplacementAnchor(viewportUpdate) {
+    return Boolean(viewportUpdate?.anchor)
+        && (!viewportUpdate.action || viewportUpdate.action.action === CHAT_SCROLL_ACTION.PRESERVE_ANCHOR);
+}
+
+async function settleSwipeReplacementAnchor(viewportUpdate) {
+    if (shouldSettleSwipeReplacementAnchor(viewportUpdate)) {
+        await settleVisibleChatMessageAnchor(viewportUpdate.anchor);
+    }
+}
+
+async function applySwipeReplacementViewportUpdate(viewportUpdate) {
+    if (shouldApplyChatBottomScrollAction(viewportUpdate?.action)) {
+        requestAnimationFrame(() => {
+            scrollChatElementToBottom();
+        });
+        return;
+    }
+
+    await settleSwipeReplacementAnchor(viewportUpdate);
 }
 
 function flushPendingMobileMessageUpdates() {
@@ -13119,6 +13172,7 @@ export async function swipe(event, direction, { source, repeated, message = chat
 
     swipeState = SWIPE_STATE.SWIPING;
     let generation;
+    let isOverswipeReplacement = false;
 
     const thisMesDiv = chatElement.children('.mes').filter(`[mesid="${mesId}"]`);
     const thisMesText = thisMesDiv.find('.mes_block .mes_text');
@@ -13395,7 +13449,7 @@ export async function swipe(event, direction, { source, repeated, message = chat
      * @param {boolean} [skipSwipeOut=false]
      */
     async function animateSwipe(run_generate = false, skipSwipeOut = false) {
-        let swipeAnchor = null;
+        let swipeViewportUpdate = null;
 
         if (!skipSwipeOut) {
             //Swipe out.
@@ -13415,17 +13469,13 @@ export async function swipe(event, direction, { source, repeated, message = chat
             //console.log('showing previously generated swipe candidate, or "..."');
             //console.log('onclick right swipe calling addOneMessage');
 
-            // SillyBunny: preserve a manual viewport position when replacing the last message via swipe.
+            // SillyBunny: route display-only swipe replacement scroll handling through the guarded lifecycle seam.
             const isLastMessageSwipe = (mesId == chat.length - 1);
-            swipeAnchor = isLastMessageSwipe && !isChatScrolledNearBottom()
-                ? captureVisibleChatMessageAnchor()
-                : null;
+            const useLifecycleRoute = source !== SWIPE_SOURCE.DELETE && source !== SWIPE_SOURCE.BACK && !isOverswipeReplacement;
+            swipeViewportUpdate = getSwipeReplacementViewportUpdate({ isLastMessageSwipe, useLifecycleRoute });
             //The swipe buttons will be refreshed in endSwipe(), refreshing them now will cause flickering.
-            addOneMessage(chat[mesId], { type: 'swipe', forceId: mesId, scroll: isLastMessageSwipe && !swipeAnchor, showSwipes: false });
-
-            if (swipeAnchor) {
-                await settleVisibleChatMessageAnchor(swipeAnchor);
-            }
+            addOneMessage(chat[mesId], { type: 'swipe', forceId: mesId, scroll: swipeViewportUpdate.scrollWithAddOneMessage, showSwipes: false });
+            await applySwipeReplacementViewportUpdate(swipeViewportUpdate);
 
             if (power_user.message_token_count_enabled) {
                 if (!chat[mesId].extra) {
@@ -13455,9 +13505,7 @@ export async function swipe(event, direction, { source, repeated, message = chat
         //Swipe in from the opposite side.
         await animateSwipeTransition(mesId, { xStart: `${-swipeRange}px`, xEnd: `${0}px`, duration: swipeDuration });
 
-        if (swipeAnchor) {
-            await settleVisibleChatMessageAnchor(swipeAnchor);
-        }
+        await settleSwipeReplacementAnchor(swipeViewportUpdate);
     }
 
     if (mesId === Number(this_edit_mes_id)) {
@@ -13554,6 +13602,7 @@ export async function swipe(event, direction, { source, repeated, message = chat
                 return;
             } else if (overswipe == OVERSWIPE_BEHAVIOR.LOOP || overswipe == OVERSWIPE_BEHAVIOR.PRISTINE_GREETING) {
                 // Loop to the first swipe.
+                isOverswipeReplacement = true;
                 newSwipeId = 0;
             }
         }

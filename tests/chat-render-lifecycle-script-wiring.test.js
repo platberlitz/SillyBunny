@@ -387,4 +387,54 @@ describe('chat render lifecycle script wiring', () => {
         expect(queueSource).toContain('applyStreamingVisibleWrite(messageId, write, { isFinal });');
         expect(queueSource).toContain('getStreamingVisibleWriteBuffer().queue(messageId, write, { isFinal });');
     });
+
+    test('swipe replacement keeps viewport routing behind the lifecycle rollout guard', () => {
+        const getSwipeReplacementViewportUpdate = findFunctionDeclaration('getSwipeReplacementViewportUpdate');
+        const source = getSource(getSwipeReplacementViewportUpdate);
+
+        expect(source).toContain('if (!useLifecycleRoute || !isChatRenderLifecycleRolloutEnabled())');
+        expect(source).toContain('const anchor = isLastMessageSwipe && !isChatScrolledNearBottom()');
+        expect(source).toContain('captureVisibleChatMessageAnchor()');
+        expect(source).toContain('scrollWithAddOneMessage: isLastMessageSwipe && !anchor');
+        expect(source).toContain('intent: CHAT_SCROLL_INTENT.REPLACE_MESSAGE');
+        expect(source).toContain('autoScrollEnabled: power_user.auto_scroll_chat_to_bottom');
+        expect(source).toContain('isNearBottom,');
+        expect(source).toContain('hasAnchor: Boolean(anchor)');
+        expect(source).toContain('isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll()');
+        expect(source).toContain('scrollWithAddOneMessage: false');
+    });
+
+    test('guard-on swipe replacement applies bottom or anchor lifecycle actions', () => {
+        const applySwipeReplacementViewportUpdate = findFunctionDeclaration('applySwipeReplacementViewportUpdate');
+        const applySource = getSource(applySwipeReplacementViewportUpdate);
+
+        expect(applySource).toContain('shouldApplyChatBottomScrollAction(viewportUpdate?.action)');
+        expect(applySource).toContain('requestAnimationFrame(() =>');
+        expect(applySource).toContain('scrollChatElementToBottom();');
+        expect(applySource).toContain('await settleSwipeReplacementAnchor(viewportUpdate);');
+
+        const shouldSettleSwipeReplacementAnchor = findFunctionDeclaration('shouldSettleSwipeReplacementAnchor');
+        const settleSource = getSource(shouldSettleSwipeReplacementAnchor);
+
+        expect(settleSource).toContain('Boolean(viewportUpdate?.anchor)');
+        expect(settleSource).toContain('viewportUpdate.action.action === CHAT_SCROLL_ACTION.PRESERVE_ANCHOR');
+    });
+
+    test('display-only swipe replacement delegates viewport handling without touching generation flow', () => {
+        const swipe = findExportedFunction('swipe');
+        const source = getSource(swipe);
+
+        expect(source).toContain('let swipeViewportUpdate = null;');
+        expect(source).toContain('let isOverswipeReplacement = false;');
+        expect(source).toContain('const useLifecycleRoute = source !== SWIPE_SOURCE.DELETE && source !== SWIPE_SOURCE.BACK && !isOverswipeReplacement;');
+        expect(source).toContain('swipeViewportUpdate = getSwipeReplacementViewportUpdate({ isLastMessageSwipe, useLifecycleRoute });');
+        expect(source).toContain('isOverswipeReplacement = true;');
+        expect(source).toContain('addOneMessage(chat[mesId], { type: \'swipe\', forceId: mesId, scroll: swipeViewportUpdate.scrollWithAddOneMessage, showSwipes: false });');
+        expect(source).toContain('await applySwipeReplacementViewportUpdate(swipeViewportUpdate);');
+        expect(source).toContain('await settleSwipeReplacementAnchor(swipeViewportUpdate);');
+
+        const runGenerateBlock = source.slice(source.indexOf('if (run_generate) {'), source.indexOf('} else {', source.indexOf('if (run_generate) {')));
+        expect(runGenerateBlock).not.toContain('getSwipeReplacementViewportUpdate');
+        expect(runGenerateBlock).not.toContain('addOneMessage');
+    });
 });
