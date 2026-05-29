@@ -597,9 +597,8 @@ let entitySelectionPulseId = 0;
 let showMoreTouchMoved = false;
 let pendingMobileMessageUpdateFrame = 0;
 let pendingMobileMessageUpdateTimer = 0;
-/** @type {Map<number, { message: object, rerenderMessage: boolean }>} */
-const pendingMobileMessageUpdates = new Map();
 let messageUpdateQueue = null;
+let mobileMessageUpdateQueue = null;
 
 let dialogueResolve = null;
 let dialogueCloseStop = false;
@@ -1995,6 +1994,16 @@ function getMessageUpdateQueue() {
     return messageUpdateQueue;
 }
 
+function getMobileMessageUpdateQueue() {
+    if (!mobileMessageUpdateQueue) {
+        mobileMessageUpdateQueue = createMessageUpdateQueue({
+            applyUpdate: applyMessageBlockUpdate,
+        });
+    }
+
+    return mobileMessageUpdateQueue;
+}
+
 function updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessage }) {
     const queue = getMessageUpdateQueue();
     queue.queue(messageId, message, { rerenderMessage });
@@ -2004,19 +2013,11 @@ function updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessag
 function flushPendingMobileMessageUpdates() {
     pendingMobileMessageUpdateFrame = 0;
     pendingMobileMessageUpdateTimer = 0;
-    const updates = [...pendingMobileMessageUpdates.entries()];
-    pendingMobileMessageUpdates.clear();
-
-    for (const [messageId, { message, rerenderMessage }] of updates) {
-        applyMessageBlockUpdate(messageId, message, { rerenderMessage });
-    }
+    getMobileMessageUpdateQueue().flush();
 }
 
 function queueMobileMessageBlockUpdate(messageId, message, { rerenderMessage }) {
-    pendingMobileMessageUpdates.set(messageId, {
-        message,
-        rerenderMessage: pendingMobileMessageUpdates.get(messageId)?.rerenderMessage || rerenderMessage,
-    });
+    getMobileMessageUpdateQueue().queue(messageId, message, { rerenderMessage });
 
     if (pendingMobileMessageUpdateFrame || pendingMobileMessageUpdateTimer) {
         return;

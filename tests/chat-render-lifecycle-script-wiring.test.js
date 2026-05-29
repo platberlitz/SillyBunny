@@ -291,4 +291,30 @@ describe('chat render lifecycle script wiring', () => {
         expect(lifecycleSource).toContain('queue.queue(messageId, message, { rerenderMessage });');
         expect(lifecycleSource).toContain('queue.flush();');
     });
+
+    test('mobile-deferred message updates use the lifecycle update queue without changing scheduling policy', () => {
+        expect(scriptSource).not.toContain('pendingMobileMessageUpdates = new Map');
+        expect(scriptSource).not.toContain('pendingMobileMessageUpdates.set');
+
+        const getMobileMessageUpdateQueue = findFunctionDeclaration('getMobileMessageUpdateQueue');
+        const getMobileQueueSource = getSource(getMobileMessageUpdateQueue);
+
+        expect(getMobileQueueSource).toContain('createMessageUpdateQueue({');
+        expect(getMobileQueueSource).toContain('applyUpdate: applyMessageBlockUpdate');
+
+        const flushPendingMobileMessageUpdates = findFunctionDeclaration('flushPendingMobileMessageUpdates');
+        const flushSource = getSource(flushPendingMobileMessageUpdates);
+
+        expect(flushSource).toContain('pendingMobileMessageUpdateFrame = 0;');
+        expect(flushSource).toContain('pendingMobileMessageUpdateTimer = 0;');
+        expect(flushSource).toContain('getMobileMessageUpdateQueue().flush();');
+
+        const queueMobileMessageBlockUpdate = findFunctionDeclaration('queueMobileMessageBlockUpdate');
+        const queueSource = getSource(queueMobileMessageBlockUpdate);
+
+        expect(queueSource).toContain('getMobileMessageUpdateQueue().queue(messageId, message, { rerenderMessage });');
+        expect(queueSource).toContain('if (pendingMobileMessageUpdateFrame || pendingMobileMessageUpdateTimer)');
+        expect(queueSource).toContain('pendingMobileMessageUpdateTimer = window.setTimeout(() =>');
+        expect(queueSource).toContain('pendingMobileMessageUpdateFrame = requestAnimationFrame(flushPendingMobileMessageUpdates);');
+    });
 });
