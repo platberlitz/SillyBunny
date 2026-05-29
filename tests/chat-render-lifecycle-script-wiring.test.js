@@ -344,4 +344,47 @@ describe('chat render lifecycle script wiring', () => {
         expect(source).toContain('shouldApplyChatBottomScrollAction(action)');
         expect(source).toContain('scrollChatElementToBottom();');
     });
+
+    test('streaming progress keeps visible DOM write routing behind the lifecycle rollout guard', () => {
+        const onProgressStreaming = findNode(scriptAst, node => node.type === 'MethodDefinition'
+            && node.key?.name === 'onProgressStreaming');
+        const source = getSource(onProgressStreaming.value);
+
+        expect(source).toContain('await this.#checkDomElements(messageId);');
+        expect(source).toContain('await updateMessageTokenAccounting(chat[messageId],');
+        expect(source).toContain('shouldUpdateMetaBadges: !shouldReduceIntermediateStreamingWork');
+        expect(source).toContain('this.setFirstSwipe(messageId);');
+        expect(source).toContain('this.#queueStreamingVisibleWrite({');
+        expect(source).toContain('formattedText,');
+        expect(source).toContain('timePassed,');
+        expect(source).toContain('currentTokenCount,');
+        expect(source).toContain('isFinal,');
+    });
+
+    test('guard-on streaming progress delegates visible DOM writes to the lifecycle stream buffer', () => {
+        expect(scriptSource).toContain('createStreamWriteBuffer,');
+
+        const getStreamingVisibleWriteBuffer = findFunctionDeclaration('getStreamingVisibleWriteBuffer');
+        const getBufferSource = getSource(getStreamingVisibleWriteBuffer);
+
+        expect(getBufferSource).toContain('createStreamWriteBuffer({');
+        expect(getBufferSource).toContain('applyWrite: applyStreamingVisibleWrite');
+
+        const applyStreamingVisibleWrite = findFunctionDeclaration('applyStreamingVisibleWrite');
+        const applySource = getSource(applyStreamingVisibleWrite);
+
+        expect(applySource).toContain('applyStreamFadeIn(messageTextDom, formattedText,');
+        expect(applySource).toContain('messageTextDom.innerHTML = formattedText;');
+        expect(applySource).toContain('messageTokenCounterDom.textContent = `${currentTokenCount}t`;');
+        expect(applySource).toContain('messageTimerDom.textContent = timePassed.timerValue;');
+        expect(applySource).toContain('messageTimerDom.title = timePassed.timerTitle;');
+
+        const queueStreamingVisibleWrite = findNode(scriptAst, node => node.type === 'MethodDefinition'
+            && node.key?.name === 'queueStreamingVisibleWrite');
+        const queueSource = getSource(queueStreamingVisibleWrite.value);
+
+        expect(queueSource).toContain('if (!isChatRenderLifecycleRolloutEnabled())');
+        expect(queueSource).toContain('applyStreamingVisibleWrite(messageId, write, { isFinal });');
+        expect(queueSource).toContain('getStreamingVisibleWriteBuffer().queue(messageId, write, { isFinal });');
+    });
 });
