@@ -2,9 +2,11 @@
 import { expect, test } from '@playwright/test';
 import {
     getChatScrollSnapshot,
+    getRedisplayCompatibilitySnapshot,
     getRenderedMessageIds,
     installSwipeCandidate,
     installSyntheticLongChat,
+    markFirstRenderedMessageEditing,
     markManualMobileScroll,
     openReadyChat,
     scrollMessageNearTop,
@@ -26,6 +28,22 @@ test.describe('issue 167 chat scroll regressions', () => {
         expect(snapshot.lastMesId).toBe('95');
         expect(snapshot.lastVisibleMesId).toBe('95');
         expect(snapshot.bottomDelta).toBeLessThanOrEqual(16);
+    });
+
+    test('redisplay keeps render follow-up hooks applied after batched render', async ({ page }) => {
+        await installSyntheticLongChat(page, { messageCount: 36, visibleCount: 12 });
+        await markFirstRenderedMessageEditing(page);
+        await page.evaluate(async () => window.SillyTavern.getContext().redisplayChat({ startIndex: 24, fade: false }));
+
+        const snapshot = await getRedisplayCompatibilitySnapshot(page);
+
+        expect(snapshot.renderedMessageIds).toEqual(Array.from({ length: 12 }, (_, index) => String(24 + index)));
+        expect(snapshot.lastMessageId).toBe('35');
+        expect(snapshot.lastMessageClassCount).toBe(1);
+        expect(snapshot.fadeClassCount).toBe(0);
+        expect(snapshot.stylePinsCount).toBe(0);
+        expect(snapshot.firstEditUpDisabled).toBe(true);
+        expect(snapshot.firstEditDownDisabled).toBe(false);
     });
 
     test('show more preserves the first visible message anchor', async ({ page }) => {

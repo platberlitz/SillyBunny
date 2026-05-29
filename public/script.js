@@ -312,6 +312,7 @@ import {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
+    renderMessagesInBatches,
     resolveChatBottomScrollAction,
     resolveChatRenderLifecycleRollout,
     resolveChatScrollAction,
@@ -2144,6 +2145,63 @@ function scrollLoadedChatToBottom() {
     }
 }
 
+async function renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize }) {
+    const renderedMessageIds = lodash.range(startIndex, startIndex + messages.length, 1);
+    const shouldYieldBetweenBatches = batchSize < messages.length;
+
+    for (let offset = 0; offset < messages.length; offset += batchSize) {
+        const batchMessages = messages.slice(offset, offset + batchSize);
+        const fragment = document.createDocumentFragment();
+        const newMessageElements = batchMessages.map((message, batchOffset) => {
+            const messageId = startIndex + offset + batchOffset;
+            const messageElement = updateMessageElement(message, { messageId });
+
+            return messageElement[0];
+        });
+
+        if (offset + batchSize >= messages.length) {
+            //The last_mes has been removed, add it to the new last message.
+            newMessageElements.at(-1).classList.add('last_mes');
+        }
+
+        //Append each batch in one DOM update.
+        for (const messageElement of newMessageElements) {
+            fragment.appendChild(messageElement);
+        }
+        chatElement[0].appendChild(fragment);
+
+        if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
+            await waitForNextFrame();
+        }
+    }
+
+    return renderedMessageIds;
+}
+
+async function renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize }) {
+    const { renderedMessageIds } = await renderMessagesInBatches({
+        messages,
+        firstMessageId: startIndex,
+        batchSize,
+        renderMessageElement: (message, messageId) => updateMessageElement(message, { messageId }),
+        insertFragment: fragment => chatElement[0].appendChild(fragment),
+        waitForNextFrame,
+        markLastMessage: true,
+    });
+
+    return renderedMessageIds;
+}
+
+async function renderRedisplayChatMessages({ messages, startIndex }) {
+    const batchSize = getMobileChatRenderBatchSize(messages.length);
+
+    if (isChatRenderLifecycleRolloutEnabled()) {
+        return renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize });
+    }
+
+    return renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize });
+}
+
 /**
  * Visually updates all chat messages including and after index by removing them, then adding them.
  * @param {object} [options] Options
@@ -2163,35 +2221,7 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
     const messages = targetChat.slice(startIndex);
 
     if (messages.length > 0) {
-        const renderedMessageIds = lodash.range(startIndex, targetChat.length, 1);
-        const batchSize = getMobileChatRenderBatchSize(messages.length);
-        const shouldYieldBetweenBatches = batchSize < messages.length;
-
-        for (let offset = 0; offset < messages.length; offset += batchSize) {
-            const batchMessages = messages.slice(offset, offset + batchSize);
-            const fragment = document.createDocumentFragment();
-            const newMessageElements = batchMessages.map((message, batchOffset) => {
-                const i = startIndex + offset + batchOffset;
-                const messageElement = updateMessageElement(message, { messageId: i });
-
-                return messageElement[0];
-            });
-
-            if (offset + batchSize >= messages.length) {
-                //The last_mes has been removed, add it to the new last message.
-                newMessageElements.at(-1).classList.add('last_mes');
-            }
-
-            //Append each batch in one DOM update.
-            for (const messageElement of newMessageElements) {
-                fragment.appendChild(messageElement);
-            }
-            chatElement[0].appendChild(fragment);
-
-            if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
-                await waitForNextFrame();
-            }
-        }
+        const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex });
 
         applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });
     }

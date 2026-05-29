@@ -297,6 +297,34 @@ export async function getRenderedMessageIds(page) {
         .filter(Boolean));
 }
 
+export async function markFirstRenderedMessageEditing(page) {
+    const firstEditButton = page.locator('#chat .mes[mesid] .mes_edit').first();
+
+    await firstEditButton.waitFor({ state: 'visible', timeout: 5000 });
+    await firstEditButton.click();
+    await page.locator('#chat .mes[mesid] .mes_edit_buttons:visible').first().waitFor({ state: 'visible', timeout: 5000 });
+    await waitForAnimationFrames(page, 2);
+}
+
+export async function getRedisplayCompatibilitySnapshot(page) {
+    return page.evaluate(() => {
+        const chat = document.querySelector('#chat');
+        const messages = Array.from(chat.querySelectorAll('.mes[mesid]'));
+        const firstMessage = messages.at(0);
+        const lastMessage = messages.at(-1);
+
+        return {
+            renderedMessageIds: messages.map(message => message.getAttribute('mesid')),
+            lastMessageId: lastMessage?.getAttribute('mesid') ?? null,
+            lastMessageClassCount: chat.querySelectorAll('.mes.last_mes').length,
+            fadeClassCount: chat.querySelectorAll('.mes.fade').length,
+            stylePinsCount: chat.querySelectorAll(':scope > .style-pins').length,
+            firstEditUpDisabled: firstMessage?.querySelector('.mes_edit_up')?.classList.contains('disabled') ?? false,
+            firstEditDownDisabled: firstMessage?.querySelector('.mes_edit_down')?.classList.contains('disabled') ?? false,
+        };
+    });
+}
+
 export async function scrollMessageNearTop(page, messageId, offsetTop = 24) {
     await page.waitForFunction((targetMessageId) => {
         return document.querySelector(`#chat .mes[mesid="${targetMessageId}"]`) !== null;
