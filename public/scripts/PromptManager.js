@@ -13,7 +13,7 @@ import { Popup } from './popup.js';
 import { t } from './i18n.js';
 import { isMobile } from './RossAscends-mods.js';
 import { accountStorage } from './util/AccountStorage.js';
-import { getPromptDisplayTokenCounts } from './prompt-token-counts.js';
+import { getPromptDisplayTokenCounts, getPromptSourceTokenCounts } from './prompt-token-counts.js';
 import { getRenderedMarkerPrompt } from './prompt-manager-marker-preview.js';
 import {
     resolvePromptManagerRenderState,
@@ -380,6 +380,10 @@ class PromptManager {
 
         // One-shot scroll restore captured before save-time layout changes.
         this.pendingPromptManagerScrollPosition = null;
+
+        // Prompt row token counts calculated from enabled preset prompt source text.
+        this.sourcePromptTokenCounts = {};
+        this.sourcePromptTokenUsage = 0;
 
         // Error state, contains error message.
         this.error = null;
@@ -1225,6 +1229,7 @@ class PromptManager {
                     this.profileEnd('filling context');
                     this.profileStart('render');
                     const scrollPosition = this.#getScrollPosition();
+                    await this.populateSourcePromptTokenCounts();
                     await this.renderPromptManager();
                     await this.renderPromptManagerListItems();
                     this.makeDraggable();
@@ -1235,6 +1240,7 @@ class PromptManager {
                 // Executed during live communication
                 this.profileStart('render');
                 const scrollPosition = this.#getScrollPosition();
+                await this.populateSourcePromptTokenCounts();
                 await this.renderPromptManager();
                 await this.renderPromptManagerListItems();
                 this.makeDraggable();
@@ -2015,6 +2021,36 @@ class PromptManager {
         this.log('Updated token usage with ' + this.tokenUsage);
     }
 
+    hasRuntimePromptTokenCounts() {
+        return Object.values(this.promptTokenCounts ?? {}).some(tokens => Number(tokens) > 0);
+    }
+
+    getActivePromptTokenCounts() {
+        return this.hasRuntimePromptTokenCounts() ? this.promptTokenCounts : this.sourcePromptTokenCounts;
+    }
+
+    getDisplayTokenUsage() {
+        return this.hasRuntimePromptTokenCounts() ? this.tokenUsage : this.sourcePromptTokenUsage;
+    }
+
+    async populateSourcePromptTokenCounts() {
+        if (this.hasRuntimePromptTokenCounts() || !this.activeCharacter || !this.tokenHandler) {
+            this.sourcePromptTokenCounts = {};
+            this.sourcePromptTokenUsage = 0;
+            return;
+        }
+
+        const prompts = this.getPromptsForCharacter(this.activeCharacter, true)
+            .filter(prompt => this.shouldTrigger(prompt))
+            .map(prompt => this.preparePrompt(prompt));
+
+        this.sourcePromptTokenCounts = await getPromptSourceTokenCounts(prompts, message => this.tokenHandler.countUntrackedAsync(message));
+        this.sourcePromptTokenUsage = Object.values(this.sourcePromptTokenCounts).reduce((total, tokens) => {
+            const tokenCount = Number(tokens);
+            return total + (Number.isFinite(tokenCount) ? tokenCount : 0);
+        }, 0);
+    }
+
     /**
      * Empties, then re-assembles the container containing the prompt list.
      */
@@ -2034,7 +2070,7 @@ class PromptManager {
                 </div>
         ` : '';
 
-        const totalActiveTokens = this.tokenUsage;
+        const totalActiveTokens = this.getDisplayTokenUsage();
 
         const headerHtml = await renderTemplateAsync('promptManagerHeader', { error: this.error, errorDiv, prefix: this.configuration.prefix, totalActiveTokens, dragLocked: power_user.prompt_manager_drag_locked });
         promptManagerDiv.insertAdjacentHTML('beforeend', headerHtml);
@@ -2117,6 +2153,7 @@ class PromptManager {
         promptManagerList.innerHTML = '';
 
         const { prefix } = this.configuration;
+        const displayTokenCounts = this.getActivePromptTokenCounts();
 
         let listItemHtml = await renderTemplateAsync('promptManagerListHeader', { prefix });
 
@@ -2127,7 +2164,7 @@ class PromptManager {
             const enabledClass = listEntry.enabled ? '' : `${prefix}prompt_manager_prompt_disabled`;
             const draggableClass = `${prefix}prompt_manager_prompt_draggable`;
             const markerClass = prompt.marker ? `${prefix}prompt_manager_marker` : '';
-            const tokens = this.promptTokenCounts?.[prompt.identifier] ?? this.tokenHandler?.getCounts()[prompt.identifier] ?? 0;
+            const tokens = displayTokenCounts?.[prompt.identifier] ?? this.tokenHandler?.getCounts()[prompt.identifier] ?? 0;
 
             // Warn the user if the chat history goes below certain token thresholds.
             let warningClass = '';
