@@ -1495,7 +1495,7 @@ function buildGoogleFontHref(fontName) {
         return '';
     }
 
-    const encodedFamily = family.split(/\s+/).filter(Boolean).join('+');
+    const encodedFamily = family.split(/\s+/).filter(Boolean).join(' ');
     return `https://fonts.googleapis.com/css2?family=${encodeURIComponent(encodedFamily)}:wght@400;500;600;700&display=swap`;
 }
 
