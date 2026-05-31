@@ -90,6 +90,7 @@ let latestAssistantPostProcessingFallbackTimeout = null;
 let latestAssistantPostProcessingFallbackDeadline = 0;
 let postGenerationRecoveryTimeout = null;
 let missedGenerationEndRecoveryTimeout = null;
+let agentRunnerInitialized = false;
 let postGenerationRecoveryHooksInitialized = false;
 let postGenerationRecoveryObserver = null;
 const activePromptTransformToasts = new Set();
@@ -4203,6 +4204,11 @@ export async function redoPromptTransform(messageIndex) {
  * Registers all event listeners for the agent runner.
  */
 export function initAgentRunner() {
+    if (agentRunnerInitialized) {
+        return;
+    }
+
+    agentRunnerInitialized = true;
     initPostGenerationRecoveryHooks();
 
     eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
