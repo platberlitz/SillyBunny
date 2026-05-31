@@ -1,19 +1,37 @@
 import { getRequestHeaders, substituteParams } from '../../../script.js';
-import { saveTtsProviderSettings, sanitizeId } from './index.js';
+import { getPreviewString, saveTtsProviderSettings, sanitizeId } from './index.js';
 
 export { OpenAITtsProvider };
+
+// SillyBunny: expose OpenAI's browser-playable response formats instead of forcing MP3.
+const OPENAI_TTS_RESPONSE_FORMATS = [
+    { value: 'wav', label: 'WAV' },
+    { value: 'mp3', label: 'MP3' },
+    { value: 'opus', label: 'Opus' },
+    { value: 'aac', label: 'AAC' },
+    { value: 'flac', label: 'FLAC' },
+];
+
+function getOpenAiTtsResponseFormat(value) {
+    const responseFormat = String(value ?? 'wav').toLowerCase();
+    return OPENAI_TTS_RESPONSE_FORMATS.some(format => format.value === responseFormat) ? responseFormat : 'wav';
+}
 
 class OpenAITtsProvider {
     static voices = [
         { name: 'Alloy', voice_id: 'alloy', lang: 'en-US', preview_url: 'https://cdn.openai.com/API/docs/audio/alloy.wav' },
         { name: 'Ash', voice_id: 'ash', lang: 'en-US', preview_url: 'https://cdn.openai.com/API/docs/audio/ash.wav' },
+        { name: 'Ballad', voice_id: 'ballad', lang: 'en-US', preview_url: false },
         { name: 'Coral', voice_id: 'coral', lang: 'en-US', preview_url: 'https://cdn.openai.com/API/docs/audio/coral.wav' },
         { name: 'Echo', voice_id: 'echo', lang: 'en-US', preview_url: 'https://cdn.openai.com/API/docs/audio/echo.wav' },
         { name: 'Fable', voice_id: 'fable', lang: 'en-US', preview_url: 'https://cdn.openai.com/API/docs/audio/fable.wav' },
+        { name: 'Marin', voice_id: 'marin', lang: 'en-US', preview_url: false },
         { name: 'Onyx', voice_id: 'onyx', lang: 'en-US', preview_url: 'https://cdn.openai.com/API/docs/audio/onyx.wav' },
         { name: 'Nova', voice_id: 'nova', lang: 'en-US', preview_url: 'https://cdn.openai.com/API/docs/audio/nova.wav' },
         { name: 'Sage', voice_id: 'sage', lang: 'en-US', preview_url: 'https://cdn.openai.com/API/docs/audio/sage.wav' },
         { name: 'Shimmer', voice_id: 'shimmer', lang: 'en-US', preview_url: 'https://cdn.openai.com/API/docs/audio/shimmer.wav' },
+        { name: 'Verse', voice_id: 'verse', lang: 'en-US', preview_url: false },
+        { name: 'Cedar', voice_id: 'cedar', lang: 'en-US', preview_url: false },
     ];
 
     settings;
@@ -26,6 +44,7 @@ class OpenAITtsProvider {
         customVoices: [],
         model: 'tts-1',
         speed: 1,
+        response_format: 'wav',
         characterInstructions: {},
     };
 
@@ -45,7 +64,15 @@ class OpenAITtsProvider {
                     <option value="tts-1-1106">tts-1-1106</option>
                     <option value="tts-1-hd-1106">tts-1-hd-1106</option>
                 </optgroup>
-            <select>
+            </select>
+            <small>Ballad, Marin, Verse, and Cedar require gpt-4o-mini-tts.</small>
+        </div>
+        <div>
+            <label for="openai-tts-response-format">Output format:</label>
+            <select id="openai-tts-response-format">
+                ${OPENAI_TTS_RESPONSE_FORMATS.map(format => `<option value="${format.value}">${format.label}</option>`).join('')}
+            </select>
+            <small>WAV is the default. OpenAI also supports raw PCM, but it is not exposed here because browser playback expects an audio container.</small>
         </div>
         <div>
             <label for="openai-tts-speed">Speed: <span id="openai-tts-speed-output"></span></label>
@@ -71,8 +98,15 @@ class OpenAITtsProvider {
             }
         }
 
+        this.settings.response_format = getOpenAiTtsResponseFormat(this.settings.response_format);
+
         $('#openai-tts-model').val(this.settings.model);
         $('#openai-tts-model').on('change', () => {
+            this.onSettingsChange();
+        });
+
+        $('#openai-tts-response-format').val(this.settings.response_format);
+        $('#openai-tts-response-format').on('change', () => {
             this.onSettingsChange();
         });
 
@@ -114,6 +148,7 @@ class OpenAITtsProvider {
     onSettingsChange() {
         // Update dynamically
         this.settings.model = String($('#openai-tts-model').find(':selected').val());
+        this.settings.response_format = getOpenAiTtsResponseFormat($('#openai-tts-response-format').find(':selected').val());
         this.settings.speed = Number($('#openai-tts-speed').val());
         $('#openai-tts-speed-output').text(this.settings.speed);
         this.updateInstructionsUI();
@@ -215,8 +250,17 @@ class OpenAITtsProvider {
         return OpenAITtsProvider.voices;
     }
 
-    async previewTtsVoice(_) {
-        return;
+    async previewTtsVoice(voiceId) {
+        this.audioElement.pause();
+        this.audioElement.currentTime = 0;
+
+        const text = getPreviewString('en-US');
+        const response = await this.fetchTtsGeneration(text, voiceId);
+        const audio = await response.blob();
+        const url = URL.createObjectURL(audio);
+        this.audioElement.src = url;
+        this.audioElement.play();
+        this.audioElement.onended = () => URL.revokeObjectURL(url);
     }
 
     async fetchTtsGeneration(inputText, voiceId, characterName = null) {
@@ -227,6 +271,7 @@ class OpenAITtsProvider {
             'voice': voiceId,
             'model': this.settings.model,
             'speed': this.settings.speed,
+            'response_format': this.settings.response_format,
         };
 
         if (this.settings.model === 'gpt-4o-mini-tts' && characterName) {
