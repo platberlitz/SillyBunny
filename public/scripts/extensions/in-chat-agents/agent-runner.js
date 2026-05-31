@@ -115,6 +115,7 @@ let postProcessingGenerationRunId = 0;
 let swipeNavigationPending = false;
 const activePathfinderRetrievalAbortControllers = new Set();
 let activePathfinderRetrievalToast = null;
+let activeInitialGenerationToast = null;
 
 /** Track which tool names were registered by the agent system so we can cleanly unregister only our own. */
 const agentRegisteredToolNames = new Set();
@@ -213,6 +214,7 @@ export function cancelAgentGeneration() {
     clearDeferredPostProcessing();
     clearMissedGenerationEndRecoveryCheck();
     clearAllPromptTransformRunningToasts();
+    clearInitialGenerationToast();
     clearPathfinderRetrievalToast();
     abortActivePathfinderRetrieval('Pathfinder retrieval cancelled by user.');
 
@@ -253,6 +255,23 @@ function clearPathfinderRetrievalToast() {
 
     toastr.clear(activePathfinderRetrievalToast);
     activePathfinderRetrievalToast = null;
+}
+
+function showInitialGenerationToast() {
+    if (activeInitialGenerationToast) {
+        return;
+    }
+
+    activeInitialGenerationToast = toastr.info('Generating initial message', 'In-Chat Agents', { timeOut: 0, extendedTimeOut: 0 });
+}
+
+function clearInitialGenerationToast() {
+    if (!activeInitialGenerationToast) {
+        return;
+    }
+
+    toastr.clear(activeInitialGenerationToast);
+    activeInitialGenerationToast = null;
 }
 
 function shouldShowPathfinderRetrievalToast(pathfinderAgent) {
@@ -1294,6 +1313,7 @@ function recoverMissedGenerationEnd(reason = 'fallback') {
     toolSyncDuringGeneration = false;
     generationStopRequested = false;
     clearMissedGenerationEndRecoveryCheck();
+    clearInitialGenerationToast();
     queueLatestAssistantPostProcessingFromSnapshot();
     scheduleDeferredPostProcessingFlush();
     schedulePostGenerationRecoveryCheck();
@@ -2999,6 +3019,7 @@ function onGenerationStarted(generationType, _options, dryRun) {
     clearPostGenerationRecoveryCheck();
     clearMissedGenerationEndRecoveryCheck();
     clearAllPromptTransformRunningToasts();
+    clearInitialGenerationToast();
     takePendingPreGenerationInterceptRuns();
     pendingGenerationSnapshot = buildActivationSnapshot(currentMainGenerationType);
     generationStartChatLength = chat.length;
@@ -3023,6 +3044,8 @@ function onGenerationEnded() {
     if (internalPromptTransformDepth > 0) {
         return;
     }
+
+    clearInitialGenerationToast();
 
     if (stoppedGenerationRunId === postProcessingGenerationRunId) {
         isGenerationInProgress = false;
@@ -3077,6 +3100,7 @@ function onGenerationStopped() {
     clearDeferredPostProcessing();
     clearAllPromptTransformRunningToasts();
     clearPathfinderRetrievalToast();
+    clearInitialGenerationToast();
     takePendingPreGenerationInterceptRuns();
     abortActivePathfinderRetrieval('Pathfinder retrieval cancelled because generation stopped.');
 }
@@ -3889,13 +3913,13 @@ async function runPostMainGenerationInterceptorsOnText(initialOutputText, genera
     return { text: currentOutputText, runs, cancelled: false };
 }
 
-function hasPostMainGenerationInterceptors(generationType) {
+function getPostMainGenerationInterceptorsForGeneration(generationType) {
     if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
-        return false;
+        return [];
     }
 
     const activationSnapshot = getGenerationContextSnapshot(generationType);
-    return getPostMainGenerationInterceptAgents(getSnapshotAgents(activationSnapshot)).length > 0;
+    return getPostMainGenerationInterceptAgents(getSnapshotAgents(activationSnapshot));
 }
 
 async function onGenerateAfterCombinePrompts(eventData) {
@@ -3942,8 +3966,12 @@ async function onGenerationOutputBufferingDecision(eventData) {
         return;
     }
 
-    if (hasPostMainGenerationInterceptors(eventData.type ?? currentMainGenerationType)) {
+    const interceptAgents = getPostMainGenerationInterceptorsForGeneration(eventData.type ?? currentMainGenerationType);
+    if (interceptAgents.length > 0) {
         eventData.hasPostMainInterceptors = true;
+        if (interceptAgents.some(shouldShowPreInterceptNotifications)) {
+            showInitialGenerationToast();
+        }
     }
 }
 
@@ -3951,6 +3979,8 @@ async function onMainGenerationOutputReady(eventData) {
     if (!eventData || eventData.dryRun || internalPromptTransformDepth > 0) {
         return;
     }
+
+    clearInitialGenerationToast();
 
     if (generationStopRequested) {
         eventData.cancelled = true;

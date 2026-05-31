@@ -520,9 +520,9 @@
       "quality",
       "prose"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Grounded Prose Rules\n- Each beat must alter pressure, leverage, focus, relation, or access.\n- Sensory detail only where it has material relevance to the scene.\n- Replace abstraction and statistical phrasing with observable detail.\n- Sparse dialogue tags when speaker and tone are already legible. After dialogue, move through action, reaction, or a new beat.\n- Default to contractions in dialogue; preserve character-appropriate formality.\n- Fresh, concrete phrasing. Render emphasis through behavior, timing, syntax, and consequence.\n- State what something is, does, or changes. Direct positive construction.\n- Similes rare, exact, and materially specific.\n- Replace every banned construction below with something narratively consistent:\n\n**Banned constructions:** \"not X,\" \"not X but Y,\" \"not quite X,\" synthetic negative parallelisms, flat-affect comparisons to weather or groceries, \"and yet,\" \"a beat,\" \"say that again,\" \"somewhere, X...,\" \"they don't X,\" \"that does it,\" \"that lands,\" \"that lands X,\" \"not a question,\" \"not really a question,\" \"not quite a question,\" \"statement than question,\" \"really looks at,\" \"like a physical blow,\" \"like a stone into still water,\" \"blood rushing,\" \"a sound between X and Y,\" \"dust motes,\" \"predator and prey\" constructions\n\n**Banned tics:** jaw-clenching, jaw-tightening, mouth open-close cycling, breath-catching, knuckle-whitening, knuckles turning pale, cheeks burning\n\n**Banned scents:** ozone, sandalwood, cedar, cardamom\n\n**Banned nicknames:** gremlin, goblin\n\n- If introducing a new unnamed character this turn, their name must start with: {{random::A::B::C::D::E::F::G::H::I::J::K::L::M::N::O::P::R::S::T::V::W::Y}} and/or {{random::A::B::C::D::E::F::G::H::I::J::K::L::M::N::O::P::R::S::T::V::W::Y}}. Create new NPCs sparingly.",
+    "prompt": "### Grounded Prose Rules\n- Each beat must alter pressure, leverage, focus, relation, or access.\n- Write sensory detail only where materially relevant. Focus on visuals and personalities of environment. Messiness or items strewn about are more informative than smells.\n- Scents allowed aside from banned ones.\n- Echoing and parroting any dialogue from any characters is forbidden.\n- Instead of stating what a character doesn't do, just say what they're currently doing. The implication is already in the active action.\n- Replace abstraction and statistical phrasing with observable detail.\n- Sparse dialogue tags when speaker and tone are already legible. After dialogue, move through action, reaction, or a new beat.\n- Default to contractions in dialogue; preserve character-appropriate formality.\n- Fresh, concrete phrasing. Render emphasis through behavior, timing, syntax, and consequence.\n- Similes rare, exact, and materially specific.\n- Replace every banned construction below with something narratively consistent, or skip it entirely:\n\n**Banned constructions:** \"not X,\" \"not X but Y,\" \"not quite X,\" synthetic negative parallelisms, flat-affect comparisons to weather or groceries, \"say that again,\" \"somewhere, X...,\" \"they don't X,\" \"that does it,\" \"that lands,\" \"that lands X,\" \"not a question,\" \"not really a question,\" \"not quite a question,\" \"statement than question,\" \"really looks at,\" \"like a physical blow,\" \"like a stone into still water,\" \"blood rushing,\" \"a sound between X and Y,\" \"dust motes,\" \"predator and prey\" constructions, \"doesn't just X, but Y\", \"doesn't X; Y\"\n\n**Banned tics:** jaw-clenching, jaw-tightening, jaw-shifting, mouth open-close cycling, breath-catching, knuckle-whitening, knuckles turning pale, cheeks burning, specific word repetition. Replace with character-specific quirks, gestures, movements, muttering.\n\n**Banned scents:** ozone, sandalwood, cedar, cardamom\n\n**Banned nicknames:** gremlin, goblin\n\n**Ban animal-esque sounds for humans:** \"they chirp\", \"they purr\", \"they growl\"\n\n**Banned Fillers:** \"A beat\", \"A pause\"\n\n**Banned number counting:** e.g. \"I see,\" Two words.\n\n**Banned combined sounds:** \"between an X and a Y\", \"half X, half Y\", \"makes a/an X sound\"\n\n**Banned environmental details:** \"dust motes\", \"metallic tang of X\"\n\n- If introducing a new unnamed character this turn, their name must start with: {{random::A::B::C::D::E::F::G::H::I::J::K::L::M::N::O::P::R::S::T::V::W::Y}} and/or {{random::A::B::C::D::E::F::G::H::I::J::K::L::M::N::O::P::R::S::T::V::W::Y}}. Create new NPCs sparingly.",
     "phase": "pre",
     "injection": {
       "position": 0,
@@ -530,6 +530,17 @@
       "role": 0,
       "order": 100,
       "scan": false
+    },
+    "preProcess": {
+      "mode": "intercept",
+      "interceptTiming": "post-main-generation",
+      "applyMode": "replace",
+      "wrapPosition": "after",
+      "wrapPrefix": "",
+      "wrapSuffix": "",
+      "patchStartTag": "<context_patch>",
+      "patchEndTag": "</context_patch>",
+      "maxTokens": 32000
     },
     "postProcess": {
       "enabled": false,
