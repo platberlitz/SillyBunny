@@ -8,6 +8,7 @@ import {
     max_context,
     online_status,
     resultCheckStatus,
+    saveSettings,
     saveSettingsDebounced,
     setGenerationParamsFromPreset,
     setOnlineStatus,
@@ -423,7 +424,7 @@ async function selectPreset(name) {
     setGenerationParamsFromPreset(preset);
     BIAS_CACHE.delete(BIAS_KEY);
     displayLogitBias(preset.logit_bias, BIAS_KEY);
-    saveSettingsDebounced();
+    await saveSettings();
 }
 
 export function formatTextGenURL(value) {

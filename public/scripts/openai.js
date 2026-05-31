@@ -24,6 +24,7 @@ import {
     name1,
     name2,
     resultCheckStatus,
+    saveSettings,
     saveSettingsDebounced,
     setOnlineStatus,
     startStatusLoading,
@@ -6851,7 +6852,7 @@ function onSettingsPresetChange() {
         scheduleOpenAIUiRefresh();
         $('#openai_logit_bias_preset').trigger('change');
 
-        saveSettingsDebounced();
+        await saveSettings();
         await eventSource.emit(event_types.OAI_PRESET_CHANGED_AFTER);
         await eventSource.emit(event_types.PRESET_CHANGED, { apiId: 'openai', name: presetName });
     });
