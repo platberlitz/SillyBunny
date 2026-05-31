@@ -19,6 +19,7 @@ import {
 /**
  * @typedef {object} AgentPreProcess
  * @property {'inject'|'intercept'} mode - Inject is the existing setExtensionPrompt flow; intercept rewrites the assembled outgoing context.
+ * @property {'pre-generation'|'post-main-generation'} interceptTiming - When intercept mode runs.
  * @property {'replace'|'wrap'|'patch'} applyMode
  * @property {'before'|'after'} wrapPosition
  * @property {string} wrapPrefix
@@ -792,6 +793,7 @@ export function createDefaultAgent() {
         },
         preProcess: {
             mode: 'inject',
+            interceptTiming: 'pre-generation',
             applyMode: 'replace',
             wrapPosition: 'after',
             wrapPrefix: '',
@@ -890,6 +892,9 @@ export function normalizeAgent(rawAgent = {}) {
             mode: ['inject', 'intercept'].includes(String(rawPreProcess.mode))
                 ? String(rawPreProcess.mode)
                 : defaults.preProcess.mode,
+            interceptTiming: ['pre-generation', 'post-main-generation'].includes(String(rawPreProcess.interceptTiming))
+                ? String(rawPreProcess.interceptTiming)
+                : defaults.preProcess.interceptTiming,
             applyMode: ['replace', 'wrap', 'patch'].includes(String(rawPreProcess.applyMode))
                 ? String(rawPreProcess.applyMode)
                 : defaults.preProcess.applyMode,

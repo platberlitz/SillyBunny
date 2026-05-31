@@ -5,6 +5,8 @@ export const GENERATION_LIFECYCLE_UI_STATE = Object.freeze({
 
 export const GENERATION_LIFECYCLE_ABORT_REASON = 'Clicked stop button';
 
+const OUTPUT_INTERCEPT_EXCLUDED_TYPES = new Set(['quiet', 'impersonate', 'first_message']);
+
 function normalizeGenerationType(type) {
     const normalizedType = String(type ?? '').trim();
     return normalizedType || null;
@@ -102,6 +104,28 @@ export function resolveStopGenerationState({
 }
 
 /**
+ * Resolves whether main generation output must be buffered before display/storage.
+ * @param {object} options Options.
+ * @param {string|null} [options.type=null] Generation type.
+ * @param {boolean} [options.isStreaming=false] Whether the main model response is streaming.
+ * @param {boolean} [options.hasPostMainInterceptors=false] Whether any post-main intercept agents are active.
+ * @returns {{canInterceptMainOutput: boolean, shouldBuffer: boolean}}
+ */
+export function resolveGenerationOutputBufferState({
+    type = null,
+    isStreaming = false,
+    hasPostMainInterceptors = false,
+} = {}) {
+    const generationType = normalizeGenerationType(type);
+    const canInterceptMainOutput = !OUTPUT_INTERCEPT_EXCLUDED_TYPES.has(generationType);
+
+    return {
+        canInterceptMainOutput,
+        shouldBuffer: Boolean(canInterceptMainOutput && isStreaming && hasPostMainInterceptors),
+    };
+}
+
+/**
  * Creates the compatibility-facing generation lifecycle seam.
  * Runtime call sites should depend on this shape instead of individual helpers.
  * @returns {object}
@@ -116,6 +140,9 @@ export function createGenerationLifecycle() {
         stop: {
             abortReason: GENERATION_LIFECYCLE_ABORT_REASON,
             resolveState: resolveStopGenerationState,
+        },
+        output: {
+            resolveBufferState: resolveGenerationOutputBufferState,
         },
     };
 }

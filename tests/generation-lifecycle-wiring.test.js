@@ -7,8 +7,12 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const scriptSource = readFileSync(path.join(repoRoot, 'public', 'script.js'), 'utf8');
 
 function getFunctionSource(name, { exported = false } = {}) {
-    const marker = `${exported ? 'export ' : ''}function ${name}(`;
-    const start = scriptSource.indexOf(marker);
+    const markers = [
+        `${exported ? 'export ' : ''}function ${name}(`,
+        `${exported ? 'export ' : ''}async function ${name}(`,
+    ];
+    const marker = markers.find(candidate => scriptSource.includes(candidate));
+    const start = marker ? scriptSource.indexOf(marker) : -1;
 
     expect(start).toBeGreaterThanOrEqual(0);
 
@@ -30,9 +34,20 @@ function getFunctionSource(name, { exported = false } = {}) {
     throw new Error(`Unable to find function source for ${name}`);
 }
 
+function getSourceBetween(startMarker, endMarker) {
+    const start = scriptSource.indexOf(startMarker);
+    expect(start).toBeGreaterThanOrEqual(0);
+
+    const end = scriptSource.indexOf(endMarker, start + startMarker.length);
+    expect(end).toBeGreaterThan(start);
+
+    return scriptSource.slice(start, end);
+}
+
 describe('generation lifecycle wiring', () => {
     test('imports generation lifecycle decisions into the script adapter', () => {
         expect(scriptSource).toContain('resolveGenerationUiLockState');
+        expect(scriptSource).toContain('resolveGenerationOutputBufferState');
         expect(scriptSource).toContain('resolveGenerationUnblockState');
         expect(scriptSource).toContain('resolveStopGenerationState');
     });
@@ -85,6 +100,46 @@ describe('generation lifecycle wiring', () => {
 
     test('routes provider-error cleanup through stopped lifecycle semantics', () => {
         expect(scriptSource).toContain('this.markUIGenStopped({ emitGenerationEnded: false, emitGenerationStopped: true });');
-        expect(scriptSource).toContain('eventSource.emit(event_types.GENERATION_STOPPED);\n        unblockGeneration(type, { emitGenerationEnded: false });');
+        expect(scriptSource).toContain('eventSource.emit(event_types.GENERATION_STOPPED);');
+        expect(scriptSource).toContain('unblockGeneration(type, { emitGenerationEnded: false });');
+    });
+
+    test('routes post-main buffering decisions through lifecycle output state', () => {
+        const bufferSource = getFunctionSource('shouldBufferMainGenerationOutput');
+
+        expect(bufferSource).toContain('event_types.GENERATION_OUTPUT_BUFFERING_DECISION');
+        expect(bufferSource).toContain('resolveGenerationOutputBufferState({');
+        expect(bufferSource).toContain('hasPostMainInterceptors: Boolean(eventData.hasPostMainInterceptors)');
+        expect(scriptSource).toContain('await shouldBufferMainGenerationOutput({ type, isStreaming: true })');
+        expect(scriptSource).toContain('await activeStreamingProcessor.generateBuffered()');
+    });
+
+    test('keeps buffered streaming output hidden until post-main intercept completes', () => {
+        const bufferedSource = getSourceBetween('async generateBuffered() {', 'async generate() {');
+        const generateSource = getFunctionSource('Generate', { exported: true });
+        const normalizedGenerateSource = generateSource.replace(/\r\n/g, '\n');
+
+        expect(bufferedSource).toContain('for await (const { text, swipes, logprobs, toolCalls, state } of this.generator())');
+        expect(bufferedSource).toContain('this.result = text;');
+        expect(bufferedSource).not.toContain('this.onStartStreaming');
+        expect(bufferedSource).not.toContain('this.onProgressStreaming');
+        expect(bufferedSource).not.toContain('this.onFinishStreaming');
+
+        expect(generateSource).toContain('const shouldBufferOutput = await shouldBufferMainGenerationOutput({ type, isStreaming: true });');
+        expect(generateSource).toContain('await activeStreamingProcessor.generateBuffered()');
+        expect(normalizedGenerateSource).toContain('const interceptResult = await applyMainGenerationOutputInterceptors({\n                            type,\n                            text: getMessage,\n                            isStreaming: true,');
+        expect(generateSource).toContain('const saveReplyType = originalType !== \'continue\' ? type : \'appendFinal\';');
+        expect(generateSource).toContain('type: saveReplyType,');
+        expect(generateSource).toContain('!shouldBufferOutput && hasToolCalls && !shouldDeleteMessage');
+    });
+
+    test('runs main output intercept event before saveReply stores non-streaming replies', () => {
+        const generateSource = getFunctionSource('Generate', { exported: true });
+        const interceptIndex = generateSource.indexOf('await applyMainGenerationOutputInterceptors({');
+        const saveIndex = generateSource.indexOf('await saveReply({ type, getMessage, title, swipes, reasoning, imageUrls, reasoningSignature, reasoningTokens: data.reasoningTokens })');
+
+        expect(interceptIndex).toBeGreaterThanOrEqual(0);
+        expect(saveIndex).toBeGreaterThanOrEqual(0);
+        expect(interceptIndex).toBeLessThan(saveIndex);
     });
 });

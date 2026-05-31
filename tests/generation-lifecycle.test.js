@@ -4,6 +4,7 @@ import {
     createGenerationLifecycle,
     GENERATION_LIFECYCLE_ABORT_REASON,
     GENERATION_LIFECYCLE_UI_STATE,
+    resolveGenerationOutputBufferState,
     resolveGenerationUiLockState,
     resolveGenerationUnblockState,
     resolveStopGenerationState,
@@ -114,6 +115,48 @@ describe('generation lifecycle helper', () => {
         });
     });
 
+    test('buffers only streaming main output that has post-main interceptors', () => {
+        expect(resolveGenerationOutputBufferState({
+            type: 'normal',
+            isStreaming: true,
+            hasPostMainInterceptors: true,
+        })).toEqual({
+            canInterceptMainOutput: true,
+            shouldBuffer: true,
+        });
+
+        expect(resolveGenerationOutputBufferState({
+            type: 'normal',
+            isStreaming: false,
+            hasPostMainInterceptors: true,
+        })).toMatchObject({
+            canInterceptMainOutput: true,
+            shouldBuffer: false,
+        });
+
+        expect(resolveGenerationOutputBufferState({
+            type: 'normal',
+            isStreaming: true,
+            hasPostMainInterceptors: false,
+        })).toMatchObject({
+            canInterceptMainOutput: true,
+            shouldBuffer: false,
+        });
+    });
+
+    test('does not intercept auxiliary output types', () => {
+        for (const type of ['quiet', 'impersonate', 'first_message']) {
+            expect(resolveGenerationOutputBufferState({
+                type,
+                isStreaming: true,
+                hasPostMainInterceptors: true,
+            })).toEqual({
+                canInterceptMainOutput: false,
+                shouldBuffer: false,
+            });
+        }
+    });
+
     test('creates a stable lifecycle seam for future runtime wiring', () => {
         const lifecycle = createGenerationLifecycle();
 
@@ -122,5 +165,6 @@ describe('generation lifecycle helper', () => {
         expect(lifecycle.ui.resolveUnblockState).toBe(resolveGenerationUnblockState);
         expect(lifecycle.stop.abortReason).toBe(GENERATION_LIFECYCLE_ABORT_REASON);
         expect(lifecycle.stop.resolveState).toBe(resolveStopGenerationState);
+        expect(lifecycle.output.resolveBufferState).toBe(resolveGenerationOutputBufferState);
     });
 });
