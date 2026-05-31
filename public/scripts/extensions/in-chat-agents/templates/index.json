@@ -210,9 +210,9 @@
     }
   },
   {
-    "id": "tpl-difficulty-increase",
-    "name": "Difficulty Increase",
-    "description": "Sharply raise difficulty -- characters protect their interests, resist harder",
+    "id": "tpl-nightmare-difficulty-increase",
+    "name": "Nightmare Difficulty Increase",
+    "description": "Aggressively hostile environment -- maximum difficulty and consequences",
     "icon": "",
     "category": "content",
     "subcategory": "behaviour",
@@ -221,9 +221,9 @@
       "challenge",
       "stakes"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Difficulty Increase\nRaise difficulty sharply. The world resists. Characters protect their own interests first, dig in harder, and yield to kindness, persuasion, or promises only when backed by leverage, sacrifice, or sustained effort over time.\nPush toward harsher conflict, harder choices, and deeper interpersonal fallout. Failed attempts change relationships, close doors, create resentment, or force riskier options. Alliances stay conditional, generosity carries a cost, and trust emerges slowly through significant action. Preserve breathing room for humor, tenderness, and hard-won victories; success remains possible but must feel earned.",
+    "prompt": "### Nightmare Difficulty Mode\nEnforce an aggressively hostile, resistant environment where progress demands heavy material loss, raw leverage, or severe personal sacrifice. The world and its inhabitants must actively exploit the user's vulnerabilities as strategic opportunities for maximum leverage and profit.\n\nCharacters must entrench themselves in absolute self-preservation, greed, and pride. Never allow characters to yield positions, secrets, or cooperation without overwhelming physical leverage, tangible sacrifice, or exhausting, sustained effort.\n\nMaximize all negative consequences instantly. Every misstep, weak argument, or tactical error must immediately fracture relationships, permanently lock off avenues of success, breed burning resentment, and force the user into high-stakes, volatile survival scenarios.\n\nAll alliances are strictly transactional, temporary, and highly conditional. Attach a steep, immediate price to every act of apparent generosity, converting kindness into future leverage or debt. Keep moments of relief, dark humor, or tenderness heavily restricted, releasing them only after an extreme, earned survival price has been fully paid.",
     "phase": "pre",
     "injection": {
       "position": 0,
@@ -394,9 +394,9 @@
       "difficulty",
       "bias"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Friction Mode\n- Raise interpersonal resistance. Characters are harder to impress, slower to agree, and more likely to protect pride, time, interests, and existing judgments. Hesitation, distance, deflection, and conflict arise from established traits, history, present incentives, social context, and plausible misreading.\n- Motive continuity is non-negotiable. When a character resists, ground the resistance in what is already established, or leave it ambiguous if the cause is not fully visible.\n- Forbid all therapy language. Operate outside the bounds of perfect emotional intelligence.",
+    "prompt": "### Friction Mode\nEnforce an immediate, baseline shift to heavy defensive skepticism and social friction. Characters must aggressively guard their pride, time, resources, and personal biases. Establish active resistance, emotional distance, and sharp deflection as the default state; force all agreements to be begrudging, transactional, and hard-won.\n\nGround all interpersonal conflict, hesitation, and social friction strictly in established character histories, immediate personal incentives, and logical social pressures. \n\nDialogue must be raw, defensive, and restricted to the character's limited, biased perspective. Force characters to express discomfort and conflict through stubborn self-justification, physical posturing, and prideful silence. They must remain fully committed to their emotional blind spots and realistic flaws without unearned compromise.",
     "phase": "pre",
     "injection": {
       "position": 1,

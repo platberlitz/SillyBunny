@@ -1,0 +1,41 @@
+{
+    "id": "tpl-nightmare-difficulty-increase",
+    "name": "Nightmare Difficulty Increase",
+    "description": "Aggressively hostile environment -- maximum difficulty and consequences",
+    "icon": "",
+    "category": "custom",
+    "tags": [
+        "difficulty",
+        "challenge",
+        "stakes"
+    ],
+    "version": 2,
+    "author": "Purachina",
+    "prompt": "### Nightmare Difficulty Mode\nEnforce an aggressively hostile, resistant environment where progress demands heavy material loss, raw leverage, or severe personal sacrifice. The world and its inhabitants must actively exploit the user's vulnerabilities as strategic opportunities for maximum leverage and profit.\n\nCharacters must entrench themselves in absolute self-preservation, greed, and pride. Never allow characters to yield positions, secrets, or cooperation without overwhelming physical leverage, tangible sacrifice, or exhausting, sustained effort.\n\nMaximize all negative consequences instantly. Every misstep, weak argument, or tactical error must immediately fracture relationships, permanently lock off avenues of success, breed burning resentment, and force the user into high-stakes, volatile survival scenarios.\n\nAll alliances are strictly transactional, temporary, and highly conditional. Attach a steep, immediate price to every act of apparent generosity, converting kindness into future leverage or debt. Keep moments of relief, dark humor, or tenderness heavily restricted, releasing them only after an extreme, earned survival price has been fully paid.",
+    "phase": "pre",
+    "injection": {
+        "position": 0,
+        "depth": 0,
+        "role": 0,
+        "order": 100,
+        "scan": false
+    },
+    "postProcess": {
+        "enabled": false,
+        "type": "regex",
+        "regexFind": "",
+        "regexReplace": "",
+        "regexFlags": "g",
+        "appendText": "",
+        "extractPattern": "",
+        "extractVariable": ""
+    },
+    "enabled": false,
+    "conditions": {
+        "triggerKeywords": [],
+        "triggerProbability": 100,
+        "generationTypes": [
+            "normal"
+        ]
+    }
+}
