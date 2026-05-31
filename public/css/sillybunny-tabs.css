@@ -1459,17 +1459,28 @@ body.movingUI #right-nav-panel.openDrawer > .sb-shell-resize-handle {
 
 .sb-shell-resize-handle {
     position: absolute;
-    right: 10px;
-    bottom: 10px;
+    right: 8px;
+    bottom: 8px;
     z-index: var(--sb-z-raised);
     display: none;
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
+    box-sizing: border-box;
+    --sb-shell-resize-accent: var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor)));
     border-radius: 0 0 var(--sb-radius-button, 14px) 0;
+    border: 1px solid color-mix(in srgb, var(--sb-shell-resize-accent) 48%, transparent);
+    background:
+        radial-gradient(circle at 76% 78%, color-mix(in srgb, var(--sb-shell-resize-accent) 34%, transparent) 0 28%, transparent 58%),
+        linear-gradient(135deg, color-mix(in srgb, var(--sb-shell-resize-accent) 16%, transparent), color-mix(in srgb, var(--sb-shell-border) 34%, transparent));
+    box-shadow:
+        0 10px 22px color-mix(in srgb, var(--SmartThemeShadowColor) 24%, transparent),
+        inset 0 0 0 1px color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent);
     pointer-events: auto;
     cursor: nwse-resize;
     touch-action: none;
-    opacity: 0.74;
+    opacity: 0.9;
+    transform-origin: right bottom;
+    transition: opacity var(--sb-transition-fast), transform var(--sb-transition-fast), background-color var(--sb-transition-fast), border-color var(--sb-transition-fast), box-shadow var(--sb-transition-fast);
 }
 
 .sb-shell-resize-handle::before {
@@ -1478,8 +1489,8 @@ body.movingUI #right-nav-panel.openDrawer > .sb-shell-resize-handle {
     inset: 0;
     border-radius: inherit;
     background:
-        linear-gradient(135deg, transparent 0 48%, color-mix(in srgb, var(--sb-shell-border) 86%, transparent) 48% 54%, transparent 54% 68%, color-mix(in srgb, var(--sb-shell-border) 86%, transparent) 68% 74%, transparent 74% 88%, color-mix(in srgb, var(--sb-shell-border) 86%, transparent) 88% 94%, transparent 94% 100%);
-    opacity: 0.92;
+        linear-gradient(135deg, transparent 0 46%, color-mix(in srgb, var(--sb-shell-resize-accent) 88%, var(--SmartThemeBodyColor)) 46% 52%, transparent 52% 64%, color-mix(in srgb, var(--sb-shell-resize-accent) 88%, var(--SmartThemeBodyColor)) 64% 70%, transparent 70% 82%, color-mix(in srgb, var(--sb-shell-resize-accent) 88%, var(--SmartThemeBodyColor)) 82% 88%, transparent 88% 100%);
+    opacity: 0.96;
 }
 
 .sb-shell-resize-handle::after {
@@ -1492,18 +1503,58 @@ body.movingUI #right-nav-panel.openDrawer > .sb-shell-resize-handle {
 .sb-shell-root.sb-shell-can-resize.openDrawer .sb-shell-resize-handle,
 #right-nav-panel.sb-shell-can-resize.openDrawer > .sb-shell-resize-handle {
     display: block;
+    animation: sbShellResizeHandlePulse 1300ms var(--sb-ease-out) 2;
 }
 
 .sb-shell-root.sb-shell-resize-active .sb-shell-resize-handle,
 #right-nav-panel.sb-shell-resize-active > .sb-shell-resize-handle,
 .sb-shell-resize-handle:hover {
+    border-color: color-mix(in srgb, var(--sb-shell-resize-accent) 72%, transparent);
+    background:
+        radial-gradient(circle at 76% 78%, color-mix(in srgb, var(--sb-shell-resize-accent) 52%, transparent) 0 30%, transparent 62%),
+        linear-gradient(135deg, color-mix(in srgb, var(--sb-shell-resize-accent) 26%, transparent), color-mix(in srgb, var(--sb-shell-border) 44%, transparent));
+    box-shadow:
+        0 14px 28px color-mix(in srgb, var(--SmartThemeShadowColor) 30%, transparent),
+        0 0 0 4px color-mix(in srgb, var(--sb-shell-resize-accent) 14%, transparent),
+        inset 0 0 0 1px color-mix(in srgb, var(--SmartThemeBodyColor) 16%, transparent);
     opacity: 1;
+    transform: scale(1.08);
 }
 
 .sb-shell-resize-handle:focus-visible {
     outline: 2px solid var(--color-focus-ring, var(--color-primary, var(--sb-accent)));
     outline-offset: 3px;
     opacity: 1;
+}
+
+@keyframes sbShellResizeHandlePulse {
+    0% {
+        box-shadow:
+            0 10px 22px color-mix(in srgb, var(--SmartThemeShadowColor) 24%, transparent),
+            0 0 0 0 color-mix(in srgb, var(--sb-shell-resize-accent) 30%, transparent),
+            inset 0 0 0 1px color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent);
+    }
+
+    46% {
+        box-shadow:
+            0 14px 28px color-mix(in srgb, var(--SmartThemeShadowColor) 28%, transparent),
+            0 0 0 10px color-mix(in srgb, var(--sb-shell-resize-accent) 18%, transparent),
+            inset 0 0 0 1px color-mix(in srgb, var(--SmartThemeBodyColor) 14%, transparent);
+    }
+
+    100% {
+        box-shadow:
+            0 10px 22px color-mix(in srgb, var(--SmartThemeShadowColor) 24%, transparent),
+            0 0 0 18px transparent,
+            inset 0 0 0 1px color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sb-shell-root.sb-shell-can-resize.openDrawer .sb-shell-resize-handle,
+    #right-nav-panel.sb-shell-can-resize.openDrawer > .sb-shell-resize-handle {
+        animation: none;
+    }
 }
 
 body.sb-shell-resizing,
