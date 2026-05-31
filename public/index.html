@@ -2809,7 +2809,7 @@
                                 Allow context sizes above the model-provided limit.
                             </div>
                         </div>
-                        <div class="inline-drawer wide100p" data-source="openai,claude,mistralai,makersuite,vertexai,deepseek,xai,zai,moonshot">
+                        <div class="inline-drawer wide100p" data-source="openai,openai_responses,claude,mistralai,makersuite,vertexai,deepseek,xai,zai,moonshot">
                             <div class="inline-drawer-toggle inline-drawer-header">
                                 <b data-i18n="Reverse Proxy">Reverse Proxy</b>
                                 <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
@@ -2871,9 +2871,33 @@
                                     <input id="openai_proxy_password" type="password" class="text_pole flex1" placeholder="" form="openai_form" autocomplete="off" />
                                     <div id="openai_proxy_password_show" title="Peek a password" data-i18n="[title]Peek a password" class="menu_button fa-solid fa-eye-slash fa-fw"></div>
                                 </div>
+                                <div class="range-block-title justifyLeft" data-i18n="Bind to Backend">
+                                    Bind to Backend
+                                </div>
+                                <div class="toggle-description justifyLeft">
+                                    <span data-i18n="Switch to this backend when the proxy preset is selected.">
+                                        Switch to this backend when the proxy preset is selected.
+                                    </span>
+                                    <br>
+                                </div>
+                                <div class="wide100p">
+                                    <select id="openai_proxy_source" class="text_pole">
+                                        <option value="" data-i18n="None (Don't switch)">None (Don't switch)</option>
+                                        <option value="openai">OpenAI</option>
+                                        <option value="openai_responses">OpenAI (Responses)</option>
+                                        <option value="claude">Claude</option>
+                                        <option value="mistralai">MistralAI</option>
+                                        <option value="makersuite">Google AI Studio</option>
+                                        <option value="vertexai">Google Vertex AI</option>
+                                        <option value="deepseek">DeepSeek</option>
+                                        <option value="xai">xAI (Grok)</option>
+                                        <option value="zai">Z.AI (GLM)</option>
+                                        <option value="moonshot">Moonshot AI</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
-                        <div id="ReverseProxyWarningMessage" data-source="openai,claude,mistralai,makersuite,vertexai,deepseek,xai,zai,moonshot">
+                        <div id="ReverseProxyWarningMessage" data-source="openai,openai_responses,claude,mistralai,makersuite,vertexai,deepseek,xai,zai,moonshot">
                             <div class="reverse_proxy_warning">
                                 <b>
                                     <div data-i18n="Using a proxy that you're not running yourself is a risk to your data privacy.">
