@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.6.1
+
+Date: 2026-05-31
+
+This maintenance bump separates staging work merged after v1.6.0 so the next stable release changelog can collect it cleanly.
+
+### Release Metadata
+- Updated app, Horde client, bundled extension, package, lockfile, and test metadata to 1.6.1.
+
+### Merged Staging PRs
+- PR #155 (2026-05-24) `fix: chat scroll and prompt manager scroll position issues`
+- PR #158 (2026-05-24) `feat: add mobile navigation customization`
+- PR #159 (2026-05-24) `fix: Make message generation glow theme-aware`
+
 ## v1.6.0
 
 Date: 2026-05-18
@@ -85,11 +99,6 @@ This update consolidates the v1.6.0 staging work since v1.5.3: preset and connec
 - The welcome panel now uses the dynamic current-release label instead of a stale hardcoded 1.4.2 eyebrow.
 - Updated app, Horde client, bundled extension, package, lockfile, and README metadata to 1.6.0.
 - Added a `changelog:merged-prs` script and GitHub workflow so future merged staging PRs are recorded in `changelog.md` automatically.
-
-### Merged Staging PRs
-- PR #155 (2026-05-24) `fix: chat scroll and prompt manager scroll position issues`
-- PR #158 (2026-05-24) `feat: add mobile navigation customization`
-- PR #159 (2026-05-24) `fix: Make message generation glow theme-aware`
 
 ## v1.5.3
 
