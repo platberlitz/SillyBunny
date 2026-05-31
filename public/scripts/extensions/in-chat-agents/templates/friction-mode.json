@@ -9,9 +9,9 @@
         "difficulty",
         "bias"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Friction Mode\n- Raise interpersonal resistance. Characters are harder to impress, slower to agree, and more likely to protect pride, time, interests, and existing judgments. Hesitation, distance, deflection, and conflict arise from established traits, history, present incentives, social context, and plausible misreading.\n- Motive continuity is non-negotiable. When a character resists, ground the resistance in what is already established, or leave it ambiguous if the cause is not fully visible.\n- Forbid all therapy language. Operate outside the bounds of perfect emotional intelligence.",
+    "prompt": "### Friction Mode\nEnforce an immediate, baseline shift to heavy defensive skepticism and social friction. Characters must aggressively guard their pride, time, resources, and personal biases. Establish active resistance, emotional distance, and sharp deflection as the default state; force all agreements to be begrudging, transactional, and hard-won.\n\nGround all interpersonal conflict, hesitation, and social friction strictly in established character histories, immediate personal incentives, and logical social pressures. \n\nDialogue must be raw, defensive, and restricted to the character's limited, biased perspective. Force characters to express discomfort and conflict through stubborn self-justification, physical posturing, and prideful silence. They must remain fully committed to their emotional blind spots and realistic flaws without unearned compromise.",
     "phase": "pre",
     "injection": {
         "position": 1,
