@@ -573,6 +573,22 @@ describe('in-chat agent post-processing runner', () => {
         message.swipe_info[message.swipe_id].extra = structuredClone(message.extra);
     }
 
+    test('does not register duplicate event listeners when initialized twice', async () => {
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+
+        initAgentRunner();
+        initAgentRunner();
+
+        const listenerCount = (eventName) => eventSource.on.mock.calls.filter(([event]) => event === eventName).length;
+
+        expect(listenerCount(eventTypes.GENERATION_STARTED)).toBe(1);
+        expect(listenerCount(eventTypes.MESSAGE_RECEIVED)).toBe(1);
+        expect(listenerCount(eventTypes.GENERATION_ENDED)).toBe(1);
+        expect(listenerCount(eventTypes.WORLDINFO_UPDATED)).toBe(1);
+        expect(document.addEventListener).toHaveBeenCalledTimes(2);
+        expect(globalThis.addEventListener).toHaveBeenCalledTimes(2);
+    });
+
     test('does not mark normal chat generation as active agent generation', async () => {
         const { initAgentRunner, isAgentGenerationActive } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
         initAgentRunner();
