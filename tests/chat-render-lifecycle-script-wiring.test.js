@@ -599,8 +599,10 @@ describe('chat render lifecycle script wiring', () => {
 
         const initSource = scriptSource.slice(scriptSource.indexOf('const chatElementScroll = document.getElementById(\'chat\');'));
         expect(initSource).toContain('const markMobileViewportScroll = getMobileViewportScrollHandler();');
-        expect(initSource).toContain('const chatShellElement = document.getElementById(\'sheld\');');
-        expect(initSource).toContain('chatShellElement?.addEventListener(\'wheel\', routeShellWheelToChat, { passive: false });');
+        expect(scriptSource).toContain('const CHAT_SHELL_WHEEL_SURFACE_SELECTOR = \'#sheld, #chat_wrapper, #form_sheld, #top-bar, #send_form\';');
+        expect(scriptSource).toContain('const shellBoundary = getChatShellWheelBoundary(event.target);');
+        expect(scriptSource).toContain('hasScrollableWheelTarget(event.target, shellBoundary)');
+        expect(initSource).toContain('document.addEventListener(\'wheel\', routeShellWheelToChat, { passive: false, capture: true });');
         expect(initSource).toContain('setupMobileChatViewportObserver(markMobileViewportScroll);');
     });
 
