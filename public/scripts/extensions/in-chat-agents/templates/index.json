@@ -10,9 +10,9 @@
       "achievements",
       "milestones"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Achievements\nTrack notable firsts, milestones, and memorable moments. Award only when something genuinely significant or entertaining happens. Use this EXACT format:\n\n[ACH|Title|Rarity|Description of the achievement]\nunlocked: MANDATORY; explain what triggered it; NEVER leave empty\n[/ACH]\n\nRarity options: ★ COMMON | ★★ UNCOMMON | ★★★ RARE | ★★★★ EPIC | ★★★★★ LEGENDARY | 💀 SECRET\n\nRules:\n- Achievements appear AFTER narrative content\n- MAXIMUM one achievement per scene; most scenes have none\n- Achievements must feel earned, never automatic\n- NEVER output an empty unlocked line",
+    "prompt": "### Achievements\nTrack notable firsts, milestones, and memorable moments. Award only when something genuinely significant or entertaining happens. Use this EXACT format:\n\n[ACH|Title|Rarity|Description]\nunlocked: MANDATORY; explain what triggered it; NEVER leave empty\n[/ACH]\n\nRarity options: ★ COMMON | ★★ UNCOMMON | ★★★ RARE | ★★★★ EPIC | ★★★★★ LEGENDARY | 💀 SECRET\n\nRules:\n- Achievements appear AFTER narrative content\n- MAXIMUM one achievement per scene; most scenes have none\n- Achievements must feel earned, never automatic\n- NEVER output an empty unlocked line",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -352,9 +352,9 @@
       "deadlines",
       "quests"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Pending Events\nTrack upcoming events, deadlines, promises, and unresolved threads. Update when events are added, resolved, or failed. Use this EXACT format:\n\n[EVENT|Type|Summary|Deadline]\ncontext: MANDATORY; explain the stakes or origin; NEVER leave empty\n[/EVENT]\n\nType options: 🎯 QUEST | 💬 PROMISE | ⏰ DEADLINE | ⚠️ THREAT | 🎉 SOCIAL | 💡 OPPORTUNITY | ❌ FAILED | ✅ RESOLVED\n\nRules:\n- Events appear AFTER narrative content\n- Only show events that were ADDED, UPDATED, or RESOLVED this scene\n- Mark resolved/failed events once, then remove them\n- Deadline can be specific (Friday 3 PM) or vague (soon, eventually)",
+    "prompt": "### Pending Events\nTrack upcoming events, deadlines, promises, and unresolved threads. Update when events are added, resolved, or failed. Use this EXACT format:\n\n[EVENT|Type|Summary|Deadline]\ncontext: MANDATORY; explain the stakes or origin\n[/EVENT]\n\nType options: 🎯 QUEST | 💬 PROMISE | ⏰ DEADLINE | ⚠️ THREAT | 🎉 SOCIAL | 💡 OPPORTUNITY | ❌ FAILED | ✅ RESOLVED\n\nRules:\n- Events appear AFTER narrative content\n- Only show events that were ADDED, UPDATED, or RESOLVED this scene\n- Mark resolved/failed events once, then remove them\n- Deadline can be specific (Friday 3 PM) or vague (soon, eventually)\n- Track only important events; low-stakes events are to be completely ignored (e.g. cooking steps).",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -697,9 +697,9 @@
       "items",
       "objects"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Inventory\nTrack items {{user}} acquires, loses, or uses that have narrative significance. Do not list mundane carried items unless plot-relevant. Use this EXACT format:\n\n[ITEM|Action|Name|Detail]\nnote: MANDATORY; explain origin or significance; NEVER leave empty\n[/ITEM]\n\nAction options: ➕ GAINED | ➖ LOST | 🔄 USED | 💔 BROKEN | 🎁 GIVEN\n\nRules:\n- Items appear AFTER narrative content when inventory changes\n- Only show items that CHANGED this scene\n- Do not track currency, consumables, or mundane objects unless plot-relevant",
+    "prompt": "### Inventory\nTrack items {{user}} acquires, loses, or uses that have narrative significance. Do not list mundane carried items unless plot-relevant. Use this EXACT format:\n\n[ITEM|Action|Name|Detail]\nnote: MANDATORY; explain origin or significance\n[/ITEM]\n\nAction options: ➕ GAINED | ➖ LOST | 🔄 USED | 💔 BROKEN | 🎁 GIVEN\n\nRules:\n- Items appear AFTER narrative content when inventory changes\n- Only show items that CHANGED this scene\n- Do not track currency, consumables, or mundane objects unless plot-relevant",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -844,9 +844,9 @@
       "npcs",
       "world"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Parallel Off-Screen Tracker\nThe world moves off-screen. Track absent characters, world motion, rumor flow, shifting relationships, and subplot pressure that may later intersect with {{user}}.\n\nUse this exact format every scene:\n\n[PARALLEL|Scope|Relevance]\n- Character 1: brief development\n- Character 2: brief development\n- World/NPCs: brief development\n[/PARALLEL]\n\nRules:\n- Exactly 3 bullet points.\n- Focus on absent characters and off-screen developments; in group scenes, prioritize characters not currently present.\n- Scope = specific location, \"Multiple locations,\" or \"Background.\"\n- Relevance = short tag: \"rising tension,\" \"opportunity,\" \"complication,\" \"threat,\" or \"alliance forming.\"\n- Keep each bullet brief, plot-relevant, and directional: plans, rumors, delays, discussions, attempts, discoveries, or shifting loyalties.\n- Off-screen developments begin below the current scene's intensity, then build over time until they intersect with the main story.",
+    "prompt": "### Parallel Off-Screen Tracker\nThe world moves off-screen. Track absent characters, world motion, rumor flow, shifting relationships, and subplot pressure that will later intersect with {{user}}.\n\nUse this exact format every scene:\n\n[PARALLEL|Scope|Relevance]\n- Character 1: brief development\n- Character 2: brief development\n- World/NPCs: brief development\n[/PARALLEL]\n\nRules:\n- Exactly 3 bullet points.\n- Focus on absent characters and off-screen developments; in group scenes, prioritize characters not currently present.\n- Scope = specific location, \"Multiple locations,\" or \"Background.\"\n- Relevance = short tag: \"rising tension,\" \"opportunity,\" \"complication,\" \"threat,\" or \"alliance forming.\"\n- Keep each bullet brief, plot-relevant, and directional: plans, rumors, delays, discussions, attempts, discoveries, or shifting loyalties.\n- Off-screen developments begin below the current scene's intensity, then build over time until they intersect with the main story.",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -886,9 +886,9 @@
       "npc",
       "meter"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Relationship Meters\nTrack affection and trust for recurring NPCs with significant interactions. Update only when meaningful shifts occur. If nothing changed, omit entirely. Use this EXACT format:\n\n[METER|Name|X/10|X/10|Status|Condition]\nbrief reason for change\n[/METER]\n\nStatus options (positive): Stranger → Acquaintance → Friendly → Close → Intimate → Devoted\nStatus options (negative): Wary → Hostile → Nemesis\nStatus options (complex): Complicated | Codependent | Estranged | Rivals | Frenemies\n\nCondition options: 💚 STABLE | 💛 SHIFTING | 💔 HEARTBROKEN | 🖤 BETRAYED | 💢RESENTFUL |🔥 PASSIONATE |❄️ COLD | 🫧 INFATUATED | 💀 SEVERED | 🩹 MENDING | ⛓️ OBSESSED | 😶 NUMB | 🌧️ GRIEVING | 🤝 RECONCILING | ⚡ VOLATILE\n\nRules:\n- Meters appear ONCE per NPC at first significant appearance, then only when changed\n- Place meter AFTER narrative content\n- Only show meters that CHANGED this scene\n- Use pipe | separators between data points\n- Affection and Trust are independent axes (high affection + low trust = infatuation/obsession; low affection + high trust = respect)\n- Shifts of more than 2 points in one scene require extreme justification\n- Condition reflects the EMOTIONAL STATE of the relationship, not just the numbers\n- Condition can change independently of scores (e.g., Trust stays at 7 but Condition shifts from STABLE to VOLATILE after a fight)\n- Contradictory signals are valid (high affection + BETRAYED, low trust + PASSIONATE)\n- SEVERED means the relationship has ended; retire the meter after one final showing\n- Never repeat an unchanged tracker across scenes",
+    "prompt": "### Relationship Meters\nTrack affection and trust for recurring NPCs with significant interactions. Update only when meaningful shifts occur. If nothing changed, omit entirely. Use this EXACT format:\n\n[METER|Name|X/10|X/10|Status|Condition]\nbrief reason for change\n[/METER]\n\nStatus options (positive): Stranger → Acquaintance → Friendly → Close → Intimate → Devoted\nStatus options (negative): Wary → Hostile → Nemesis\nStatus options (complex): Complicated | Codependent | Estranged | Rivals | Frenemies\n\nCondition options: 💚 STABLE | 💛 SHIFTING | 💔 HEARTBROKEN | 🖤 BETRAYED | 💢RESENTFUL |🔥 PASSIONATE |❄️ COLD | 🫧 INFATUATED | 💀 SEVERED | 🩹 MENDING | ⛓️ OBSESSED | 😶 NUMB | 🌧️ GRIEVING | 🤝 RECONCILING | ⚡ VOLATILE\n\nRules:\n- Meters appear ONCE per NPC at first significant appearance, then only when changed\n- Place meter AFTER narrative content\n- Only show meters that CHANGED this scene\n- Use pipe | separators between data points\n- Affection and Trust are independent axes (high affection + low trust = infatuation/obsession; low affection + high trust = respect)\n- Shifts of more than 2 points in one scene require extreme justification\n- Condition reflects the EMOTIONAL STATE of the relationship, not just the numbers\n- Condition can change independently of scores (e.g., Trust stays at 7 but Condition shifts from STABLE to VOLATILE after a fight)\n- Contradictory signals are valid (high affection + BETRAYED, low trust + PASSIONATE)\n- SEVERED means the relationship has ended; retire the meter after one final showing\n- Relationships may stagnate or lower; slow down relationship development",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -928,9 +928,9 @@
       "rumors",
       "perception"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Rumors & Reputation\nTrack how <user> is perceived by groups and factions. Update when public perception shifts due to witnessed actions, gossip, or deliberate manipulation. Use this EXACT format:\n\n[REP|Source|Perception|Direction]\ncause: MANDATORY; explain what triggered this reputation shift; NEVER leave empty\n[/REP]\n\nDirection options: 📈 RISING | 📉 FALLING | 🔄 MIXED | 🆕 NEW\n\nRules:\n- Reputation appears AFTER narrative content when public perception changes\n- Source can be a named NPC, a group (e.g., \"Freshmen,\" \"Faculty\"), or a location (e.g., \"The dorm floor\")\n- Perception is what they think; a short phrase, not necessarily accurate\n- Only show reputations that CHANGED or were ESTABLISHED this scene\n- Contradictory reputations across different sources are encouraged",
+    "prompt": "### Rumors & Reputation\nTrack how <user> is perceived by groups and factions. Update when public perception shifts due to witnessed actions, gossip, or deliberate manipulation. Use this EXACT format:\n\n[REP|Source|Perception|Direction]\ncause: MANDATORY; explain what triggered this reputation shift\n[/REP]\n\nDirection options: 📈 RISING | 📉 FALLING | 🔄 MIXED | 🆕 NEW\n\nRules:\n- Reputation appears AFTER narrative content when public perception changes\n- Source can be a named NPC, a group (e.g., \"Freshmen,\" \"Faculty\"), or a location (e.g., \"The dorm floor\")\n- Perception is what they think; a short phrase, not necessarily accurate\n- Only show reputations that CHANGED or were ESTABLISHED this scene\n- Contradictory reputations across different sources are encouraged and allowed",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -1052,9 +1052,9 @@
       "location",
       "time"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Scene Tracker\nMark scene transitions, time shifts, and location changes. Use this EXACT format at the BEGINNING of the response when scene context changes:\n\n[SCENE|Location|Time|Weather/Atmosphere]\ndetail: one-line sensory detail to set the current scene\n[/SCENE]\n\nRules:\n- Appears at the TOP of responses where setting shifts\n- Never repeat if location/time has not changed\n- Time can be specific (3:47 PM) or atmospheric (late afternoon, the golden hour before dusk)\n- Weather/Atmosphere is a brief mood descriptor (humid, tense, festive)",
+    "prompt": "### Scene Tracker\nMark scene transitions, time shifts, and location changes. Use this EXACT format at the BEGINNING of the response when scene context changes:\n\n[SCENE|Location|Time|Weather/Atmosphere]\ndetail: MANDATORY; one-line sensory detail that informs the current environment\n[/SCENE]\n\nRules:\n- Appears at the TOP of responses where setting shifts\n- Never repeat if location/time has not changed\n- Time can be specific (3:47 PM) or atmospheric (late afternoon, the golden hour before dusk)\n- Weather/Atmosphere is a brief mood descriptor (humid, tense, festive)",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -1095,9 +1095,9 @@
       "lies",
       "information"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Secrets & Information Asymmetry\nTrack significant secrets, lies, hidden knowledge, and information gaps between characters. Use this EXACT format:\n\n[SECRET|Owner|What They Know or Hide|Who Else Knows]\ncontext: MANDATORY; explain the stakes or origin; NEVER leave empty\n[/SECRET]\n\nRules:\n- Secrets appear AFTER narrative content when new information asymmetry is established or knowledge spreads\n- Owner is the character who holds or hides the information\n- \"Who Else Knows\" can be \"No one,\" a list of names, or \"Public\"\n- Only show secrets that were ESTABLISHED, REVEALED, or SPREAD this scene",
+    "prompt": "### Secrets & Information Asymmetry\nTrack significant secrets, lies, hidden knowledge, and information gaps between characters. Use this EXACT format:\n\n[SECRET|Owner|What They Know or Hide|Who Else Knows]\ncontext: MANDATORY; explain the stakes or origin\n[/SECRET]\n\nRules:\n- Secrets appear AFTER narrative content when new information asymmetry is established or knowledge spreads\n- Owner is the character who holds or hides the information\n- \"Who Else Knows\" can be \"No one,\" a list of names, or \"Public\"\n- Only show secrets that were ESTABLISHED, REVEALED, or SPREAD this scene",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -1137,9 +1137,9 @@
       "conditions",
       "health"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Status & Conditions\nTrack active physical, mental, or behavioral states when they meaningfully change. Never list baseline states. Use this EXACT format:\n\n[STATUS|Character|Condition|Severity]\nnote: MANDATORY; explain the cause or context; NEVER leave empty\n[/STATUS]\n\nSeverity options: 🟢 MILD | 🟡 MODERATE | 🔴 SEVERE | ⚫ CRITICAL | ✅ CLEARED\n\nRules:\n- Status appears AFTER narrative content when a condition is gained, worsened, improved, or cleared\n- Only show statuses that CHANGED this scene\n- Character can be {{user}} or any NPC\n- Condition is the specific state (e.g., \"Exhausted,\" \"Drunk,\" \"Paranoid,\" \"Bleeding\")\n- The note line is MANDATORY; always explain what caused this condition\n- NEVER output an empty note line",
+    "prompt": "### Status & Conditions\nTrack active physical, mental, or behavioral states when they meaningfully change. Never list baseline states. Use this EXACT format:\n\n[STATUS|Character|Condition|Severity]\nnote: MANDATORY; explain the cause or context\n[/STATUS]\n\nSeverity options: 🟢 MILD | 🟡 MODERATE | 🔴 SEVERE | ⚫ CRITICAL | ✅ CLEARED\n\nRules:\n- Status appears AFTER narrative content when a condition is gained, worsened, improved, or cleared\n- Only show statuses that CHANGED this scene\n- Character can be {{user}} or any NPC\n- Condition is the specific state (e.g., \"Exhausted,\" \"Drunk,\" \"Paranoid,\" \"Bleeding\")\n",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -1179,9 +1179,9 @@
       "day",
       "clock"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Time Tracker\nMaintain a running timestamp when time advances meaningfully: scene jumps, hours passing, sleeping, or deadline-relevant progression. Use this EXACT format:\n\n[TIME|Day X|Day of Week|Approximate Hour]\nnote: MANDATORY; explain the time context; NEVER leave empty\n[/TIME]\n\nRules:\n- Time appears at the TOP of responses when time shifts without a location change\n- If both location and time change, use Scene Tracker and Time Tracker together\n- Day format: \"Day 1,\" \"Day 47,\" etc.\n- Day of week: Monday, Tuesday, etc., or \"Unknown\" if not established\n- Hour can be specific (3:47 PM) or general (early morning, late afternoon)\n- Multiple Time Trackers per scene are allowed",
+    "prompt": "### Time Tracker\nMaintain a running timestamp when time advances meaningfully: scene jumps, hours passing, sleeping, or deadline-relevant progression. Use this EXACT format:\n\n[TIME|Day X|Day of Week|Approximate Hour]\nnote: MANDATORY; explain the time context\n[/TIME]\n\nRules:\n- Time appears at the TOP of responses when time shifts without a location change\n- If both location and time change, use Scene Tracker and Time Tracker together\n- Day format: \"Day 1,\" \"Day 47,\" etc.\n- Day of week: Monday, Tuesday, etc., or \"Unknown\" if not established\n- Hour can be specific (3:47 PM) or general (early morning, late afternoon)\n- Multiple Time Trackers per scene are allowed",
     "phase": "both",
     "injection": {
       "position": 0,
