@@ -9,6 +9,10 @@ This maintenance bump separates staging work merged after v1.6.0 so the next sta
 ### Release Metadata
 - Updated app, Horde client, bundled extension, package, lockfile, and test metadata to 1.6.1.
 
+### In-Chat Agents
+- Updated bundled tracker agent templates with Pura's Director Preset 13.3 wording and bumped affected tracker templates to v2 so installed agents can be manually updated from the version pill.
+- Added a script to detect changed bundled agent template content and bump matching template versions across individual template files and the bundled index.
+
 ### Merged Staging PRs
 - PR #155 (2026-05-24) `fix: chat scroll and prompt manager scroll position issues`
 - PR #158 (2026-05-24) `feat: add mobile navigation customization`

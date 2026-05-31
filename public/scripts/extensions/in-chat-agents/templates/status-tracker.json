@@ -9,9 +9,9 @@
         "conditions",
         "health"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Status & Conditions\nTrack active physical, mental, or behavioral states when they meaningfully change. Never list baseline states. Use this EXACT format:\n\n[STATUS|Character|Condition|Severity]\nnote: MANDATORY; explain the cause or context; NEVER leave empty\n[/STATUS]\n\nSeverity options: 🟢 MILD | 🟡 MODERATE | 🔴 SEVERE | ⚫ CRITICAL | ✅ CLEARED\n\nRules:\n- Status appears AFTER narrative content when a condition is gained, worsened, improved, or cleared\n- Only show statuses that CHANGED this scene\n- Character can be {{user}} or any NPC\n- Condition is the specific state (e.g., \"Exhausted,\" \"Drunk,\" \"Paranoid,\" \"Bleeding\")\n- The note line is MANDATORY; always explain what caused this condition\n- NEVER output an empty note line",
+    "prompt": "### Status & Conditions\nTrack active physical, mental, or behavioral states when they meaningfully change. Never list baseline states. Use this EXACT format:\n\n[STATUS|Character|Condition|Severity]\nnote: MANDATORY; explain the cause or context\n[/STATUS]\n\nSeverity options: 🟢 MILD | 🟡 MODERATE | 🔴 SEVERE | ⚫ CRITICAL | ✅ CLEARED\n\nRules:\n- Status appears AFTER narrative content when a condition is gained, worsened, improved, or cleared\n- Only show statuses that CHANGED this scene\n- Character can be {{user}} or any NPC\n- Condition is the specific state (e.g., \"Exhausted,\" \"Drunk,\" \"Paranoid,\" \"Bleeding\")\n",
     "phase": "both",
     "injection": {
         "position": 0,
