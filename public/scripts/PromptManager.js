@@ -4,7 +4,7 @@ import { DOMPurify } from '../lib.js';
 
 import { event_types, eventSource, is_send_press, main_api, saveSettingsDebounced, substituteParams } from '../script.js';
 import { is_group_generating } from './group-chats.js';
-import { Message, MessageCollection, TokenHandler } from './openai.js';
+import { getCurrentOpenAIPresetPromptOrder, Message, MessageCollection, TokenHandler } from './openai.js';
 import { power_user } from './power-user.js';
 import { debounce, waitUntilCondition, escapeHtml, uuidv4 } from './utils.js';
 import { debounce_timeout } from './constants.js';
@@ -1013,8 +1013,12 @@ class PromptManager {
                 .then(userChoice => {
                     if (!userChoice) return;
 
+                    // SillyBunny: reset to the selected preset's saved order before falling back to the upstream default.
+                    const presetPromptOrder = getCurrentOpenAIPresetPromptOrder(this.activeCharacter?.id);
+                    const resetPromptOrder = presetPromptOrder.length ? presetPromptOrder : promptManagerDefaultPromptOrder;
+
                     this.removePromptOrderForCharacter(this.activeCharacter);
-                    this.addPromptOrderForCharacter(this.activeCharacter, promptManagerDefaultPromptOrder);
+                    this.addPromptOrderForCharacter(this.activeCharacter, resetPromptOrder);
 
                     this.render();
                     this.saveServiceSettings();
