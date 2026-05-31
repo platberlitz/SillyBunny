@@ -21,6 +21,20 @@ const SELECT_SAMPLER = {
 
 const textGenObjectStore = localforage.createInstance({ name: 'SillyTavern_TextCompletions' });
 let selectedSamplers = {};
+const DEFAULT_HIDDEN_TG_SAMPLERS = new Set([
+    'rep_pen',
+    'rep_pen_range',
+    'rep_pen_decay',
+    'rep_pen_slope',
+    'encoder_rep_pen',
+    'freq_pen',
+    'presence_pen',
+    'mirostat_mode',
+    'mirostat_tau',
+    'mirostat_eta',
+    'xtc_probability',
+    'xtc_threshold',
+]);
 
 // Goal 1: show popup with all samplers for active API
 async function showSamplerSelectPopup() {
@@ -52,12 +66,13 @@ async function showSamplerSelectPopup() {
     if (main_api === 'textgenerationwebui') {
         $('#prioritizeManuallySelectedSamplers').show();
         $('#prioritizeManuallySelectedSamplers').toggleClass('toggleEnabled', isSamplerManualPriorityEnabled());
-        $('#prioritizeManuallySelectedSamplers').off('click').on('click', function () {
+        $('#prioritizeManuallySelectedSamplers').off('click').on('click', async function () {
             $(this).toggleClass('toggleEnabled');
 
             const isActive = $(this).hasClass('toggleEnabled');
 
             toggleSamplerManualPriority(isActive);
+            await saveApiSelectedSamplers();
         });
     } else {
         $('#prioritizeManuallySelectedSamplers').hide();
@@ -65,7 +80,9 @@ async function showSamplerSelectPopup() {
     }
 
     await showPromise;
-    if (main_api === 'textgenerationwebui') await saveApiSelectedSamplers();
+    if (main_api === 'textgenerationwebui' && selectedSamplers[textgenerationwebui_settings.type]?.st_manual_priority !== undefined) {
+        await saveApiSelectedSamplers();
+    }
 }
 
 function getRelatedDOMElement(samplerName) {
@@ -199,7 +216,16 @@ function setSamplerListListeners() {
         const shouldDisplay = isChecked ? targetDisplayType : 'none';
         relatedDOMElement.css('display', shouldDisplay);
 
-        if (main_api === 'textgenerationwebui') setApiSamplersState(samplerName, shouldDisplay !== 'none');
+        if (main_api === 'textgenerationwebui') {
+            setApiSamplersState(samplerName, shouldDisplay !== 'none');
+
+            if (!isSamplerManualPriorityEnabled()) {
+                toggleSamplerManualPriority(true);
+                $('#prioritizeManuallySelectedSamplers').toggleClass('toggleEnabled', true);
+            }
+
+            await saveApiSelectedSamplers();
+        }
 
         console.log(samplerName, relatedDOMElement.data(SELECT_SAMPLER.DATA), shouldDisplay);
     });
@@ -321,6 +347,15 @@ export async function loadApiSelectedSamplers() {
         console.log('Text Completions: unable to load selected samplers, using default samplers', error);
         selectedSamplers = {};
     }
+}
+
+/**
+ * Returns whether a Text Completion sampler is hidden by default in automatic mode.
+ * @param {string} samplerName Target sampler key name
+ * @returns {boolean}
+ */
+export function isSamplerHiddenByDefault(samplerName) {
+    return DEFAULT_HIDDEN_TG_SAMPLERS.has(samplerName);
 }
 
 /**

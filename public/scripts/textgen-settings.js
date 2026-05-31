@@ -20,7 +20,7 @@ import { autoSelectInstructPreset, selectContextPreset, selectInstructPreset } f
 import { BIAS_CACHE, createNewLogitBiasEntry, displayLogitBias, getLogitBiasListResult } from './logit-bias.js';
 
 import { power_user, registerDebugFunction } from './power-user.js';
-import { getActiveManualApiSamplers, loadApiSelectedSamplers, isSamplerManualPriorityEnabled } from './samplerSelect.js';
+import { getActiveManualApiSamplers, loadApiSelectedSamplers, isSamplerManualPriorityEnabled, isSamplerHiddenByDefault } from './samplerSelect.js';
 import { SECRET_KEYS, writeSecret } from './secrets.js';
 import { getEventSourceStream } from './sse-stream.js';
 import { getLocalPromptCacheValue, isLikelyLocalServerUrl } from './local-url-utils.js';
@@ -1175,7 +1175,9 @@ export function initTextGenSettings() {
  * @returns void
  */
 function showSamplerControls(apiType = null) {
-    $('#textgenerationwebui_api-settings [data-tg-samplers], #textgenerationwebui_api [data-tg-samplers], #sb-sampling-textgenerationwebui [data-tg-samplers]').each(function (idx, elem) {
+    const samplerControlsSelector = '#textgenerationwebui_api-settings [data-tg-samplers], #textgenerationwebui_api [data-tg-samplers], #sb-sampling-textgenerationwebui [data-tg-samplers]';
+
+    $(samplerControlsSelector).each(function (idx, elem) {
         const typeSpecificControlled = $(elem).data('tg-type') !== undefined;
 
         if (!typeSpecificControlled) $(this).show();
@@ -1186,20 +1188,34 @@ function showSamplerControls(apiType = null) {
     const prioritizeManualSamplerSelect = isSamplerManualPriorityEnabled(apiType ?? textgenerationwebui_settings.type);
     const samplersActivatedManually = getActiveManualApiSamplers(apiType ?? textgenerationwebui_settings.type);
 
-    if (!samplersActivatedManually?.length || !prioritizeManualSamplerSelect) return;
+    if (!prioritizeManualSamplerSelect) {
+        hideDefaultSamplerControls(samplerControlsSelector);
+        return;
+    }
 
-    $('#textgenerationwebui_api-settings [data-tg-samplers], #textgenerationwebui_api [data-tg-samplers], #sb-sampling-textgenerationwebui [data-tg-samplers]').each(function () {
-        const tgSamplers = $(this).attr('data-tg-samplers').split(',').map(x => x.trim()).filter(str => str !== '');
+    $(samplerControlsSelector).each(function () {
+        const tgSamplers = getSamplerNamesFromElement(this);
+        const shouldShow = tgSamplers.some(tgSampler => samplersActivatedManually.includes(tgSampler));
 
-        for (const tgSampler of tgSamplers) {
-            if (samplersActivatedManually.includes(tgSampler)) {
-                $(this).show();
-                return;
-            } else {
-                $(this).hide();
-            }
+        $(this).toggle(shouldShow);
+    });
+}
+
+function hideDefaultSamplerControls(selector) {
+    $(selector).each(function () {
+        const shouldHide = getSamplerNamesFromElement(this).some(isSamplerHiddenByDefault);
+
+        if (shouldHide) {
+            $(this).hide();
         }
     });
+}
+
+function getSamplerNamesFromElement(element) {
+    return String($(element).attr('data-tg-samplers') ?? '')
+        .split(',')
+        .map(x => x.trim())
+        .filter(str => str !== '');
 }
 
 function showTypeSpecificControls(apiType) {
