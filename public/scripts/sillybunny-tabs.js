@@ -5216,11 +5216,16 @@ async function ensureChatMessageRendered(messageId) {
 
     const context = getSillyTavernContext();
     const chatLength = Array.isArray(context?.chat) ? context.chat.length : 0;
-    const firstRenderedId = Number(document.querySelector('#chat .mes[mesid]')?.getAttribute('mesid') ?? NaN);
+    const renderedMessages = Array.from(document.querySelectorAll('#chat .mes[mesid]'));
+    const firstRenderedId = Number(renderedMessages.at(0)?.getAttribute('mesid') ?? NaN);
+    const lastRenderedId = Number(renderedMessages.at(-1)?.getAttribute('mesid') ?? NaN);
     const chatModule = await getChatScriptModule().catch(() => null);
     const showMoreMessages = typeof context?.showMoreMessages === 'function'
         ? context.showMoreMessages
         : chatModule?.showMoreMessages;
+    const showNewerMessages = typeof context?.showNewerMessages === 'function'
+        ? context.showNewerMessages
+        : chatModule?.showNewerMessages;
     const redisplayChat = typeof context?.redisplayChat === 'function'
         ? context.redisplayChat
         : chatModule?.redisplayChat;
@@ -5234,12 +5239,22 @@ async function ensureChatMessageRendered(messageId) {
         }
     }
 
+    if (typeof showNewerMessages === 'function' && Number.isInteger(lastRenderedId) && messageId > lastRenderedId) {
+        await showNewerMessages(messageId - lastRenderedId);
+        await waitForNextAnimationFrame();
+        messageElement = getChatMessageElement(messageId);
+        if (messageElement instanceof HTMLElement) {
+            return messageElement;
+        }
+    }
+
     if (typeof redisplayChat === 'function' && chatLength > 0) {
-        if (!getChatMessageElement(0)) {
-            getChatScrollElement()?.querySelectorAll('.mes, #show_more_messages').forEach(element => element.remove());
+        const fallbackStartIndex = Math.max(0, Math.min(messageId, chatLength - 1));
+        if (!getChatMessageElement(fallbackStartIndex)) {
+            getChatScrollElement()?.querySelectorAll('.mes, #show_more_messages, #show_newer_messages').forEach(element => element.remove());
         }
 
-        await redisplayChat({ startIndex: 0, fade: false });
+        await redisplayChat({ startIndex: fallbackStartIndex, fade: false });
         await waitForNextAnimationFrame();
         return getChatMessageElement(messageId);
     }

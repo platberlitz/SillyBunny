@@ -6610,11 +6610,11 @@ body:not(.movingUI) .drawer-content.maximized {
     align-self: center;
 }
 
-#show_more_messages {
+#show_more_messages,
+#show_newer_messages {
     text-align: center;
     margin: 10px auto;
     font-weight: 500;
-    order: -1;
     cursor: pointer;
     padding: 0.5em 1em;
     background-color: var(--SmartThemeBlurTintColor);
@@ -6624,7 +6624,12 @@ body:not(.movingUI) .drawer-content.maximized {
     transition: filter var(--animation-duration-2x) ease-in-out;
 }
 
-#show_more_messages:hover {
+#show_more_messages {
+    order: -1;
+}
+
+#show_more_messages:hover,
+#show_newer_messages:hover {
     filter: brightness(1.25);
 }
 
