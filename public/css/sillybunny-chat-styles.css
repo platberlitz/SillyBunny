@@ -1173,6 +1173,24 @@ body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes .ch_name .
         margin-bottom: 0 !important;
     }
 }
+
+@media screen and (min-width: 1001px) {
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
+        flex: 0 0 auto;
+        inline-size: auto;
+        min-inline-size: 0;
+        width: auto;
+    }
+
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes[is_user="false"]:not(.smallSysMes) .mesAvatarWrapper {
+        flex-direction: row;
+    }
+
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mes_block .ch_name {
+        align-items: center;
+    }
+}
+
 body.big-avatars.echostyle #chat {
     .ch_name {
         margin-top: -22px !important;
