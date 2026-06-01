@@ -36,6 +36,7 @@ import { createSeparateSummaryMemoryEntry, createSummaryMemoryEntry, deriveSumma
 const MODULE_NAME = 'in-chat-agents';
 const PATHFINDER_LOG_PREFIX = '[Pathfinder]';
 const PATHFINDER_LOG_MODE_KEY = 'pathfinder-retrieval-log-mode';
+const PATHFINDER_QUICKSTART_DISMISSED_KEY = 'pathfinder-quickstart-dismissed';
 const DEFAULT_PIPELINE_MAX_TOKENS = 32000;
 
 let settingsEl = null;
@@ -45,6 +46,16 @@ let summaryMemoryUnsubscribe = null;
 
 function logPathfinder(message, ...details) {
     console.log(`${PATHFINDER_LOG_PREFIX} ${message}`, ...details);
+}
+
+function isQuickstartDismissed() {
+    return localStorage.getItem(PATHFINDER_QUICKSTART_DISMISSED_KEY) === 'true';
+}
+
+function applyQuickstartDismissalState() {
+    if (isQuickstartDismissed()) {
+        settingsEl.find('#pf--quickstart').hide();
+    }
 }
 
 function ensureEnabledLorebooks(settings) {
@@ -253,6 +264,7 @@ export async function openPathfinderSettings(agent) {
 
     // Initialize UI
     await refreshLorebookList();
+    applyQuickstartDismissalState();
     loadSettingsIntoUI();
     bindEvents();
     settingsEl.find('#pf--log-mode').val(retrievalLogMode);
@@ -532,46 +544,6 @@ function readPromptMaxTokens() {
     return Math.min(200000, Math.max(100, value));
 }
 
-const PATHFINDER_MODE_LABELS = {
-    off: 'Off',
-    tool: 'Tool',
-    pipeline: 'Pipeline',
-    both: 'Both',
-};
-
-function normalizePathfinderModeValue(value) {
-    const mode = String(value || '').trim().toLowerCase();
-    return Object.hasOwn(PATHFINDER_MODE_LABELS, mode) ? mode : 'off';
-}
-
-function getPathfinderModeValue(settings = getPathfinderSettings()) {
-    const toolEnabled = Boolean(settings?.sidecarEnabled);
-    const pipelineEnabled = Boolean(settings?.pipelineEnabled);
-
-    if (toolEnabled && pipelineEnabled) {
-        return 'both';
-    }
-
-    if (toolEnabled) {
-        return 'tool';
-    }
-
-    if (pipelineEnabled) {
-        return 'pipeline';
-    }
-
-    return 'off';
-}
-
-function applyPathfinderModeValue(settings, value) {
-    const mode = normalizePathfinderModeValue(value);
-
-    settings.sidecarEnabled = mode === 'tool' || mode === 'both';
-    settings.pipelineEnabled = mode === 'pipeline' || mode === 'both';
-
-    return mode;
-}
-
 /**
  * Load current settings into UI elements
  */
@@ -596,7 +568,6 @@ function loadSettingsIntoUI() {
     settingsEl.find('#pf--dedupe-natural-activation').prop('checked', s.dedupeNaturalActivation !== false);
     settingsEl.find('#pf--auto-summary').prop('checked', s.autoSummary || false);
     settingsEl.find('#pf--auto-summary-interval').val(s.autoSummaryInterval ?? 20);
-    settingsEl.find('#pf--mode-selector').val(getPathfinderModeValue(s));
 
     settingsEl.find('#pf--enable-summarize-tool').prop('checked', isPathfinderToolEnabled('Pathfinder_Summarize'));
 
@@ -788,6 +759,12 @@ ${recentChat}`;
  * Bind all event handlers
  */
 function bindEvents() {
+    settingsEl.find('#pf--quickstart-dismiss').on('click', () => {
+        localStorage.setItem(PATHFINDER_QUICKSTART_DISMISSED_KEY, 'true');
+        settingsEl.find('#pf--quickstart').slideUp(180);
+        logPathfinder('Dismissed Pathfinder introduction card.');
+    });
+
     settingsEl.find('#pf--master-enable').on('change', async function () {
         if (!currentAgent) {
             return;
@@ -840,21 +817,6 @@ function bindEvents() {
     });
 
     // Mode toggles
-    settingsEl.find('#pf--mode-selector').on('change', function () {
-        const s = getPathfinderSettings();
-        const previousToolEnabled = Boolean(s.sidecarEnabled);
-        const mode = applyPathfinderModeValue(s, $(this).val());
-        setPathfinderSettings(s);
-        logPathfinder(`Pathfinder mode set to ${PATHFINDER_MODE_LABELS[mode]}.`);
-        updateModeCardStates();
-        updateStatusBanner();
-        updateAgentSettings();
-
-        if (previousToolEnabled !== Boolean(s.sidecarEnabled)) {
-            syncToolAgentRegistrations();
-        }
-    });
-
     settingsEl.find('#pf--enable-tools').on('change', function () {
         const enabled = $(this).prop('checked');
         const s = getPathfinderSettings();
@@ -1510,7 +1472,6 @@ function updateModeCardStates() {
     const toolCard = settingsEl.find('.pf--mode-card[data-mode="tools"]');
     const pipelineCard = settingsEl.find('.pf--mode-card[data-mode="pipeline"]');
 
-    settingsEl.find('#pf--mode-selector').val(getPathfinderModeValue(s));
     settingsEl.find('#pf--enable-tools').prop('checked', toolEnabled);
     settingsEl.find('#pf--enable-pipeline').prop('checked', pipelineEnabled);
 

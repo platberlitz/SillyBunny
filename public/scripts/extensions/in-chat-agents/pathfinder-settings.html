@@ -21,8 +21,13 @@
     <!-- Quick Start Guide -->
     <div id="pf--quickstart" class="pf--quickstart">
         <div class="pf--quickstart-header">
-            <i class="fa-solid fa-route"></i>
-            <strong>What is Pathfinder?</strong>
+            <div class="pf--quickstart-title">
+                <i class="fa-solid fa-route"></i>
+                <strong>What is Pathfinder?</strong>
+            </div>
+            <button type="button" id="pf--quickstart-dismiss" class="pf--quickstart-close" aria-label="Hide Pathfinder explanation" title="Hide Pathfinder explanation">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
         </div>
         <div class="pf--quickstart-body">
             <p>Pathfinder gives the AI <b>intelligent access to your lorebooks</b>. Instead of relying on keywords, it uses AI to predict which lore entries are relevant to the current scene.</p>
@@ -35,40 +40,43 @@
     </div>
 
     <!-- Step 1: Select Lorebooks -->
-    <div class="pf--section pf--section-primary">
-        <div class="pf--section-header">
+    <div id="pf--lorebook-section" class="pf--section pf--section-primary pf--section-collapsible">
+        <div class="pf--section-header pf--collapsible-header">
+            <i class="fa-solid fa-chevron-down pf--chevron"></i>
             <span class="pf--step-badge">1</span>
             <strong>Select Lorebooks</strong>
             <span class="pf--required">(Required)</span>
         </div>
-        <div class="pf--section-desc">
-            Choose which lorebooks Pathfinder can access. These must be lorebooks attached to your current character or chat.
-        </div>
-        <div id="pf--lorebook-list" class="pf--lorebook-list">
-            <div class="pf--empty-state">
-                <i class="fa-solid fa-book-open"></i>
-                <span>No lorebooks found. Attach a lorebook to your character first.</span>
+        <div class="pf--section-body">
+            <div class="pf--section-desc">
+                Choose which lorebooks Pathfinder can access. These must be lorebooks attached to your current character or chat.
             </div>
-        </div>
-        <div class="pf--lorebook-actions">
-            <button type="button" id="pf--refresh-lorebooks" class="menu_button menu_button_icon">
-                <i class="fa-solid fa-rotate"></i>
-                <span>Refresh List</span>
-            </button>
-        </div>
-        <div class="pf--setting-group pf--lorebook-toggle">
-            <label class="checkbox_label">
-                <input type="checkbox" id="pf--auto-use-attached" />
-                <span>Automatically use attached character/chat lorebooks</span>
-            </label>
-            <div class="pf--setting-help">When enabled, Pathfinder auto-selects lorebooks attached to the active character card or chat.</div>
-        </div>
-        <div class="pf--setting-group pf--lorebook-toggle">
-            <label class="checkbox_label">
-                <input type="checkbox" id="pf--auto-sync-lorebooks" />
-                <span>Reset selections to the current chat/character lorebooks on chat change</span>
-            </label>
-            <div class="pf--setting-help">Prevents a previous chat's lorebook from staying selected when the new chat has no attached lorebook.</div>
+            <div id="pf--lorebook-list" class="pf--lorebook-list">
+                <div class="pf--empty-state">
+                    <i class="fa-solid fa-book-open"></i>
+                    <span>No lorebooks found. Attach a lorebook to your character first.</span>
+                </div>
+            </div>
+            <div class="pf--lorebook-actions">
+                <button type="button" id="pf--refresh-lorebooks" class="menu_button menu_button_icon">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>Refresh List</span>
+                </button>
+            </div>
+            <div class="pf--setting-group pf--lorebook-toggle">
+                <label class="checkbox_label">
+                    <input type="checkbox" id="pf--auto-use-attached" />
+                    <span>Automatically use attached character/chat lorebooks</span>
+                </label>
+                <div class="pf--setting-help">When enabled, Pathfinder auto-selects lorebooks attached to the active character card or chat.</div>
+            </div>
+            <div class="pf--setting-group pf--lorebook-toggle">
+                <label class="checkbox_label">
+                    <input type="checkbox" id="pf--auto-sync-lorebooks" />
+                    <span>Reset selections to the current chat/character lorebooks on chat change</span>
+                </label>
+                <div class="pf--setting-help">Prevents a previous chat's lorebook from staying selected when the new chat has no attached lorebook.</div>
+            </div>
         </div>
     </div>
 
@@ -77,19 +85,6 @@
         <div class="pf--section-header">
             <span class="pf--step-badge">2</span>
             <strong>Choose How Pathfinder Works</strong>
-        </div>
-
-        <div class="pf--mode-selector-row">
-            <label class="pf--setting-label" for="pf--mode-selector">
-                <i class="fa-solid fa-route"></i>
-                <span>Mode</span>
-            </label>
-            <select id="pf--mode-selector" class="text_pole" aria-label="Pathfinder mode">
-                <option value="off">Off</option>
-                <option value="tool">Tool</option>
-                <option value="pipeline">Pipeline</option>
-                <option value="both">Both</option>
-            </select>
         </div>
 
         <!-- Warning banner when both modes enabled -->
@@ -569,6 +564,7 @@
 .pf--quickstart-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
     padding: 10px 14px;
     background: color-mix(in srgb, var(--pf-surface-strong) 92%, var(--pf-accent) 8%);
@@ -576,8 +572,38 @@
     font-size: 14px;
 }
 
-.pf--quickstart-header i {
+.pf--quickstart-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.pf--quickstart-title i {
     color: var(--pf-accent);
+}
+
+.pf--quickstart-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    margin: -4px -6px -4px 8px;
+    border: 1px solid color-mix(in srgb, var(--pf-border) 72%, transparent);
+    border-radius: var(--pf-radius-sm);
+    background: color-mix(in srgb, var(--pf-surface-strong) 88%, var(--pf-text) 4%);
+    color: var(--pf-text-muted);
+    cursor: pointer;
+    transition: background 0.18s var(--pf-ease), border-color 0.18s var(--pf-ease), color 0.18s var(--pf-ease);
+}
+
+.pf--quickstart-close:hover,
+.pf--quickstart-close:focus-visible {
+    background: var(--pf-surface-hover);
+    border-color: color-mix(in srgb, var(--pf-border) 66%, var(--pf-accent) 20%);
+    color: var(--pf-text);
 }
 
 .pf--quickstart-body {
@@ -805,37 +831,6 @@
 }
 
 /* Mode Cards */
-.pf--mode-selector-row {
-    display: grid;
-    grid-template-columns: max-content minmax(160px, 260px);
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-    padding: 10px 12px;
-    background: color-mix(in srgb, var(--pf-surface-strong) 90%, var(--pf-accent) 6%);
-    border: 1px solid color-mix(in srgb, var(--pf-border) 80%, transparent);
-    border-radius: var(--pf-radius-md);
-}
-
-.pf--mode-selector-row .pf--setting-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--pf-text);
-}
-
-.pf--mode-selector-row .pf--setting-label i {
-    color: var(--pf-accent);
-}
-
-#pf--mode-selector {
-    width: 100%;
-    min-width: 0;
-}
-
 .pf--mode-cards {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1197,11 +1192,6 @@
 @media (max-width: 600px) {
     .pf--settings {
         max-height: calc(100dvh - 120px);
-    }
-
-    .pf--mode-selector-row {
-        grid-template-columns: 1fr;
-        align-items: stretch;
     }
 
     .pf--mode-cards {
