@@ -31,6 +31,7 @@ import {
     getOneCharacter,
     getRequestHeaders,
     getThumbnailUrl,
+    refreshCharacterAvatar,
     is_send_press,
     main_api,
     name1,
@@ -5207,22 +5208,7 @@ async function uploadCharacterAvatar(avatarKey, base64Data, { resizePrompt = fal
             throw new Error(errorText); // Will be caught and logged below
         }
 
-        // Bust cache for the avatar thumbnail and character image
-        const thumbnailUrl = getThumbnailUrl('avatar', avatarKey);
-        await fetch(thumbnailUrl, { method: 'GET', cache: 'reload' });
-        await fetch(`/characters/${avatarKey}`, { method: 'GET', cache: 'reload' });
-
-        // Refresh all visible avatar images that use this thumbnail URL
-        // This handles messages, character list, and any other place using the thumbnail
-        const avatarImages = document.querySelectorAll(`img[src^="${thumbnailUrl}"]`);
-        for (const img of avatarImages) {
-            if (img instanceof HTMLImageElement) {
-                const originalSrc = img.src;
-                img.src = '';
-                img.src = originalSrc;
-            }
-        }
-        console.debug(`Refreshed ${avatarImages.length} avatar images for ${avatarKey}`);
+        await refreshCharacterAvatar(avatarKey);
 
         return true;
     } catch (error) {
@@ -5480,6 +5466,7 @@ async function updateCharacterCallback(args) {
         // Update the side panel if this is the currently selected character
         if (characterIndex === this_chid) {
             select_selected_character(this_chid, { switchMenu: false });
+            await refreshCharacterAvatar(character.avatar);
         }
 
         toastr.success(t`Character "${character.name}" updated successfully`);
