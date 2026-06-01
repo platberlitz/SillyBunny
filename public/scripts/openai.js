@@ -6178,9 +6178,7 @@ function setAutoAppendReasoningTagControls() {
 
 async function getStatusOpen() {
     const noValidateSources = [
-        chat_completion_sources.CLAUDE,
         chat_completion_sources.AI21,
-        chat_completion_sources.VERTEXAI,
         chat_completion_sources.PERPLEXITY,
         chat_completion_sources.ZAI,
         chat_completion_sources.MINIMAX,
@@ -6232,6 +6230,12 @@ async function getStatusOpen() {
 
     if (oai_settings.chat_completion_source === chat_completion_sources.MINIMAX) {
         data.minimax_endpoint = oai_settings.minimax_endpoint;
+    }
+
+    if (oai_settings.chat_completion_source === chat_completion_sources.VERTEXAI) {
+        data.vertexai_auth_mode = oai_settings.vertexai_auth_mode;
+        data.vertexai_region = oai_settings.vertexai_region;
+        data.vertexai_express_project_id = oai_settings.vertexai_express_project_id;
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.WORKERS_AI) {
@@ -7522,7 +7526,7 @@ async function onModelChange() {
     if (oai_settings.chat_completion_source == chat_completion_sources.CLAUDE) {
         if (maxContextUnlocked) {
             $('#openai_max_context').attr('max', unlocked_max);
-        } else if (/^claude-(sonnet-4-5|sonnet-4-6|opus-4-6|opus-4-7)/.test(value)) {
+        } else if (/^claude-(sonnet-4-(?:[5-9]|\d{2,})|opus-4-(?:[6-9]|\d{2,}))/.test(value)) {
             $('#openai_max_context').attr('max', max_1mil);
         } else if (/^claude-(3|opus|haiku|sonnet)/.test(value)) {
             $('#openai_max_context').attr('max', max_200k);
