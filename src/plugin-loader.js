@@ -5,9 +5,12 @@ import url from 'node:url';
 import express from 'express';
 import { default as git, CheckRepoActions } from 'simple-git';
 import { sync as commandExistsSync } from 'command-exists';
-import { getConfigValue, color } from './util.js';
+import { getConfig, getConfigValue, color } from './util.js';
 
-const enableServerPlugins = !!getConfigValue('enableServerPlugins', false, 'boolean');
+const SERVER_PLUGINS_CONFIG_KEY = 'enableServerPlugins';
+const COMMON_SERVER_PLUGIN_CONFIG_MISTAKES = ['enableServerPlugin', 'enableserverplugin', 'enableserverplugins'];
+
+const enableServerPlugins = !!getConfigValue(SERVER_PLUGINS_CONFIG_KEY, false, 'boolean');
 const enableServerPluginsAutoUpdate = !!getConfigValue('enableServerPluginsAutoUpdate', true, 'boolean');
 
 /**
@@ -44,6 +47,7 @@ export async function loadPlugins(app, pluginsPath) {
 
         // Server plugins are disabled.
         if (!enableServerPlugins) {
+            warnAboutDisabledServerPlugins(pluginsPath);
             return emptyFn;
         }
 
@@ -74,7 +78,7 @@ export async function loadPlugins(app, pluginsPath) {
                 continue;
             }
 
-            await loadFromFile(app, pluginFilePath, exitHooks);
+            await loadFromFile(app, pluginFilePath, exitHooks, path.dirname(pluginFilePath));
         }
 
         if (loadedPlugins.size > 0) {
@@ -111,7 +115,7 @@ async function loadFromDirectory(app, pluginDirectoryPath, exitHooks) {
     for (const fileType of fileTypes) {
         const filePath = path.join(pluginDirectoryPath, fileType);
         if (fs.existsSync(filePath)) {
-            if (await loadFromFile(app, filePath, exitHooks)) {
+            if (await loadFromFile(app, filePath, exitHooks, pluginDirectoryPath)) {
                 return;
             }
         }
@@ -131,7 +135,7 @@ async function loadFromPackage(app, packageJsonPath, exitHooks) {
         const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
         if (packageJson.main) {
             const pluginFilePath = path.join(path.dirname(packageJsonPath), packageJson.main);
-            return await loadFromFile(app, pluginFilePath, exitHooks);
+            return await loadFromFile(app, pluginFilePath, exitHooks, path.dirname(packageJsonPath));
         }
     } catch (error) {
         console.error(`Failed to load plugin from ${packageJsonPath}: ${error}`);
@@ -145,9 +149,10 @@ async function loadFromPackage(app, packageJsonPath, exitHooks) {
  * @param {string} pluginFilePath Path to plugin directory
  * @param {Array.<Function>} exitHooks Array of functions to be run on plugin exit. Will be pushed to if the plugin has
  * an "exit" function.
+ * @param {string} pluginDirectoryPath Path to the plugin directory
  * @returns {Promise<boolean>} Promise that resolves to true if plugin was loaded successfully
  */
-async function loadFromFile(app, pluginFilePath, exitHooks) {
+async function loadFromFile(app, pluginFilePath, exitHooks, pluginDirectoryPath = path.dirname(pluginFilePath)) {
     try {
         const fileUrl = url.pathToFileURL(pluginFilePath).toString();
         const plugin = await import(fileUrl);
@@ -155,8 +160,94 @@ async function loadFromFile(app, pluginFilePath, exitHooks) {
         return await initPlugin(app, plugin, exitHooks);
     } catch (error) {
         console.error(`Failed to load plugin from ${pluginFilePath}: ${error}`);
+        logMissingDependencyHint(error, pluginDirectoryPath);
         return false;
     }
+}
+
+/**
+ * Warn when server plugins appear to be configured with a common typo or are installed but disabled.
+ * @param {string} pluginsPath Path to plugins directory
+ */
+function warnAboutDisabledServerPlugins(pluginsPath) {
+    const config = getConfig();
+    const mistakenConfigKey = COMMON_SERVER_PLUGIN_CONFIG_MISTAKES.find(key => Object.prototype.hasOwnProperty.call(config, key));
+
+    if (mistakenConfigKey) {
+        console.warn(color.yellow(`Config key '${mistakenConfigKey}' is ignored. Did you mean '${SERVER_PLUGINS_CONFIG_KEY}' (plural and camelCase)?`));
+    }
+
+    if (hasPluginCandidates(pluginsPath)) {
+        console.warn(color.yellow(`Server plugins are installed in ${pluginsPath}, but ${SERVER_PLUGINS_CONFIG_KEY} is false. Set ${SERVER_PLUGINS_CONFIG_KEY}: true in config.yaml to load them.`));
+    }
+}
+
+/**
+ * Check whether a plugins directory contains loadable plugin candidates.
+ * @param {string} pluginsPath Path to plugins directory
+ * @returns {boolean} True if the directory contains plugin candidates
+ */
+function hasPluginCandidates(pluginsPath) {
+    try {
+        if (!fs.existsSync(pluginsPath)) {
+            return false;
+        }
+
+        return fs.readdirSync(pluginsPath)
+            .filter(file => !file.startsWith('.'))
+            .some(file => {
+                try {
+                    const pluginFilePath = path.join(pluginsPath, file);
+                    const stat = fs.statSync(pluginFilePath);
+                    return stat.isDirectory() || (stat.isFile() && (isCommonJS(file) || isESModule(file)));
+                } catch {
+                    return false;
+                }
+            });
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Log an actionable install hint when a server plugin fails because a package dependency is missing.
+ * @param {unknown} error Import error
+ * @param {string} pluginDirectoryPath Path to the plugin directory
+ */
+function logMissingDependencyHint(error, pluginDirectoryPath) {
+    const missingDependency = getMissingDependencyName(error);
+
+    if (!missingDependency) {
+        return;
+    }
+
+    console.error(color.yellow(`Server plugin dependency '${missingDependency}' was not found.`));
+    console.error(color.yellow(`Install the plugin's dependencies, then restart: cd "${pluginDirectoryPath}" && npm install`));
+    console.error(color.yellow('If you use Bun, run bun install in the same plugin directory instead. Stop SillyBunny first if your package manager reports that node_modules is busy.'));
+}
+
+/**
+ * Extract a missing package specifier from Node/Bun module resolution errors.
+ * @param {unknown} error Import error
+ * @returns {string|null} Missing dependency package name, if detected
+ */
+function getMissingDependencyName(error) {
+    const message = String(error?.message ?? error);
+    const match = message.match(/Cannot find package ['"]([^'"]+)['"]/) ||
+        message.match(/Cannot find module ['"]([^'"]+)['"]/) ||
+        message.match(/Could not resolve ['"]([^'"]+)['"]/) ||
+        message.match(/Module not found.*['"]([^'"]+)['"]/);
+
+    if (!match) {
+        return null;
+    }
+
+    const specifier = match[1];
+    if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:') || specifier.startsWith('file:')) {
+        return null;
+    }
+
+    return specifier;
 }
 
 /**
