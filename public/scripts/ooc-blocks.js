@@ -4,7 +4,7 @@ const OOC_BLOCK_PLACEHOLDER_SUFFIX = '_\uE001';
 
 /**
  * Normalizes prompt-context retention settings.
- * -1 preserves every context message, 0 strips every context message, N preserves the last N messages.
+ * -1 preserves every context message, 0 preserves the active turn, N preserves through depth N.
  * @param {number|string} value Retention setting value.
  * @returns {number} Normalized context depth.
  */
@@ -33,7 +33,7 @@ export function shouldRetainContextAtDepth(messageDepth, retentionDepth) {
         return true;
     }
 
-    return Math.max(0, Number(messageDepth) || 0) < normalizedDepth;
+    return Math.max(0, Number(messageDepth) || 0) <= normalizedDepth;
 }
 
 /**

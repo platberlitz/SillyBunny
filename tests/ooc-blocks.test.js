@@ -73,11 +73,24 @@ describe('OOC block handling', () => {
         expect(normalizeContextRetentionDepth(2.9)).toBe(2);
     });
 
-    test('retains context content according to -1, 0, and last-N depths', () => {
+    test('retains context content according to -1, active-turn, and max-depth settings', () => {
         expect(shouldRetainContextAtDepth(50, -1)).toBe(true);
-        expect(shouldRetainContextAtDepth(0, 0)).toBe(false);
+        expect(shouldRetainContextAtDepth(0, 0)).toBe(true);
+        expect(shouldRetainContextAtDepth(1, 0)).toBe(false);
         expect(shouldRetainContextAtDepth(0, 2)).toBe(true);
         expect(shouldRetainContextAtDepth(1, 2)).toBe(true);
-        expect(shouldRetainContextAtDepth(2, 2)).toBe(false);
+        expect(shouldRetainContextAtDepth(2, 2)).toBe(true);
+        expect(shouldRetainContextAtDepth(3, 2)).toBe(false);
+    });
+
+    test('keeps OOC and HTML for the active turn when context depth is zero', () => {
+        expect(stripOocBlocksFromContext('Visible ((active turn note)) text', shouldRetainContextAtDepth(0, 0)))
+            .toBe('Visible ((active turn note)) text');
+        expect(stripOocBlocksFromContext('Visible ((older note)) text', shouldRetainContextAtDepth(1, 0)))
+            .toBe('Visible text');
+        expect(stripHtmlTagsFromContext('Visible <em>active turn tag</em> text', shouldRetainContextAtDepth(0, 0)))
+            .toBe('Visible <em>active turn tag</em> text');
+        expect(stripHtmlTagsFromContext('Visible <em>older tag</em> text', shouldRetainContextAtDepth(1, 0)))
+            .toBe('Visible older tag text');
     });
 });

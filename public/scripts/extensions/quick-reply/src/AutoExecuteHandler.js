@@ -1,6 +1,5 @@
+import { getUniqueQuickReplySetLinksBySetName } from './quick-reply-set-list.js';
 import { warn } from './shared.js';
-import { QuickReply } from './QuickReply.js';
-import { QuickReplySettings } from './QuickReplySettings.js';
 
 export class AutoExecuteHandler {
     /** @type {QuickReplySettings} */ settings;
@@ -33,15 +32,13 @@ export class AutoExecuteHandler {
 
 
     getCommands(eventName) {
-        const getFromConfig = (config) => {
-            // This safely handles cases where a link exists but the set hasn't been loaded (link.set is null)
-            return config?.setList?.map(link => link.set ? link.set.qrList.filter(qr => qr[eventName]) : [])?.flat() ?? [];
-        };
-        return [
-            ...getFromConfig(this.settings.config),
-            ...getFromConfig(this.settings.chatConfig),
-            ...getFromConfig(this.settings.charConfig),
-        ];
+        return getUniqueQuickReplySetLinksBySetName([
+            ...(this.settings.config?.setList ?? []),
+            ...(this.settings.chatConfig?.setList ?? []),
+            ...(this.settings.charConfig?.setList ?? []),
+        ])
+            .map(link => link.set ? link.set.qrList.filter(qr => qr[eventName]) : [])
+            .flat();
     }
 
     async handleStartup() {
@@ -87,17 +84,13 @@ export class AutoExecuteHandler {
         const automationIds = entries.map(entry => entry.automationId).filter(Boolean);
         if (automationIds.length === 0) return;
 
-        const getFromConfig = (config) => {
-            return config?.setList
-                ?.map(link => link.set ? link.set.qrList.filter(qr => qr.automationId && automationIds.includes(qr.automationId)) : [])
-                ?.flat() ?? [];
-        };
-
-        const qrList = [
-            ...getFromConfig(this.settings.config),
-            ...getFromConfig(this.settings.chatConfig),
-            ...getFromConfig(this.settings.charConfig),
-        ];
+        const qrList = getUniqueQuickReplySetLinksBySetName([
+            ...(this.settings.config?.setList ?? []),
+            ...(this.settings.chatConfig?.setList ?? []),
+            ...(this.settings.charConfig?.setList ?? []),
+        ])
+            .map(link => link.set ? link.set.qrList.filter(qr => qr.automationId && automationIds.includes(qr.automationId)) : [])
+            .flat();
 
         await this.performAutoExecute(qrList);
     }

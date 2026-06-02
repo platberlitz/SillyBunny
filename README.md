@@ -223,12 +223,29 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ### v1.6.1 (2026-05-31)
 
-This maintenance bump separates staging work merged after v1.6.0 so the next stable release changelog can collect it cleanly.
+This update carries the post-v1.6.0 staging line forward with safer chat rendering, tighter mobile navigation, sturdier preset/profile persistence, more reliable Quick Replies, and a broader cleanup pass across settings, screenshots, and release tooling.
+
+**Added**
+* Desktop vertical navigation settings and clearer mobile navigation customization make the shell easier to tune without changing the default layout.
+* Post-main in-chat agent intercept timing gives agent workflows a cleaner place to process main-model output.
+* OpenAI TTS now supports explicit audio format selection.
+* Current-chat files access, Quick Action icon picking, compact Pathfinder mode controls, and Pathfinder submodule toggles expand the utility surface without crowding first-run defaults.
 
 **Changed**
 * Updated app, Horde client, bundled extension, package, lockfile, and test metadata to 1.6.1.
-* Updated bundled tracker agent templates with Pura's Director Preset 13.3 wording and bumped affected tracker templates to v2 so installed agents can be manually updated from the version pill.
-* Added a script to detect changed bundled agent template content and bump matching template versions across individual template files and the bundled index.
+* Chat rendering now routes bottom scroll, redisplay, show-more, message updates, streaming, swipe replacement, media resize, and mobile viewport handling through lifecycle helpers with proven routes enabled by default.
+* Mobile shell, preset/API sync, generation, extension boot, Prompt Manager, and tooling hydration behavior now sit behind smaller lifecycle seams for easier future syncs and safer bug fixes.
+* Pura Director and bundled tracker templates were refreshed and versioned so installed agents can be manually updated from the version pill.
+* Release automation was refreshed so merged staging work is easier to keep represented in the changelog.
+
+**Fixed**
+* Connection profiles and presets now persist more reliably, including immediate connection-profile preset saves, prompt-order reset from the selected preset, reverse-proxy backend binding, and current chat-completion model fetching.
+* Quick Reply loading, active-set rendering, API listing, auto-execute, settings selectors, and context menus now dedupe duplicate set names without dropping saved chat or character links.
+* OOC and HTML context depth `0` now keeps the active turn while stripping older context messages.
+* Sampler visibility startup now avoids overwriting saved selections when browser storage is slow to respond.
+* Character avatar refresh, imported character selection, desktop Prompt Manager scroll, chat shell wheel routing, shell resize handles, Select2 dropdowns, native chat style headers, bounded rendered messages, and wand message screenshots were tightened.
+* Duplicate agent runner initialization, text-completion close handlers, local generation aborts, LCPP status restore, text-completion reasoning leaks, Guided Generations steering, post-agent provider-error handling, and Pathfinder swipe/settings reuse were hardened.
+* PR checks, changelog automation, frontend asset handling, and upstream touch tracking were cleaned up.
 
 ### v1.6.0 (2026-05-18)
 

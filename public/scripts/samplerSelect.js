@@ -10,6 +10,7 @@ import { setting_names as TGsamplerNames, showTGSamplerControls, textgenerationw
 import { renderTemplateAsync } from './templates.js';
 import { Popup, POPUP_TYPE } from './popup.js';
 import { localforage } from '../lib.js';
+import { loadStoredSelectedSamplers } from './sampler-storage.js';
 
 const forcedOnColoring = 'color: #89db35;';
 const forcedOffColoring = 'color: #e84f62;';
@@ -21,6 +22,7 @@ const SELECT_SAMPLER = {
 
 const textGenObjectStore = localforage.createInstance({ name: 'SillyTavern_TextCompletions' });
 let selectedSamplers = {};
+let selectedSamplersStorageReady = true;
 
 // Goal 1: show popup with all samplers for active API
 async function showSamplerSelectPopup() {
@@ -316,10 +318,12 @@ export async function validateDisabledSamplers(redraw = false) {
 export async function loadApiSelectedSamplers() {
     try {
         console.debug('Text Completions: loading selected samplers');
-        selectedSamplers = await textGenObjectStore.getItem('selectedSamplers') || {};
+        selectedSamplers = await loadStoredSelectedSamplers(textGenObjectStore);
+        selectedSamplersStorageReady = true;
     } catch (error) {
         console.log('Text Completions: unable to load selected samplers, using default samplers', error);
         selectedSamplers = {};
+        selectedSamplersStorageReady = false;
     }
 }
 
@@ -329,10 +333,17 @@ export async function loadApiSelectedSamplers() {
  */
 export async function saveApiSelectedSamplers() {
     try {
+        if (!selectedSamplersStorageReady) {
+            console.warn('Text Completions: skipping selected sampler save because storage did not finish loading.');
+            return false;
+        }
+
         console.debug('Text Completions: saving selected samplers');
         await textGenObjectStore.setItem('selectedSamplers', selectedSamplers);
+        return true;
     } catch (error) {
         console.log('Text Completions: unable to save selected samplers', error);
+        return false;
     }
 }
 
@@ -350,8 +361,8 @@ export async function resetApiSelectedSamplers(tcApiType = '', silent = false) {
 
         console.debug('Text Completions: resetting selected samplers');
         delete selectedSamplers[tcApiType];
-        await saveApiSelectedSamplers();
-        if (!silent) toastr.success('Selected samplers cleared.');
+        const saved = await saveApiSelectedSamplers();
+        if (saved && !silent) toastr.success('Selected samplers cleared.');
     } catch (error) {
         console.log('Text Completions: unable to reset selected preset samplers', error);
     }
@@ -411,6 +422,7 @@ export function setApiSamplerVisibilityState(state, tcApiType = '') {
     selectedSamplers[tcApiType] = Object.fromEntries(
         Object.entries(state).map(([key, value]) => [key, String(value) === 'true']),
     );
+    selectedSamplersStorageReady = true;
 
     return true;
 }

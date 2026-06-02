@@ -102,6 +102,58 @@ This ledger tracks intentional SillyBunny divergence in upstream-origin files. I
 | Last reviewed | 2026-05-28 extension boot lifecycle wiring. |
 | Owner | Refactor integrator and extension runtime owner. |
 
+### `public/scripts/extensions/quick-reply/` - active set canonicalization
+| Field | Value |
+| --- | --- |
+| Area | Extension quick replies, settings, and automation. |
+| Divergence reason | SillyBunny needs duplicate Quick Reply set names from saved/imported data to resolve to one canonical active set so buttons, auto-execute, API lookup, settings selectors, and persisted chat/character links do not duplicate or disappear. |
+| Target seam | `public/scripts/extensions/quick-reply/src/quick-reply-set-list.js`. |
+| Adapter shape | Keep call sites using normalized set/link helpers for load, render, API, auto-execute, and settings traversal. |
+| Protecting tests | `tests/quick-reply-set-list.test.js`, `tests/quick-reply-config.test.js`, `tests/quick-reply-button-ui.test.js`, `tests/quick-reply-auto-execute.test.js`, `tests/quick-reply-api.test.js`. |
+| Validation | `npm run test:unit --prefix tests -- quick-reply-set-list.test.js quick-reply-config.test.js quick-reply-button-ui.test.js quick-reply-auto-execute.test.js quick-reply-api.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
+| Rollback path | Remove helper calls and revert to exact-name set/link traversal if canonicalization regresses saved Quick Reply data. |
+| Last reviewed | 2026-06-02 Quick Replies duplicate fix. |
+| Owner | Refactor integrator and extension runtime owner. |
+
+### `public/scripts/ooc-blocks.js` - prompt context retention
+| Field | Value |
+| --- | --- |
+| Area | Prompt context and settings. |
+| Divergence reason | SillyBunny exposes OOC and raw HTML retention depth where `0` must keep the active turn while stripping older context messages. |
+| Target seam | `public/scripts/ooc-blocks.js`. |
+| Adapter shape | Keep retention-depth normalization and message-depth checks in this module; keep settings copy in `public/index.html` aligned with behavior. |
+| Protecting tests | `tests/ooc-blocks.test.js`. |
+| Validation | `npm run test:unit --prefix tests -- ooc-blocks.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
+| Rollback path | Revert the comparison and settings copy to previous strip-at-zero behavior. |
+| Last reviewed | 2026-06-02 active-turn retention fix. |
+| Owner | Refactor integrator. |
+
+### `public/scripts/samplerSelect.js` - selected sampler storage
+| Field | Value |
+| --- | --- |
+| Area | Preset/API sync and sampler settings. |
+| Divergence reason | SillyBunny persists text-generation sampler visibility and manual priority while guarding startup from slow IndexedDB reads that could otherwise overwrite saved selections with fallback state. |
+| Target seam | `public/scripts/sampler-storage.js`. |
+| Adapter shape | Keep `samplerSelect.js` as the DOM/settings adapter and delegate timeout-backed storage loading to `sampler-storage.js`. |
+| Protecting tests | `tests/sampler-storage.test.js`. |
+| Validation | `npm run test:unit --prefix tests -- sampler-storage.test.js`, `npm run lint`, `npm run check:frontend-budgets`. |
+| Rollback path | Revert the storage helper import and save guard, returning to direct `localforage.getItem('selectedSamplers')` loading. |
+| Last reviewed | 2026-06-02 sampler storage timeout guard. |
+| Owner | Refactor integrator and preset/API sync owner. |
+
+### `public/index.html` - boot assets and settings copy
+| Field | Value |
+| --- | --- |
+| Area | Settings and frontend boot. |
+| Divergence reason | SillyBunny keeps `script.js` loaded through its canonical URL and keeps OOC/HTML retention settings copy synchronized with active-turn depth behavior. |
+| Target seam | `public/scripts/ooc-blocks.js` for retention behavior; no separate seam for the HTML boot URL. |
+| Adapter shape | Keep HTML changes limited to static boot references and settings labels/tooltips. |
+| Protecting tests | `tests/frontend-assets.test.js`, `tests/ooc-blocks.test.js`. |
+| Validation | `npm run test:unit --prefix tests -- frontend-assets.test.js ooc-blocks.test.js`, `npm run build:frontend`, browser smoke check. |
+| Rollback path | Restore versioned `script.js` references and previous settings copy if cache behavior or settings semantics regress. |
+| Last reviewed | 2026-06-02 frontend asset and OOC settings update. |
+| Owner | Refactor integrator. |
+
 ### `public/scripts/PromptManager.js` - prompt manager lifecycle
 | Field | Value |
 | --- | --- |

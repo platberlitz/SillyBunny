@@ -5,6 +5,7 @@ import { SlashCommandScope } from '../../../slash-commands/SlashCommandScope.js'
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { debounceAsync, warn } from './shared.js';
 import { QuickReply } from './QuickReply.js';
+import { getQuickReplySetNameKey, getUniqueQuickReplySetsByName } from './quick-reply-set-list.js';
 
 export class QuickReplySet {
     /**@type {QuickReplySet[]}*/ static list = [];
@@ -24,7 +25,8 @@ export class QuickReplySet {
      * @param {string} name - name of the QuickReplySet
      */
     static get(name) {
-        return this.list.find(it => it.name == name);
+        const key = getQuickReplySetNameKey(name);
+        return this.list.find(it => getQuickReplySetNameKey(it) === key);
     }
 
     /**@type {string}*/ name;
@@ -293,7 +295,7 @@ export class QuickReplySet {
                         noOpt.textContent = '-- Select QR Set --';
                         sel.append(noOpt);
                     }
-                    for (const qrs of QuickReplySet.list) {
+                    for (const qrs of getUniqueQuickReplySetsByName(QuickReplySet.list)) {
                         const opt = document.createElement('option'); {
                             opt.value = qrs.name;
                             opt.textContent = qrs.name;
@@ -345,7 +347,7 @@ export class QuickReplySet {
             sel.focus();
             await prom;
             if (dlg.result == POPUP_RESULT.AFFIRMATIVE) {
-                const qrs = QuickReplySet.list.find(it => it.name == sel.value);
+                const qrs = QuickReplySet.get(sel.value);
                 qrs.addQuickReply(qr.toJSON());
                 if (!isCopy) {
                     qr.delete();

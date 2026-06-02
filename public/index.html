@@ -18,7 +18,7 @@
         }
     </style>
     <link rel="preload" as="style" href="style.css?v=20260523b">
-    <link rel="modulepreload" href="script.js?v=20260602a">
+    <link rel="modulepreload" href="script.js">
     <link rel="modulepreload" href="scripts/sillybunny-tabs.js?v=20260602a">
     <link rel="preload" as="font" type="font/woff2" href="webfonts/Figtree/Figtree-Regular.woff2?v=20260422b" crossorigin>
     <link rel="manifest" crossorigin="use-credentials" href="manifest.json">
@@ -5651,16 +5651,16 @@
                                     <small data-i18n="Show tags in responses">Show &lt;tags&gt; in responses</small>
                                 </label>
                                 <div class="flex-container alignitemscenter gap10">
-                                    <label for="ooc_context_depth" class="flex1" title="Keep OOC ((...)) blocks in prompt context. -1 keeps all messages, 0 strips all messages, N keeps the last N messages." data-i18n="[title]Keep OOC blocks in prompt context. -1 keeps all messages, 0 strips all messages, N keeps the last N messages.">
+                                    <label for="ooc_context_depth" class="flex1" title="Keep OOC ((...)) blocks in prompt context. -1 keeps all messages, 0 keeps only the active turn, N keeps through depth N." data-i18n="[title]Keep OOC blocks in prompt context. -1 keeps all messages, 0 keeps only the active turn, N keeps through depth N.">
                                         <small data-i18n="OOC context depth">OOC context depth</small>
-                                        <small class="opacity50p" data-i18n="-1 keeps all OOC blocks; 0 strips all; N keeps the last N messages.">-1 keeps all OOC blocks; 0 strips all; N keeps the last N messages.</small>
+                                        <small class="opacity50p" data-i18n="-1 keeps all OOC blocks; 0 keeps active turn only; N keeps through depth N.">-1 keeps all OOC blocks; 0 keeps active turn only; N keeps through depth N.</small>
                                     </label>
                                     <input id="ooc_context_depth" class="text_pole widthUnset" type="number" min="-1" step="1" value="-1" />
                                 </div>
                                 <div class="flex-container alignitemscenter gap10">
-                                    <label for="html_context_depth" class="flex1" title="Keep raw HTML tags in prompt context. -1 keeps all messages, 0 strips all messages, N keeps the last N messages." data-i18n="[title]Keep raw HTML tags in prompt context. -1 keeps all messages, 0 strips all messages, N keeps the last N messages.">
+                                    <label for="html_context_depth" class="flex1" title="Keep raw HTML tags in prompt context. -1 keeps all messages, 0 keeps only the active turn, N keeps through depth N." data-i18n="[title]Keep raw HTML tags in prompt context. -1 keeps all messages, 0 keeps only the active turn, N keeps through depth N.">
                                         <small data-i18n="HTML tag context depth">HTML tag context depth</small>
-                                        <small class="opacity50p" data-i18n="-1 keeps all HTML tags; 0 strips all; N keeps the last N messages.">-1 keeps all HTML tags; 0 strips all; N keeps the last N messages.</small>
+                                        <small class="opacity50p" data-i18n="-1 keeps all HTML tags; 0 keeps active turn only; N keeps through depth N.">-1 keeps all HTML tags; 0 keeps active turn only; N keeps through depth N.</small>
                                     </label>
                                     <input id="html_context_depth" class="text_pole widthUnset" type="number" min="-1" step="1" value="-1" />
                                 </div>
@@ -8750,7 +8750,7 @@
     <script type="module" src="lib/eventemitter.js"></script>
     <script type="module" src="scripts/i18n.js"></script>
     <script type="module" src="scripts/performance-loader.js"></script>
-    <script type="module" src="script.js?v=20260602a"></script>
+    <script type="module" src="script.js"></script>
     <script type="module" src="scripts/sillybunny-tabs.js?v=20260602a"></script>
     <script>
         window.addEventListener('load', (event) => {
