@@ -7,8 +7,8 @@ import {
     loadFrontendManifest,
 } from '../frontend-assets.js';
 
-function setPublicAssetHeaders(res, requestPath) {
-    if (/\.(?:html?|json|map)$/i.test(requestPath)) {
+export function setPublicAssetHeaders(res, requestPath) {
+    if (/\.(?:html?|json|map|m?js)$/i.test(requestPath)) {
         res.setHeader('Cache-Control', 'no-cache');
         return;
     }

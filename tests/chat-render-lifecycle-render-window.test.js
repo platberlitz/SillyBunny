@@ -36,4 +36,17 @@ describe('chat render lifecycle render window helper', () => {
         expect(getChatHistoryPageSize(100, { renderedMessageCount: 100, windowSize: 100 })).toBe(99);
         expect(getChatHistoryPageSize(500, { renderedMessageCount: 200, windowSize: 200 })).toBe(199);
     });
+
+    test('can load an exact page for target-reveal callers', () => {
+        expect(getChatHistoryPageSize(50, {
+            renderedMessageCount: 100,
+            windowSize: 100,
+            preserveAnchor: false,
+        })).toBe(50);
+        expect(getChatHistoryPageSize(500, {
+            renderedMessageCount: 200,
+            windowSize: 200,
+            preserveAnchor: false,
+        })).toBe(200);
+    });
 });

@@ -683,4 +683,8 @@ initUserStorage(globalThis.DATA_ROOT)
     .then(preSetupTasks)
     .then(apply404Middleware)
     .then(() => new ServerStartup(app, cliArgs).start())
-    .then(postSetupTasks);
+    .then(postSetupTasks)
+    .catch((error) => {
+        console.error('A critical error has occurred while starting the server:', error);
+        process.exit(1);
+    });

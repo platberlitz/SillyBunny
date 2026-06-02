@@ -56,6 +56,7 @@ These screenshots show the graphical shell UI across Workspace, Customize, Agent
 * [Project Goals](#project-goals-aka-why-we-made-this-fork)
 * [Changes Compared to SillyTavern](#changes-vs-sillytavern)
 * [Latest Update](#latest-update)
+    * [v1.6.1 (2026-05-31)](#v161-2026-05-31)
     * [v1.6.0 (2026-05-18)](#v160-2026-05-18)
     * [v1.5.3 (2026-05-03)](#v153-2026-05-03)
     * [v1.5.2 (2026-04-30)](#v152-2026-04-30)
@@ -221,6 +222,15 @@ SillyBunny includes some extras by default to help you get started right away:
 ---
 
 ## Latest Update
+
+### v1.6.1 (2026-05-31)
+
+This maintenance bump separates staging work merged after v1.6.0 so the next stable release changelog can collect it cleanly.
+
+**Changed**
+* Updated app, Horde client, bundled extension, package, lockfile, and test metadata to 1.6.1.
+* Updated bundled tracker agent templates with Pura's Director Preset 13.3 wording and bumped affected tracker templates to v2 so installed agents can be manually updated from the version pill.
+* Added a script to detect changed bundled agent template content and bump matching template versions across individual template files and the bundled index.
 
 ### v1.6.0 (2026-05-18)
 

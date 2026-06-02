@@ -101,4 +101,26 @@ describe('plugin loader diagnostics', () => {
         expect(errors).toContain('bun install');
         expect(errors).toContain('node_modules is busy');
     });
+
+    test('does not print dependency install hints for missing Windows absolute paths', async () => {
+        const pluginsPath = createPluginsDirectory();
+        const pluginPath = path.join(pluginsPath, 'local-plugin');
+        fs.mkdirSync(pluginPath);
+        fs.writeFileSync(path.join(pluginPath, 'package.json'), JSON.stringify({
+            type: 'module',
+            main: 'index.mjs',
+        }));
+        fs.writeFileSync(path.join(pluginPath, 'index.mjs'), 'import \'C:/missing/local-module.js\';\n');
+        const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+        const { loadPlugins } = await importPluginLoader({
+            enableServerPlugins: true,
+        });
+
+        await loadPlugins(createApp(), pluginsPath);
+
+        const errors = errorSpy.mock.calls.flat().join('\n');
+        expect(errors).not.toContain('Server plugin dependency');
+        expect(errors).not.toContain('npm install');
+        expect(errors).not.toContain('bun install');
+    });
 });

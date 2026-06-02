@@ -162,7 +162,7 @@ describe('chat render lifecycle script wiring', () => {
 
         expect(source).toContain('const requestedWindowSize = messagesToLoad ?? power_user.chat_truncation;');
         expect(source).toContain('const windowSize = getChatRenderWindowSize(requestedWindowSize);');
-        expect(source).toContain('const count = getChatHistoryPageSize(requestedWindowSize, { renderedMessageCount, windowSize });');
+        expect(source).toContain('preserveAnchor: messagesToLoad === null');
         expect(source).toContain('const firstId = clamp(messageId - count, 0, Infinity);');
         expect(source).toContain('const messages = chat.slice(firstId, messageId);');
         expect(source).toContain('const anchor = captureVisibleChatMessageAnchor();');
@@ -184,7 +184,7 @@ describe('chat render lifecycle script wiring', () => {
         expect(source).toContain('const { renderedMessageCount, lastMessageId } = getRenderedChatMessageWindow();');
         expect(source).toContain('const requestedWindowSize = messagesToLoad ?? power_user.chat_truncation;');
         expect(source).toContain('const windowSize = getChatRenderWindowSize(requestedWindowSize);');
-        expect(source).toContain('const count = getChatHistoryPageSize(requestedWindowSize, { renderedMessageCount, windowSize });');
+        expect(source).toContain('preserveAnchor: messagesToLoad === null');
         expect(source).toContain('const firstId = Number.isInteger(lastMessageId) ? lastMessageId + 1 : 0;');
         expect(source).toContain('const messages = chat.slice(firstId, lastId);');
         expect(source).toContain('const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex: firstId });');
@@ -612,7 +612,10 @@ describe('chat render lifecycle script wiring', () => {
 
         expect(getSource(findExportedFunction('redisplayChat'))).toContain('unobserveChatMessageResize(removedMessageElements);');
         expect(getSource(findExportedFunction('clearChat'))).toContain('disposeChatMessageResizeObserver();');
-        expect(getSource(findExportedFunction('deleteLastMessage'))).toContain('unobserveChatMessageResize(messageElement);');
+        const deleteLastMessageSource = getSource(findExportedFunction('deleteLastMessage'));
+        expect(deleteLastMessageSource).toContain('const deletedMessageId = chat.length - 1;');
+        expect(deleteLastMessageSource).toContain('chatElement.find(`.mes[mesid="${deletedMessageId}"]`)');
+        expect(deleteLastMessageSource).toContain('unobserveChatMessageResize(messageElement);');
         expect(getSource(findExportedFunction('deleteMessage'))).toContain('unobserveChatMessageResize(messageElement);');
         expect(scriptSource).toContain('$(window).on(\'beforeunload\', () => {');
         expect(scriptSource).toContain('disposeChatMessageResizeObserver();');

@@ -2873,7 +2873,11 @@ export async function showMoreMessages(messagesToLoad = null) {
     const renderedMessageCount = getRenderedChatMessageElements().length;
     const requestedWindowSize = messagesToLoad ?? power_user.chat_truncation;
     const windowSize = getChatRenderWindowSize(requestedWindowSize);
-    const count = getChatHistoryPageSize(requestedWindowSize, { renderedMessageCount, windowSize });
+    const count = getChatHistoryPageSize(requestedWindowSize, {
+        renderedMessageCount,
+        windowSize,
+        preserveAnchor: messagesToLoad === null,
+    });
     let messageId = Number(firstDisplayedMesId);
     const showMoreButton = $(`#${CHAT_HISTORY_OLDER_BUTTON_ID}`);
     const showMoreButtonElement = showMoreButton[0];
@@ -2943,7 +2947,11 @@ export async function showNewerMessages(messagesToLoad = null) {
     const { renderedMessageCount, lastMessageId } = getRenderedChatMessageWindow();
     const requestedWindowSize = messagesToLoad ?? power_user.chat_truncation;
     const windowSize = getChatRenderWindowSize(requestedWindowSize);
-    const count = getChatHistoryPageSize(requestedWindowSize, { renderedMessageCount, windowSize });
+    const count = getChatHistoryPageSize(requestedWindowSize, {
+        renderedMessageCount,
+        windowSize,
+        preserveAnchor: messagesToLoad === null,
+    });
     const showNewerButton = $(`#${CHAT_HISTORY_NEWER_BUTTON_ID}`);
     const showNewerButtonElement = showNewerButton[0];
     const firstId = Number.isInteger(lastMessageId) ? lastMessageId + 1 : 0;
@@ -3226,12 +3234,19 @@ export async function clearChat({ clearData = false } = {}) {
 }
 
 export async function deleteLastMessage() {
-    deleteItemizedPromptForMessage(chat.length - 1);
-    chat.length = chat.length - 1;
-    const messageElement = chatElement.children('.mes').last();
+    if (chat.length === 0) {
+        return;
+    }
+
+    const deletedMessageId = chat.length - 1;
+    deleteItemizedPromptForMessage(deletedMessageId);
+    chat.length = deletedMessageId;
+    const messageElement = chatElement.find(`.mes[mesid="${deletedMessageId}"]`);
     unobserveChatMessageResize(messageElement);
     messageElement.remove();
-    await eventSource.emit(event_types.MESSAGE_DELETED, chat.length);
+    syncRenderedChatLastMessageClass();
+    syncChatHistoryWindowControls();
+    await eventSource.emit(event_types.MESSAGE_DELETED, deletedMessageId);
 }
 
 /**
@@ -6422,14 +6437,20 @@ class TempResponseLength {
  * Removes last message from the chat DOM.
  * @returns {Promise<void>} Resolves when the message is removed.
  */
-function removeLastMessage() {
+function removeLastMessage(messageId = null) {
     return new Promise((resolve) => {
-        const lastMes = chatElement.children('.mes').last();
+        const lastMes = Number.isInteger(messageId)
+            ? chatElement.find(`.mes[mesid="${messageId}"]`)
+            : chatElement.children('.mes').last();
         if (lastMes.length === 0) {
+            syncRenderedChatLastMessageClass();
+            syncChatHistoryWindowControls();
             return resolve();
         }
         lastMes.hide(animation_duration, function () {
             $(this).remove();
+            syncRenderedChatLastMessageClass();
+            syncChatHistoryWindowControls();
             resolve();
         });
     });
@@ -6550,10 +6571,11 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 if (type === 'regenerate') {
                     requestMobileChatBottomPin();
                 }
-                deleteItemizedPromptForMessage(chat.length - 1);
-                chat.length = chat.length - 1;
-                await removeLastMessage();
-                await eventSource.emit(event_types.MESSAGE_DELETED, chat.length);
+                const deletedMessageId = chat.length - 1;
+                deleteItemizedPromptForMessage(deletedMessageId);
+                chat.length = deletedMessageId;
+                await removeLastMessage(deletedMessageId);
+                await eventSource.emit(event_types.MESSAGE_DELETED, deletedMessageId);
             }
         }
 

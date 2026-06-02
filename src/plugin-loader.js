@@ -243,7 +243,14 @@ function getMissingDependencyName(error) {
     }
 
     const specifier = match[1];
-    if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:') || specifier.startsWith('file:')) {
+    if (
+        specifier.startsWith('.')
+        || specifier.startsWith('/')
+        || specifier.startsWith('node:')
+        || specifier.startsWith('file:')
+        || path.isAbsolute(specifier)
+        || /^[a-zA-Z]:[\\/]/.test(specifier)
+    ) {
         return null;
     }
 
