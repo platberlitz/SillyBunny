@@ -8406,7 +8406,7 @@ export function loadProxyPresets(settings) {
     }
     $('#openai_proxy_preset').val(selected_proxy.name);
     const shouldApplySource = Boolean(selected_proxy.source);
-    setProxyPreset(selected_proxy.name, selected_proxy.url, selected_proxy.password, selected_proxy.source, { applySource: shouldApplySource });
+    setProxyPreset(selected_proxy.name, selected_proxy.url, selected_proxy.password, selected_proxy.source, { applySource: shouldApplySource, silent: true });
 }
 
 function normalizeProxyPreset(preset) {
@@ -8447,7 +8447,7 @@ function updateProxyPresetOption(preset) {
     }
 }
 
-function setProxyPreset(name, url, password, source = '', { applySource = true } = {}) {
+function setProxyPreset(name, url, password, source = '', { applySource = true, silent = false } = {}) {
     const normalizedPreset = normalizeProxyPreset({ name, url, password, source });
     const preset = proxies.find(p => p.name === normalizedPreset.name);
     if (preset) {
@@ -8468,7 +8468,21 @@ function setProxyPreset(name, url, password, source = '', { applySource = true }
     $('#openai_proxy_password').val(oai_settings.proxy_password);
     $('#openai_proxy_source').val(normalizedPreset.source || '');
 
-    if (applySource && normalizedPreset.source && normalizedPreset.source !== oai_settings.chat_completion_source) {
+    const shouldSwitchSource = applySource && normalizedPreset.source && normalizedPreset.source !== oai_settings.chat_completion_source;
+
+    // SillyBunny: when applying a bound preset during settings load (silent), switch the backend
+    // and refresh source-dependent UI without triggering a reconnect or the proxy confirmation modal,
+    // which would otherwise block the startup loader and freeze the settings panel. See #304 regression.
+    if (silent) {
+        if (shouldSwitchSource) {
+            oai_settings.chat_completion_source = normalizedPreset.source;
+            $('#chat_completion_source').val(normalizedPreset.source);
+            toggleChatCompletionForms();
+        }
+        return;
+    }
+
+    if (shouldSwitchSource) {
         $('#chat_completion_source').val(normalizedPreset.source).trigger('change');
     } else {
         reconnectOpenAi();
