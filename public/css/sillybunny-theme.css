@@ -2142,7 +2142,12 @@ input[type='range']::-moz-range-thumb {
 }
 
 .select2-container--default .select2-dropdown {
-    background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 96%, transparent);
+    background-color: #11151c;
+    background-image: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--SmartThemeBlurTintColor) 94%, var(--SmartThemeBodyColor) 6%),
+        color-mix(in srgb, var(--SmartThemeBlurTintColor) 98%, black 2%)
+    );
     border-radius: var(--sb-radius-button);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 88%, transparent);
     box-shadow: 0 18px 32px color-mix(in srgb, var(--SmartThemeShadowColor) 18%, transparent);
@@ -2154,6 +2159,25 @@ input[type='range']::-moz-range-thumb {
     max-height: 300px;
     overflow-x: hidden;
     overflow-y: auto;
+}
+
+.select2-container--default .select2-results__options {
+    background-color: #11151c;
+    background-image: linear-gradient(var(--SmartThemeBlurTintColor), var(--SmartThemeBlurTintColor));
+}
+
+.select2-container--default .select2-results__option--selectable {
+    background-color: transparent;
+    color: var(--SmartThemeBodyColor);
+    opacity: 1;
+}
+
+.select2-container--default .select2-results__option--selected {
+    background-color: #11151c;
+    background-image: linear-gradient(
+        color-mix(in srgb, var(--color-primary, var(--sb-accent)) 18%, var(--SmartThemeBlurTintColor) 82%),
+        color-mix(in srgb, var(--color-primary, var(--sb-accent)) 18%, var(--SmartThemeBlurTintColor) 82%)
+    );
 }
 
 .select2-container--default .select2-selection--single {
@@ -2189,7 +2213,13 @@ input[type='range']::-moz-range-thumb {
 }
 
 .select2-container--default .select2-results__option--highlighted[aria-selected] {
-    background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 20%, transparent);
+    background-color: #11151c;
+    background-image: linear-gradient(
+        color-mix(in srgb, var(--color-primary, var(--sb-accent)) 28%, var(--SmartThemeBlurTintColor) 72%),
+        color-mix(in srgb, var(--color-primary, var(--sb-accent)) 28%, var(--SmartThemeBlurTintColor) 72%)
+    );
+    color: var(--SmartThemeBodyColor);
+    opacity: 1;
 }
 
 #range_block_openai {
