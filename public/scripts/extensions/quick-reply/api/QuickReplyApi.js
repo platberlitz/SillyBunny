@@ -4,6 +4,7 @@ import { QuickReplySet } from '../src/QuickReplySet.js';
 import { QuickReplySettings } from '../src/QuickReplySettings.js';
 import { SettingsUi } from '../src/ui/SettingsUi.js';
 import { onlyUnique } from '../../../utils.js';
+import { getUniqueQuickReplySetLinksBySetName, getUniqueQuickReplySetsByName } from '../src/quick-reply-set-list.js';
 
 export class QuickReplyApi {
     /** @type {QuickReplySettings} */ settings;
@@ -56,7 +57,7 @@ export class QuickReplyApi {
      * @returns the return value of the quick reply, or undefined if not found
      */
     async executeQuickReplyByIndex(idx) {
-        const qr = [...this.settings.config.setList, ...(this.settings.chatConfig?.setList ?? [])]
+        const qr = getUniqueQuickReplySetLinksBySetName([...this.settings.config.setList, ...(this.settings.chatConfig?.setList ?? [])])
             .map(it => it.set.qrList)
             .flat()[idx]
         ;
@@ -454,7 +455,7 @@ export class QuickReplyApi {
      * @returns array with the names of all quick reply sets
      */
     listSets() {
-        return QuickReplySet.list.map(it => it.name);
+        return getUniqueQuickReplySetsByName(QuickReplySet.list).map(it => it.name);
     }
     /**
      * Gets a list of all globally active quick reply sets.
@@ -462,7 +463,7 @@ export class QuickReplyApi {
      * @returns array with the names of all quick reply sets
      */
     listGlobalSets() {
-        return this.settings.config.setList.map(it => it.set.name);
+        return getUniqueQuickReplySetLinksBySetName(this.settings.config.setList).map(it => it.set.name);
     }
     /**
      * Gets a list of all quick reply sets activated by the current chat.
@@ -470,7 +471,7 @@ export class QuickReplyApi {
      * @returns array with the names of all quick reply sets
      */
     listChatSets() {
-        return this.settings.chatConfig?.setList?.flatMap(it => it.set.name) ?? [];
+        return getUniqueQuickReplySetLinksBySetName(this.settings.chatConfig?.setList).map(it => it.set.name);
     }
 
     /**

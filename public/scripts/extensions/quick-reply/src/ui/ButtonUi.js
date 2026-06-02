@@ -1,6 +1,7 @@
 import { animation_duration } from '../../../../../script.js';
 import { dragElement } from '../../../../RossAscends-mods.js';
 import { loadMovingUIState } from '../../../../power-user.js';
+import { getUniqueQuickReplySetLinksBySetName } from '../quick-reply-set-list.js';
 
 export class ButtonUi {
     /** @type {QuickReplySettings} */ settings;
@@ -92,6 +93,14 @@ export class ButtonUi {
         this.placementObserver = null;
     }
 
+    getVisibleSetLinks() {
+        return getUniqueQuickReplySetLinksBySetName([
+            ...this.settings.config.setList,
+            ...(this.settings.chatConfig?.setList ?? []),
+            ...(this.settings.charConfig?.setList ?? []),
+        ].filter(link => link.isVisible));
+    }
+
 
     renderBar() {
         if (!this.dom) {
@@ -124,10 +133,7 @@ export class ButtonUi {
                         root.append(buttons);
                     }
                 }
-                [...this.settings.config.setList, ...(this.settings.chatConfig?.setList ?? []), ...(this.settings.charConfig?.setList ?? [])]
-                    .filter(link => link.isVisible)
-                    .forEach(link => buttonHolder.append(link.set.render()))
-                ;
+                this.getVisibleSetLinks().forEach(link => buttonHolder.append(link.set.render()));
             }
         }
         return this.dom;
@@ -182,10 +188,7 @@ export class ButtonUi {
                             body.append(buttons);
                         }
                     }
-                    [...this.settings.config.setList, ...(this.settings.chatConfig?.setList ?? []), ...(this.settings.charConfig?.setList ?? [])]
-                        .filter(link => link.isVisible)
-                        .forEach(link => buttonHolder.append(link.set.render()))
-                    ;
+                    this.getVisibleSetLinks().forEach(link => buttonHolder.append(link.set.render()));
                     root.append(body);
                 }
             }

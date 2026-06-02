@@ -1,4 +1,5 @@
 import { QuickReplySet } from './QuickReplySet.js';
+import { getQuickReplySetLinkNameKey, getQuickReplySetNameKey, getUniqueQuickReplySetsByName } from './quick-reply-set-list.js';
 
 export class QuickReplySetLink {
     static from(props) {
@@ -41,11 +42,11 @@ export class QuickReplySetLink {
                     this.set = QuickReplySet.get(set.value);
                     this.update();
                 });
-                QuickReplySet.list.toSorted((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())).forEach(qrs => {
+                getUniqueQuickReplySetsByName(QuickReplySet.list).toSorted((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())).forEach(qrs => {
                     const opt = document.createElement('option'); {
                         opt.value = qrs.name;
                         opt.textContent = qrs.name;
-                        opt.selected = qrs == this.set;
+                        opt.selected = getQuickReplySetNameKey(qrs) === getQuickReplySetLinkNameKey(this);
                         set.append(opt);
                     }
                 });

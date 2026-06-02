@@ -173,8 +173,9 @@ class FakeMutationObserver {
     }
 }
 
-function createVisibleSet(label = 'HELP') {
+function createVisibleSet(label = 'HELP', name = label) {
     return {
+        name,
         render() {
             const button = document.createElement('button');
             button.classList.add('qr--button');
@@ -184,14 +185,14 @@ function createVisibleSet(label = 'HELP') {
     };
 }
 
-function createSettings(label = 'HELP') {
+function createSettings(label = 'HELP', name = label) {
     return {
         isEnabled: true,
         isPopout: false,
         isCombined: false,
         showPopoutButton: false,
         config: {
-            setList: [{ isVisible: true, set: createVisibleSet(label) }],
+            setList: [{ isVisible: true, set: createVisibleSet(label, name) }],
         },
     };
 }
@@ -270,5 +271,36 @@ describe('Quick Reply button bar', () => {
         buttons.refresh();
 
         expect(document.querySelector('#qr--bar')?.querySelector('.qr--button')?.textContent).toBe('Shard Memory');
+    });
+
+    test('renders one visible button set when active scopes contain duplicate set names', () => {
+        appendComposer();
+        const settings = createSettings('Global Help');
+        settings.chatConfig = {
+            setList: [{ isVisible: true, set: createVisibleSet('Chat Help', ' global help ') }],
+        };
+        const buttons = new ButtonUi(settings);
+
+        buttons.show();
+
+        const qrButtons = document.querySelector('#qr--bar')?.querySelectorAll('.qr--button') ?? [];
+        expect(qrButtons).toHaveLength(1);
+        expect(qrButtons[0].textContent).toBe('Global Help');
+    });
+
+    test('lets a visible duplicate render when the earlier matching link is hidden', () => {
+        appendComposer();
+        const settings = createSettings('Hidden Global', 'Memory Sharding');
+        settings.config.setList[0].isVisible = false;
+        settings.chatConfig = {
+            setList: [{ isVisible: true, set: createVisibleSet('Visible Chat', ' memory sharding ') }],
+        };
+        const buttons = new ButtonUi(settings);
+
+        buttons.show();
+
+        const qrButtons = document.querySelector('#qr--bar')?.querySelectorAll('.qr--button') ?? [];
+        expect(qrButtons).toHaveLength(1);
+        expect(qrButtons[0].textContent).toBe('Visible Chat');
     });
 });

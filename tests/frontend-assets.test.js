@@ -73,6 +73,14 @@ describe('frontend asset manifest rewriting', () => {
         expect(FRONTEND_ASSET_PREFIX).toBe('/frontend-assets/');
     });
 
+    test('loads the main app module through the canonical URL', () => {
+        const indexHtml = fs.readFileSync(path.join(process.cwd(), '..', 'public', 'index.html'), 'utf8');
+
+        expect(indexHtml).toContain('<link rel="modulepreload" href="script.js">');
+        expect(indexHtml).toContain('<script type="module" src="script.js"></script>');
+        expect(indexHtml).not.toMatch(/(?:href|src)="script\.js\?/);
+    });
+
     test('only treats fingerprinted frontend asset names as immutable', () => {
         expect(HASHED_FRONTEND_ASSET_RE.test('script-0123456789ab.js')).toBe(true);
         expect(HASHED_FRONTEND_ASSET_RE.test('scripts/extensions-abcdef123456.js')).toBe(true);

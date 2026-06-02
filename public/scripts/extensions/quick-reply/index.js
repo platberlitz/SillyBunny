@@ -5,6 +5,7 @@ import { AutoExecuteHandler } from './src/AutoExecuteHandler.js';
 // QuickReply imported lazily inside loadSets to avoid circular TDZ
 import { QuickReplyConfig } from './src/QuickReplyConfig.js';
 import { QuickReplySet } from './src/QuickReplySet.js';
+import { getUniqueQuickReplySetLinksBySetName, getUniqueQuickReplySetsByName } from './src/quick-reply-set-list.js';
 import { QuickReplySettings } from './src/QuickReplySettings.js';
 import { SlashCommandHandler } from './src/SlashCommandHandler.js';
 import { ButtonUi } from './src/ui/ButtonUi.js';
@@ -60,6 +61,7 @@ const loadSets = async () => {
 
     if (response.ok) {
         const setList = (await response.json()).quickReplyPresets ?? [];
+        const migratedSets = [];
         for (const set of setList) {
             if (set.version !== 2) {
                 // migrate old QR set
@@ -90,13 +92,20 @@ const loadSets = async () => {
                 });
             }
             if (set.version == 2) {
-                QuickReplySet.list.push(QuickReplySet.from(JSON.parse(JSON.stringify(set))));
+                migratedSets.push(set);
             }
         }
+        const uniqueSets = getUniqueQuickReplySetsByName(migratedSets);
+        if (uniqueSets.length !== migratedSets.length) {
+            warn(`Skipped ${migratedSets.length - uniqueSets.length} duplicate Quick Reply set(s) while loading.`);
+        }
+
+        QuickReplySet.list.splice(0, QuickReplySet.list.length, ...uniqueSets.map(set => QuickReplySet.from(JSON.parse(JSON.stringify(set)))));
+
         // need to load QR lists after all sets are loaded to be able to resolve context menu entries
         const { QuickReply } = await import('./src/QuickReply.js');
-        setList.forEach((set, idx) => {
-            QuickReplySet.list[idx].qrList = set.qrList.map(it => QuickReply.from(it));
+        uniqueSets.forEach((set, idx) => {
+            QuickReplySet.list[idx].qrList = (set.qrList ?? []).map(it => QuickReply.from(it));
             QuickReplySet.list[idx].init();
         });
         log('sets: ', QuickReplySet.list);
@@ -196,11 +205,11 @@ async function doInit() {
             ...settings.config.setList,
             ...(settings.chatConfig?.setList ?? []),
             ...(settings.charConfig?.setList ?? []),
-        ]
+        ];
+        qr = getUniqueQuickReplySetLinksBySetName(qr)
             .map(it => it.set.qrList)
             .flat()
-            .find(it => it.label == name)
-            ;
+            .find(it => it.label == name);
         if (!qr) {
             let [setName, ...qrName] = name.split('.');
             qrName = qrName.join('.');

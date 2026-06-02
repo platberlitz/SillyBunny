@@ -15,8 +15,118 @@ This maintenance bump separates staging work merged after v1.6.0 so the next sta
 
 ### Merged Staging PRs
 - PR #155 (2026-05-24) `fix: chat scroll and prompt manager scroll position issues`
+- PR #156 (2026-05-22) `fix: improve mobile group and editor spacing`
+- PR #157 (2026-05-22) `chore: remove redundant fork update launcher`
 - PR #158 (2026-05-24) `feat: add mobile navigation customization`
 - PR #159 (2026-05-24) `fix: Make message generation glow theme-aware`
+- PR #160 (2026-05-23) `fix: avoid duplicate text completion close handlers`
+- PR #161 (2026-05-25) `fix: surface moving ui reset for offscreen panels`
+- PR #162 (2026-05-25) `fix: normalize character book positions`
+- PR #163 (2026-05-26) `fix: isolate local prompt cache lanes`
+- PR #165 (2026-05-26) `fix: abort generation on client disconnect`
+- PR #191 (2026-05-26) `Fix local generation aborts after stop`
+- PR #192 (2026-05-27) `fix: restore LCPP status after refresh`
+- PR #193 (2026-05-27) `fix: keep quick reply bar after startup`
+- PR #194 (2026-05-27) `Fix imported character auto-selection`
+- PR #195 (2026-05-27) `fix: respect OpenAI preset link mode`
+- PR #196 (2026-05-27) `Fix iOS group candidate row selection`
+- PR #197 (2026-05-27) `fix: prevent text completion reasoning leaks in agents`
+- PR #198 (2026-05-27) `fix: cover Guided Generations steering commands`
+- PR #199 (2026-05-27) `fix: support oklch message screenshots`
+- PR #200 (2026-05-27) `Fix Prose Polisher for guided impersonate`
+- PR #201 (2026-05-27) `refactor: chat scroll anchor lifecycle`
+- PR #203 (2026-05-27) `refactor: add chat render scroll intent resolver`
+- PR #204 (2026-05-27) `fix: keep input history menu above composer`
+- PR #205 (2026-05-28) `refactor: add chat render lifecycle index seam`
+- PR #206 (2026-05-28) `chore: add chat lifecycle rollout guard`
+- PR #207 (2026-05-27) `fix: stop disabled extensions injecting prompts`
+- PR #208 (2026-05-28) `refactor: route chat bottom scroll through lifecycle`
+- PR #211 (2026-05-29) `Refactor redisplay chat batching through lifecycle`
+- PR #212 (2026-05-29) `Refactor show-more batching through lifecycle`
+- PR #213 (2026-05-29) `Refactor chat lifecycle update queue helper`
+- PR #214 (2026-05-29) `Refactor chat lifecycle message update route`
+- PR #215 (2026-05-29) `Refactor mobile message updates through lifecycle queue`
+- PR #216 (2026-05-29) `Refactor chat lifecycle stream buffer helper`
+- PR #217 (2026-05-29) `Refactor streaming start scroll through lifecycle`
+- PR #218 (2026-05-29) `Refactor streaming progress writes through lifecycle`
+- PR #219 (2026-05-29) `Test replace-message anchor positions`
+- PR #220 (2026-05-29) `Route swipe replacement through lifecycle`
+- PR #221 (2026-05-29) `Add lifecycle resize observer helper`
+- PR #227 (2026-05-29) `Refactor chat lifecycle media resize route`
+- PR #228 (2026-05-29) `Fix Guided Generations GGSystemPrompt cleanup`
+- PR #229 (2026-05-29) `Refactor chat lifecycle mobile viewport helper`
+- PR #230 (2026-05-29) `Refactor chat lifecycle mobile viewport route`
+- PR #231 (2026-05-29) `test: add chat render performance baseline`
+- PR #232 (2026-05-29) `Refactor chat lifecycle route rollout defaults`
+- PR #233 (2026-05-29) `Refactor chat lifecycle bottom scroll default on`
+- PR #234 (2026-05-29) `Refactor chat lifecycle initial load default on`
+- PR #235 (2026-05-29) `Refactor chat lifecycle redisplay batch default on`
+- PR #236 (2026-05-29) `Refactor chat lifecycle show more default on`
+- PR #237 (2026-05-29) `Refactor chat lifecycle message update default on`
+- PR #238 (2026-05-29) `Refactor chat lifecycle streaming start default on`
+- PR #239 (2026-05-29) `Refactor chat lifecycle streaming progress default on`
+- PR #240 (2026-05-29) `Refactor chat lifecycle replace message default on`
+- PR #241 (2026-05-29) `Refactor chat lifecycle media resize default on`
+- PR #242 (2026-05-29) `Refactor chat lifecycle mobile viewport default on`
+- PR #243 (2026-05-29) `Refactor mobile shell lifecycle helper`
+- PR #244 (2026-05-29) `Refactor mobile shell lifecycle wiring`
+- PR #245 (2026-05-29) `Refactor preset API sync lifecycle helper`
+- PR #246 (2026-05-29) `Refactor preset API sync lifecycle wiring`
+- PR #247 (2026-05-29) `Refactor generation lifecycle helper`
+- PR #248 (2026-05-29) `Refactor generation lifecycle wiring`
+- PR #249 (2026-05-29) `Refactor extension boot lifecycle helper`
+- PR #250 (2026-05-29) `Refactor extension boot lifecycle wiring`
+- PR #251 (2026-05-29) `Refactor prompt manager lifecycle helper`
+- PR #252 (2026-05-29) `Refactor prompt manager lifecycle wiring`
+- PR #253 (2026-05-29) `Refactor tooling UI hydration helper`
+- PR #254 (2026-05-29) `Refactor tooling UI hydration wiring`
+- PR #255 (2026-05-29) `Fix bulk preset deletion tooltip copy`
+- PR #256 (2026-05-29) `Add compact Pathfinder mode selector`
+- PR #257 (2026-05-29) `Add Quick Action icon picker`
+- PR #258 (2026-05-29) `Fix character lorebook focus routing`
+- PR #259 (2026-05-29) `Fix first-launch topbar scale default`
+- PR #260 (2026-05-29) `Style boolean radio choices as segmented toggles`
+- PR #261 (2026-05-29) `Fix Workspace Select2 dropdown geometry`
+- PR #262 (2026-05-29) `Fix Quick Image Gen collapsed drawer layout`
+- PR #263 (2026-05-29) `Add Pathfinder submodule toggle`
+- PR #264 (2026-05-29) `Stabilize mobile sampler range rows`
+- PR #265 (2026-05-29) `Add current chat files access`
+- PR #266 (2026-05-29) `Add vertical chat layout setting`
+- PR #267 (2026-05-29) `Preserve Prompt Manager scroll after save`
+- PR #268 (2026-05-29) `Show source prompt token counts before generation`
+- PR #269 (2026-05-29) `fix: encode Google Font family spaces correctly`
+- PR #270 (2026-05-29) `fix: make mobile quick action icons tappable`
+- PR #271 (2026-05-29) `fix: stabilize chat scrolling`
+- PR #272 (2026-05-29) `Fix post agents after provider errors`
+- PR #273 (2026-05-29) `Fix chat vectorization toggle persistence`
+- PR #274 (2026-05-29) `Bind reverse proxy presets to source`
+- PR #275 (2026-05-29) `Fix iOS streaming scroll jitter`
+- PR #276 (2026-05-29) `Fix in-chat agent regex refresh`
+- PR #278 (2026-05-29) `fix: stabilize streaming resize scroll pins`
+- PR #279 (2026-05-29) `feat: add desktop vertical navigation settings`
+- PR #280 (2026-05-31) `fix: chat shell wheel routing`
+- PR #281 (2026-05-31) `feat: add post-main in-chat agent intercept timing`
+- PR #283 (2026-06-02) `fix: persist presets immediately in connection profiles`
+- PR #285 (2026-06-02) `feat: add explicit UI for reverse proxy backend binding`
+- PR #286 (2026-05-31) `chore: Bump version numbers from 1.6.0 to 1.6.1`
+- PR #287 (2026-06-02) `fix: improve server plugin dependency diagnostics`
+- PR #288 (2026-05-31) `chore: update Pura director preset and tracker templates`
+- PR #289 (2026-06-02) `fix: reset prompt order from selected preset`
+- PR #290 (2026-06-02) `fix: make shell resize handles more visible`
+- PR #291 (2026-06-02) `fix: preserve desktop prompt manager scroll`
+- PR #292 (2026-05-31) `fix: prevent duplicate agent runner initialization`
+- PR #293 (2026-05-31) `chore: update Pura Director Preset agents to v2`
+- PR #294 (2026-06-02) `feat(tts): add OpenAI audio format selection`
+- PR #295 (2026-06-02) `fix: bound rendered chat messages`
+- PR #296 (2026-06-02) `chore: align PR checks with SillyBunny`
+- PR #297 (2026-06-02) `fix: fetch current chat completion models`
+- PR #298 (2026-06-02) `fix: refresh edited character avatars`
+- PR #299 (2026-06-02) `fix: align desktop shell tabs with navigation preferences`
+- PR #300 (2026-06-02) `fix: align native chat style headers`
+- PR #301 (2026-06-02) `fix: improve Pathfinder swipe reuse and settings UI`
+- PR #302 (2026-06-02) `fix: harden Select2 dropdown surfaces`
+- PR #303 (2026-06-02) `fix: prevent corrupted wand message screenshots`
+- PR #304 (2026-06-02) `fix: switch backend for bound reverse proxy presets`
 
 ## v1.6.0
 
