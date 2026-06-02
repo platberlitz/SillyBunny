@@ -223,7 +223,7 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ### v1.6.1 (2026-06-02)
 
-This update carries the post-v1.6.0 staging line forward with safer chat rendering, tighter mobile navigation, sturdier preset/profile persistence, more reliable Quick Replies, and a broader cleanup pass across settings, screenshots, and release tooling.
+This update carries the post-v1.6.0 staging line forward with safer chat rendering, tighter mobile navigation, sturdier preset/profile persistence, more reliable Quick Replies, and a broader cleanup pass across settings, screenshots, and release notes.
 
 **Added**
 * Desktop vertical navigation settings and clearer mobile navigation customization make the shell easier to tune without changing the default layout.
@@ -236,7 +236,7 @@ This update carries the post-v1.6.0 staging line forward with safer chat renderi
 * Chat rendering now routes bottom scroll, redisplay, show-more, message updates, streaming, swipe replacement, media resize, and mobile viewport handling through lifecycle helpers with proven routes enabled by default.
 * Mobile shell, preset/API sync, generation, extension boot, Prompt Manager, and tooling hydration behavior now sit behind smaller lifecycle seams for easier future syncs and safer bug fixes.
 * Pura Director and bundled tracker templates were refreshed and versioned so installed agents can be manually updated from the version pill.
-* Release automation was refreshed so merged staging work is easier to keep represented in the changelog.
+* Release notes were refreshed so merged staging work is easier to review.
 
 **Fixed**
 * Connection profiles and presets now persist more reliably, including immediate connection-profile preset saves, prompt-order reset from the selected preset, reverse-proxy backend binding, and current chat-completion model fetching.
@@ -245,7 +245,7 @@ This update carries the post-v1.6.0 staging line forward with safer chat renderi
 * Sampler visibility startup now avoids overwriting saved selections when browser storage is slow to respond.
 * Character avatar refresh, imported character selection, desktop Prompt Manager scroll, chat shell wheel routing, shell resize handles, Select2 dropdowns, native chat style headers, bounded rendered messages, and wand message screenshots were tightened.
 * Duplicate agent runner initialization, text-completion close handlers, local generation aborts, LCPP status restore, text-completion reasoning leaks, Guided Generations steering, post-agent provider-error handling, and Pathfinder swipe/settings reuse were hardened.
-* Changelog automation, frontend asset handling, and compatibility tracking were cleaned up.
+* Release notes, frontend asset handling, and compatibility tracking were cleaned up.
 
 ### v1.6.0 (2026-05-18)
 

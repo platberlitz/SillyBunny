@@ -4,7 +4,7 @@
 
 Date: 2026-06-02
 
-This update keeps the 1.6 series moving with safer chat lifecycle defaults, stronger preset/profile persistence, more reliable Quick Replies, and cleaner release automation.
+This update keeps the 1.6 series moving with safer chat lifecycle defaults, stronger preset/profile persistence, more reliable Quick Replies, and cleaner release notes.
 
 ### Release Metadata
 - Updated app, Horde client, bundled extension, package, lockfile, and test metadata to 1.6.1.
