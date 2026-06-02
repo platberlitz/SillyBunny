@@ -63,4 +63,14 @@ describe('OpenAI proxy preset wiring', () => {
         expect(sourceChangeIndex).toBeGreaterThan(passwordUpdateIndex);
         expect(setProxyPresetSource).toContain('reconnectOpenAi();');
     });
+
+    test('applies selected proxy backend binding when loading presets', () => {
+        const loadProxyPresetsSource = getFunctionSource('loadProxyPresets');
+        const applySourceFlagIndex = loadProxyPresetsSource.indexOf('const shouldApplySource = Boolean(selected_proxy.source);');
+        const setProxyPresetIndex = loadProxyPresetsSource.indexOf('setProxyPreset(selected_proxy.name, selected_proxy.url, selected_proxy.password, selected_proxy.source, { applySource: shouldApplySource });');
+
+        expect(applySourceFlagIndex).toBeGreaterThanOrEqual(0);
+        expect(setProxyPresetIndex).toBeGreaterThan(applySourceFlagIndex);
+        expect(loadProxyPresetsSource).not.toContain('{ applySource: false }');
+    });
 });
