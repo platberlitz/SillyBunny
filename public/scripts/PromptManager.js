@@ -1168,11 +1168,20 @@ class PromptManager {
     }
 
     #readScrollPosition() {
-        // SillyBunny: prefer .sb-shell-panel-scroller (the actual scroll container inside
-        // the SillyBunny shell) before falling back to upstream .scrollableInner, which is
-        // set to overflow:visible inside the shell and always reports scrollTop 0.
-        return document.getElementById(this.configuration.prefix + 'prompt_manager')
-            ?.closest('.sb-shell-panel-scroller, .scrollableInner')?.scrollTop;
+        return this.#getScrollContainer()?.scrollTop;
+    }
+
+    #getScrollContainer() {
+        const promptManager = document.getElementById(this.configuration.prefix + 'prompt_manager');
+        const listElement = this.listElement ?? promptManager?.querySelector(`#${this.configuration.prefix}prompt_manager_list`);
+
+        // SillyBunny: desktop split scrolls the constrained prompt list itself; mobile
+        // still scrolls through the shell/upstream panel container.
+        if (this.isDesktopSplitLayout() && listElement instanceof HTMLElement) {
+            return listElement;
+        }
+
+        return promptManager?.closest('.sb-shell-panel-scroller, .scrollableInner') ?? null;
     }
 
     #queuePromptManagerScrollRestore() {
@@ -1187,8 +1196,7 @@ class PromptManager {
     #setScrollPosition(scrollPosition) {
         const restoreState = resolvePromptManagerScrollRestore({ scrollPosition });
         if (!restoreState.shouldRestore) return;
-        const container = document.getElementById(this.configuration.prefix + 'prompt_manager')
-            ?.closest('.sb-shell-panel-scroller, .scrollableInner');
+        const container = this.#getScrollContainer();
         if (!container) return;
         container.scrollTo(0, restoreState.scrollPosition);
         // Defer a second restore to handle the reflow that occurs when renderPromptManager
