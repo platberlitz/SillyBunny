@@ -67,10 +67,30 @@ describe('OpenAI proxy preset wiring', () => {
     test('applies selected proxy backend binding when loading presets', () => {
         const loadProxyPresetsSource = getFunctionSource('loadProxyPresets');
         const applySourceFlagIndex = loadProxyPresetsSource.indexOf('const shouldApplySource = Boolean(selected_proxy.source);');
-        const setProxyPresetIndex = loadProxyPresetsSource.indexOf('setProxyPreset(selected_proxy.name, selected_proxy.url, selected_proxy.password, selected_proxy.source, { applySource: shouldApplySource });');
+        const setProxyPresetIndex = loadProxyPresetsSource.indexOf('setProxyPreset(selected_proxy.name, selected_proxy.url, selected_proxy.password, selected_proxy.source, { applySource: shouldApplySource, silent: true });');
 
         expect(applySourceFlagIndex).toBeGreaterThanOrEqual(0);
         expect(setProxyPresetIndex).toBeGreaterThan(applySourceFlagIndex);
         expect(loadProxyPresetsSource).not.toContain('{ applySource: false }');
+    });
+
+    test('switches backend on silent load without triggering a reconnect', () => {
+        const setProxyPresetSource = getFunctionSource('setProxyPreset');
+        const silentBranchIndex = setProxyPresetSource.indexOf('if (silent) {');
+        const silentSourceAssignIndex = setProxyPresetSource.indexOf('oai_settings.chat_completion_source = normalizedPreset.source;');
+        const silentValIndex = setProxyPresetSource.indexOf('$(\'#chat_completion_source\').val(normalizedPreset.source);');
+        const silentRefreshIndex = setProxyPresetSource.indexOf('toggleChatCompletionForms();');
+        const silentReturnIndex = setProxyPresetSource.indexOf('return;', silentBranchIndex);
+        const reconnectIndex = setProxyPresetSource.indexOf('reconnectOpenAi();');
+
+        // Silent branch applies the source and refreshes UI before returning early.
+        expect(silentBranchIndex).toBeGreaterThanOrEqual(0);
+        expect(silentSourceAssignIndex).toBeGreaterThan(silentBranchIndex);
+        expect(silentValIndex).toBeGreaterThan(silentSourceAssignIndex);
+        expect(silentRefreshIndex).toBeGreaterThan(silentValIndex);
+        expect(silentReturnIndex).toBeGreaterThan(silentRefreshIndex);
+
+        // Silent branch must short-circuit before the reconnect path.
+        expect(reconnectIndex).toBeGreaterThan(silentReturnIndex);
     });
 });
