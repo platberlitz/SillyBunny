@@ -325,6 +325,9 @@ import {
     createMessageUpdateQueue,
     createMobileViewportObserver,
     createStreamWriteBuffer,
+    getChatHistoryPageSize,
+    getChatRenderWindowStartIndex,
+    normalizeChatRenderWindowSize,
     renderMessagesInBatches,
     resolveChatBottomScrollAction,
     resolveChatRenderLifecycleRollout,
@@ -2671,6 +2674,104 @@ function insertShowMoreFragment(referenceNode, fragment) {
     }
 }
 
+const CHAT_HISTORY_OLDER_BUTTON_ID = 'show_more_messages';
+const CHAT_HISTORY_NEWER_BUTTON_ID = 'show_newer_messages';
+const CHAT_HISTORY_WINDOW_CONTROL_SELECTOR = `#${CHAT_HISTORY_OLDER_BUTTON_ID}, #${CHAT_HISTORY_NEWER_BUTTON_ID}`;
+
+function getChatRenderWindowSize(requestedSize = power_user.chat_truncation) {
+    // SillyBunny: prevent long chats from using 0/huge truncation values to render every message into the DOM.
+    return normalizeChatRenderWindowSize(requestedSize);
+}
+
+function getRenderedChatMessageElements() {
+    return Array.from(chatElement[0]?.querySelectorAll('.mes[mesid]') ?? []);
+}
+
+function getRenderedChatMessageWindow() {
+    const elements = getRenderedChatMessageElements();
+    const firstMessageId = Number(elements.at(0)?.getAttribute('mesid'));
+    const lastMessageId = Number(elements.at(-1)?.getAttribute('mesid'));
+
+    return {
+        elements,
+        renderedMessageCount: elements.length,
+        firstMessageId: Number.isInteger(firstMessageId) ? firstMessageId : null,
+        lastMessageId: Number.isInteger(lastMessageId) ? lastMessageId : null,
+    };
+}
+
+function removeChatHistoryWindowControls() {
+    $(CHAT_HISTORY_WINDOW_CONTROL_SELECTOR).remove();
+}
+
+function ensureChatHistoryWindowControl(id, label, appendMethod) {
+    if (document.getElementById(id)) {
+        return;
+    }
+
+    if (appendMethod === 'prepend') {
+        chatElement.prepend(`<div id="${id}">${label}</div>`);
+    } else {
+        chatElement.append(`<div id="${id}">${label}</div>`);
+    }
+}
+
+function syncRenderedChatLastMessageClass() {
+    const chatNode = chatElement[0];
+    const renderedMessages = getRenderedChatMessageElements();
+
+    chatNode?.querySelector('.mes.last_mes')?.classList.remove('last_mes');
+    renderedMessages.at(-1)?.classList.add('last_mes');
+}
+
+function syncChatHistoryWindowControls() {
+    const { renderedMessageCount, firstMessageId, lastMessageId } = getRenderedChatMessageWindow();
+
+    if (renderedMessageCount === 0) {
+        removeChatHistoryWindowControls();
+        return;
+    }
+
+    if (Number.isInteger(firstMessageId) && firstMessageId > 0) {
+        ensureChatHistoryWindowControl(CHAT_HISTORY_OLDER_BUTTON_ID, 'Show more messages', 'prepend');
+    } else {
+        $(`#${CHAT_HISTORY_OLDER_BUTTON_ID}`).remove();
+    }
+
+    if (Number.isInteger(lastMessageId) && lastMessageId < getLastMessageId()) {
+        ensureChatHistoryWindowControl(CHAT_HISTORY_NEWER_BUTTON_ID, 'Show newer messages', 'append');
+    } else {
+        $(`#${CHAT_HISTORY_NEWER_BUTTON_ID}`).remove();
+    }
+}
+
+function pruneRenderedChatMessagesToWindow({ windowSize, pruneFrom }) {
+    const renderedMessages = getRenderedChatMessageElements();
+    const excessMessageCount = renderedMessages.length - windowSize;
+
+    if (excessMessageCount <= 0) {
+        return;
+    }
+
+    const removedMessages = pruneFrom === 'end'
+        ? renderedMessages.slice(-excessMessageCount)
+        : renderedMessages.slice(0, excessMessageCount);
+    const removedMessageElements = $(removedMessages);
+
+    unobserveChatMessageResize(removedMessageElements);
+    removedMessageElements.remove();
+    syncRenderedChatLastMessageClass();
+    syncChatHistoryWindowControls();
+}
+
+function removeRenderedChatMessages() {
+    const renderedMessages = $(getRenderedChatMessageElements());
+
+    unobserveChatMessageResize(renderedMessages);
+    renderedMessages.remove();
+    removeChatHistoryWindowControls();
+}
+
 async function renderShowMoreMessagesLegacy({
     messages,
     firstId,
@@ -2769,9 +2870,12 @@ export async function showMoreMessages(messagesToLoad = null) {
     isLoadingMoreMessages = true;
 
     const firstDisplayedMesId = chatElement.children('.mes').first().attr('mesid');
+    const renderedMessageCount = getRenderedChatMessageElements().length;
+    const requestedWindowSize = messagesToLoad ?? power_user.chat_truncation;
+    const windowSize = getChatRenderWindowSize(requestedWindowSize);
+    const count = getChatHistoryPageSize(requestedWindowSize, { renderedMessageCount, windowSize });
     let messageId = Number(firstDisplayedMesId);
-    let count = messagesToLoad || power_user.chat_truncation || Number.MAX_SAFE_INTEGER;
-    const showMoreButton = $('#show_more_messages');
+    const showMoreButton = $(`#${CHAT_HISTORY_OLDER_BUTTON_ID}`);
     const showMoreButtonElement = showMoreButton[0];
 
     // If there are no messages displayed, or the message somehow has no mesid, we default to one higher than last message id,
@@ -2803,6 +2907,8 @@ export async function showMoreMessages(messagesToLoad = null) {
             shouldPreserveScroll,
         });
 
+        pruneRenderedChatMessagesToWindow({ windowSize, pruneFrom: 'end' });
+        syncChatHistoryWindowControls();
         refreshSwipeButtons();
 
         if (firstId === 0) {
@@ -2812,6 +2918,7 @@ export async function showMoreMessages(messagesToLoad = null) {
         }
 
         applyStylePins();
+        updateEditArrowClasses();
 
         if (shouldPreserveScroll) {
             await settleVisibleChatMessageAnchor(anchor);
@@ -2826,17 +2933,63 @@ export async function showMoreMessages(messagesToLoad = null) {
     }
 }
 
-export async function printMessages() {
-    let startIndex = 0;
-    let count = power_user.chat_truncation || Number.MAX_SAFE_INTEGER;
-
-    if (chat.length > count) {
-        startIndex = chat.length - count;
-        chatElement.append('<div id="show_more_messages">Show more messages</div>');
+export async function showNewerMessages(messagesToLoad = null) {
+    if (isLoadingMoreMessages) {
+        return;
     }
 
+    isLoadingMoreMessages = true;
+
+    const { renderedMessageCount, lastMessageId } = getRenderedChatMessageWindow();
+    const requestedWindowSize = messagesToLoad ?? power_user.chat_truncation;
+    const windowSize = getChatRenderWindowSize(requestedWindowSize);
+    const count = getChatHistoryPageSize(requestedWindowSize, { renderedMessageCount, windowSize });
+    const showNewerButton = $(`#${CHAT_HISTORY_NEWER_BUTTON_ID}`);
+    const showNewerButtonElement = showNewerButton[0];
+    const firstId = Number.isInteger(lastMessageId) ? lastMessageId + 1 : 0;
+    const lastId = Math.min(firstId + count, chat.length);
+    const messages = chat.slice(firstId, lastId);
+
+    if (messages.length === 0) {
+        syncChatHistoryWindowControls();
+        isLoadingMoreMessages = false;
+        return;
+    }
+
+    try {
+        if (showNewerButtonElement instanceof HTMLElement) {
+            showNewerButtonElement.setAttribute('aria-busy', 'true');
+        }
+
+        showNewerButton.remove();
+
+        const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex: firstId });
+
+        pruneRenderedChatMessagesToWindow({ windowSize, pruneFrom: 'start' });
+        syncRenderedChatLastMessageClass();
+        syncChatHistoryWindowControls();
+        applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });
+        refreshSwipeButtons();
+        applyStylePins();
+        updateEditArrowClasses();
+
+        await eventSource.emit(event_types.MORE_MESSAGES_LOADED);
+    } finally {
+        if (showNewerButtonElement instanceof HTMLElement) {
+            showNewerButtonElement.removeAttribute('aria-busy');
+        }
+        isLoadingMoreMessages = false;
+    }
+}
+
+export async function printMessages() {
+    const count = getChatRenderWindowSize(power_user.chat_truncation);
+    const startIndex = getChatRenderWindowStartIndex(chat.length, count);
+
+    removeRenderedChatMessages();
     beginChatLoadBottomLock();
     await redisplayChat({ startIndex, fade: false, pinBottomDuringRender: true });
+    syncChatHistoryWindowControls();
 
     // Wait for next frame to ensure batch rendering completes
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -2959,15 +3112,24 @@ async function renderRedisplayChatMessages({ messages, startIndex, pinBottomDuri
 export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = true, pinBottomDuringRender = false } = {}) {
     const messageElements = chatElement.find('.mes');
     messageElements.removeClass('last_mes');
+    const { renderedMessageCount, firstMessageId, lastMessageId } = getRenderedChatMessageWindow();
+    const shouldReplaceRenderedWindow = renderedMessageCount > 0
+        && Number.isInteger(firstMessageId)
+        && Number.isInteger(lastMessageId)
+        && (startIndex < firstMessageId || startIndex > lastMessageId + 1);
 
     //Remove messages after index.
-    const removedMessageElements = messageElements.filter(`.mes[mesid="${startIndex}"]`).nextAll('.mes').addBack();
+    const removedMessageElements = shouldReplaceRenderedWindow
+        ? messageElements
+        : messageElements.filter(`.mes[mesid="${startIndex}"]`).nextAll('.mes').addBack();
     unobserveChatMessageResize(removedMessageElements);
     removedMessageElements.remove();
 
     const t1 = performance.now();
 
-    const messages = targetChat.slice(startIndex);
+    const windowSize = getChatRenderWindowSize();
+    const endIndex = Math.min(targetChat.length, startIndex + windowSize);
+    const messages = targetChat.slice(startIndex, endIndex);
 
     if (messages.length > 0) {
         const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex, pinBottomDuringRender });
@@ -2975,11 +3137,12 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
         applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });
     }
 
+    syncChatHistoryWindowControls();
     refreshSwipeButtons(false, fade);
     applyStylePins();
     updateEditArrowClasses();
 
-    console.info(`Rendered ${targetChat.length - startIndex} messages in ${((performance.now() - t1) / 1000).toFixed(3)} seconds.`);
+    console.info(`Rendered ${messages.length} of ${targetChat.length - startIndex} messages in ${((performance.now() - t1) / 1000).toFixed(3)} seconds.`);
 }
 
 export function scrollOnMediaLoad({ force = false } = {}) {
@@ -3049,7 +3212,7 @@ export async function clearChat({ clearData = false } = {}) {
     if (is_delete_mode) {
         $('#dialogue_del_mes_cancel').trigger('click');
     }
-    //This will also remove non '.mes' elements, e.g. '<div id="show_more_messages">Show more messages</div>'.
+    //This will also remove non '.mes' elements, e.g. chat history window controls.
     chatElement.children().remove();
     if ($('.zoomed_avatar[forChar]').length) {
         console.debug('saw avatars to remove');
@@ -4155,9 +4318,19 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
     const isTailAppend = !insertAfter && !insertBefore;
     const tailAppendIsNearBottom = isTailAppend && scroll ? isChatScrolledNearBottom() : true;
     const shouldPinMobileBottom = isTailAppend && scroll && shouldPinMobileChatToBottom();
+    const renderedWindowBeforeAdd = getRenderedChatMessageWindow();
+    const shouldResetForTailGap = isTailAppend
+        && type !== 'swipe'
+        && renderedWindowBeforeAdd.renderedMessageCount > 0
+        && Number.isInteger(renderedWindowBeforeAdd.lastMessageId)
+        && renderedWindowBeforeAdd.lastMessageId < messageId - 1;
 
     let messageElement;
     let insertedElement = null;
+
+    if (shouldResetForTailGap) {
+        removeRenderedChatMessages();
+    }
 
     if (type === 'swipe') {
         // Forbidden black magic
@@ -4191,6 +4364,11 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
         ? insertedElement
         : Array.from(chatNode?.querySelectorAll('.mes') ?? []).at(-1);
     lastMessageElement?.classList.add('last_mes');
+
+    if (isTailAppend && type !== 'swipe') {
+        pruneRenderedChatMessagesToWindow({ windowSize: getChatRenderWindowSize(), pruneFrom: 'start' });
+        syncChatHistoryWindowControls();
+    }
 
     if (showSwipes) refreshSwipeButtons();
     // Don't scroll if not inserting last
@@ -16640,13 +16818,13 @@ jQuery(async function () {
         $('#avatar-and-name-block').slideToggle();
     });
 
-    $(document).on('touchstart', '#show_more_messages', function (event) {
+    $(document).on('touchstart', CHAT_HISTORY_WINDOW_CONTROL_SELECTOR, function (event) {
         const touch = event.originalEvent?.changedTouches?.[0];
         showMoreTouchMoved = false;
         showMoreTouchStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
     });
 
-    $(document).on('touchmove', '#show_more_messages', function (event) {
+    $(document).on('touchmove', CHAT_HISTORY_WINDOW_CONTROL_SELECTOR, function (event) {
         if (!showMoreTouchStart) {
             return;
         }
@@ -16662,7 +16840,7 @@ jQuery(async function () {
         showMoreTouchMoved = showMoreTouchMoved || deltaX > SHOW_MORE_TOUCH_MOVE_CANCEL_PX || deltaY > SHOW_MORE_TOUCH_MOVE_CANCEL_PX;
     });
 
-    $(document).on('mouseup touchend', '#show_more_messages', async function (event) {
+    $(document).on('mouseup touchend', CHAT_HISTORY_WINDOW_CONTROL_SELECTOR, async function (event) {
         if (event.type === 'touchend') {
             lastShowMoreTouchEventAt = Date.now();
             showMoreTouchStart = null;
@@ -16678,6 +16856,11 @@ jQuery(async function () {
         showMoreTouchMoved = false;
         event.stopPropagation();
         event.preventDefault();
+        if (event.currentTarget?.id === CHAT_HISTORY_NEWER_BUTTON_ID) {
+            await showNewerMessages();
+            return;
+        }
+
         await showMoreMessages();
     });
 
