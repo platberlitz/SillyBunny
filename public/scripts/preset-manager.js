@@ -35,6 +35,7 @@ import { SlashCommandParser } from './slash-commands/SlashCommandParser.js';
 import { checkForSystemPromptInInstructTemplate, system_prompts } from './sysprompt.js';
 import { renderTemplateAsync } from './templates.js';
 import {
+    getTextCompletionPresetSettings,
     textgenerationwebui_settings as textgen_settings,
     textgenerationwebui_preset_names,
     textgenerationwebui_presets,
@@ -954,7 +955,7 @@ class PresetManager {
                 case 'novel':
                     return nai_settings;
                 case 'textgenerationwebui':
-                    return textgen_settings;
+                    return getTextCompletionPresetSettings();
                 case 'openai':
                     return getChatCompletionPreset(oai_settings);
                 case 'context': {

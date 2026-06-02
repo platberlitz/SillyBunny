@@ -12,6 +12,24 @@ import { AIMLAPI_HEADERS, OPENROUTER_HEADERS, SILICONFLOW_ENDPOINT, ZAI_ENDPOINT
 
 export const router = express.Router();
 
+// SillyBunny: keep OpenAI TTS proxy content types aligned with the requested audio format.
+const OPENAI_TTS_CONTENT_TYPES = {
+    mp3: 'audio/mpeg',
+    opus: 'audio/opus',
+    aac: 'audio/aac',
+    flac: 'audio/flac',
+    wav: 'audio/wav',
+};
+
+function getOpenAiTtsResponseFormat(value) {
+    const responseFormat = String(value ?? 'wav').toLowerCase();
+    return Object.hasOwn(OPENAI_TTS_CONTENT_TYPES, responseFormat) ? responseFormat : 'wav';
+}
+
+function getOpenAiTtsContentType(result, responseFormat) {
+    return result.headers.get('content-type') || OPENAI_TTS_CONTENT_TYPES[responseFormat] || OPENAI_TTS_CONTENT_TYPES.wav;
+}
+
 router.post('/caption-image', async (request, response) => {
     try {
         let key = '';
@@ -289,9 +307,10 @@ router.post('/generate-voice', async (request, response) => {
             return response.sendStatus(400);
         }
 
+        const responseFormat = getOpenAiTtsResponseFormat(request.body.response_format);
         const requestBody = {
             input: request.body.text,
-            response_format: 'mp3',
+            response_format: responseFormat,
             voice: request.body.voice ?? 'alloy',
             speed: request.body.speed ?? 1,
             model: request.body.model ?? 'tts-1',
@@ -319,7 +338,7 @@ router.post('/generate-voice', async (request, response) => {
         }
 
         const buffer = await result.arrayBuffer();
-        response.setHeader('Content-Type', 'audio/mpeg');
+        response.setHeader('Content-Type', getOpenAiTtsContentType(result, responseFormat));
         return response.send(Buffer.from(buffer));
     } catch (error) {
         console.error('OpenAI TTS generation failed', error);
@@ -773,6 +792,7 @@ custom.post('/generate-voice', async (request, response) => {
             return response.sendStatus(400);
         }
 
+        const responseFormat = getOpenAiTtsResponseFormat(response_format);
         const result = await fetch(provider_endpoint, {
             method: 'POST',
             headers: {
@@ -781,7 +801,7 @@ custom.post('/generate-voice', async (request, response) => {
             },
             body: JSON.stringify({
                 input: input ?? '',
-                response_format: response_format ?? 'mp3',
+                response_format: responseFormat,
                 voice: voice ?? 'alloy',
                 speed: speed ?? 1,
                 model: model ?? 'tts-1',
@@ -795,7 +815,7 @@ custom.post('/generate-voice', async (request, response) => {
         }
 
         const buffer = await result.arrayBuffer();
-        response.setHeader('Content-Type', 'audio/mpeg');
+        response.setHeader('Content-Type', getOpenAiTtsContentType(result, responseFormat));
         return response.send(Buffer.from(buffer));
     } catch (error) {
         console.error('OpenAI TTS generation failed', error);

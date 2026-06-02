@@ -46,6 +46,14 @@ describe('prompt manager lifecycle wiring', () => {
         expect(source).not.toContain('scrollPosition === undefined || scrollPosition === null');
     });
 
+    test('preserves desktop prompt list scroll before shell fallback', () => {
+        const source = getMethodSource('#getScrollContainer');
+
+        expect(source).toContain('this.isDesktopSplitLayout()');
+        expect(source).toContain('prompt_manager_list');
+        expect(source.indexOf('return listElement;')).toBeLessThan(source.indexOf('closest(\'.sb-shell-panel-scroller, .scrollableInner\')'));
+    });
+
     test('captures prompt manager scroll before save-triggered render', () => {
         const saveStart = promptManagerSource.indexOf('this.handleSavePrompt = (event) => {');
         const saveEnd = promptManagerSource.indexOf('// Reset prompt should it be a system prompt', saveStart);

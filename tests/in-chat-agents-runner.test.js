@@ -292,7 +292,7 @@ describe('in-chat agent post-processing runner', () => {
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/sidecar-retrieval.js', () => ({
-            PATHFINDER_RETRIEVAL_PROMPT_KEYS: [],
+            PATHFINDER_RETRIEVAL_PROMPT_KEYS: ['pathfinder_sidecar_retrieval', 'pathfinder_pipeline_retrieval'],
             runSidecarRetrieval,
         }));
 
@@ -659,6 +659,76 @@ describe('in-chat agent post-processing runner', () => {
         resolveRetrieval();
         await generationPromise;
 
+        expect(extensionPrompts.pathfinder_pipeline_retrieval).toEqual({ value: 'retrieved lore' });
+        expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toEqual({ value: 'Use the current scene style.' });
+    });
+
+    test('reuses cached Pathfinder retrieval when swiping the same assistant message', async () => {
+        usePrePromptAgent();
+        enabledAgents.unshift({
+            id: 'agent-pathfinder',
+            name: 'Pathfinder',
+            category: 'tool',
+            sourceTemplateId: 'tpl-pathfinder',
+            phase: 'both',
+            prompt: '',
+            injection: { order: 0 },
+            settings: { pipelineEnabled: true, sidecarEnabled: false, pipelineId: 'default' },
+            tools: [],
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        });
+        chat.push(
+            {
+                name: 'User',
+                mes: 'Which lore applies here?',
+                is_user: true,
+                is_system: false,
+                send_date: 'user-1',
+                extra: {},
+            },
+            {
+                name: 'Assistant',
+                mes: 'First swipe',
+                is_user: false,
+                is_system: false,
+                send_date: 'assistant-0',
+                gen_started: 'started-0',
+                gen_finished: 'finished-0',
+                swipe_id: 0,
+                swipes: ['First swipe', 'Second swipe'],
+                swipe_info: [
+                    { send_date: 'assistant-0', gen_started: 'started-0', gen_finished: 'finished-0', extra: {} },
+                    { send_date: 'assistant-1', gen_started: 'started-1', gen_finished: 'finished-1', extra: {} },
+                ],
+                extra: {},
+            },
+        );
+        runSidecarRetrieval.mockImplementation(async (setPrompt, promptTypes, promptRoles) => {
+            setPrompt('pathfinder_pipeline_retrieval', 'retrieved lore', promptTypes.IN_PROMPT, 4, false, promptRoles.SYSTEM);
+        });
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+
+        expect(runSidecarRetrieval).toHaveBeenCalledTimes(1);
+        expect(extensionPrompts.pathfinder_pipeline_retrieval).toEqual({ value: 'retrieved lore' });
+        expect(chat[1].swipe_info[0].extra.pathfinderRetrievalCache).toHaveLength(1);
+
+        switchToSwipe(chat[1], 1);
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        expect(extensionPrompts.pathfinder_pipeline_retrieval).toBeUndefined();
+
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+
+        expect(runSidecarRetrieval).toHaveBeenCalledTimes(1);
         expect(extensionPrompts.pathfinder_pipeline_retrieval).toEqual({ value: 'retrieved lore' });
         expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toEqual({ value: 'Use the current scene style.' });
     });

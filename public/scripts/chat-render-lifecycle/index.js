@@ -26,6 +26,13 @@ import {
     renderMessagesInBatches,
 } from './render-batch.js';
 import {
+    CHAT_RENDER_WINDOW_DEFAULT,
+    CHAT_RENDER_WINDOW_MAX,
+    getChatHistoryPageSize,
+    getChatRenderWindowStartIndex,
+    normalizeChatRenderWindowSize,
+} from './render-window.js';
+import {
     createStreamWriteBuffer,
 } from './stream-buffer.js';
 import {
@@ -43,6 +50,8 @@ export {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     CHAT_RENDER_LIFECYCLE_ROUTE,
     CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS,
+    CHAT_RENDER_WINDOW_DEFAULT,
+    CHAT_RENDER_WINDOW_MAX,
     CHAT_SCROLL_ACTION,
     CHAT_SCROLL_INTENT,
     captureVisibleMessageAnchor,
@@ -51,7 +60,10 @@ export {
     createFrameWriteScheduler,
     createMobileViewportObserver,
     createStreamWriteBuffer,
+    getChatHistoryPageSize,
+    getChatRenderWindowStartIndex,
     MOBILE_VIEWPORT_SETTLE_DELAY_MS,
+    normalizeChatRenderWindowSize,
     resolveChatBottomScrollAction,
     resolveChatScrollAction,
     restoreVisibleMessageAnchor,
@@ -94,6 +106,13 @@ export function createChatRenderLifecycle() {
         },
         renderBatch: {
             render: renderMessagesInBatches,
+        },
+        renderWindow: {
+            defaultSize: CHAT_RENDER_WINDOW_DEFAULT,
+            maxSize: CHAT_RENDER_WINDOW_MAX,
+            getPageSize: getChatHistoryPageSize,
+            getStartIndex: getChatRenderWindowStartIndex,
+            normalizeSize: normalizeChatRenderWindowSize,
         },
         streamBuffer: {
             create: createStreamWriteBuffer,

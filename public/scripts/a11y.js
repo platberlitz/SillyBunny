@@ -17,6 +17,7 @@ const buttonSelectors = [
     '.bg_example .mobile-only-menu-toggle',
     '.paginationjs-pages li a',
     '#show_more_messages',
+    '#show_newer_messages',
 ].join(', ');
 
 const listSelectors = [

@@ -5,6 +5,7 @@ import path from 'node:path';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const openAiSource = readFileSync(path.join(repoRoot, 'public', 'scripts', 'openai.js'), 'utf8');
+const indexHtml = readFileSync(path.join(repoRoot, 'public', 'index.html'), 'utf8');
 
 function getFunctionSource(name) {
     const marker = `function ${name}(`;
@@ -31,10 +32,24 @@ function getFunctionSource(name) {
 }
 
 describe('OpenAI proxy preset wiring', () => {
-    test('saves reverse proxy presets with the current Chat Completion source', () => {
+    test('saves reverse proxy presets with the selected backend binding', () => {
         expect(openAiSource).toContain('buildReverseProxyPresetForSave({');
-        expect(openAiSource).toContain('source: oai_settings.chat_completion_source');
+        expect(openAiSource).toContain('source: $(\'#openai_proxy_source\').val() || \'\'');
         expect(openAiSource).toContain('supportedSources: REVERSE_PROXY_SUPPORTED_SOURCES');
+    });
+
+    test('shows an explicit reverse proxy backend selector', () => {
+        expect(indexHtml).toContain('id="openai_proxy_source"');
+        expect(indexHtml).toContain('None (Don\'t switch)');
+        expect(indexHtml).toContain('value="makersuite"');
+    });
+
+    test('renders clean source indicators in proxy preset options', () => {
+        const optionTextSource = getFunctionSource('getReverseProxyPresetOptionText');
+
+        expect(openAiSource).toContain('function getReverseProxySourceLabel(source)');
+        expect(openAiSource).toContain('[chat_completion_sources.MAKERSUITE]: \'AI Studio\'');
+        expect(optionTextSource).toContain('`${normalizedPreset.name} [${sourceLabel}]`');
     });
 
     test('applies proxy credentials before switching Chat Completion source', () => {

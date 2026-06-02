@@ -6,6 +6,8 @@ import {
     CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
     CHAT_RENDER_LIFECYCLE_ROUTE,
     CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS,
+    CHAT_RENDER_WINDOW_DEFAULT,
+    CHAT_RENDER_WINDOW_MAX,
     captureVisibleMessageAnchor,
     createChatRenderLifecycle,
     createDelegatedResizeObserver,
@@ -13,7 +15,10 @@ import {
     createFrameWriteScheduler,
     createMobileViewportObserver,
     createStreamWriteBuffer,
+    getChatHistoryPageSize,
+    getChatRenderWindowStartIndex,
     MOBILE_VIEWPORT_SETTLE_DELAY_MS,
+    normalizeChatRenderWindowSize,
     resolveChatBottomScrollAction,
     resolveChatRenderLifecycleRollout,
     resolveChatScrollAction,
@@ -36,6 +41,9 @@ describe('chat render lifecycle index seam', () => {
         expect(typeof resolveChatScrollAction).toBe('function');
         expect(typeof resolveChatRenderLifecycleRollout).toBe('function');
         expect(typeof renderMessagesInBatches).toBe('function');
+        expect(typeof normalizeChatRenderWindowSize).toBe('function');
+        expect(typeof getChatRenderWindowStartIndex).toBe('function');
+        expect(typeof getChatHistoryPageSize).toBe('function');
         expect(typeof createMessageUpdateQueue).toBe('function');
         expect(typeof createStreamWriteBuffer).toBe('function');
         expect(typeof createDelegatedResizeObserver).toBe('function');
@@ -43,6 +51,8 @@ describe('chat render lifecycle index seam', () => {
         expect(CHAT_SCROLL_INTENT.TAIL_APPEND).toBe('tail-append');
         expect(CHAT_SCROLL_ACTION.PIN_BOTTOM).toBe('pin-bottom');
         expect(CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY).toBe('sillybunny.chatRenderLifecycle.enabled');
+        expect(CHAT_RENDER_WINDOW_DEFAULT).toBe(100);
+        expect(CHAT_RENDER_WINDOW_MAX).toBe(200);
         expect(CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD).toBe('initial-load');
         expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.BOTTOM_SCROLL]).toBe(true);
         expect(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS[CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD]).toBe(true);
@@ -75,6 +85,11 @@ describe('chat render lifecycle index seam', () => {
         expect(lifecycle.rollout.routeDefaults).toBe(CHAT_RENDER_LIFECYCLE_ROUTE_DEFAULTS);
         expect(lifecycle.rollout.resolve).toBe(resolveChatRenderLifecycleRollout);
         expect(lifecycle.renderBatch.render).toBe(renderMessagesInBatches);
+        expect(lifecycle.renderWindow.defaultSize).toBe(CHAT_RENDER_WINDOW_DEFAULT);
+        expect(lifecycle.renderWindow.maxSize).toBe(CHAT_RENDER_WINDOW_MAX);
+        expect(lifecycle.renderWindow.normalizeSize).toBe(normalizeChatRenderWindowSize);
+        expect(lifecycle.renderWindow.getStartIndex).toBe(getChatRenderWindowStartIndex);
+        expect(lifecycle.renderWindow.getPageSize).toBe(getChatHistoryPageSize);
         expect(lifecycle.streamBuffer.create).toBe(createStreamWriteBuffer);
         expect(lifecycle.updateQueue.create).toBe(createMessageUpdateQueue);
         expect(lifecycle.resizeObserver.create).toBe(createDelegatedResizeObserver);

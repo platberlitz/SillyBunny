@@ -56,6 +56,7 @@ import {
     setCharacterName,
     setExtensionPrompt,
     showMoreMessages,
+    showNewerMessages,
     swipe,
     stopGeneration,
     substituteParams,
@@ -3309,7 +3310,7 @@ export function initDefaultSlashCommands() {
     }));
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'chat-render',
-        helpString: t`Renders a specified number of messages into the chat window. Displays all messages if no argument is provided.`,
+        helpString: t`Renders a specified number of messages into the chat window, bounded by the chat render window cap.`,
         callback: async (args, number) => {
             await showMoreMessages(number && !isNaN(Number(number)) ? Number(number) : Number.MAX_SAFE_INTEGER);
             if (isTrueBoolean(String(args?.scroll ?? ''))) {
@@ -3499,10 +3500,18 @@ export function initDefaultSlashCommands() {
             }
 
             // Load more messages if needed
-            const firstDisplayedMessageId = getFirstDisplayedMessageId();
+            const renderedMessageIds = Array.from(document.querySelectorAll('#chat .mes[mesid]'))
+                .map(element => Number(element.getAttribute('mesid')))
+                .filter(Number.isInteger);
+            const firstDisplayedMessageId = renderedMessageIds.length ? Math.min(...renderedMessageIds) : getFirstDisplayedMessageId();
+            const lastDisplayedMessageId = renderedMessageIds.length ? Math.max(...renderedMessageIds) : NaN;
             if (isFinite(firstDisplayedMessageId) && messageIndex < firstDisplayedMessageId) {
                 const needToLoadCount = firstDisplayedMessageId - messageIndex;
                 await showMoreMessages(needToLoadCount);
+                await delay(debounce_timeout.quick);
+            } else if (isFinite(lastDisplayedMessageId) && messageIndex > lastDisplayedMessageId) {
+                const needToLoadCount = messageIndex - lastDisplayedMessageId;
+                await showNewerMessages(needToLoadCount);
                 await delay(debounce_timeout.quick);
             }
 

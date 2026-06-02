@@ -8,6 +8,7 @@ import {
     max_context,
     online_status,
     resultCheckStatus,
+    saveSettings,
     saveSettingsDebounced,
     setGenerationParamsFromPreset,
     setOnlineStatus,
@@ -20,7 +21,14 @@ import { autoSelectInstructPreset, selectContextPreset, selectInstructPreset } f
 import { BIAS_CACHE, createNewLogitBiasEntry, displayLogitBias, getLogitBiasListResult } from './logit-bias.js';
 
 import { power_user, registerDebugFunction } from './power-user.js';
-import { getActiveManualApiSamplers, loadApiSelectedSamplers, isSamplerManualPriorityEnabled } from './samplerSelect.js';
+import {
+    getActiveManualApiSamplers,
+    getApiSamplerVisibilityState,
+    isSamplerManualPriorityEnabled,
+    loadApiSelectedSamplers,
+    saveApiSelectedSamplers,
+    setApiSamplerVisibilityState,
+} from './samplerSelect.js';
 import { SECRET_KEYS, writeSecret } from './secrets.js';
 import { getEventSourceStream } from './sse-stream.js';
 import { getLocalPromptCacheValue, isLikelyLocalServerUrl } from './local-url-utils.js';
@@ -148,6 +156,7 @@ export const APHRODITE_DEFAULT_ORDER = [
     'xtc',
 ];
 const BIAS_KEY = '#textgenerationwebui_api-settings';
+const SAMPLER_VISIBILITY_EXTENSION_KEY = 'samplerVisibility';
 
 // Maybe let it be configurable in the future?
 // (7 days later) The future has come.
@@ -423,7 +432,35 @@ async function selectPreset(name) {
     setGenerationParamsFromPreset(preset);
     BIAS_CACHE.delete(BIAS_KEY);
     displayLogitBias(preset.logit_bias, BIAS_KEY);
-    saveSettingsDebounced();
+    await applyPresetSamplerVisibility(preset);
+    await saveSettings();
+}
+
+function getPresetSamplerVisibility(preset) {
+    const samplerVisibility = preset?.extensions?.[SAMPLER_VISIBILITY_EXTENSION_KEY];
+    return samplerVisibility && typeof samplerVisibility === 'object' && !Array.isArray(samplerVisibility)
+        ? samplerVisibility
+        : null;
+}
+
+async function applyPresetSamplerVisibility(preset) {
+    const samplerVisibility = getPresetSamplerVisibility(preset);
+
+    if (!samplerVisibility) {
+        return;
+    }
+
+    if (setApiSamplerVisibilityState(samplerVisibility)) {
+        await saveApiSelectedSamplers();
+        showSamplerControls();
+    }
+}
+
+export function getTextCompletionPresetSettings() {
+    const settings = structuredClone(textgenerationwebui_settings);
+    settings.extensions = settings.extensions || {};
+    settings.extensions[SAMPLER_VISIBILITY_EXTENSION_KEY] = getApiSamplerVisibilityState();
+    return settings;
 }
 
 export function formatTextGenURL(value) {

@@ -2,16 +2,40 @@ name: ✅ Pull Request Checks
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, edited]
 
 permissions:
   contents: read
 
 jobs:
+  validate-pr-metadata:
+    name: ✅ Validate PR Metadata
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate target branch
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ "$BASE_REF" != "staging" ]; then
+            echo "Pull requests must target the staging branch. Current target: $BASE_REF"
+            exit 1
+          fi
+
+      - name: Validate PR title prefix
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if ! grep -Eq '^(fix|chore|feat|sync|docs)(\([^)]+\))?!?:[[:space:]].+' <<< "$PR_TITLE"; then
+            echo "PR title must start with one of: fix:, chore:, feat:, sync:, docs:"
+            echo "Current title: $PR_TITLE"
+            exit 1
+          fi
+
   block-default-user-state:
     name: ✅ Block tracked default-user state
     runs-on: ubuntu-latest
-    if: always() && (github.event.action == 'opened' || github.event.action == 'synchronize')
+    if: always() && github.event.action != 'edited'
 
     steps:
       - name: Checkout Repository
@@ -33,13 +57,7 @@ jobs:
     name: ✅ Check ESLint on PR
     runs-on: ubuntu-latest
     # Only needs to run when code is changed
-    if: always() && (github.event.action == 'opened' || github.event.action == 'synchronize')
-
-    # Override permissions, linter likely needs write access to issues
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
+    if: always() && github.event.action != 'edited'
 
     steps:
       - name: Checkout Repository
@@ -61,23 +79,13 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Run ESLint
-        # Action ESLint
-        # https://github.com/marketplace/actions/action-eslint
-        uses: sibiraj-s/action-eslint@bcf41bb9abce43cdbad51ab9b3da2eddaa17eab3 # v3.0.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}                # ESLint can run with the original permissions
-          eslint-args: '--ignore-path=.gitignore --quiet'
-          extensions: 'js'
-          annotations: true
-          ignore-patterns: |
-            dist/
-            lib/
+        run: npm run lint
 
   run-tests:
     name: ✅ Run Unit Tests on PR
     runs-on: ubuntu-latest
     # Only needs to run when code is changed
-    if: always() && (github.event.action == 'opened' || github.event.action == 'synchronize')
+    if: always() && github.event.action != 'edited'
 
     steps:
       - name: Checkout Repository
@@ -105,9 +113,9 @@ jobs:
         run: npm run test:unit --prefix tests
 
   frontend-budgets:
-    name: ✅ Check Frontend Budgets
+    name: ✅ Check Frontend Assets
     runs-on: ubuntu-latest
-    if: always() && (github.event.action == 'opened' || github.event.action == 'synchronize')
+    if: always() && github.event.action != 'edited'
 
     steps:
       - name: Checkout Repository
@@ -126,3 +134,29 @@ jobs:
 
       - name: Run frontend budget check
         run: npm run check:frontend-budgets
+
+      - name: Build frontend assets
+        run: npm run build:frontend
+
+  run-bun-checks:
+    name: ✅ Check Bun Runtime
+    runs-on: ubuntu-latest
+    if: always() && github.event.action != 'edited'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+            ref: ${{ github.event.pull_request.head.sha }}
+            repository: ${{ github.event.pull_request.head.repo.full_name }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.11
+
+      - name: Install dependencies with Bun
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Run Bun startup smoke
+        run: bun src/server-init.js
