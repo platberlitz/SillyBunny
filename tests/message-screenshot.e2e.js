@@ -51,20 +51,30 @@ async function installScreenshotMessage(page, messageText) {
     }, messageText);
 }
 
-async function exportScreenshot(page, messageIndex, startId, endId) {
-    await page.locator('#chat .mes').nth(messageIndex).locator('.mes_screenshot').dispatchEvent('click');
+async function completeScreenshotExport(page, startId, endId) {
     await page.locator('#message_screenshot_start_id').fill(String(startId));
     await page.locator('#message_screenshot_end_id').fill(String(endId));
 
     const downloadPromise = page.waitForEvent('download', { timeout: 45000 });
-    await page.locator('.message_screenshot_popup .popup-button-ok').click();
+    await page.locator('.message_screenshot_popup .popup-button-ok').dispatchEvent('click');
     return await downloadPromise;
+}
+
+async function exportScreenshotFromMessage(page, messageIndex, startId, endId) {
+    await page.locator('#chat .mes').nth(messageIndex).locator('.mes_screenshot').dispatchEvent('click');
+    return await completeScreenshotExport(page, startId, endId);
+}
+
+async function exportScreenshotFromWand(page, startId, endId) {
+    await page.locator('#wand_message_screenshot').waitFor({ state: 'attached' });
+    await page.locator('#wand_message_screenshot').dispatchEvent('click');
+    return await completeScreenshotExport(page, startId, endId);
 }
 
 test.describe('message screenshots', () => {
     test.setTimeout(120000);
 
-    test('exports single-message and range screenshots with OKLCH message colors', async ({ page }) => {
+    test('exports message and wand screenshots with OKLCH message colors', async ({ page }) => {
         const screenshotErrors = [];
         page.on('console', message => {
             if (message.type() === 'error' && /screenshot|html2canvas|unsupported color/i.test(message.text())) {
@@ -77,11 +87,15 @@ test.describe('message screenshots', () => {
         await dismissOnboardingIfPresent(page);
         await installScreenshotMessage(page, 'single screenshot oklch regression');
 
-        const singleDownload = await exportScreenshot(page, 0, 0, 0);
+        const singleDownload = await exportScreenshotFromMessage(page, 0, 0, 0);
         expect(singleDownload.suggestedFilename()).toContain('message-0.png');
 
-        const rangeDownload = await exportScreenshot(page, 0, 0, 1);
+        const rangeDownload = await exportScreenshotFromMessage(page, 0, 0, 1);
         expect(rangeDownload.suggestedFilename()).toContain('messages-0-1.png');
+
+        const wandDownload = await exportScreenshotFromWand(page, 1, 1);
+        expect(wandDownload.suggestedFilename()).toContain('message-1.png');
+
         expect(screenshotErrors).toEqual([]);
     });
 });

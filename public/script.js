@@ -10954,12 +10954,15 @@ function sanitizeMessageElementForScreenshot(messageElement) {
     const removableSelector = [
         '.mes_button',
         '.mes_buttons',
+        '.extraMesButtons',
+        '.extraMesButtonsHint',
         '.mes_edit_buttons',
         '.mes_reasoning_actions',
         '.for_checkbox',
         '.del_checkbox',
         '.swipe_left',
         '.swipe_right',
+        '.swipeRightBlock',
         '.swipes-counter',
         '.right_menu_button',
         '.code-copy',
@@ -11268,7 +11271,12 @@ async function renderMessageScreenshotCanvas(startId, endId) {
     surface.style.width = `${Math.max(320, chatWidth)}px`;
     surface.replaceChildren(...screenshotElements);
     shell.appendChild(surface);
-    document.body.appendChild(shell);
+
+    // Keep the capture under #chat so chat-scoped SillyBunny layout rules apply to cloned messages.
+    const captureParent = chatElement[0] instanceof HTMLElement
+        ? chatElement[0]
+        : document.getElementById('chat') ?? document.body;
+    captureParent.appendChild(shell);
 
     try {
         const html2canvas = await getMessageScreenshotLibrary();

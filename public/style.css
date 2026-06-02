@@ -4992,7 +4992,11 @@ input[type="range"]::-webkit-slider-thumb {
     margin: 0;
 }
 
-.sb-message-screenshot-surface :is(.mes_button, .mes_buttons, .mes_edit_buttons, .mes_reasoning_actions, .for_checkbox, .del_checkbox, .swipe_left, .swipe_right, .swipes-counter, .right_menu_button, .code-copy) {
+.sb-message-screenshot-surface .last_mes:not(.smallSysMes) .mesAvatarWrapper {
+    padding-bottom: 0 !important;
+}
+
+.sb-message-screenshot-surface :is(.mes_button, .mes_buttons, .extraMesButtons, .extraMesButtonsHint, .mes_edit_buttons, .mes_reasoning_actions, .for_checkbox, .del_checkbox, .swipe_left, .swipe_right, .swipeRightBlock, .swipes-counter, .right_menu_button, .code-copy) {
     display: none !important;
 }
 
