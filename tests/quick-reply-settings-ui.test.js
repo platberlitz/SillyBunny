@@ -76,7 +76,7 @@ describe('Quick Reply settings deletion', () => {
         };
         const deletedSet = {
             name: 'Memory Sharding',
-            delete: jest.fn(async () => undefined),
+            delete: jest.fn(async () => true),
         };
 
         const ui = new SettingsUi(settings);
@@ -87,5 +87,42 @@ describe('Quick Reply settings deletion', () => {
         expect(settings.chatConfig.setList).toEqual([createLink('Chat Other')]);
         expect(settings.charConfig.setList).toEqual([createLink('Character Other')]);
         expect(settings.save).toHaveBeenCalledTimes(1);
+    });
+
+    test('keeps active links when set deletion fails', async () => {
+        const settings = {
+            config: {
+                setList: [
+                    createLink('Memory Sharding'),
+                    createLink('Global Other'),
+                ],
+            },
+            chatConfig: {
+                setList: [
+                    createLink('Memory Sharding'),
+                    createLink('Chat Other'),
+                ],
+            },
+            charConfig: {
+                setList: [
+                    createLink('Memory Sharding'),
+                    createLink('Character Other'),
+                ],
+            },
+            save: jest.fn(),
+        };
+        const deletedSet = {
+            name: 'Memory Sharding',
+            delete: jest.fn(async () => false),
+        };
+
+        const ui = new SettingsUi(settings);
+        await expect(ui.doDeleteQrSet(deletedSet)).resolves.toBe(false);
+
+        expect(deletedSet.delete).toHaveBeenCalledTimes(1);
+        expect(settings.config.setList).toEqual([createLink('Memory Sharding'), createLink('Global Other')]);
+        expect(settings.chatConfig.setList).toEqual([createLink('Memory Sharding'), createLink('Chat Other')]);
+        expect(settings.charConfig.setList).toEqual([createLink('Memory Sharding'), createLink('Character Other')]);
+        expect(settings.save).not.toHaveBeenCalled();
     });
 });

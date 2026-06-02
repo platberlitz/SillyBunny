@@ -302,12 +302,16 @@ export class SettingsUi {
     async deleteQrSet() {
         const confirmed = await Popup.show.confirm('Delete Quick Reply Set', `Are you sure you want to delete the Quick Reply Set "${this.currentQrSet.name}"?<br>This cannot be undone.`);
         if (confirmed) {
-            await this.doDeleteQrSet(this.currentQrSet);
-            this.rerender();
+            if (await this.doDeleteQrSet(this.currentQrSet)) {
+                this.rerender();
+            }
         }
     }
     async doDeleteQrSet(qrs) {
-        await qrs.delete();
+        const deleted = await qrs.delete();
+        if (!deleted) {
+            return false;
+        }
         //TODO (HACK) should just bubble up from QuickReplySet.delete() but that would require proper or at least more comples onDelete listeners
         this.settings.config.setList = removeQuickReplySetLinksByName(this.settings.config.setList, qrs);
         if (this.settings.chatConfig) {
@@ -317,6 +321,7 @@ export class SettingsUi {
             this.settings.charConfig.setList = removeQuickReplySetLinksByName(this.settings.charConfig.setList, qrs);
         }
         this.settings.save();
+        return true;
     }
 
     async renameQrSet() {

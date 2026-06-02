@@ -444,7 +444,10 @@ export class QuickReplyApi {
         if (!set) {
             throw new Error(`No quick reply set with name "${name}" found.`);
         }
-        await set.delete();
+        const deleted = await set.delete();
+        if (!deleted) {
+            return;
+        }
         this.settings.config.setList = removeQuickReplySetLinksByName(this.settings.config.setList, set);
         if (this.settings.chatConfig) {
             this.settings.chatConfig.setList = removeQuickReplySetLinksByName(this.settings.chatConfig.setList, set);
