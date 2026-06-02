@@ -10084,25 +10084,7 @@ async function read_avatar_load(input) {
 
         const formData = new FormData(/** @type {HTMLFormElement} */($('#form_create').get(0)));
         const avatarKey = formData.get('avatar_url').toString();
-
-        // Bust cache for the avatar thumbnail and character image
-        const thumbnailUrl = getThumbnailUrl('avatar', avatarKey);
-        await fetch(thumbnailUrl, { method: 'GET', cache: 'reload' });
-        await fetch(`/characters/${avatarKey}`, { method: 'GET', cache: 'reload' });
-
-        // Refresh all visible avatar images that use this thumbnail URL
-        // This handles messages, character list, and any other place using the thumbnail
-        const avatarImages = document.querySelectorAll(`img[src^="${thumbnailUrl}"]`);
-        for (const img of avatarImages) {
-            if (img instanceof HTMLImageElement) {
-                const originalSrc = img.src;
-                img.src = '';
-                img.src = originalSrc;
-            }
-        }
-        console.debug(`Refreshed ${avatarImages.length} avatar images for ${avatarKey}`);
-
-        console.log('Avatar refreshed');
+        await refreshCharacterAvatar(avatarKey);
     }
 }
 
@@ -10166,6 +10148,90 @@ function parseAvatarSource(rawSrc) {
     }
 
     return { type: null, file: rawSrc, original: rawSrc };
+}
+
+function isThumbnailAvatarSource(rawSrc) {
+    try {
+        return new URL(rawSrc, window.location.origin).pathname === '/thumbnail';
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Refreshes visible UI references after a character avatar image is replaced in-place.
+ * @param {string} avatarKey Character avatar filename.
+ * @returns {Promise<void>}
+ */
+export async function refreshCharacterAvatar(avatarKey) {
+    if (!avatarKey || avatarKey === 'none') {
+        return;
+    }
+
+    const thumbnailUrl = getThumbnailUrl('avatar', avatarKey);
+    const fullAvatarUrl = getFullAvatarUrl('avatar', avatarKey);
+    const cacheBustedThumbnailUrl = getThumbnailUrl('avatar', avatarKey, true);
+    const cacheBustedFullAvatarUrl = getFullAvatarUrl('avatar', avatarKey, true);
+
+    try {
+        await Promise.all([
+            fetch(thumbnailUrl, { method: 'GET', cache: 'reload' }),
+            fetch(fullAvatarUrl, { method: 'GET', cache: 'reload' }),
+        ]);
+    } catch (error) {
+        console.warn('Could not reload character avatar cache:', error);
+    }
+
+    let refreshedImages = 0;
+
+    for (const img of document.querySelectorAll('img')) {
+        if (!(img instanceof HTMLImageElement)) {
+            continue;
+        }
+
+        const srcAvatar = parseAvatarSource(img.getAttribute('src'));
+        const thumbnailAvatar = parseAvatarSource(img.getAttribute('data-thumbnail-src'));
+        const srcMatches = srcAvatar?.type === 'avatar' && srcAvatar.file === avatarKey;
+        const thumbnailMatches = thumbnailAvatar?.type === 'avatar' && thumbnailAvatar.file === avatarKey;
+
+        if (!srcMatches && !thumbnailMatches) {
+            continue;
+        }
+
+        if (thumbnailMatches) {
+            img.setAttribute('data-thumbnail-src', cacheBustedThumbnailUrl);
+        }
+
+        if (srcMatches) {
+            img.setAttribute('src', isThumbnailAvatarSource(img.getAttribute('src')) ? cacheBustedThumbnailUrl : cacheBustedFullAvatarUrl);
+        }
+
+        refreshedImages++;
+    }
+
+    const avatarCssUrl = `url("${String(cacheBustedThumbnailUrl).replace(/(["\\])/g, '\\$1')}")`;
+    const originalAvatarCssUrl = `url("${String(cacheBustedFullAvatarUrl).replace(/(["\\])/g, '\\$1')}")`;
+
+    for (const messageElement of document.querySelectorAll('.mes')) {
+        if (!(messageElement instanceof HTMLElement)) {
+            continue;
+        }
+
+        const avatarImg = messageElement.querySelector('.avatar img');
+        const srcAvatar = parseAvatarSource(avatarImg?.getAttribute('src'));
+        const thumbnailAvatar = parseAvatarSource(avatarImg?.getAttribute('data-thumbnail-src'));
+        const matchesAvatar = (srcAvatar?.type === 'avatar' && srcAvatar.file === avatarKey) || (thumbnailAvatar?.type === 'avatar' && thumbnailAvatar.file === avatarKey);
+
+        if (!matchesAvatar) {
+            continue;
+        }
+
+        messageElement.style.setProperty('--sb-message-avatar', avatarCssUrl);
+        messageElement.style.setProperty('--mes-avatar-url', avatarCssUrl);
+        messageElement.style.setProperty('--mes-avatar-original-url', originalAvatarCssUrl);
+    }
+
+    console.debug(`Refreshed ${refreshedImages} avatar images for ${avatarKey}`);
 }
 
 export function buildAvatarList(block, entities, { templateId = 'inline_avatar_template', empty = true, interactable = false, highlightFavs = true } = {}) {
