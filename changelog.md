@@ -131,6 +131,7 @@ This update keeps the 1.6 series moving with safer chat lifecycle defaults, stro
 - PR #306 (2026-06-02) `fix: close release readiness regressions`
 - PR #307 (2026-06-02) `fix: avoid forced reconnect when loading bound reverse proxy presets`
 - PR #308 (2026-06-02) `fix: restore desktop lorebook selection surfaces`
+- PR #309 (2026-06-02) `fix: close release polish regressions`
 - PR #310 (2026-06-02) `fix: sync reverse proxy preset when chat completion source changes`
 
 ## v1.6.0
