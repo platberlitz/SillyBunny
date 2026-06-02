@@ -53,10 +53,13 @@ const PROMPT_KEY_PREFIX = 'inchat_agent_';
 const PATHFINDER_AUTO_SUMMARY_PROMPT_KEY = 'pathfinder_zz_auto_summary';
 const MESSAGE_EXTRA_KEY = 'inChatAgents';
 const POST_PROCESSING_RUNS_EXTRA_KEY = 'inChatAgentPostRuns';
+const PATHFINDER_RETRIEVAL_CACHE_EXTRA_KEY = 'pathfinderRetrievalCache';
 export const PROMPT_RUNS_EXTRA_KEY = 'inChatAgentPromptRuns';
 export const PROMPT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
 export const PRE_GENERATION_INTERCEPT_HISTORY_KEY = 'inChatAgentPreGenerationInterceptHistory';
 const MAX_TRANSFORM_HISTORY = 10;
+const MAX_PATHFINDER_RETRIEVAL_CACHE = 6;
+const PATHFINDER_RETRIEVAL_CONTEXT_MESSAGE_LIMIT = 10;
 const pendingRefreshTimeouts = new Map();
 const pendingRegexSnapshotSaves = new WeakSet();
 const GREETING_GENERATION_TYPE = 'first_message';
@@ -957,6 +960,218 @@ function getMessageRevisionKey(message) {
         normalizeMessageRunValue(swipeInfo?.send_date ?? message?.send_date),
         normalizeMessageRunValue(message?.swipe_id),
     ].join('|');
+}
+
+function getPathfinderRetrievalCacheTarget(generationType) {
+    if (normalizeGenerationType(generationType) !== 'normal') {
+        return null;
+    }
+
+    if (generationStartLastAssistantIndex < 0 || generationStartLastAssistantIndex !== chat.length - 1) {
+        return null;
+    }
+
+    const message = chat[generationStartLastAssistantIndex];
+    if (!message || message !== generationStartLastAssistantMessage || message.is_user || message.is_system) {
+        return null;
+    }
+
+    return {
+        message,
+        messageIndex: generationStartLastAssistantIndex,
+    };
+}
+
+function getPathfinderCacheMessageRole(message) {
+    if (message?.is_system) {
+        return 'system';
+    }
+
+    return message?.is_user ? 'user' : 'assistant';
+}
+
+function getPathfinderRetrievalContextSnapshot(targetMessageIndex) {
+    const endIndex = Math.max(0, Number(targetMessageIndex));
+    const startIndex = Math.max(0, endIndex - PATHFINDER_RETRIEVAL_CONTEXT_MESSAGE_LIMIT);
+
+    return chat.slice(startIndex, endIndex).map((message, offset) => ({
+        index: startIndex + offset,
+        role: getPathfinderCacheMessageRole(message),
+        name: normalizeMessageRunValue(message?.name),
+        mes: normalizeMessageRunValue(message?.mes),
+        swipeId: normalizeMessageRunValue(message?.swipe_id),
+        sendDate: normalizeMessageRunValue(message?.send_date),
+        genStarted: normalizeMessageRunValue(message?.gen_started),
+        genFinished: normalizeMessageRunValue(message?.gen_finished),
+    }));
+}
+
+function normalizePathfinderCacheValue(value, seen = new WeakSet()) {
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+
+    if (Array.isArray(value)) {
+        return value.map(item => normalizePathfinderCacheValue(item, seen));
+    }
+
+    if (value && typeof value === 'object') {
+        if (seen.has(value)) {
+            return '[Circular]';
+        }
+
+        seen.add(value);
+        const normalized = {};
+        for (const key of Object.keys(value).sort()) {
+            const item = value[key];
+            if (typeof item === 'function' || item === undefined) {
+                continue;
+            }
+
+            normalized[key] = normalizePathfinderCacheValue(item, seen);
+        }
+        seen.delete(value);
+        return normalized;
+    }
+
+    if (typeof value === 'bigint') {
+        return String(value);
+    }
+
+    return value ?? null;
+}
+
+function getPathfinderRetrievalSettingsSnapshot(pathfinderAgent) {
+    let runtimeSettings = {};
+    try {
+        runtimeSettings = getPathfinderRuntimeSettings() ?? {};
+    } catch {
+        runtimeSettings = {};
+    }
+
+    return normalizePathfinderCacheValue({
+        agentId: pathfinderAgent?.id ?? '',
+        settings: pathfinderAgent?.settings ?? {},
+        runtimeSettings,
+    });
+}
+
+function buildPathfinderRetrievalCacheSignature(pathfinderAgent, activationSnapshot, generationType, cacheTarget) {
+    if (!cacheTarget) {
+        return '';
+    }
+
+    const signaturePayload = normalizePathfinderCacheValue({
+        version: 1,
+        chatId: normalizeSnapshotChatId(activationSnapshot?.chatId ?? getCurrentSnapshotChatId()),
+        generationType: normalizeGenerationType(generationType),
+        targetMessageIndex: cacheTarget.messageIndex,
+        promptKeys: PATHFINDER_RETRIEVAL_PROMPT_KEYS,
+        context: getPathfinderRetrievalContextSnapshot(cacheTarget.messageIndex),
+        pathfinder: getPathfinderRetrievalSettingsSnapshot(pathfinderAgent),
+    });
+
+    try {
+        return JSON.stringify(signaturePayload);
+    } catch {
+        return '';
+    }
+}
+
+function isPathfinderRetrievalCacheEntry(value) {
+    return Boolean(
+        value &&
+        typeof value === 'object' &&
+        typeof value.signature === 'string' &&
+        Array.isArray(value.prompts),
+    );
+}
+
+function appendPathfinderRetrievalCaches(target, value) {
+    if (Array.isArray(value)) {
+        target.push(...value.filter(isPathfinderRetrievalCacheEntry));
+    }
+}
+
+function getStoredPathfinderRetrievalCaches(message) {
+    const caches = [];
+    appendPathfinderRetrievalCaches(caches, message?.extra?.[PATHFINDER_RETRIEVAL_CACHE_EXTRA_KEY]);
+
+    if (Array.isArray(message?.swipe_info)) {
+        for (const swipeInfo of message.swipe_info) {
+            appendPathfinderRetrievalCaches(caches, swipeInfo?.extra?.[PATHFINDER_RETRIEVAL_CACHE_EXTRA_KEY]);
+        }
+    }
+
+    const deduped = new Map();
+    for (const cache of caches) {
+        deduped.set(cache.signature, cache);
+    }
+
+    return [...deduped.values()];
+}
+
+function findPathfinderRetrievalCache(message, signature) {
+    if (!signature) {
+        return null;
+    }
+
+    return getStoredPathfinderRetrievalCaches(message).find(cache => cache.signature === signature) ?? null;
+}
+
+function getPathfinderPromptValue(key) {
+    const prompt = extension_prompts[key];
+    if (!prompt || prompt.value === undefined || prompt.value === null) {
+        return '';
+    }
+
+    return String(prompt.value);
+}
+
+function capturePathfinderRetrievalPromptSnapshot() {
+    return PATHFINDER_RETRIEVAL_PROMPT_KEYS
+        .map(key => ({ key, value: getPathfinderPromptValue(key) }))
+        .filter(prompt => prompt.value.trim());
+}
+
+function restorePathfinderRetrievalPromptSnapshot(cache) {
+    if (!isPathfinderRetrievalCacheEntry(cache)) {
+        return false;
+    }
+
+    for (const prompt of cache.prompts) {
+        if (!PATHFINDER_RETRIEVAL_PROMPT_KEYS.includes(prompt?.key) || typeof prompt.value !== 'string' || !prompt.value.trim()) {
+            continue;
+        }
+
+        setExtensionPrompt(
+            prompt.key,
+            prompt.value,
+            extension_prompt_types.IN_PROMPT,
+            4,
+            false,
+            extension_prompt_roles.SYSTEM,
+        );
+    }
+
+    return true;
+}
+
+function storePathfinderRetrievalCache(message, signature) {
+    if (!message || !signature) {
+        return;
+    }
+
+    const cacheEntry = {
+        signature,
+        prompts: capturePathfinderRetrievalPromptSnapshot(),
+        savedAt: Date.now(),
+    };
+    const caches = getStoredPathfinderRetrievalCaches(message).filter(cache => cache.signature !== signature);
+    caches.push(cacheEntry);
+
+    setAgentExtraValue(message, PATHFINDER_RETRIEVAL_CACHE_EXTRA_KEY, caches.slice(-MAX_PATHFINDER_RETRIEVAL_CACHE));
+    saveChatDebounced();
 }
 
 function hasProcessedPostProcessingRun(message, runKey, messageIndex = null, indexRunKey = '') {
@@ -3146,21 +3361,34 @@ async function onGenerationAfterCommands(generationType, _options, dryRun) {
 
     if (!dryRun && pathfinderAgent) {
         const retrievalCancelRevision = agentGenerationCancelRevision;
-        const retrievalAbortController = new AbortController();
         syncPathfinderRuntimeSettings(pathfinderAgent);
-        activePathfinderRetrievalAbortControllers.add(retrievalAbortController);
+        const retrievalCacheTarget = getPathfinderRetrievalCacheTarget(normalizedGenerationType);
+        const retrievalCacheSignature = buildPathfinderRetrievalCacheSignature(pathfinderAgent, activationSnapshot, normalizedGenerationType, retrievalCacheTarget);
+        const cachedRetrieval = findPathfinderRetrievalCache(retrievalCacheTarget?.message, retrievalCacheSignature);
+        let retrievalAbortController = null;
 
-        try {
-            if (shouldShowPathfinderRetrievalToast(pathfinderAgent)) {
-                showPathfinderRetrievalToast();
+        if (cachedRetrieval) {
+            restorePathfinderRetrievalPromptSnapshot(cachedRetrieval);
+        } else {
+            retrievalAbortController = new AbortController();
+            activePathfinderRetrievalAbortControllers.add(retrievalAbortController);
+
+            try {
+                if (shouldShowPathfinderRetrievalToast(pathfinderAgent)) {
+                    showPathfinderRetrievalToast();
+                }
+                await runSidecarRetrieval(setExtensionPrompt, extension_prompt_types, extension_prompt_roles, retrievalAbortController.signal);
+            } finally {
+                clearPathfinderRetrievalToast();
+                activePathfinderRetrievalAbortControllers.delete(retrievalAbortController);
             }
-            await runSidecarRetrieval(setExtensionPrompt, extension_prompt_types, extension_prompt_roles, retrievalAbortController.signal);
-        } finally {
-            clearPathfinderRetrievalToast();
-            activePathfinderRetrievalAbortControllers.delete(retrievalAbortController);
+
+            if (!generationStopRequested && agentGenerationCancelRevision === retrievalCancelRevision && !retrievalAbortController.signal.aborted) {
+                storePathfinderRetrievalCache(retrievalCacheTarget?.message, retrievalCacheSignature);
+            }
         }
 
-        if (generationStopRequested || agentGenerationCancelRevision !== retrievalCancelRevision || retrievalAbortController.signal.aborted) {
+        if (generationStopRequested || agentGenerationCancelRevision !== retrievalCancelRevision || retrievalAbortController?.signal.aborted) {
             return;
         }
 
