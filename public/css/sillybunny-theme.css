@@ -2234,6 +2234,19 @@ input[type='range']::-moz-range-thumb {
     pointer-events: auto;
 }
 
+.select2-container--default .sb-world-info-select2-dropdown {
+    box-sizing: border-box;
+    min-width: min(260px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    background-color: #11151c;
+    background-image: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--SmartThemeBlurTintColor) 94%, var(--SmartThemeBodyColor) 6%),
+        color-mix(in srgb, var(--SmartThemeBlurTintColor) 98%, black 2%)
+    );
+    pointer-events: auto;
+}
+
 #select2-world_info-results,
 #select2-world_editor_select-results {
     display: block;
