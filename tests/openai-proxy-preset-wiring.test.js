@@ -93,4 +93,33 @@ describe('OpenAI proxy preset wiring', () => {
         // Silent branch must short-circuit before the reconnect path.
         expect(reconnectIndex).toBeGreaterThan(silentReturnIndex);
     });
+
+    test('keeps the backend binding two-way by syncing the proxy preset on source change', () => {
+        const syncSource = getFunctionSource('syncProxyPresetToBoundSource');
+
+        // Re-entrancy guard prevents feeding back into the source change handler.
+        expect(openAiSource).toContain('let isSyncingProxyBinding = false;');
+        expect(syncSource).toContain('if (isSyncingProxyBinding) {');
+        expect(syncSource).toContain('isSyncingProxyBinding = true;');
+        expect(syncSource).toContain('isSyncingProxyBinding = false;');
+
+        // Only acts on supported sources and finds a preset bound to that source.
+        expect(syncSource).toContain('REVERSE_PROXY_SUPPORTED_SOURCES.includes(source)');
+        expect(syncSource).toContain('proxies.find(preset => preset.name !== \'None\' && preset.source === source)');
+
+        // Applies the bound preset without re-triggering the source change or a redundant reconnect.
+        expect(syncSource).toContain('{ applySource: false, silent: true }');
+    });
+
+    test('invokes the reverse binding sync from the chat completion source change handler', () => {
+        const initSource = getFunctionSource('initOpenAI');
+        const sourceChangeIndex = initSource.indexOf('$(\'#chat_completion_source\').on(\'change\'');
+        const syncCallIndex = initSource.indexOf('syncProxyPresetToBoundSource(oai_settings.chat_completion_source);');
+        const reconnectIndex = initSource.indexOf('reconnectOpenAi();', sourceChangeIndex);
+
+        expect(sourceChangeIndex).toBeGreaterThanOrEqual(0);
+        expect(syncCallIndex).toBeGreaterThan(sourceChangeIndex);
+        // Proxy preset must be applied before reconnecting so the reconnect uses the bound proxy.
+        expect(reconnectIndex).toBeGreaterThan(syncCallIndex);
+    });
 });
