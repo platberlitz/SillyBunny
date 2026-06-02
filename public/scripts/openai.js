@@ -8405,7 +8405,8 @@ export function loadProxyPresets(settings) {
         appendProxyPresetOption(preset);
     }
     $('#openai_proxy_preset').val(selected_proxy.name);
-    setProxyPreset(selected_proxy.name, selected_proxy.url, selected_proxy.password, selected_proxy.source, { applySource: false });
+    const shouldApplySource = Boolean(selected_proxy.source);
+    setProxyPreset(selected_proxy.name, selected_proxy.url, selected_proxy.password, selected_proxy.source, { applySource: shouldApplySource });
 }
 
 function normalizeProxyPreset(preset) {
