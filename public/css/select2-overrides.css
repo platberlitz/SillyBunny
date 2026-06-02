@@ -1,6 +1,7 @@
 /* Customize the Select2 container */
 .select2-container {
     color: var(--SmartThemeBodyColor);
+    max-width: 100%;
 }
 
 /* Customize the dropdown */
@@ -52,6 +53,7 @@
 
 .select2-container .select2-results>.select2-results__options {
     max-height: 300px;
+    overflow-x: hidden;
 }
 
 .select2-container .select2-selection--multiple .select2-selection__choice__remove {
@@ -92,6 +94,10 @@
 .select2-results__option {
     color: var(--SmartThemeBodyColor);
     background-color: var(--SmartThemeBodyColor);
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .select2-container .select2-selection--multiple,

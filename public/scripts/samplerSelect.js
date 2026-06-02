@@ -10,6 +10,7 @@ import { setting_names as TGsamplerNames, showTGSamplerControls, textgenerationw
 import { renderTemplateAsync } from './templates.js';
 import { Popup, POPUP_TYPE } from './popup.js';
 import { localforage } from '../lib.js';
+import { loadStoredSelectedSamplers } from './sampler-storage.js';
 
 const forcedOnColoring = 'color: #89db35;';
 const forcedOffColoring = 'color: #e84f62;';
@@ -21,6 +22,7 @@ const SELECT_SAMPLER = {
 
 const textGenObjectStore = localforage.createInstance({ name: 'SillyTavern_TextCompletions' });
 let selectedSamplers = {};
+let selectedSamplersStorageReady = true;
 
 // Goal 1: show popup with all samplers for active API
 async function showSamplerSelectPopup() {
@@ -57,7 +59,7 @@ async function showSamplerSelectPopup() {
 
             const isActive = $(this).hasClass('toggleEnabled');
 
-            toggleSamplerManualPriority(isActive);
+            toggleSamplerManualPriority(isActive, '', true);
         });
     } else {
         $('#prioritizeManuallySelectedSamplers').hide();
@@ -199,7 +201,7 @@ function setSamplerListListeners() {
         const shouldDisplay = isChecked ? targetDisplayType : 'none';
         relatedDOMElement.css('display', shouldDisplay);
 
-        if (main_api === 'textgenerationwebui') setApiSamplersState(samplerName, shouldDisplay !== 'none');
+        if (main_api === 'textgenerationwebui') setApiSamplersState(samplerName, shouldDisplay !== 'none', '', true);
 
         console.log(samplerName, relatedDOMElement.data(SELECT_SAMPLER.DATA), shouldDisplay);
     });
@@ -316,10 +318,12 @@ export async function validateDisabledSamplers(redraw = false) {
 export async function loadApiSelectedSamplers() {
     try {
         console.debug('Text Completions: loading selected samplers');
-        selectedSamplers = await textGenObjectStore.getItem('selectedSamplers') || {};
+        selectedSamplers = await loadStoredSelectedSamplers(textGenObjectStore);
+        selectedSamplersStorageReady = true;
     } catch (error) {
         console.log('Text Completions: unable to load selected samplers, using default samplers', error);
         selectedSamplers = {};
+        selectedSamplersStorageReady = false;
     }
 }
 
@@ -329,10 +333,17 @@ export async function loadApiSelectedSamplers() {
  */
 export async function saveApiSelectedSamplers() {
     try {
+        if (!selectedSamplersStorageReady) {
+            console.warn('Text Completions: skipping selected sampler save because storage did not finish loading.');
+            return false;
+        }
+
         console.debug('Text Completions: saving selected samplers');
         await textGenObjectStore.setItem('selectedSamplers', selectedSamplers);
+        return true;
     } catch (error) {
         console.log('Text Completions: unable to save selected samplers', error);
+        return false;
     }
 }
 
@@ -350,8 +361,8 @@ export async function resetApiSelectedSamplers(tcApiType = '', silent = false) {
 
         console.debug('Text Completions: resetting selected samplers');
         delete selectedSamplers[tcApiType];
-        await saveApiSelectedSamplers();
-        if (!silent) toastr.success('Selected samplers cleared.');
+        const saved = await saveApiSelectedSamplers();
+        if (saved && !silent) toastr.success('Selected samplers cleared.');
     } catch (error) {
         console.log('Text Completions: unable to reset selected preset samplers', error);
     }
@@ -362,15 +373,17 @@ export async function resetApiSelectedSamplers(tcApiType = '', silent = false) {
  * @param {string} samplerName Target sampler key name
  * @param {string|boolean} state Visibility state of the target sampler
  * @param {string?} tcApiType Name of the target API Type - It picks the currently active TC API type name by default
+ * @param {boolean} explicitSave Whether this write comes from a user/API action that should re-enable saving after a startup timeout
  * @returns void
  */
-export function setApiSamplersState(samplerName, state, tcApiType = '') {
+export function setApiSamplersState(samplerName, state, tcApiType = '', explicitSave = false) {
     if (!textgenerationwebui_settings?.type && !tcApiType) return;
     if (!tcApiType) tcApiType = textgenerationwebui_settings.type;
     if (!selectedSamplers[tcApiType]) selectedSamplers[tcApiType] = {};
 
     const presetSamplers = selectedSamplers[tcApiType];
     presetSamplers[samplerName] = String(state) === 'true';
+    if (explicitSave) selectedSamplersStorageReady = true;
 }
 
 /**
@@ -384,6 +397,36 @@ export function getAllManualApiSamplers(tcApiType = '') {
     if (!selectedSamplers[tcApiType]) selectedSamplers[tcApiType] = {};
 
     return selectedSamplers[tcApiType];
+}
+
+/**
+ * Returns a copy of the sampler visibility state for the active/selected TC API Type.
+ * @param {string?} tcApiType Name of the target API Type - It picks the currently active TC API type name by default
+ * @returns {Record<string, boolean>} Sampler visibility state
+ */
+export function getApiSamplerVisibilityState(tcApiType = '') {
+    return Object.fromEntries(
+        Object.entries(getAllManualApiSamplers(tcApiType)).map(([key, value]) => [key, String(value) === 'true']),
+    );
+}
+
+/**
+ * Replaces the sampler visibility state for the active/selected TC API Type.
+ * @param {Record<string, any>} state Sampler visibility state
+ * @param {string?} tcApiType Name of the target API Type - It picks the currently active TC API type name by default
+ * @returns {boolean} Whether the sampler visibility state was applied
+ */
+export function setApiSamplerVisibilityState(state, tcApiType = '') {
+    if (!state || typeof state !== 'object' || Array.isArray(state)) return false;
+    if (!textgenerationwebui_settings?.type && !tcApiType) return false;
+    if (!tcApiType) tcApiType = textgenerationwebui_settings.type;
+
+    selectedSamplers[tcApiType] = Object.fromEntries(
+        Object.entries(state).map(([key, value]) => [key, String(value) === 'true']),
+    );
+    selectedSamplersStorageReady = true;
+
+    return true;
 }
 
 /**
@@ -411,15 +454,17 @@ export function getActiveManualApiSamplers(tcApiType = '') {
 /**
  * @param {string|boolean} state Target state of the feature
  * @param {string?} tcApiType Name of the target API Type - It picks the currently active TC API type name by default
+ * @param {boolean} explicitSave Whether this write comes from a user/API action that should re-enable saving after a startup timeout
  * @returns void
  */
-export function toggleSamplerManualPriority(state = false, tcApiType = '') {
+export function toggleSamplerManualPriority(state = false, tcApiType = '', explicitSave = false) {
     if (!textgenerationwebui_settings?.type && !tcApiType) return;
     if (!tcApiType) tcApiType = textgenerationwebui_settings.type;
     if (!selectedSamplers[tcApiType]) selectedSamplers[tcApiType] = {};
 
     const presetSamplers = selectedSamplers[tcApiType];
     presetSamplers.st_manual_priority = String(state) === 'true';
+    if (explicitSave) selectedSamplersStorageReady = true;
 }
 
 /**

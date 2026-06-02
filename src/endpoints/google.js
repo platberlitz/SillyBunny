@@ -13,6 +13,44 @@ import { delay, getConfigValue, trimTrailingSlash } from '../util.js';
 
 const API_MAKERSUITE = 'https://generativelanguage.googleapis.com';
 const API_VERTEX_AI = 'https://us-central1-aiplatform.googleapis.com';
+const GOOGLE_API_VERSION_PATTERN = /^v\d+(?:alpha|beta)?$/i;
+
+/**
+ * Gets a Google API base URL, preserving bases that already end in an API version.
+ * @param {string} apiUrl Root or versioned API/proxy base URL
+ * @param {string} apiVersion API version to append when the base is not versioned
+ * @returns {string} Google API base URL
+ */
+export function getGoogleApiBaseUrl(apiUrl, apiVersion) {
+    const baseUrl = String(apiUrl ?? '');
+
+    try {
+        const url = new URL(baseUrl);
+        const pathSegments = url.pathname.split('/').filter(Boolean);
+        const finalPathSegment = pathSegments[pathSegments.length - 1] || '';
+
+        if (GOOGLE_API_VERSION_PATTERN.test(finalPathSegment)) {
+            // SillyBunny: some reverse proxies already expose a versioned Google base.
+            url.pathname = url.pathname.replace(/\/$/, '');
+            return url.toString();
+        }
+
+        // SillyBunny: preserve custom proxy paths like /gemini before appending the requested version.
+        url.pathname = `${url.pathname.replace(/\/$/, '')}/${apiVersion}`;
+        return url.toString();
+    } catch {
+        const trimmedBaseUrl = trimTrailingSlash(baseUrl);
+        const pathPart = trimmedBaseUrl.split(/[?#]/, 1)[0];
+        const pathSegments = pathPart.split('/').filter(Boolean);
+        const finalPathSegment = pathSegments[pathSegments.length - 1] || '';
+
+        if (GOOGLE_API_VERSION_PATTERN.test(finalPathSegment)) {
+            return trimmedBaseUrl;
+        }
+
+        return `${trimmedBaseUrl}/${apiVersion}`;
+    }
+}
 
 function createWavHeader(dataSize, sampleRate, numChannels = 1, bitsPerSample = 16) {
     const header = Buffer.alloc(44);
@@ -212,7 +250,7 @@ export async function getGoogleApiConfig(request, model, endpoint = 'generateCon
         } else {
             // Proxy mode: use Authorization header
             const apiUrl = trimTrailingSlash(request.body.reverse_proxy || API_VERTEX_AI);
-            baseUrl = `${apiUrl}/v1`;
+            baseUrl = getGoogleApiBaseUrl(apiUrl, 'v1');
             url = `${baseUrl}/publishers/google/models/${model}:${endpoint}`;
             headers['Authorization'] = authHeader;
         }
@@ -221,7 +259,7 @@ export async function getGoogleApiConfig(request, model, endpoint = 'generateCon
         const apiKey = request.body.reverse_proxy ? request.body.proxy_password : readSecret(request.user.directories, SECRET_KEYS.MAKERSUITE);
         const apiUrl = trimTrailingSlash(request.body.reverse_proxy || API_MAKERSUITE);
         const apiVersion = getConfigValue('gemini.apiVersion', 'v1beta');
-        baseUrl = `${apiUrl}/${apiVersion}`;
+        baseUrl = getGoogleApiBaseUrl(apiUrl, apiVersion);
         url = `${baseUrl}/models/${model}:${endpoint}`;
         headers['x-goog-api-key'] = apiKey;
     }

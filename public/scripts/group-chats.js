@@ -81,6 +81,7 @@ import {
     unshallowCharacter,
     chatElement,
     ensureMessageMediaIsArray,
+    syncCharacterMenuActiveEntity,
 } from '../script.js';
 import { printTagList, createTagMapFromList, applyTagsOnCharacterSelect, tag_map, applyTagsOnGroupSelect, printTagFilters, tag_filter_type } from './tags.js';
 import { FILTER_TYPES, FilterHelper } from './filters.js';
@@ -129,10 +130,49 @@ const GROUP_MEMBER_MODELS_KEY = 'member_models';
 const GROUP_AUTO_MODE_KEY = 'SillyBunny.groupAutoModeEnabled';
 const GROUP_DM_SETTINGS_KEY = 'SillyBunny.groupDmSettings';
 const GROUP_DM_UNREAD_KEY = 'SillyBunny.groupDmUnread';
+const ENTITY_SELECTION_PULSE_CLEANUP_MS = 900;
 const defaultGroupDmSettings = {
     autoDmEnabled: false,
     autoDmMember: '',
 };
+let entitySelectionPulseId = 0;
+
+function pulseSelectedEntityCard(card) {
+    const charactersBlock = card?.closest?.('#rm_print_characters_block');
+    if (!(charactersBlock instanceof HTMLElement) || !(card instanceof HTMLElement)) {
+        return;
+    }
+
+    charactersBlock.querySelectorAll('.sb-just-selected').forEach(element => {
+        element.classList.remove('sb-just-selected');
+        element.removeAttribute('data-sb-selection-pulse');
+    });
+
+    const pulseToken = String(++entitySelectionPulseId);
+    let cleanupTimer = 0;
+    const cleanupPulse = () => {
+        window.clearTimeout(cleanupTimer);
+        card.removeEventListener('animationend', cleanupPulseOnAnimationEnd);
+        if (card.dataset.sbSelectionPulse !== pulseToken) {
+            return;
+        }
+
+        card.classList.remove('sb-just-selected');
+        card.removeAttribute('data-sb-selection-pulse');
+    };
+    const cleanupPulseOnAnimationEnd = (event) => {
+        if (event.target !== card || event.animationName !== 'sb-entity-select-pulse') {
+            return;
+        }
+
+        cleanupPulse();
+    };
+
+    card.dataset.sbSelectionPulse = pulseToken;
+    card.classList.add('sb-just-selected');
+    card.addEventListener('animationend', cleanupPulseOnAnimationEnd, { once: true });
+    cleanupTimer = window.setTimeout(cleanupPulse, ENTITY_SELECTION_PULSE_CLEANUP_MS);
+}
 
 function getGlobalGroupAutoModeEnabled() {
     return accountStorage.getItem(GROUP_AUTO_MODE_KEY) === 'true';
@@ -1188,9 +1228,11 @@ async function validateGroup(group) {
  * Loads the chat messages for a specific group.
  * @param {string} groupId - The ID of the group to load chat messages for.
  * @param {boolean} reload - Whether to reload the group chat after loading.
+ * @param {object} options - Load options.
+ * @param {boolean} [options.switchMenu=true] Whether to switch the right menu to the group editor.
  * @returns {Promise<void>} A promise that resolves when the chat messages have been loaded.
  */
-export async function getGroupChat(groupId, reload = false) {
+export async function getGroupChat(groupId, reload = false, { switchMenu = true } = {}) {
     const group = groups.find((x) => x.id === groupId);
     if (!group) {
         console.warn('Group not found', groupId);
@@ -1245,7 +1287,7 @@ export async function getGroupChat(groupId, reload = false) {
     updateChatMetadata(metadata, true);
     applyGroupDmChatMode(metadata);
 
-    if (reload) {
+    if (reload && switchMenu) {
         select_group_chats(groupId, true);
     }
 
@@ -1514,13 +1556,14 @@ function resetSelectedGroup() {
  * @param {string} groupId Group ID
  * @param {boolean} shouldSaveGroup Whether to save the group after saving the chat
  * @param {boolean} force Force the saving on integrity error
- * @returns {Promise<void>} A promise that resolves when the group chat has been saved.
+ * @param {boolean} throwOnError Rethrow save errors after notifying the user
+ * @returns {Promise<boolean>} A promise that resolves when the group chat has been saved.
  */
-async function saveGroupChat(groupId, shouldSaveGroup, force = false) {
+async function saveGroupChat(groupId, shouldSaveGroup, force = false, throwOnError = false) {
     const group = groups.find(x => x.id == groupId);
     if (!group) {
         console.warn('Group not found', groupId);
-        return;
+        return false;
     }
     const chatId = group.chat_id;
     if (chatId && Array.isArray(group.chats) && !group.chats.includes(chatId)) {
@@ -1547,7 +1590,10 @@ async function saveGroupChat(groupId, shouldSaveGroup, force = false) {
         if (!isIntegrityError) {
             toastr.error(t`Check the server connection and reload the page to prevent data loss.`, t`Group Chat could not be saved`);
             console.error('Group chat could not be saved', response);
-            return;
+            if (throwOnError) {
+                throw new Error('Group chat could not be saved');
+            }
+            return false;
         }
 
         const popupResult = await Popup.show.input(
@@ -1563,15 +1609,17 @@ async function saveGroupChat(groupId, shouldSaveGroup, force = false) {
         if (!forceSaveConfirmed) {
             console.warn('Chat integrity check failed, and user did not confirm the overwrite. Reloading the page.');
             window.location.reload();
-            return;
+            return false;
         }
 
-        await saveGroupChat(groupId, shouldSaveGroup, true);
+        return await saveGroupChat(groupId, shouldSaveGroup, true, throwOnError);
     }
 
     if (shouldSaveGroup) {
         await editGroup(groupId, false, false);
     }
+
+    return true;
 }
 
 /**
@@ -2761,7 +2809,8 @@ async function renameOpenGroup() {
     await editGroup(openGroupId, true, true);
 }
 
-globalThis.SillyBunnyShell = Object.assign(globalThis.SillyBunnyShell || {}, {
+const sillyBunnyShell = /** @type {any} */ (globalThis.SillyBunnyShell || {});
+globalThis.SillyBunnyShell = Object.assign(sillyBunnyShell, {
     renameOpenGroup,
 });
 
@@ -3245,6 +3294,26 @@ async function onGroupActionClick(event) {
     await eventSource.emit(event_types.GROUP_UPDATED);
 }
 
+function isMobileGroupCandidateRowTap(event) {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (!target || target.closest('.right_menu_button, input, button, select, textarea, a')) {
+        return false;
+    }
+
+    return globalThis.SillyBunnyShell?.isMobileViewport?.() ?? Boolean(globalThis.matchMedia?.('(max-width: 768px)')?.matches);
+}
+
+async function onGroupCandidateRowClick(event) {
+    if (!isMobileGroupCandidateRowTap(event)) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    await modifyGroupMember(openGroupId, $(this), false);
+    await eventSource.emit(event_types.GROUP_UPDATED);
+}
+
 function updateFavButtonState(state) {
     fav_grp_checked = state;
     $('#rm_group_fav').val(String(fav_grp_checked));
@@ -3255,9 +3324,11 @@ function updateFavButtonState(state) {
 /**
  * Opens a group chat by its ID and updates the UI accordingly.
  * @param {string} groupId ID of the group to open
+ * @param {object} options Open options
+ * @param {boolean} [options.switchMenu=true] Whether to switch the right menu to the group editor
  * @returns {Promise<boolean>} Whether the group was opened
  */
-export async function openGroupById(groupId) {
+export async function openGroupById(groupId, { switchMenu = true } = {}) {
     if (isChatSaving) {
         toastr.info(t`Please wait until the chat is saved before switching characters.`, t`Your chat is still saving...`);
         return false;
@@ -3268,26 +3339,32 @@ export async function openGroupById(groupId) {
         return false;
     }
 
-    if (!is_send_press && !is_group_generating) {
-        select_group_chats(groupId, false);
-
-        if (selected_group !== groupId) {
-            groupChatQueueOrder = new Map();
-            setCharacterId(undefined);
-            setCharacterName('');
-            resetSelectedGroup();
-            await clearChat({ clearData: true });
-            cancelTtsPlay();
-            selected_group = groupId;
-            setEditedMessageId(undefined);
-            updateChatMetadata({}, true);
-            await getGroupChat(groupId);
-            syncGroupAutoModeToggle();
-            return true;
-        }
+    if (is_send_press || is_group_generating) {
+        return false;
     }
 
-    return false;
+    if (switchMenu) {
+        select_group_chats(groupId, false);
+    }
+
+    if (selected_group === groupId) {
+        syncCharacterMenuActiveEntity();
+        return true;
+    }
+
+    groupChatQueueOrder = new Map();
+    setCharacterId(undefined);
+    setCharacterName('');
+    resetSelectedGroup();
+    await clearChat({ clearData: true });
+    cancelTtsPlay();
+    selected_group = groupId;
+    setEditedMessageId(undefined);
+    updateChatMetadata({}, true);
+    await getGroupChat(groupId, false, { switchMenu });
+    syncGroupAutoModeToggle();
+    syncCharacterMenuActiveEntity();
+    return true;
 }
 
 /**
@@ -3783,10 +3860,16 @@ jQuery(() => {
         });
     }
 
-    $(document).on('click', '.group_select', function () {
-        const shouldCloseCharacterMenu = $(this).closest('#rm_print_characters_block').length > 0;
+    $(document).on('click', '.group_select', async function () {
+        const isCharactersBlockClick = $(this).closest('#rm_print_characters_block').length > 0;
+        const shouldCloseCharacterMenu = isCharactersBlockClick && (globalThis.SillyBunnyShell?.isMobileViewport?.() ?? true);
         const groupId = $(this).attr('data-chid') || $(this).attr('data-grid');
-        openGroupById(groupId);
+        // SillyBunny: drawer selection flashes Editor instead of opening it.
+        const didOpenGroup = await openGroupById(groupId, { switchMenu: false });
+        if (didOpenGroup && isCharactersBlockClick) {
+            pulseSelectedEntityCard(this);
+            globalThis.SillyBunnyShell?.highlightCharacterEditorTab?.();
+        }
         if (shouldCloseCharacterMenu) {
             globalThis.SillyBunnyShell?.closeCharacters?.();
         }
@@ -3837,6 +3920,7 @@ jQuery(() => {
     $('#group_avatar_button').on('input', uploadGroupAvatar);
     $('#rm_group_restore_avatar').on('click', restoreGroupAvatar);
     $(document).on('click', '.group_member .right_menu_button', onGroupActionClick);
+    $(document).on('click', '#rm_group_add_members .group_member', onGroupCandidateRowClick);
     $(document).on('change', '.group_member_model_input', onGroupMemberModelInput);
     eventSource.on(event_types.CHAT_CHANGED, updateGroupSpeakerControls);
     eventSource.on(event_types.GROUP_UPDATED, updateGroupSpeakerControls);

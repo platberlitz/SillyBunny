@@ -27,12 +27,14 @@ import {
     normalizeAgentCategory,
     getAgentChatScopeLabel,
     getPromptTransformMode,
+    isPathfinderSubmoduleEnabled,
     findTemplateForAgentSnapshot,
     getRedundantBundledAgentDuplicateIds,
     reconcileScopedEnabledAgentIdsFromLegacyFlags,
     resolveConnectionProfile,
     setAgentEnabledForCurrentScope,
     setGlobalSettings,
+    setPathfinderSubmoduleEnabled,
     getGroups,
     getCustomGroups,
     loadBuiltinGroups,
@@ -44,11 +46,13 @@ import {
 import {
     cancelAgentGeneration,
     buildPromptDynamicMacros,
+    deactivatePathfinderRuntime,
     initAgentRunner,
     isAgentGenerationActive,
     onAgentGenerationStateChanged,
     getPreGenerationInterceptHistoryForMessage,
     getPromptTransformHistoryForMessage,
+    refreshRegexSnapshotsForAgent,
     runAgentOnMessage,
     syncToolAgentRegistrations,
     undoPromptTransform,
@@ -60,7 +64,7 @@ import {
     createDefaultRegexScript,
     normalizeRegexScript,
 } from './regex-scripts.js';
-import { initPathfinder } from './pathfinder-init.js';
+import { initPathfinder, teardownPathfinder } from './pathfinder-init.js';
 import { openPathfinderSettings, isPathfinderAgent } from './pathfinder-settings-ui.js';
 import { getPathfinderToolDefinitions } from './pathfinder/tool-definitions.js';
 import { buildFallbackPromptText, extractProfileResponseText } from './llm-utils.js';
@@ -140,6 +144,7 @@ const AGENT_PHASE_LABELS = {
 };
 const DEFAULT_PRE_PROCESS = {
     mode: 'inject',
+    interceptTiming: 'pre-generation',
     applyMode: 'replace',
     wrapPosition: 'after',
     wrapPrefix: '',
@@ -207,6 +212,7 @@ function sortAgentsByOrder(agentList = []) {
 async function toggleAgentEnabled(agent) {
     setAgentEnabledForCurrentScope(agent, !isAgentEnabledForCurrentScope(agent));
     await saveAgent(agent);
+    refreshRegexSnapshotsForAgent(agent.id);
     persistExtensionState();
     syncToolAgentRegistrations();
     renderAgentList();
@@ -503,6 +509,13 @@ function isPreGenerationInterceptAgent(agent) {
     );
 }
 
+function isPostMainGenerationInterceptAgent(agent) {
+    return Boolean(
+        isPreGenerationInterceptAgent(agent) &&
+        getAgentPreProcess(agent).interceptTiming === 'post-main-generation',
+    );
+}
+
 function canPreviewPreGenerationPrompt(agent) {
     return Boolean(
         !isPathfinderAgent(agent) &&
@@ -526,7 +539,9 @@ async function previewPreGenerationPrompt(agent, promptOverride = null) {
         dynamicMacros: buildPromptDynamicMacros('', null, agent, 'normal'),
     });
     const previewNote = isPreGenerationInterceptAgent(agent)
-        ? 'Preview shows the agent instruction after macro substitution. At runtime, intercept mode also receives the assembled outgoing context and can rewrite it before the main model sees it.'
+        ? isPostMainGenerationInterceptAgent(agent)
+            ? 'Preview shows the agent instruction after macro substitution. At runtime, post-main intercept mode also receives the fresh assistant output and can rewrite it before it is shown or saved.'
+            : 'Preview shows the agent instruction after macro substitution. At runtime, intercept mode also receives the assembled outgoing context and can rewrite it before the main model sees it.'
         : 'Preview uses the current chat context with no generated assistant message yet. Random macros are evaluated now and may differ when the agent runs.';
     const previewHtml = $(
         `<div class="ica--prompt-preview">
@@ -1476,6 +1491,15 @@ function renderAgentList() {
     }
 
     if (!selectModeActive && allAgents.length > 0) {
+        const legend = $(`
+            <div class="ica--action-legend" aria-label="Agent card action legend">
+                <span><i class="fa-solid fa-eye"></i> Preview</span>
+                <span><i class="fa-solid fa-robot"></i> Apply</span>
+                <span><i class="fa-solid fa-pen-to-square"></i> Edit</span>
+                <span><i class="fa-solid fa-download"></i> Export</span>
+                <span><i class="fa-solid fa-trash"></i> Delete</span>
+            </div>
+        `);
         const favoriteAgents = allAgents.filter(agent => agent.favorite);
         const quickSection = $(`
             <div class="ica--quick-section">
@@ -1490,6 +1514,7 @@ function renderAgentList() {
                 <div class="ica--quick-grid"></div>
             </div>
         `);
+        container.append(legend);
         const quickGrid = quickSection.find('.ica--quick-grid');
 
         if (favoriteAgents.length === 0) {
@@ -1603,8 +1628,9 @@ function renderAgentList() {
             const promptTransformEnabled = hasPromptTransform(agent);
             const promptTransformLabel = getPromptTransformLabel(agent);
             const preInterceptEnabled = isPreGenerationInterceptAgent(agent);
+            const preInterceptLabel = isPostMainGenerationInterceptAgent(agent) ? 'post-main intercept' : 'pre intercept';
             const previewPromptButton = canPreviewPreGenerationPrompt(agent)
-                ? `<button type="button" class="ica--card-btn ica--btn-preview-prompt" title="Preview this pre-generation prompt after macro substitution"><i class="fa-solid fa-eye"></i> ${preInterceptEnabled ? 'Preview Instruction' : 'Preview Prompt'}</button>`
+                ? `<button type="button" class="ica--card-btn ica--btn-preview-prompt" title="Preview this pre-generation prompt after macro substitution" aria-label="${preInterceptEnabled ? 'Preview Instruction' : 'Preview Prompt'}"><i class="fa-solid fa-eye"></i></button>`
                 : '';
             const connectionProfileLabel = agent.connectionProfile
                 ? profileNames.get(agent.connectionProfile) || `Missing profile (${agent.connectionProfile})`
@@ -1631,7 +1657,7 @@ function renderAgentList() {
                     <div class="ica--card-desc">${escapeHtml(desc)}</div>
                     <div class="ica--card-meta">
                         ${agent.conditions.triggerProbability < 100 ? `<span class="ica--card-pill"><i class="fa-solid fa-dice fa-xs"></i> ${agent.conditions.triggerProbability}%</span>` : ''}
-                        ${preInterceptEnabled ? '<span class="ica--card-pill"><i class="fa-solid fa-shuffle fa-xs"></i> pre intercept</span>' : ''}
+                        ${preInterceptEnabled ? `<span class="ica--card-pill"><i class="fa-solid fa-shuffle fa-xs"></i> ${preInterceptLabel}</span>` : ''}
                         ${!preInterceptEnabled && agent.injection.position === 1 ? `<span class="ica--card-pill">depth ${agent.injection.depth}</span>` : ''}
                         ${promptTransformEnabled ? `<span class="ica--card-pill"><i class="fa-solid fa-robot fa-xs"></i> ${promptTransformLabel}</span>` : ''}
                         ${regexCount > 0 ? `<span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${regexCount} regex</span>` : ''}
@@ -1642,10 +1668,10 @@ function renderAgentList() {
                     </div>
                     <div class="ica--card-actions">
                         ${previewPromptButton}
-                        ${isPathfinderAgent(agent) ? '' : '<button type="button" class="ica--card-btn ica--btn-run" title="Manually apply this agent to the last assistant reply"><i class="fa-solid fa-robot"></i> Apply to Last Reply</button>'}
-                        <button type="button" class="ica--card-btn ica--btn-edit"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
-                        ${isPathfinderAgent(agent) ? '' : '<button type="button" class="ica--card-btn ica--btn-export"><i class="fa-solid fa-download"></i> Export</button>'}
-                        <button type="button" class="ica--card-btn ica--btn-delete caution"><i class="fa-solid fa-trash"></i></button>
+                        ${isPathfinderAgent(agent) ? '' : '<button type="button" class="ica--card-btn ica--btn-run" title="Manually apply this agent to the last assistant reply" aria-label="Apply to Last Reply"><i class="fa-solid fa-robot"></i></button>'}
+                        <button type="button" class="ica--card-btn ica--btn-edit" title="Edit agent" aria-label="Edit agent"><i class="fa-solid fa-pen-to-square"></i></button>
+                        ${isPathfinderAgent(agent) ? '' : '<button type="button" class="ica--card-btn ica--btn-export" title="Export agent" aria-label="Export agent"><i class="fa-solid fa-download"></i></button>'}
+                        <button type="button" class="ica--card-btn ica--btn-delete caution" title="Delete agent" aria-label="Delete agent"><i class="fa-solid fa-trash"></i></button>
                     </div>
                 </div>
             `);
@@ -1893,6 +1919,18 @@ async function openEditor(agentId = null) {
     });
     editorEl.find('#ica--editor-modelOverride').val(agent.modelOverride || '');
 
+    let editorFullscreen = false;
+    const fullscreenButton = editorEl.find('#ica--editor-fullscreen');
+    const updateEditorFullscreenState = (nextEnabled) => {
+        editorFullscreen = Boolean(nextEnabled);
+        editorEl.toggleClass('ica--editor-fullscreen', editorFullscreen);
+        document.body.classList.toggle('ica--editor-fullscreen-active', editorFullscreen);
+        fullscreenButton.attr('aria-pressed', String(editorFullscreen));
+        fullscreenButton.attr('title', editorFullscreen ? 'Exit fullscreen editor' : 'Toggle fullscreen editor');
+        fullscreenButton.find('i').attr('class', `fa-solid ${editorFullscreen ? 'fa-compress' : 'fa-maximize'}`);
+    };
+    fullscreenButton.on('click', () => updateEditorFullscreenState(!editorFullscreen));
+
     // Injection
     editorEl.find('#ica--editor-position').val(agent.injection.position);
     editorEl.find('#ica--editor-depth').val(agent.injection.depth);
@@ -1901,6 +1939,7 @@ async function openEditor(agentId = null) {
     editorEl.find('#ica--editor-scan').prop('checked', agent.injection.scan);
     const preProcess = getAgentPreProcess(agent);
     editorEl.find('#ica--editor-pre-mode').val(preProcess.mode);
+    editorEl.find('#ica--editor-pre-interceptTiming').val(preProcess.interceptTiming);
     editorEl.find('#ica--editor-pre-applyMode').val(preProcess.applyMode);
     editorEl.find('#ica--editor-pre-wrapPosition').val(preProcess.wrapPosition);
     editorEl.find('#ica--editor-pre-wrapPrefix').val(preProcess.wrapPrefix);
@@ -2094,8 +2133,8 @@ async function openEditor(agentId = null) {
                     <div class="ica--regex-item-actions">
                         <button type="button" class="ica--card-btn ica--regex-up" title="Move up"><i class="fa-solid fa-arrow-up"></i></button>
                         <button type="button" class="ica--card-btn ica--regex-down" title="Move down"><i class="fa-solid fa-arrow-down"></i></button>
-                        <button type="button" class="ica--card-btn ica--regex-edit"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
-                        <button type="button" class="ica--card-btn caution ica--regex-delete"><i class="fa-solid fa-trash"></i></button>
+                        <button type="button" class="ica--card-btn ica--regex-edit" title="Edit regex" aria-label="Edit regex"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button type="button" class="ica--card-btn caution ica--regex-delete" title="Delete regex" aria-label="Delete regex"><i class="fa-solid fa-trash"></i></button>
                     </div>
                 </div>
             `);
@@ -2173,6 +2212,9 @@ async function openEditor(agentId = null) {
             preProcess: {
                 ...getAgentPreProcess(agent),
                 mode: editorEl.find('#ica--editor-pre-mode').val()?.toString() || 'inject',
+                interceptTiming: editorEl.find('#ica--editor-pre-interceptTiming').val()?.toString() === 'post-main-generation'
+                    ? 'post-main-generation'
+                    : 'pre-generation',
             },
         };
         await previewPreGenerationPrompt(previewAgent, editorEl.find('#ica--editor-prompt').val()?.toString() || '');
@@ -2185,6 +2227,8 @@ async function openEditor(agentId = null) {
         wide: true,
         large: true,
     }).show();
+
+    document.body.classList.remove('ica--editor-fullscreen-active');
 
     if (result !== POPUP_RESULT.AFFIRMATIVE) return;
 
@@ -2206,6 +2250,9 @@ async function openEditor(agentId = null) {
     agent.preProcess = {
         ...getAgentPreProcess(agent),
         mode: editorEl.find('#ica--editor-pre-mode').val()?.toString() === 'intercept' ? 'intercept' : 'inject',
+        interceptTiming: editorEl.find('#ica--editor-pre-interceptTiming').val()?.toString() === 'post-main-generation'
+            ? 'post-main-generation'
+            : 'pre-generation',
         applyMode: ['replace', 'wrap', 'patch'].includes(editorEl.find('#ica--editor-pre-applyMode').val()?.toString())
             ? editorEl.find('#ica--editor-pre-applyMode').val().toString()
             : 'replace',
@@ -2255,6 +2302,7 @@ async function openEditor(agentId = null) {
     }
 
     await saveAgent(agent);
+    refreshRegexSnapshotsForAgent(agent.id);
     renderAgentList();
 }
 
@@ -2994,13 +3042,14 @@ function buildPromptTransformDiffMarkup(beforeText, afterText) {
 
 function getPreGenerationInterceptModeLabel(entry) {
     const mode = String(entry?.applyMode ?? 'replace');
+    const timing = entry?.timing === 'post-main-generation' ? 'post-main' : 'pre-gen';
     if (mode === 'wrap') {
-        return 'wrap';
+        return `${timing} wrap`;
     }
     if (mode === 'patch') {
-        return 'patch';
+        return `${timing} patch`;
     }
-    return 'replace';
+    return `${timing} replace`;
 }
 
 function parseChatInterceptSummaryMessages(value) {
@@ -3212,7 +3261,7 @@ function buildPreGenerationInterceptEntryMarkup(entry, i) {
 
     return `
         <div class="ica-transform-history-entry ica-preintercept-history-entry" data-index="${i}">
-            <h5>${escapeHtml(entry.agentName || 'Agent')} <small>(pre-gen ${escapeHtml(modeLabel)})</small></h5>
+            <h5>${escapeHtml(entry.agentName || 'Agent')} <small>(${escapeHtml(modeLabel)})</small></h5>
             <small>${escapeHtml(timestamp)}${timestamp ? ' · ' : ''}${escapeHtml(statusText)}</small>
             ${buildPreGenerationInterceptSummaryMarkup(entry)}
             <details class="ica-preintercept-raw">
@@ -3254,7 +3303,7 @@ async function openPromptTransformHistoryPopup(messageIndex) {
     }).join('');
 
     const html = $(`<div class="ica-transform-history">
-        ${preGenerationEntries ? `<section class="ica-transform-history-section"><h4>Pre-Generation Intercepts</h4>${preGenerationEntries}</section>` : ''}
+        ${preGenerationEntries ? `<section class="ica-transform-history-section"><h4>Generation Intercepts</h4>${preGenerationEntries}</section>` : ''}
         ${postGenerationEntries ? `<section class="ica-transform-history-section"><h4>Post-Generation Changes</h4>${postGenerationEntries}</section>` : ''}
     </div>`);
 
@@ -3290,6 +3339,11 @@ function getPathfinderSettingsAgent() {
     return getAgents().find(isPathfinderAgent) ?? null;
 }
 
+function removePathfinderExtensionsHost() {
+    document.getElementById(PATHFINDER_EXTENSIONS_HOST_ID)?.remove();
+    pathfinderExtensionsMountPromise = null;
+}
+
 function ensurePathfinderExtensionsHost() {
     const parent = document.getElementById('extensions_settings2') ?? document.getElementById('extensions_settings');
     if (!parent) {
@@ -3317,6 +3371,11 @@ function ensurePathfinderExtensionsHost() {
 }
 
 async function mountPathfinderSettingsInExtensions() {
+    if (!isPathfinderSubmoduleEnabled()) {
+        removePathfinderExtensionsHost();
+        return null;
+    }
+
     const host = ensurePathfinderExtensionsHost();
     if (!host) {
         console.warn('[Pathfinder] Could not mount settings in Extensions drawer because #extensions_settings was not found.');
@@ -3337,6 +3396,11 @@ async function mountPathfinderSettingsInExtensions() {
     }
 
     const settingsPanel = await openPathfinderSettings(agent);
+    if (!isPathfinderSubmoduleEnabled()) {
+        removePathfinderExtensionsHost();
+        return null;
+    }
+
     if (!settingsPanel) {
         body.innerHTML = '<div class="pf--extensions-empty">Could not load Pathfinder settings.</div>';
         return host;
@@ -3350,6 +3414,11 @@ async function mountPathfinderSettingsInExtensions() {
 }
 
 function schedulePathfinderExtensionsMount() {
+    if (!isPathfinderSubmoduleEnabled()) {
+        removePathfinderExtensionsHost();
+        return Promise.resolve(null);
+    }
+
     pathfinderExtensionsMountPromise = mountPathfinderSettingsInExtensions()
         .catch(error => {
             console.warn('[Pathfinder] Failed to mount settings in Extensions drawer:', error);
@@ -3385,6 +3454,11 @@ function openPathfinderExtensionsDrawer(host) {
  * @param {Object} agent - The Pathfinder agent
  */
 async function openPathfinderEditor(agent) {
+    if (!isPathfinderSubmoduleEnabled()) {
+        toastr.warning('Pathfinder is disabled in In-Chat Agents settings.');
+        return;
+    }
+
     const existingHost = document.getElementById(PATHFINDER_EXTENSIONS_HOST_ID);
     if (existingHost) {
         const host = await (pathfinderExtensionsMountPromise ?? schedulePathfinderExtensionsMount());
@@ -3467,10 +3541,15 @@ function refreshConnectionProfileUi() {
 function populateGlobalNotificationToggle() {
     updateGlobalAgentToggle();
     populateSeparateRecentChatsToggle();
+    populatePathfinderSubmoduleToggle();
     $('#ica--promptTransformShowNotifications').prop(
         'checked',
         Boolean(getGlobalSettings().promptTransformShowNotifications),
     );
+}
+
+function populatePathfinderSubmoduleToggle() {
+    $('#ica--pathfinderSubmoduleEnabled').prop('checked', isPathfinderSubmoduleEnabled());
 }
 
 function populateGlobalExecutionModeDropdown() {
@@ -3812,9 +3891,11 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         toastr.success(`Updated ${migratedRegexPostDefaultsCount} bundled regex agent(s) to post-generation defaults.`);
     }
 
-    const migratedPathfinderToolCount = await migratePathfinderAgentToolsFromTemplate();
-    if (migratedPathfinderToolCount > 0) {
-        toastr.success(`Updated ${migratedPathfinderToolCount} Pathfinder agent(s) with default tool toggles.`);
+    if (isPathfinderSubmoduleEnabled()) {
+        const migratedPathfinderToolCount = await migratePathfinderAgentToolsFromTemplate();
+        if (migratedPathfinderToolCount > 0) {
+            toastr.success(`Updated ${migratedPathfinderToolCount} Pathfinder agent(s) with default tool toggles.`);
+        }
     }
 
     const migratedPromptTransformImpersonateCount = await migrateBundledPromptTransformImpersonateToSavedAgents();
@@ -3852,11 +3933,12 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         console.error('[InChatAgents] Agent runner initialization failed:', err);
     }
 
-    // Initialize Pathfinder (tool agent core)
-    try {
-        initPathfinder(getContext());
-    } catch (err) {
-        console.warn('[InChatAgents] Pathfinder initialization failed:', err);
+    if (isPathfinderSubmoduleEnabled()) {
+        try {
+            initPathfinder(getContext());
+        } catch (err) {
+            console.warn('[InChatAgents] Pathfinder initialization failed:', err);
+        }
     }
 
     // Sync any existing tool agents' tools with ToolManager
@@ -4025,6 +4107,34 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     $('#ica--promptTransformShowNotifications').on('change', function () {
         setGlobalSettings({ promptTransformShowNotifications: $(this).prop('checked') });
         persistExtensionState();
+    });
+    $('#ica--pathfinderSubmoduleEnabled').on('change', async function () {
+        const enabled = $(this).prop('checked');
+        setPathfinderSubmoduleEnabled(enabled);
+        persistExtensionState();
+        populatePathfinderSubmoduleToggle();
+
+        if (enabled) {
+            try {
+                const migratedPathfinderToolCount = await migratePathfinderAgentToolsFromTemplate();
+                if (migratedPathfinderToolCount > 0) {
+                    toastr.success(`Updated ${migratedPathfinderToolCount} Pathfinder agent(s) with default tool toggles.`);
+                }
+                initPathfinder(getContext());
+                schedulePathfinderExtensionsMount();
+                syncToolAgentRegistrations();
+                toastr.info('Pathfinder submodule enabled.');
+            } catch (err) {
+                console.warn('[InChatAgents] Failed to enable Pathfinder submodule:', err);
+                toastr.error('Could not enable Pathfinder.');
+            }
+            return;
+        }
+
+        teardownPathfinder();
+        deactivatePathfinderRuntime();
+        removePathfinderExtensionsHost();
+        toastr.info('Pathfinder submodule disabled.');
     });
     $('#ica--appendAgentsExecutionMode').on('change', function () {
         setGlobalSettings({ appendAgentsExecutionMode: this.value });

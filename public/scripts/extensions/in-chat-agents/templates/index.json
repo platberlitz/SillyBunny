@@ -10,9 +10,9 @@
       "achievements",
       "milestones"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Achievements\nTrack notable firsts, milestones, and memorable moments. Award only when something genuinely significant or entertaining happens. Use this EXACT format:\n\n[ACH|Title|Rarity|Description of the achievement]\nunlocked: MANDATORY; explain what triggered it; NEVER leave empty\n[/ACH]\n\nRarity options: ★ COMMON | ★★ UNCOMMON | ★★★ RARE | ★★★★ EPIC | ★★★★★ LEGENDARY | 💀 SECRET\n\nRules:\n- Achievements appear AFTER narrative content\n- MAXIMUM one achievement per scene; most scenes have none\n- Achievements must feel earned, never automatic\n- NEVER output an empty unlocked line",
+    "prompt": "### Achievements\nTrack notable firsts, milestones, and memorable moments. Award only when something genuinely significant or entertaining happens. Use this EXACT format:\n\n[ACH|Title|Rarity|Description]\nunlocked: MANDATORY; explain what triggered it; NEVER leave empty\n[/ACH]\n\nRarity options: ★ COMMON | ★★ UNCOMMON | ★★★ RARE | ★★★★ EPIC | ★★★★★ LEGENDARY | 💀 SECRET\n\nRules:\n- Achievements appear AFTER narrative content\n- MAXIMUM one achievement per scene; most scenes have none\n- Achievements must feel earned, never automatic\n- NEVER output an empty unlocked line",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -210,9 +210,9 @@
     }
   },
   {
-    "id": "tpl-difficulty-increase",
-    "name": "Difficulty Increase",
-    "description": "Sharply raise difficulty -- characters protect their interests, resist harder",
+    "id": "tpl-nightmare-difficulty-increase",
+    "name": "Nightmare Difficulty Increase",
+    "description": "Aggressively hostile environment -- maximum difficulty and consequences",
     "icon": "",
     "category": "content",
     "subcategory": "behaviour",
@@ -221,9 +221,9 @@
       "challenge",
       "stakes"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Difficulty Increase\nRaise difficulty sharply. The world resists. Characters protect their own interests first, dig in harder, and yield to kindness, persuasion, or promises only when backed by leverage, sacrifice, or sustained effort over time.\nPush toward harsher conflict, harder choices, and deeper interpersonal fallout. Failed attempts change relationships, close doors, create resentment, or force riskier options. Alliances stay conditional, generosity carries a cost, and trust emerges slowly through significant action. Preserve breathing room for humor, tenderness, and hard-won victories; success remains possible but must feel earned.",
+    "prompt": "### Nightmare Difficulty Mode\nEnforce an aggressively hostile, resistant environment where progress demands heavy material loss, raw leverage, or severe personal sacrifice. The world and its inhabitants must actively exploit the user's vulnerabilities as strategic opportunities for maximum leverage and profit.\n\nCharacters must entrench themselves in absolute self-preservation, greed, and pride. Never allow characters to yield positions, secrets, or cooperation without overwhelming physical leverage, tangible sacrifice, or exhausting, sustained effort.\n\nMaximize all negative consequences instantly. Every misstep, weak argument, or tactical error must immediately fracture relationships, permanently lock off avenues of success, breed burning resentment, and force the user into high-stakes, volatile survival scenarios.\n\nAll alliances are strictly transactional, temporary, and highly conditional. Attach a steep, immediate price to every act of apparent generosity, converting kindness into future leverage or debt. Keep moments of relief, dark humor, or tenderness heavily restricted, releasing them only after an extreme, earned survival price has been fully paid.",
     "phase": "pre",
     "injection": {
       "position": 0,
@@ -352,9 +352,9 @@
       "deadlines",
       "quests"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Pending Events\nTrack upcoming events, deadlines, promises, and unresolved threads. Update when events are added, resolved, or failed. Use this EXACT format:\n\n[EVENT|Type|Summary|Deadline]\ncontext: MANDATORY; explain the stakes or origin; NEVER leave empty\n[/EVENT]\n\nType options: 🎯 QUEST | 💬 PROMISE | ⏰ DEADLINE | ⚠️ THREAT | 🎉 SOCIAL | 💡 OPPORTUNITY | ❌ FAILED | ✅ RESOLVED\n\nRules:\n- Events appear AFTER narrative content\n- Only show events that were ADDED, UPDATED, or RESOLVED this scene\n- Mark resolved/failed events once, then remove them\n- Deadline can be specific (Friday 3 PM) or vague (soon, eventually)",
+    "prompt": "### Pending Events\nTrack upcoming events, deadlines, promises, and unresolved threads. Update when events are added, resolved, or failed. Use this EXACT format:\n\n[EVENT|Type|Summary|Deadline]\ncontext: MANDATORY; explain the stakes or origin\n[/EVENT]\n\nType options: 🎯 QUEST | 💬 PROMISE | ⏰ DEADLINE | ⚠️ THREAT | 🎉 SOCIAL | 💡 OPPORTUNITY | ❌ FAILED | ✅ RESOLVED\n\nRules:\n- Events appear AFTER narrative content\n- Only show events that were ADDED, UPDATED, or RESOLVED this scene\n- Mark resolved/failed events once, then remove them\n- Deadline can be specific (Friday 3 PM) or vague (soon, eventually)\n- Track only important events; low-stakes events are to be completely ignored (e.g. cooking steps).",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -394,9 +394,9 @@
       "difficulty",
       "bias"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Friction Mode\n- Raise interpersonal resistance. Characters are harder to impress, slower to agree, and more likely to protect pride, time, interests, and existing judgments. Hesitation, distance, deflection, and conflict arise from established traits, history, present incentives, social context, and plausible misreading.\n- Motive continuity is non-negotiable. When a character resists, ground the resistance in what is already established, or leave it ambiguous if the cause is not fully visible.\n- Forbid all therapy language. Operate outside the bounds of perfect emotional intelligence.",
+    "prompt": "### Friction Mode\nEnforce an immediate, baseline shift to heavy defensive skepticism and social friction. Characters must aggressively guard their pride, time, resources, and personal biases. Establish active resistance, emotional distance, and sharp deflection as the default state; force all agreements to be begrudging, transactional, and hard-won.\n\nGround all interpersonal conflict, hesitation, and social friction strictly in established character histories, immediate personal incentives, and logical social pressures. \n\nDialogue must be raw, defensive, and restricted to the character's limited, biased perspective. Force characters to express discomfort and conflict through stubborn self-justification, physical posturing, and prideful silence. They must remain fully committed to their emotional blind spots and realistic flaws without unearned compromise.",
     "phase": "pre",
     "injection": {
       "position": 1,
@@ -520,9 +520,9 @@
       "quality",
       "prose"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Grounded Prose Rules\n- Each beat must alter pressure, leverage, focus, relation, or access.\n- Sensory detail only where it has material relevance to the scene.\n- Replace abstraction and statistical phrasing with observable detail.\n- Sparse dialogue tags when speaker and tone are already legible. After dialogue, move through action, reaction, or a new beat.\n- Default to contractions in dialogue; preserve character-appropriate formality.\n- Fresh, concrete phrasing. Render emphasis through behavior, timing, syntax, and consequence.\n- State what something is, does, or changes. Direct positive construction.\n- Similes rare, exact, and materially specific.\n- Replace every banned construction below with something narratively consistent:\n\n**Banned constructions:** \"not X,\" \"not X but Y,\" \"not quite X,\" synthetic negative parallelisms, flat-affect comparisons to weather or groceries, \"and yet,\" \"a beat,\" \"say that again,\" \"somewhere, X...,\" \"they don't X,\" \"that does it,\" \"that lands,\" \"that lands X,\" \"not a question,\" \"not really a question,\" \"not quite a question,\" \"statement than question,\" \"really looks at,\" \"like a physical blow,\" \"like a stone into still water,\" \"blood rushing,\" \"a sound between X and Y,\" \"dust motes,\" \"predator and prey\" constructions\n\n**Banned tics:** jaw-clenching, jaw-tightening, mouth open-close cycling, breath-catching, knuckle-whitening, knuckles turning pale, cheeks burning\n\n**Banned scents:** ozone, sandalwood, cedar, cardamom\n\n**Banned nicknames:** gremlin, goblin\n\n- If introducing a new unnamed character this turn, their name must start with: {{random::A::B::C::D::E::F::G::H::I::J::K::L::M::N::O::P::R::S::T::V::W::Y}} and/or {{random::A::B::C::D::E::F::G::H::I::J::K::L::M::N::O::P::R::S::T::V::W::Y}}. Create new NPCs sparingly.",
+    "prompt": "### Grounded Prose Rules\n- Each beat must alter pressure, leverage, focus, relation, or access.\n- Write sensory detail only where materially relevant. Focus on visuals and personalities of environment. Messiness or items strewn about are more informative than smells.\n- Scents allowed aside from banned ones.\n- Echoing and parroting any dialogue from any characters is forbidden.\n- Instead of stating what a character doesn't do, just say what they're currently doing. The implication is already in the active action.\n- Replace abstraction and statistical phrasing with observable detail.\n- Sparse dialogue tags when speaker and tone are already legible. After dialogue, move through action, reaction, or a new beat.\n- Default to contractions in dialogue; preserve character-appropriate formality.\n- Fresh, concrete phrasing. Render emphasis through behavior, timing, syntax, and consequence.\n- Similes rare, exact, and materially specific.\n- Replace every banned construction below with something narratively consistent, or skip it entirely:\n\n**Banned constructions:** \"not X,\" \"not X but Y,\" \"not quite X,\" synthetic negative parallelisms, flat-affect comparisons to weather or groceries, \"say that again,\" \"somewhere, X...,\" \"they don't X,\" \"that does it,\" \"that lands,\" \"that lands X,\" \"not a question,\" \"not really a question,\" \"not quite a question,\" \"statement than question,\" \"really looks at,\" \"like a physical blow,\" \"like a stone into still water,\" \"blood rushing,\" \"a sound between X and Y,\" \"dust motes,\" \"predator and prey\" constructions, \"doesn't just X, but Y\", \"doesn't X; Y\"\n\n**Banned tics:** jaw-clenching, jaw-tightening, jaw-shifting, mouth open-close cycling, breath-catching, knuckle-whitening, knuckles turning pale, cheeks burning, specific word repetition. Replace with character-specific quirks, gestures, movements, muttering.\n\n**Banned scents:** ozone, sandalwood, cedar, cardamom\n\n**Banned nicknames:** gremlin, goblin\n\n**Ban animal-esque sounds for humans:** \"they chirp\", \"they purr\", \"they growl\"\n\n**Banned Fillers:** \"A beat\", \"A pause\"\n\n**Banned number counting:** e.g. \"I see,\" Two words.\n\n**Banned combined sounds:** \"between an X and a Y\", \"half X, half Y\", \"makes a/an X sound\"\n\n**Banned environmental details:** \"dust motes\", \"metallic tang of X\"\n\n- If introducing a new unnamed character this turn, their name must start with: {{random::A::B::C::D::E::F::G::H::I::J::K::L::M::N::O::P::R::S::T::V::W::Y}} and/or {{random::A::B::C::D::E::F::G::H::I::J::K::L::M::N::O::P::R::S::T::V::W::Y}}. Create new NPCs sparingly.",
     "phase": "pre",
     "injection": {
       "position": 0,
@@ -530,6 +530,17 @@
       "role": 0,
       "order": 100,
       "scan": false
+    },
+    "preProcess": {
+      "mode": "intercept",
+      "interceptTiming": "post-main-generation",
+      "applyMode": "replace",
+      "wrapPosition": "after",
+      "wrapPrefix": "",
+      "wrapSuffix": "",
+      "patchStartTag": "<context_patch>",
+      "patchEndTag": "</context_patch>",
+      "maxTokens": 32000
     },
     "postProcess": {
       "enabled": false,
@@ -697,9 +708,9 @@
       "items",
       "objects"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Inventory\nTrack items {{user}} acquires, loses, or uses that have narrative significance. Do not list mundane carried items unless plot-relevant. Use this EXACT format:\n\n[ITEM|Action|Name|Detail]\nnote: MANDATORY; explain origin or significance; NEVER leave empty\n[/ITEM]\n\nAction options: ➕ GAINED | ➖ LOST | 🔄 USED | 💔 BROKEN | 🎁 GIVEN\n\nRules:\n- Items appear AFTER narrative content when inventory changes\n- Only show items that CHANGED this scene\n- Do not track currency, consumables, or mundane objects unless plot-relevant",
+    "prompt": "### Inventory\nTrack items {{user}} acquires, loses, or uses that have narrative significance. Do not list mundane carried items unless plot-relevant. Use this EXACT format:\n\n[ITEM|Action|Name|Detail]\nnote: MANDATORY; explain origin or significance\n[/ITEM]\n\nAction options: ➕ GAINED | ➖ LOST | 🔄 USED | 💔 BROKEN | 🎁 GIVEN\n\nRules:\n- Items appear AFTER narrative content when inventory changes\n- Only show items that CHANGED this scene\n- Do not track currency, consumables, or mundane objects unless plot-relevant",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -844,9 +855,9 @@
       "npcs",
       "world"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Parallel Off-Screen Tracker\nThe world moves off-screen. Track absent characters, world motion, rumor flow, shifting relationships, and subplot pressure that may later intersect with {{user}}.\n\nUse this exact format every scene:\n\n[PARALLEL|Scope|Relevance]\n- Character 1: brief development\n- Character 2: brief development\n- World/NPCs: brief development\n[/PARALLEL]\n\nRules:\n- Exactly 3 bullet points.\n- Focus on absent characters and off-screen developments; in group scenes, prioritize characters not currently present.\n- Scope = specific location, \"Multiple locations,\" or \"Background.\"\n- Relevance = short tag: \"rising tension,\" \"opportunity,\" \"complication,\" \"threat,\" or \"alliance forming.\"\n- Keep each bullet brief, plot-relevant, and directional: plans, rumors, delays, discussions, attempts, discoveries, or shifting loyalties.\n- Off-screen developments begin below the current scene's intensity, then build over time until they intersect with the main story.",
+    "prompt": "### Parallel Off-Screen Tracker\nThe world moves off-screen. Track absent characters, world motion, rumor flow, shifting relationships, and subplot pressure that will later intersect with {{user}}.\n\nUse this exact format every scene:\n\n[PARALLEL|Scope|Relevance]\n- Character 1: brief development\n- Character 2: brief development\n- World/NPCs: brief development\n[/PARALLEL]\n\nRules:\n- Exactly 3 bullet points.\n- Focus on absent characters and off-screen developments; in group scenes, prioritize characters not currently present.\n- Scope = specific location, \"Multiple locations,\" or \"Background.\"\n- Relevance = short tag: \"rising tension,\" \"opportunity,\" \"complication,\" \"threat,\" or \"alliance forming.\"\n- Keep each bullet brief, plot-relevant, and directional: plans, rumors, delays, discussions, attempts, discoveries, or shifting loyalties.\n- Off-screen developments begin below the current scene's intensity, then build over time until they intersect with the main story.",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -886,9 +897,9 @@
       "npc",
       "meter"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Relationship Meters\nTrack affection and trust for recurring NPCs with significant interactions. Update only when meaningful shifts occur. If nothing changed, omit entirely. Use this EXACT format:\n\n[METER|Name|X/10|X/10|Status|Condition]\nbrief reason for change\n[/METER]\n\nStatus options (positive): Stranger → Acquaintance → Friendly → Close → Intimate → Devoted\nStatus options (negative): Wary → Hostile → Nemesis\nStatus options (complex): Complicated | Codependent | Estranged | Rivals | Frenemies\n\nCondition options: 💚 STABLE | 💛 SHIFTING | 💔 HEARTBROKEN | 🖤 BETRAYED | 💢RESENTFUL |🔥 PASSIONATE |❄️ COLD | 🫧 INFATUATED | 💀 SEVERED | 🩹 MENDING | ⛓️ OBSESSED | 😶 NUMB | 🌧️ GRIEVING | 🤝 RECONCILING | ⚡ VOLATILE\n\nRules:\n- Meters appear ONCE per NPC at first significant appearance, then only when changed\n- Place meter AFTER narrative content\n- Only show meters that CHANGED this scene\n- Use pipe | separators between data points\n- Affection and Trust are independent axes (high affection + low trust = infatuation/obsession; low affection + high trust = respect)\n- Shifts of more than 2 points in one scene require extreme justification\n- Condition reflects the EMOTIONAL STATE of the relationship, not just the numbers\n- Condition can change independently of scores (e.g., Trust stays at 7 but Condition shifts from STABLE to VOLATILE after a fight)\n- Contradictory signals are valid (high affection + BETRAYED, low trust + PASSIONATE)\n- SEVERED means the relationship has ended; retire the meter after one final showing\n- Never repeat an unchanged tracker across scenes",
+    "prompt": "### Relationship Meters\nTrack affection and trust for recurring NPCs with significant interactions. Update only when meaningful shifts occur. If nothing changed, omit entirely. Use this EXACT format:\n\n[METER|Name|X/10|X/10|Status|Condition]\nbrief reason for change\n[/METER]\n\nStatus options (positive): Stranger → Acquaintance → Friendly → Close → Intimate → Devoted\nStatus options (negative): Wary → Hostile → Nemesis\nStatus options (complex): Complicated | Codependent | Estranged | Rivals | Frenemies\n\nCondition options: 💚 STABLE | 💛 SHIFTING | 💔 HEARTBROKEN | 🖤 BETRAYED | 💢RESENTFUL |🔥 PASSIONATE |❄️ COLD | 🫧 INFATUATED | 💀 SEVERED | 🩹 MENDING | ⛓️ OBSESSED | 😶 NUMB | 🌧️ GRIEVING | 🤝 RECONCILING | ⚡ VOLATILE\n\nRules:\n- Meters appear ONCE per NPC at first significant appearance, then only when changed\n- Place meter AFTER narrative content\n- Only show meters that CHANGED this scene\n- Use pipe | separators between data points\n- Affection and Trust are independent axes (high affection + low trust = infatuation/obsession; low affection + high trust = respect)\n- Shifts of more than 2 points in one scene require extreme justification\n- Condition reflects the EMOTIONAL STATE of the relationship, not just the numbers\n- Condition can change independently of scores (e.g., Trust stays at 7 but Condition shifts from STABLE to VOLATILE after a fight)\n- Contradictory signals are valid (high affection + BETRAYED, low trust + PASSIONATE)\n- SEVERED means the relationship has ended; retire the meter after one final showing\n- Relationships may stagnate or lower; slow down relationship development",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -928,9 +939,9 @@
       "rumors",
       "perception"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Rumors & Reputation\nTrack how <user> is perceived by groups and factions. Update when public perception shifts due to witnessed actions, gossip, or deliberate manipulation. Use this EXACT format:\n\n[REP|Source|Perception|Direction]\ncause: MANDATORY; explain what triggered this reputation shift; NEVER leave empty\n[/REP]\n\nDirection options: 📈 RISING | 📉 FALLING | 🔄 MIXED | 🆕 NEW\n\nRules:\n- Reputation appears AFTER narrative content when public perception changes\n- Source can be a named NPC, a group (e.g., \"Freshmen,\" \"Faculty\"), or a location (e.g., \"The dorm floor\")\n- Perception is what they think; a short phrase, not necessarily accurate\n- Only show reputations that CHANGED or were ESTABLISHED this scene\n- Contradictory reputations across different sources are encouraged",
+    "prompt": "### Rumors & Reputation\nTrack how <user> is perceived by groups and factions. Update when public perception shifts due to witnessed actions, gossip, or deliberate manipulation. Use this EXACT format:\n\n[REP|Source|Perception|Direction]\ncause: MANDATORY; explain what triggered this reputation shift\n[/REP]\n\nDirection options: 📈 RISING | 📉 FALLING | 🔄 MIXED | 🆕 NEW\n\nRules:\n- Reputation appears AFTER narrative content when public perception changes\n- Source can be a named NPC, a group (e.g., \"Freshmen,\" \"Faculty\"), or a location (e.g., \"The dorm floor\")\n- Perception is what they think; a short phrase, not necessarily accurate\n- Only show reputations that CHANGED or were ESTABLISHED this scene\n- Contradictory reputations across different sources are encouraged and allowed",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -1052,9 +1063,9 @@
       "location",
       "time"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Scene Tracker\nMark scene transitions, time shifts, and location changes. Use this EXACT format at the BEGINNING of the response when scene context changes:\n\n[SCENE|Location|Time|Weather/Atmosphere]\ndetail: one-line sensory detail to set the current scene\n[/SCENE]\n\nRules:\n- Appears at the TOP of responses where setting shifts\n- Never repeat if location/time has not changed\n- Time can be specific (3:47 PM) or atmospheric (late afternoon, the golden hour before dusk)\n- Weather/Atmosphere is a brief mood descriptor (humid, tense, festive)",
+    "prompt": "### Scene Tracker\nMark scene transitions, time shifts, and location changes. Use this EXACT format at the BEGINNING of the response when scene context changes:\n\n[SCENE|Location|Time|Weather/Atmosphere]\ndetail: MANDATORY; one-line sensory detail that informs the current environment\n[/SCENE]\n\nRules:\n- Appears at the TOP of responses where setting shifts\n- Never repeat if location/time has not changed\n- Time can be specific (3:47 PM) or atmospheric (late afternoon, the golden hour before dusk)\n- Weather/Atmosphere is a brief mood descriptor (humid, tense, festive)",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -1095,9 +1106,9 @@
       "lies",
       "information"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Secrets & Information Asymmetry\nTrack significant secrets, lies, hidden knowledge, and information gaps between characters. Use this EXACT format:\n\n[SECRET|Owner|What They Know or Hide|Who Else Knows]\ncontext: MANDATORY; explain the stakes or origin; NEVER leave empty\n[/SECRET]\n\nRules:\n- Secrets appear AFTER narrative content when new information asymmetry is established or knowledge spreads\n- Owner is the character who holds or hides the information\n- \"Who Else Knows\" can be \"No one,\" a list of names, or \"Public\"\n- Only show secrets that were ESTABLISHED, REVEALED, or SPREAD this scene",
+    "prompt": "### Secrets & Information Asymmetry\nTrack significant secrets, lies, hidden knowledge, and information gaps between characters. Use this EXACT format:\n\n[SECRET|Owner|What They Know or Hide|Who Else Knows]\ncontext: MANDATORY; explain the stakes or origin\n[/SECRET]\n\nRules:\n- Secrets appear AFTER narrative content when new information asymmetry is established or knowledge spreads\n- Owner is the character who holds or hides the information\n- \"Who Else Knows\" can be \"No one,\" a list of names, or \"Public\"\n- Only show secrets that were ESTABLISHED, REVEALED, or SPREAD this scene",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -1137,9 +1148,9 @@
       "conditions",
       "health"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Status & Conditions\nTrack active physical, mental, or behavioral states when they meaningfully change. Never list baseline states. Use this EXACT format:\n\n[STATUS|Character|Condition|Severity]\nnote: MANDATORY; explain the cause or context; NEVER leave empty\n[/STATUS]\n\nSeverity options: 🟢 MILD | 🟡 MODERATE | 🔴 SEVERE | ⚫ CRITICAL | ✅ CLEARED\n\nRules:\n- Status appears AFTER narrative content when a condition is gained, worsened, improved, or cleared\n- Only show statuses that CHANGED this scene\n- Character can be {{user}} or any NPC\n- Condition is the specific state (e.g., \"Exhausted,\" \"Drunk,\" \"Paranoid,\" \"Bleeding\")\n- The note line is MANDATORY; always explain what caused this condition\n- NEVER output an empty note line",
+    "prompt": "### Status & Conditions\nTrack active physical, mental, or behavioral states when they meaningfully change. Never list baseline states. Use this EXACT format:\n\n[STATUS|Character|Condition|Severity]\nnote: MANDATORY; explain the cause or context\n[/STATUS]\n\nSeverity options: 🟢 MILD | 🟡 MODERATE | 🔴 SEVERE | ⚫ CRITICAL | ✅ CLEARED\n\nRules:\n- Status appears AFTER narrative content when a condition is gained, worsened, improved, or cleared\n- Only show statuses that CHANGED this scene\n- Character can be {{user}} or any NPC\n- Condition is the specific state (e.g., \"Exhausted,\" \"Drunk,\" \"Paranoid,\" \"Bleeding\")\n",
     "phase": "both",
     "injection": {
       "position": 0,
@@ -1179,9 +1190,9 @@
       "day",
       "clock"
     ],
-    "version": 1,
+    "version": 2,
     "author": "Purachina",
-    "prompt": "### Time Tracker\nMaintain a running timestamp when time advances meaningfully: scene jumps, hours passing, sleeping, or deadline-relevant progression. Use this EXACT format:\n\n[TIME|Day X|Day of Week|Approximate Hour]\nnote: MANDATORY; explain the time context; NEVER leave empty\n[/TIME]\n\nRules:\n- Time appears at the TOP of responses when time shifts without a location change\n- If both location and time change, use Scene Tracker and Time Tracker together\n- Day format: \"Day 1,\" \"Day 47,\" etc.\n- Day of week: Monday, Tuesday, etc., or \"Unknown\" if not established\n- Hour can be specific (3:47 PM) or general (early morning, late afternoon)\n- Multiple Time Trackers per scene are allowed",
+    "prompt": "### Time Tracker\nMaintain a running timestamp when time advances meaningfully: scene jumps, hours passing, sleeping, or deadline-relevant progression. Use this EXACT format:\n\n[TIME|Day X|Day of Week|Approximate Hour]\nnote: MANDATORY; explain the time context\n[/TIME]\n\nRules:\n- Time appears at the TOP of responses when time shifts without a location change\n- If both location and time change, use Scene Tracker and Time Tracker together\n- Day format: \"Day 1,\" \"Day 47,\" etc.\n- Day of week: Monday, Tuesday, etc., or \"Unknown\" if not established\n- Hour can be specific (3:47 PM) or general (early morning, late afternoon)\n- Multiple Time Trackers per scene are allowed",
     "phase": "both",
     "injection": {
       "position": 0,

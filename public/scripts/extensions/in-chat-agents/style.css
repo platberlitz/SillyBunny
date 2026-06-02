@@ -842,6 +842,26 @@ button.ica--card-pill--version-update {
     opacity: 0.6;
 }
 
+.ica--action-legend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px 12px;
+    flex-wrap: wrap;
+    margin: 0 0 8px;
+    padding: 6px 8px;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor) 72%, transparent);
+    font-size: calc(var(--mainFontSize) * 0.74);
+    line-height: 1.2;
+}
+
+.ica--action-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
 /* ── Prompt Manager button ──────────────────────────── */
 
 /* ── Prompt Manager button ──────────────────────────── */
@@ -890,6 +910,40 @@ button.ica--card-pill--version-update {
     align-items: center;
     gap: 6px;
     flex-wrap: wrap;
+}
+
+.ica--editor-section-actions .menu_button_icon:is(#ica--editor-preview-prompt, #ica--editor-refine, #ica--editor-fullscreen) {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0;
+    justify-content: center;
+}
+
+.ica--editor-section-actions .menu_button_icon:is(#ica--editor-preview-prompt, #ica--editor-refine, #ica--editor-fullscreen) > span {
+    display: none;
+}
+
+.ica--editor.ica--editor-fullscreen {
+    position: fixed;
+    inset: max(10px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px));
+    z-index: 10050;
+    max-height: none;
+    padding: 12px;
+    overflow-y: auto;
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 62%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #222) 96%, var(--SmartThemeChatTintColor, #222) 4%);
+    box-shadow: 0 24px 80px color-mix(in srgb, var(--SmartThemeShadowColor) 40%, transparent);
+}
+
+.ica--editor-fullscreen-active {
+    overflow: hidden;
+}
+
+.ica--editor.ica--editor-fullscreen #ica--editor-prompt {
+    min-height: min(54vh, 620px);
 }
 
 .ica--prompt-preview pre {
@@ -1016,6 +1070,32 @@ button.ica--card-pill--version-update {
     display: flex;
     flex-wrap: wrap;
     gap: 10px 14px;
+}
+
+.ica--card-actions .ica--card-btn,
+.ica--regex-item-actions .ica--card-btn {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+}
+
+.ica--card-actions .ica--card-btn {
+    font-size: calc(var(--mainFontSize) * 0.9);
+}
+
+.ica--card-actions .ica--card-btn:not(:has(> i:only-child)) {
+    font-size: 0;
+}
+
+.ica--card-actions .ica--card-btn > i,
+.ica--regex-item-actions .ica--card-btn > i {
+    font-size: calc(var(--mainFontSize) * 0.9);
 }
 
 /* ── Template Browser ───────────────────────────────── */

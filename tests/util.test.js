@@ -1,9 +1,9 @@
 import { afterEach, describe, test, expect, jest } from '@jest/globals';
-import { once } from 'node:events';
+import { EventEmitter, once } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { Response } from 'node-fetch';
 import { CHAT_COMPLETION_SOURCES } from '../src/constants';
-import { abortOnResponseClose, flattenSchema, forwardFetchResponse } from '../src/util';
+import { abortOnRequestClose, flattenSchema, forwardFetchResponse } from '../src/util';
 
 function createMockExpressResponse() {
     const response = new PassThrough();
@@ -11,6 +11,10 @@ function createMockExpressResponse() {
     response.statusMessage = '';
 
     return response;
+}
+
+function createMockExpressRequest() {
+    return { socket: new EventEmitter() };
 }
 
 async function collectResponseBody(response) {
@@ -144,6 +148,25 @@ describe('forwardFetchResponse', () => {
         expect(destroySpy).toHaveBeenCalled();
     });
 
+    test('should destroy upstream streaming bodies that are not Node Readable instances', async () => {
+        const upstreamBody = Object.assign(new EventEmitter(), {
+            pipe: jest.fn(),
+            destroy: jest.fn(),
+        });
+        const response = createMockExpressResponse();
+        response.socket = {};
+
+        await forwardFetchResponse({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            body: upstreamBody,
+        }, response);
+        response.emit('close');
+
+        expect(upstreamBody.destroy).toHaveBeenCalled();
+    });
+
     test('should log JSON error bodies and return the original body for non-2xx streaming responses', async () => {
         const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
         const body = JSON.stringify({ error: { message: 'Forbidden by upstream policy' }, detail: 'policy_denied' });
@@ -177,25 +200,25 @@ describe('forwardFetchResponse', () => {
     });
 });
 
-describe('abortOnResponseClose', () => {
-    test('should abort the upstream controller when the client response closes early', () => {
-        const response = createMockExpressResponse();
+describe('abortOnRequestClose', () => {
+    test('should abort the upstream controller when the client request socket closes', () => {
+        const request = createMockExpressRequest();
         const controller = new AbortController();
 
-        abortOnResponseClose(response, controller);
-        response.emit('close');
+        abortOnRequestClose(request, controller);
+        request.socket.emit('close');
 
         expect(controller.signal.aborted).toBe(true);
     });
 
-    test('should not abort the upstream controller after a normal response end', () => {
-        const response = createMockExpressResponse();
-        const controller = new AbortController();
+    test('should replace existing socket close listeners before registering the abort handler', () => {
+        const request = createMockExpressRequest();
+        const existingListener = jest.fn();
 
-        abortOnResponseClose(response, controller);
-        response.end();
-        response.emit('close');
+        request.socket.on('close', existingListener);
+        abortOnRequestClose(request, new AbortController());
+        request.socket.emit('close');
 
-        expect(controller.signal.aborted).toBe(false);
+        expect(existingListener).not.toHaveBeenCalled();
     });
 });

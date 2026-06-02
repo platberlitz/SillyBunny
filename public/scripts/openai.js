@@ -24,6 +24,7 @@ import {
     name1,
     name2,
     resultCheckStatus,
+    saveSettings,
     saveSettingsDebounced,
     setOnlineStatus,
     startStatusLoading,
@@ -59,6 +60,8 @@ import {
     getStringHash,
     getVideoDurationFromDataURL,
     isDataURL,
+    isFalseBoolean,
+    isTrueBoolean,
     isUuid,
     isValidUrl,
     parseJsonFile,
@@ -72,7 +75,7 @@ import { isMobile } from './RossAscends-mods.js';
 import { saveLogprobsForActiveMessage } from './logprobs.js';
 import { SlashCommandParser } from './slash-commands/SlashCommandParser.js';
 import { SlashCommand } from './slash-commands/SlashCommand.js';
-import { ARGUMENT_TYPE, SlashCommandArgument } from './slash-commands/SlashCommandArgument.js';
+import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from './slash-commands/SlashCommandArgument.js';
 import { renderTemplateAsync } from './templates.js';
 import { SlashCommandEnumValue } from './slash-commands/SlashCommandEnumValue.js';
 import { callGenericPopup, Popup, POPUP_RESULT, POPUP_TYPE } from './popup.js';
@@ -83,7 +86,7 @@ import { COMETAPI_IGNORE_PATTERNS, IGNORE_SYMBOL, MEDIA_DISPLAY, MEDIA_TYPE } fr
 import { syncOpenRouterProvidersForModel, updateOpenRouterProvidersWarning } from './textgen-models.js';
 import { hasTextOrArrayPayload, shouldRetainContextAtDepth, stripHtmlTagsFromContext, stripOocBlocksFromContext } from './ooc-blocks.js';
 import { checkPostInterceptChatBudget } from './openai-prompt-budget.js';
-import { buildChatCompletionPreset, shouldIncludeConnectionFieldsInPreset } from './openai-preset-utils.js';
+import { buildChatCompletionPresetForSave, buildReverseProxyPresetForSave, normalizeReverseProxyPreset } from './openai-preset-utils.js';
 
 export {
     openai_messages_count,
@@ -238,11 +241,38 @@ export const chat_completion_sources = {
     WORKERS_AI: 'workers_ai',
 };
 
+export const REVERSE_PROXY_SUPPORTED_SOURCES = [
+    chat_completion_sources.CLAUDE,
+    chat_completion_sources.OPENAI,
+    chat_completion_sources.OPENAI_RESPONSES,
+    chat_completion_sources.MISTRALAI,
+    chat_completion_sources.MAKERSUITE,
+    chat_completion_sources.VERTEXAI,
+    chat_completion_sources.DEEPSEEK,
+    chat_completion_sources.XAI,
+    chat_completion_sources.ZAI,
+    chat_completion_sources.MOONSHOT,
+];
+
+const REVERSE_PROXY_SOURCE_LABELS = {
+    [chat_completion_sources.OPENAI]: 'OpenAI',
+    [chat_completion_sources.OPENAI_RESPONSES]: 'OpenAI (Responses)',
+    [chat_completion_sources.CLAUDE]: 'Claude',
+    [chat_completion_sources.MISTRALAI]: 'MistralAI',
+    [chat_completion_sources.MAKERSUITE]: 'AI Studio',
+    [chat_completion_sources.VERTEXAI]: 'Vertex AI',
+    [chat_completion_sources.DEEPSEEK]: 'DeepSeek',
+    [chat_completion_sources.XAI]: 'xAI',
+    [chat_completion_sources.ZAI]: 'Z.AI',
+    [chat_completion_sources.MOONSHOT]: 'Moonshot',
+};
+
 const MODEL_ID_SEARCH_CONTROLS = [
     { source: chat_completion_sources.CLAUDE, setting: 'claude_model', input: '#claude_model_id', select: '#model_claude_select', dynamicGroupId: 'claude_other_models' },
     { source: chat_completion_sources.AI21, setting: 'ai21_model', input: '#ai21_model_id', select: '#model_ai21_select', dynamicGroupId: 'ai21_other_models' },
     { source: chat_completion_sources.COHERE, setting: 'cohere_model', input: '#cohere_model_id', select: '#model_cohere_select', dynamicGroupId: 'cohere_other_models' },
     { source: chat_completion_sources.PERPLEXITY, setting: 'perplexity_model', input: '#perplexity_model_id', select: '#model_perplexity_select', dynamicGroupId: 'perplexity_other_models' },
+    { source: chat_completion_sources.MAKERSUITE, setting: 'google_model', input: '#makersuite_model_id', select: '#model_google_select', dynamicGroupId: 'google_other_models' },
     { source: chat_completion_sources.VERTEXAI, setting: 'vertexai_model', input: '#vertexai_model_id', select: '#model_vertexai_select', dynamicGroupId: 'vertexai_other_models' },
     { source: chat_completion_sources.CUSTOM, setting: 'custom_model', input: '#custom_model_id', select: '#model_custom_select', datalist: '#model_custom_select_fill', dynamicOnly: true },
     { source: chat_completion_sources.ZAI, setting: 'zai_model', input: '#zai_model_id', select: '#model_zai_select', dynamicGroupId: 'zai_other_models' },
@@ -622,6 +652,7 @@ export let proxies = [
         name: 'None',
         url: '',
         password: '',
+        source: '',
     },
 ];
 export let selected_proxy = proxies[0];
@@ -631,6 +662,27 @@ export let openai_settings;
 
 /** @type {import('./PromptManager.js').PromptManager} */
 export let promptManager = null;
+
+/**
+ * SillyBunny: prompt order reset needs the selected preset's saved order, not the current modified settings.
+ * Gets the prompt order from the selected OpenAI preset before user edits are applied.
+ * @param {number|string|null} characterId Character/dummy ID to match in the preset prompt order.
+ * @returns {Array<Object>} Prompt order from the selected preset, or an empty array.
+ */
+export function getCurrentOpenAIPresetPromptOrder(characterId) {
+    const presetName = oai_settings.preset_settings_openai;
+    const presetIndex = openai_setting_names?.[presetName];
+    const presetPromptOrder = openai_settings?.[presetIndex]?.prompt_order;
+
+    if (!Array.isArray(presetPromptOrder)) {
+        return [];
+    }
+
+    const promptOrderEntry = presetPromptOrder.find(entry => String(entry?.character_id) === String(characterId))
+        ?? presetPromptOrder.find(entry => Array.isArray(entry?.order));
+
+    return Array.isArray(promptOrderEntry?.order) ? promptOrderEntry.order : [];
+}
 
 async function validateReverseProxy() {
     if (!oai_settings.reverse_proxy) {
@@ -2108,6 +2160,33 @@ function createOpenAIModelOption(option, { favorite = false } = {}) {
         .attr('data-favorite', favorite ? 'true' : 'false');
 }
 
+function syncOpenAIModelIdInput(modelId = oai_settings.openai_model) {
+    $('#openai_model_id').val(String(modelId || ''));
+}
+
+function ensureOpenAIModelSelectOption(modelId) {
+    const value = String(modelId || '');
+    const $modelSelect = $('#model_openai_select');
+
+    if (!value || $modelSelect.length === 0 || $modelSelect.find(`option[value="${CSS.escape(value)}"]`).length > 0) {
+        return;
+    }
+
+    let $currentGroup = $modelSelect.find('optgroup[data-sb-current-model="true"]');
+    if ($currentGroup.length === 0) {
+        $currentGroup = $('<optgroup>', {
+            label: t`Current`,
+        })
+            .attr('data-sb-generated', 'true')
+            .attr('data-sb-current-model', 'true');
+        $modelSelect.append($currentGroup);
+    } else {
+        $currentGroup.empty();
+    }
+
+    $currentGroup.append(createOpenAIModelOption({ value, text: value }));
+}
+
 function appendOpenAIModelEntry($container, entry, favoriteValues = new Set()) {
     if (entry.type === 'group') {
         const $group = $('<optgroup>', { label: entry.label }).attr('data-sb-generated', 'true');
@@ -2126,6 +2205,16 @@ function appendOpenAIModelEntry($container, entry, favoriteValues = new Set()) {
     }
 }
 
+function getApiSelect2DropdownParent() {
+    const apiDropdownParent = $('#rm_api_block');
+    return apiDropdownParent.length ? apiDropdownParent : $(document.body);
+}
+
+function getPromptManagerSelect2DropdownParent() {
+    const promptManagerPopup = $('#completion_prompt_manager_popup');
+    return promptManagerPopup.length ? promptManagerPopup : getApiSelect2DropdownParent();
+}
+
 function initOpenAIModelSearch() {
     const $modelSelect = $('#model_openai_select');
 
@@ -2138,6 +2227,7 @@ function initOpenAIModelSearch() {
     }
 
     $modelSelect.select2({
+        dropdownParent: getApiSelect2DropdownParent(),
         placeholder: t`Select a model`,
         searchInputPlaceholder: t`Search models...`,
         searchInputCssClass: 'text_pole',
@@ -2152,7 +2242,7 @@ function updateOpenAIModelFavoriteButton() {
         return;
     }
 
-    const currentModel = String($('#model_openai_select').val() || oai_settings.openai_model || '');
+    const currentModel = String($('#openai_model_id').val() || oai_settings.openai_model || $('#model_openai_select').val() || '');
     const isFavorite = currentModel.length > 0 && getModelFavoritesForSource(chat_completion_sources.OPENAI).includes(currentModel);
     const title = currentModel.length === 0
         ? t`Select a model first`
@@ -2175,10 +2265,10 @@ function rebuildOpenAIModelSelect() {
     }
 
     const optionMap = collectOpenAIOptionMap();
-    const selectedValue = String($modelSelect.val() || oai_settings.openai_model || default_settings.openai_model || '');
+    const selectedValue = String(oai_settings.openai_model || $modelSelect.val() || default_settings.openai_model || '');
     const favoriteOptions = getModelFavoritesForSource(chat_completion_sources.OPENAI)
-        .map(modelId => optionMap.get(modelId))
-        .filter(Boolean);
+        .filter(Boolean)
+        .map(modelId => optionMap.get(modelId) || { value: modelId, text: modelId });
     const favoriteValues = new Set(favoriteOptions.map(option => option.value));
     const externalModels = [chat_completion_sources.OPENAI, chat_completion_sources.OPENAI_RESPONSES].includes(oai_settings.chat_completion_source)
         ? (Array.isArray(model_list) ? model_list : [])
@@ -2220,7 +2310,9 @@ function rebuildOpenAIModelSelect() {
     if (selectedValue && $modelSelect.find(`option[value="${CSS.escape(selectedValue)}"]`).length === 0) {
         const $currentGroup = $('<optgroup>', {
             label: t`Current`,
-        }).attr('data-sb-generated', 'true');
+        })
+            .attr('data-sb-generated', 'true')
+            .attr('data-sb-current-model', 'true');
 
         $currentGroup.append(createOpenAIModelOption({ value: selectedValue, text: selectedValue }));
         $modelSelect.append($currentGroup);
@@ -2239,13 +2331,14 @@ function rebuildOpenAIModelSelect() {
         oai_settings.openai_model = nextValue;
     }
 
+    syncOpenAIModelIdInput(nextValue);
     initOpenAIModelSearch();
     $modelSelect.trigger('change.select2');
     updateOpenAIModelFavoriteButton();
 }
 
 function toggleOpenAIModelFavorite() {
-    const modelId = String($('#model_openai_select').val() || oai_settings.openai_model || '');
+    const modelId = String($('#openai_model_id').val() || oai_settings.openai_model || $('#model_openai_select').val() || '');
     if (!modelId) {
         return;
     }
@@ -2555,6 +2648,10 @@ function rebuildModelIdSearchControl(control, { preserveQuery = false } = {}) {
 
     if (selectedValue && select.querySelector(`option[value="${CSS.escape(selectedValue)}"]`)) {
         select.value = selectedValue;
+    }
+
+    if (!preserveQuery) {
+        input.value = selectedValue;
     }
 
     rebuildModelIdSearchDatalist(control, optionMap, favoriteOptions, query);
@@ -3786,12 +3883,21 @@ function saveModelList(data) {
             }
         });
 
-        const selectedModel = model_list.find(model => model.id === oai_settings.google_model);
-        if (model_list.length > 0 && (!selectedModel || !oai_settings.google_model)) {
+        if (model_list.length > 0 && !oai_settings.google_model) {
             oai_settings.google_model = model_list[0].id;
         }
 
+        if (oai_settings.google_model && $('#model_google_select').find(`option[value="${CSS.escape(oai_settings.google_model)}"]`).length === 0) {
+            $('#google_other_models').append(
+                $('<option>', {
+                    value: oai_settings.google_model,
+                    text: oai_settings.google_model,
+                }),
+            );
+        }
+
         $('#model_google_select').val(oai_settings.google_model).trigger('change');
+        $('#makersuite_model_id').val(oai_settings.google_model);
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.GROQ) {
@@ -4387,20 +4493,6 @@ export async function createGenerationParameters(settings, model, type, messages
         chat_completion_sources.CHUTES,
     ];
 
-    // Sources that support proxying
-    const proxySupportedSources = [
-        chat_completion_sources.CLAUDE,
-        chat_completion_sources.OPENAI,
-        chat_completion_sources.OPENAI_RESPONSES,
-        chat_completion_sources.MISTRALAI,
-        chat_completion_sources.MAKERSUITE,
-        chat_completion_sources.VERTEXAI,
-        chat_completion_sources.DEEPSEEK,
-        chat_completion_sources.XAI,
-        chat_completion_sources.ZAI,
-        chat_completion_sources.MOONSHOT,
-    ];
-
     // Sources that support logprobs
     const logprobsSupportedSources = [
         chat_completion_sources.OPENAI,
@@ -4499,7 +4591,7 @@ export async function createGenerationParameters(settings, model, type, messages
         delete generate_data.stop;
     }
 
-    if (settings.reverse_proxy && proxySupportedSources.includes(settings.chat_completion_source)) {
+    if (settings.reverse_proxy && REVERSE_PROXY_SUPPORTED_SOURCES.includes(settings.chat_completion_source)) {
         await validateReverseProxy();
         generate_data.reverse_proxy = settings.reverse_proxy;
         generate_data.proxy_password = settings.proxy_password;
@@ -5098,6 +5190,10 @@ class TokenHandler {
         this.counts[type] += token_count;
 
         return token_count;
+    }
+
+    async countUntrackedAsync(messages, full) {
+        return this.countTokenAsyncFn(messages, full);
     }
 
     getTokensForIdentifier(identifier) {
@@ -6117,9 +6213,7 @@ function setAutoAppendReasoningTagControls() {
 
 async function getStatusOpen() {
     const noValidateSources = [
-        chat_completion_sources.CLAUDE,
         chat_completion_sources.AI21,
-        chat_completion_sources.VERTEXAI,
         chat_completion_sources.PERPLEXITY,
         chat_completion_sources.ZAI,
         chat_completion_sources.MINIMAX,
@@ -6149,19 +6243,7 @@ async function getStatusOpen() {
         chat_completion_source: oai_settings.chat_completion_source,
     };
 
-    const validateProxySources = [
-        chat_completion_sources.CLAUDE,
-        chat_completion_sources.OPENAI,
-        chat_completion_sources.OPENAI_RESPONSES,
-        chat_completion_sources.MISTRALAI,
-        chat_completion_sources.MAKERSUITE,
-        chat_completion_sources.VERTEXAI,
-        chat_completion_sources.DEEPSEEK,
-        chat_completion_sources.XAI,
-        chat_completion_sources.ZAI,
-        chat_completion_sources.MOONSHOT,
-    ];
-    if (oai_settings.reverse_proxy && validateProxySources.includes(oai_settings.chat_completion_source)) {
+    if (oai_settings.reverse_proxy && REVERSE_PROXY_SUPPORTED_SOURCES.includes(oai_settings.chat_completion_source)) {
         await validateReverseProxy();
     }
 
@@ -6183,6 +6265,12 @@ async function getStatusOpen() {
 
     if (oai_settings.chat_completion_source === chat_completion_sources.MINIMAX) {
         data.minimax_endpoint = oai_settings.minimax_endpoint;
+    }
+
+    if (oai_settings.chat_completion_source === chat_completion_sources.VERTEXAI) {
+        data.vertexai_auth_mode = oai_settings.vertexai_auth_mode;
+        data.vertexai_region = oai_settings.vertexai_region;
+        data.vertexai_express_project_id = oai_settings.vertexai_express_project_id;
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.WORKERS_AI) {
@@ -6237,7 +6325,7 @@ async function getStatusOpen() {
  * @returns {Object} The preset body object
  */
 export function getChatCompletionPreset(settings = oai_settings) {
-    return buildChatCompletionPreset(settings, settingsToUpdate);
+    return buildChatCompletionPresetForSave(settings, settingsToUpdate);
 }
 
 function normalizeLogitBiasEntry(entry) {
@@ -6325,9 +6413,7 @@ function refreshLogitBiasPresetOptions() {
  * @returns {Promise<void>}
  */
 async function saveOpenAIPreset(name, settings, triggerUi = true) {
-    const presetBody = buildChatCompletionPreset(settings, settingsToUpdate, {
-        includeConnection: shouldIncludeConnectionFieldsInPreset(settings),
-    });
+    const presetBody = getChatCompletionPreset(settings);
     const savePresetSettings = await fetch('/api/presets/save', {
         method: 'POST',
         headers: getRequestHeaders(),
@@ -6344,7 +6430,7 @@ async function saveOpenAIPreset(name, settings, triggerUi = true) {
         if (Object.keys(openai_setting_names).includes(data.name)) {
             oai_settings.preset_settings_openai = data.name;
             const value = openai_setting_names[data.name];
-            Object.assign(openai_settings[value], presetBody);
+            openai_settings[value] = presetBody;
             $(`#settings_preset_openai option[value="${value}"]`).prop('selected', true);
             if (triggerUi) $('#settings_preset_openai').trigger('change');
         } else {
@@ -6804,7 +6890,7 @@ function onSettingsPresetChange() {
         scheduleOpenAIUiRefresh();
         $('#openai_logit_bias_preset').trigger('change');
 
-        saveSettingsDebounced();
+        await saveSettings();
         await eventSource.emit(event_types.OAI_PRESET_CHANGED_AFTER);
         await eventSource.emit(event_types.PRESET_CHANGED, { apiId: 'openai', name: presetName });
     });
@@ -7225,6 +7311,7 @@ async function onModelChange() {
     if ($(this).is('#model_openai_select')) {
         console.log('OpenAI model changed to', value);
         oai_settings.openai_model = value;
+        syncOpenAIModelIdInput(value);
     }
 
     if ($(this).is('#model_openrouter_select')) {
@@ -7257,6 +7344,7 @@ async function onModelChange() {
 
         console.log('Google model changed to', value);
         oai_settings.google_model = value;
+        $('#makersuite_model_id').val(value);
     }
 
     if ($(this).is('#model_vertexai_select')) {
@@ -7473,7 +7561,7 @@ async function onModelChange() {
     if (oai_settings.chat_completion_source == chat_completion_sources.CLAUDE) {
         if (maxContextUnlocked) {
             $('#openai_max_context').attr('max', unlocked_max);
-        } else if (/^claude-(sonnet-4-5|sonnet-4-6|opus-4-6|opus-4-7)/.test(value)) {
+        } else if (/^claude-(sonnet-4-(?:[5-9]|\d{2,})|opus-4-(?:[6-9]|\d{2,}))/.test(value)) {
             $('#openai_max_context').attr('max', max_1mil);
         } else if (/^claude-(3|opus|haiku|sonnet)/.test(value)) {
             $('#openai_max_context').attr('max', max_200k);
@@ -7875,7 +7963,8 @@ function toggleChatCompletionForms() {
             $('#model_openai_select').trigger('change');
         }
     } else if (oai_settings.chat_completion_source == chat_completion_sources.MAKERSUITE) {
-        $('#model_google_select').trigger('change');
+        refreshModelIdSearchControlsForSource(chat_completion_sources.MAKERSUITE);
+        $('#model_google_select').val(oai_settings.google_model).trigger('change');
     } else if (oai_settings.chat_completion_source == chat_completion_sources.VERTEXAI) {
         $('#model_vertexai_select').trigger('change');
         // Update UI based on authentication mode
@@ -8002,18 +8091,7 @@ async function onCustomizeParametersClick() {
     };
 
     const applyCustomReasoningPreset = (preset, { preserveValues = false } = {}) => {
-        oai_settings.custom_reasoning_preset = preset;
-
-        if (preset !== custom_reasoning_preset_types.CUSTOM) {
-            const presetConfig = getCustomReasoningPresetConfig(preset);
-            oai_settings.custom_reasoning_param_name = presetConfig.paramName;
-            oai_settings.custom_reasoning_param_format = presetConfig.format;
-            if (!preserveValues) {
-                oai_settings.custom_reasoning_enabled_value = presetConfig.enabledValue;
-                oai_settings.custom_reasoning_disabled_value = presetConfig.disabledValue;
-            }
-        }
-
+        setCustomReasoningPreset(preset, { preserveValues });
         syncCustomReasoningPopup();
         saveSettingsDebounced();
     };
@@ -8309,44 +8387,106 @@ export function isReasoningSignatureSupported(settings = oai_settings) {
  */
 export function loadProxyPresets(settings) {
     let proxyPresets = settings.proxies;
-    selected_proxy = settings.selected_proxy || selected_proxy;
     if (!Array.isArray(proxyPresets) || proxyPresets.length === 0) {
-        proxyPresets = proxies;
+        proxyPresets = proxies.map(preset => normalizeProxyPreset(preset));
     } else {
-        proxies = proxyPresets;
+        proxyPresets = proxyPresets.map(preset => normalizeProxyPreset(preset));
+    }
+
+    proxies = proxyPresets;
+    selected_proxy = normalizeProxyPreset(settings.selected_proxy || selected_proxy);
+    if (!proxies.some(preset => preset.name === selected_proxy.name)) {
+        proxies.push(selected_proxy);
     }
 
     $('#openai_proxy_preset').empty();
 
-    for (const preset of proxyPresets) {
-        const option = document.createElement('option');
-        option.innerText = preset.name;
-        option.value = preset.name;
-        option.selected = preset.name === 'None';
-        $('#openai_proxy_preset').append(option);
+    for (const preset of proxies) {
+        appendProxyPresetOption(preset);
     }
     $('#openai_proxy_preset').val(selected_proxy.name);
-    setProxyPreset(selected_proxy.name, selected_proxy.url, selected_proxy.password);
+    const shouldApplySource = Boolean(selected_proxy.source);
+    setProxyPreset(selected_proxy.name, selected_proxy.url, selected_proxy.password, selected_proxy.source, { applySource: shouldApplySource, silent: true });
 }
 
-function setProxyPreset(name, url, password) {
-    const preset = proxies.find(p => p.name === name);
+function normalizeProxyPreset(preset) {
+    return normalizeReverseProxyPreset(preset, { supportedSources: REVERSE_PROXY_SUPPORTED_SOURCES });
+}
+
+function getReverseProxySourceLabel(source) {
+    return REVERSE_PROXY_SOURCE_LABELS[source] || '';
+}
+
+function getReverseProxyPresetOptionText(preset) {
+    const normalizedPreset = normalizeProxyPreset(preset);
+    const sourceLabel = getReverseProxySourceLabel(normalizedPreset.source);
+
+    return sourceLabel ? `${normalizedPreset.name} [${sourceLabel}]` : normalizedPreset.name;
+}
+
+function getProxyPresetOption(name) {
+    return $('#openai_proxy_preset option').filter((_, option) => option.value === name);
+}
+
+function appendProxyPresetOption(preset) {
+    const normalizedPreset = normalizeProxyPreset(preset);
+    const option = document.createElement('option');
+    option.innerText = getReverseProxyPresetOptionText(normalizedPreset);
+    option.value = normalizedPreset.name;
+    option.selected = normalizedPreset.name === 'None';
+    $('#openai_proxy_preset').append(option);
+}
+
+function updateProxyPresetOption(preset) {
+    const option = getProxyPresetOption(preset.name);
+
+    if (option.length > 0) {
+        option.text(getReverseProxyPresetOptionText(preset));
+    } else {
+        appendProxyPresetOption(preset);
+    }
+}
+
+function setProxyPreset(name, url, password, source = '', { applySource = true, silent = false } = {}) {
+    const normalizedPreset = normalizeProxyPreset({ name, url, password, source });
+    const preset = proxies.find(p => p.name === normalizedPreset.name);
     if (preset) {
-        preset.url = url;
-        preset.password = password;
+        preset.url = normalizedPreset.url;
+        preset.password = normalizedPreset.password;
+        preset.source = normalizedPreset.source;
         selected_proxy = preset;
     } else {
-        let new_proxy = { name, url, password };
+        let new_proxy = normalizedPreset;
         proxies.push(new_proxy);
         selected_proxy = new_proxy;
     }
 
-    $('#openai_reverse_proxy_name').val(name);
-    oai_settings.reverse_proxy = url;
+    $('#openai_reverse_proxy_name').val(normalizedPreset.name);
+    oai_settings.reverse_proxy = normalizedPreset.url;
     $('#openai_reverse_proxy').val(oai_settings.reverse_proxy);
-    oai_settings.proxy_password = password;
+    oai_settings.proxy_password = normalizedPreset.password;
     $('#openai_proxy_password').val(oai_settings.proxy_password);
-    reconnectOpenAi();
+    $('#openai_proxy_source').val(normalizedPreset.source || '');
+
+    const shouldSwitchSource = applySource && normalizedPreset.source && normalizedPreset.source !== oai_settings.chat_completion_source;
+
+    // SillyBunny: when applying a bound preset during settings load (silent), switch the backend
+    // and refresh source-dependent UI without triggering a reconnect or the proxy confirmation modal,
+    // which would otherwise block the startup loader and freeze the settings panel. See #304 regression.
+    if (silent) {
+        if (shouldSwitchSource) {
+            oai_settings.chat_completion_source = normalizedPreset.source;
+            $('#chat_completion_source').val(normalizedPreset.source);
+            toggleChatCompletionForms();
+        }
+        return;
+    }
+
+    if (shouldSwitchSource) {
+        $('#chat_completion_source').val(normalizedPreset.source).trigger('change');
+    } else {
+        reconnectOpenAi();
+    }
 }
 
 function onProxyPresetChange() {
@@ -8354,29 +8494,66 @@ function onProxyPresetChange() {
     const selectedPreset = proxies.find(preset => preset.name === value);
 
     if (selectedPreset) {
-        setProxyPreset(selectedPreset.name, selectedPreset.url, selectedPreset.password);
+        setProxyPreset(selectedPreset.name, selectedPreset.url, selectedPreset.password, selectedPreset.source);
     } else {
         console.error(t`Proxy preset '${value}' not found in proxies array.`);
     }
     saveSettingsDebounced();
 }
 
+// SillyBunny: reverse direction of the reverse-proxy backend binding. Selecting a bound preset already
+// switches the backend (forward); this keeps the binding two-way by selecting a preset bound to the
+// newly chosen backend. Guarded against re-entrancy so it can't feed back into the source change handler.
+let isSyncingProxyBinding = false;
+
+/**
+ * Selects the reverse proxy preset bound to the given Chat Completion source, when one exists.
+ * @param {string} source Chat Completion source value
+ */
+function syncProxyPresetToBoundSource(source) {
+    if (isSyncingProxyBinding) {
+        return;
+    }
+    if (!source || !REVERSE_PROXY_SUPPORTED_SOURCES.includes(source)) {
+        return;
+    }
+    // Already on a preset bound to this source; nothing to switch.
+    if (selected_proxy && selected_proxy.name !== 'None' && selected_proxy.source === source) {
+        return;
+    }
+    const boundPreset = proxies.find(preset => preset.name !== 'None' && preset.source === source);
+    if (!boundPreset || boundPreset.name === selected_proxy?.name) {
+        return;
+    }
+
+    isSyncingProxyBinding = true;
+    try {
+        $('#openai_proxy_preset').val(boundPreset.name);
+        // applySource: false avoids re-triggering the source change we are already handling;
+        // silent: true applies the proxy URL/password without a redundant reconnect.
+        setProxyPreset(boundPreset.name, boundPreset.url, boundPreset.password, boundPreset.source, { applySource: false, silent: true });
+        saveSettingsDebounced();
+    } finally {
+        isSyncingProxyBinding = false;
+    }
+}
+
 $('#save_proxy').on('click', async function () {
     const presetName = $('#openai_reverse_proxy_name').val();
     const reverseProxy = $('#openai_reverse_proxy').val();
     const proxyPassword = $('#openai_proxy_password').val();
+    const preset = buildReverseProxyPresetForSave({
+        name: presetName,
+        url: reverseProxy,
+        password: proxyPassword,
+        source: $('#openai_proxy_source').val() || '',
+    }, { supportedSources: REVERSE_PROXY_SUPPORTED_SOURCES });
 
-    setProxyPreset(presetName, reverseProxy, proxyPassword);
+    setProxyPreset(preset.name, preset.url, preset.password, preset.source);
     saveSettingsDebounced();
     toastr.success(t`Proxy Saved`);
-    if ($('#openai_proxy_preset').val() !== presetName) {
-        const option = document.createElement('option');
-        option.text = String(presetName);
-        option.value = String(presetName);
-
-        $('#openai_proxy_preset').append(option);
-    }
-    $('#openai_proxy_preset').val(presetName);
+    updateProxyPresetOption(preset);
+    $('#openai_proxy_preset').val(preset.name);
 });
 
 $('#delete_proxy').on('click', async function () {
@@ -8385,20 +8562,16 @@ $('#delete_proxy').on('click', async function () {
 
     if (index !== -1) {
         proxies.splice(index, 1);
-        $('#openai_proxy_preset option[value="' + presetName + '"]').remove();
+        getProxyPresetOption(presetName).remove();
 
         if (proxies.length > 0) {
             const newIndex = Math.max(0, index - 1);
             selected_proxy = proxies[newIndex];
         } else {
-            selected_proxy = { name: 'None', url: '', password: '' };
+            selected_proxy = normalizeProxyPreset({ name: 'None', url: '', password: '', source: '' });
         }
 
-        $('#openai_reverse_proxy_name').val(selected_proxy.name);
-        oai_settings.reverse_proxy = selected_proxy.url;
-        $('#openai_reverse_proxy').val(selected_proxy.url);
-        oai_settings.proxy_password = selected_proxy.password;
-        $('#openai_proxy_password').val(selected_proxy.password);
+        setProxyPreset(selected_proxy.name, selected_proxy.url, selected_proxy.password, selected_proxy.source);
 
         saveSettingsDebounced();
         $('#openai_proxy_preset').val(selected_proxy.name);
@@ -8425,6 +8598,230 @@ function runProxyCallback(_, value) {
     const foundName = result[0].item;
     $('#openai_proxy_preset').val(foundName).trigger('change');
     return foundName;
+}
+
+function getSlashCommandStringValue(value) {
+    return String(value ?? '');
+}
+
+function getSlashCommandBooleanValue(value, commandName) {
+    if (isTrueBoolean(value)) {
+        return true;
+    }
+
+    if (isFalseBoolean(value)) {
+        return false;
+    }
+
+    throw new Error(t`Invalid value "${value}" for /${commandName}. Use true or false.`);
+}
+
+function getSlashCommandEnumValue(value, validValues, commandName) {
+    if (!validValues.includes(value)) {
+        throw new Error(t`Invalid value "${value}" for /${commandName}. Valid values are: ${validValues.join(', ')}`);
+    }
+
+    return value;
+}
+
+function hasSlashCommandValue(args, value) {
+    return isTrueBoolean(String(args?.force ?? 'false'))
+        || args?._hasUnnamedArgument
+        || String(value ?? '').trim().length > 0;
+}
+
+function syncCustomReasoningSettingControls() {
+    $('#custom_reasoning_preset').val(oai_settings.custom_reasoning_preset);
+    $('#custom_reasoning_param_name').val(oai_settings.custom_reasoning_param_name);
+    $('#custom_reasoning_param_format').val(oai_settings.custom_reasoning_param_format);
+    $('#custom_reasoning_enabled_value').val(oai_settings.custom_reasoning_enabled_value);
+    $('#custom_reasoning_disabled_value').val(oai_settings.custom_reasoning_disabled_value);
+
+    const format = String(oai_settings.custom_reasoning_param_format ?? custom_reasoning_param_formats.OPENAI);
+    const showToggleValues = [custom_reasoning_param_formats.STRING, custom_reasoning_param_formats.THINKING_OBJECT].includes(format);
+    $('.sb-custom-reasoning-toggle-values').toggle(showToggleValues);
+}
+
+function setCustomReasoningPreset(preset, { preserveValues = false } = {}) {
+    oai_settings.custom_reasoning_preset = preset;
+
+    if (preset !== custom_reasoning_preset_types.CUSTOM) {
+        const presetConfig = getCustomReasoningPresetConfig(preset);
+        oai_settings.custom_reasoning_param_name = presetConfig.paramName;
+        oai_settings.custom_reasoning_param_format = presetConfig.format;
+        if (!preserveValues) {
+            oai_settings.custom_reasoning_enabled_value = presetConfig.enabledValue;
+            oai_settings.custom_reasoning_disabled_value = presetConfig.disabledValue;
+        }
+    }
+
+    syncCustomReasoningSettingControls();
+}
+
+function markCustomReasoningPreset() {
+    oai_settings.custom_reasoning_preset = custom_reasoning_preset_types.CUSTOM;
+    syncCustomReasoningSettingControls();
+}
+
+function markCustomReasoningPresetForManualCommand(args) {
+    if (!isTrueBoolean(String(args?.quiet ?? 'false'))) {
+        markCustomReasoningPreset();
+    }
+}
+
+function runBooleanChatCompletionSettingCallback(commandName, settingName, selector, onChange = null) {
+    return (args, value) => {
+        const stringValue = getSlashCommandStringValue(value).trim();
+        if (!hasSlashCommandValue(args, value)) {
+            return String(Boolean(oai_settings[settingName]));
+        }
+
+        oai_settings[settingName] = getSlashCommandBooleanValue(stringValue, commandName);
+        $(selector).prop('checked', oai_settings[settingName]);
+        onChange?.();
+        saveSettingsDebounced();
+        return String(oai_settings[settingName]);
+    };
+}
+
+function runEnumChatCompletionSettingCallback(commandName, settingName, selector, validValues, onChange = null) {
+    return (args, value) => {
+        const stringValue = getSlashCommandStringValue(value).trim();
+        if (!hasSlashCommandValue(args, value)) {
+            return getSlashCommandStringValue(oai_settings[settingName]);
+        }
+
+        oai_settings[settingName] = getSlashCommandEnumValue(stringValue, validValues, commandName);
+        $(selector).val(oai_settings[settingName]);
+        onChange?.(args);
+        saveSettingsDebounced();
+        return getSlashCommandStringValue(oai_settings[settingName]);
+    };
+}
+
+function runStringChatCompletionSettingCallback(commandName, settingName, selector, onChange = null, validValues = null, normalizeValue = value => value) {
+    return (args, value) => {
+        if (!hasSlashCommandValue(args, value)) {
+            return getSlashCommandStringValue(oai_settings[settingName]);
+        }
+
+        const stringValue = normalizeValue(getSlashCommandStringValue(value).trim());
+        if (Array.isArray(validValues) && stringValue) {
+            getSlashCommandEnumValue(stringValue, validValues, commandName);
+        }
+
+        oai_settings[settingName] = stringValue;
+        $(selector).val(oai_settings[settingName]);
+        onChange?.(args);
+        saveSettingsDebounced();
+        return getSlashCommandStringValue(oai_settings[settingName]);
+    };
+}
+
+const REQUEST_IMAGE_RESOLUTION_VALUES = ['', '1K', '2K', '4K'];
+const REQUEST_IMAGE_ASPECT_RATIO_VALUES = ['', '1:1', '9:16', '16:9', '3:4', '4:3', '3:2', '2:3', '5:4', '4:5', '21:9'];
+
+function registerChatCompletionProfileSlashCommand({ name, callback, description, typeList = [ARGUMENT_TYPE.STRING], enumList = [], forceEnum = false }) {
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name,
+        callback,
+        returns: t`current value`,
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'quiet',
+                description: t`suppress UI side effects where supported`,
+                typeList: [ARGUMENT_TYPE.BOOLEAN],
+                defaultValue: 'false',
+            }),
+        ],
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description,
+                typeList,
+                enumList,
+                forceEnum,
+            }),
+        ],
+        helpString: `Sets the Chat Completion ${description}. Gets the current value if no argument is provided.`,
+    }));
+}
+
+function registerChatCompletionProfileSlashCommands() {
+    registerChatCompletionProfileSlashCommand({
+        name: 'request-reasoning',
+        callback: runBooleanChatCompletionSettingCallback('request-reasoning', 'show_thoughts', '#openai_show_thoughts', setToolReasoningControls),
+        description: 'request model reasoning setting',
+        typeList: [ARGUMENT_TYPE.BOOLEAN],
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'reasoning-effort',
+        callback: runEnumChatCompletionSettingCallback('reasoning-effort', 'reasoning_effort', '#openai_reasoning_effort', Object.values(reasoning_effort_types)),
+        description: 'reasoning effort',
+        enumList: Object.values(reasoning_effort_types),
+        forceEnum: true,
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'verbosity',
+        callback: runEnumChatCompletionSettingCallback('verbosity', 'verbosity', '#openai_verbosity', Object.values(verbosity_levels)),
+        description: 'verbosity',
+        enumList: Object.values(verbosity_levels),
+        forceEnum: true,
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'enable-web-search',
+        callback: runBooleanChatCompletionSettingCallback('enable-web-search', 'enable_web_search', '#openai_enable_web_search', calculateOpenRouterCost),
+        description: 'web search request setting',
+        typeList: [ARGUMENT_TYPE.BOOLEAN],
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'request-images',
+        callback: runBooleanChatCompletionSettingCallback('request-images', 'request_images', '#openai_request_images'),
+        description: 'inline image request setting',
+        typeList: [ARGUMENT_TYPE.BOOLEAN],
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'request-image-resolution',
+        callback: runStringChatCompletionSettingCallback('request-image-resolution', 'request_image_resolution', '#request_image_resolution', null, REQUEST_IMAGE_RESOLUTION_VALUES, value => value.toLowerCase() === 'auto' ? '' : value),
+        description: 'requested image resolution',
+        enumList: ['auto', ...REQUEST_IMAGE_RESOLUTION_VALUES.filter(Boolean)],
+        forceEnum: true,
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'request-image-aspect-ratio',
+        callback: runStringChatCompletionSettingCallback('request-image-aspect-ratio', 'request_image_aspect_ratio', '#request_image_aspect_ratio', null, REQUEST_IMAGE_ASPECT_RATIO_VALUES, value => value.toLowerCase() === 'auto' ? '' : value),
+        description: 'requested image aspect ratio',
+        enumList: ['auto', ...REQUEST_IMAGE_ASPECT_RATIO_VALUES.filter(Boolean)],
+        forceEnum: true,
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'custom-reasoning-preset',
+        callback: runEnumChatCompletionSettingCallback('custom-reasoning-preset', 'custom_reasoning_preset', '#custom_reasoning_preset', Object.values(custom_reasoning_preset_types), () => setCustomReasoningPreset(oai_settings.custom_reasoning_preset)),
+        description: 'custom reasoning preset',
+        enumList: Object.values(custom_reasoning_preset_types),
+        forceEnum: true,
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'custom-reasoning-param-format',
+        callback: runEnumChatCompletionSettingCallback('custom-reasoning-param-format', 'custom_reasoning_param_format', '#custom_reasoning_param_format', Object.values(custom_reasoning_param_formats), markCustomReasoningPresetForManualCommand),
+        description: 'custom reasoning parameter format',
+        enumList: Object.values(custom_reasoning_param_formats),
+        forceEnum: true,
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'custom-reasoning-param-name',
+        callback: runStringChatCompletionSettingCallback('custom-reasoning-param-name', 'custom_reasoning_param_name', '#custom_reasoning_param_name', markCustomReasoningPresetForManualCommand),
+        description: 'custom reasoning parameter name',
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'custom-reasoning-enabled-value',
+        callback: runStringChatCompletionSettingCallback('custom-reasoning-enabled-value', 'custom_reasoning_enabled_value', '#custom_reasoning_enabled_value', markCustomReasoningPresetForManualCommand),
+        description: 'custom reasoning enabled value',
+    });
+    registerChatCompletionProfileSlashCommand({
+        name: 'custom-reasoning-disabled-value',
+        callback: runStringChatCompletionSettingCallback('custom-reasoning-disabled-value', 'custom_reasoning_disabled_value', '#custom_reasoning_disabled_value', markCustomReasoningPresetForManualCommand),
+        description: 'custom reasoning disabled value',
+    });
 }
 
 /**
@@ -8593,6 +8990,8 @@ export function initOpenAI() {
         ],
         helpString: 'Sets a proxy preset by name.',
     }));
+    // SillyBunny: Connection Manager snapshots Chat Completion request behavior via slash commands.
+    registerChatCompletionProfileSlashCommands();
 
     $('#test_api_button').on('click', testApiConnection);
 
@@ -8804,6 +9203,7 @@ export function initOpenAI() {
         syncMaxContextUnlockedControl(oai_settings);
         toggleChatCompletionForms();
         applyConfigurableContextLimit();
+        syncProxyPresetToBoundSource(oai_settings.chat_completion_source);
         saveSettingsDebounced();
         reconnectOpenAi();
         forceCharacterEditorTokenize();
@@ -8941,6 +9341,19 @@ export function initOpenAI() {
         saveSettingsDebounced();
     });
 
+    $('#openai_model_id').on('input', function () {
+        const value = String($(this).val());
+        oai_settings.openai_model = value;
+
+        if (value) {
+            ensureOpenAIModelSelectOption(value);
+            $('#model_openai_select').val(value).trigger('change');
+        } else {
+            updateOpenAIModelFavoriteButton();
+            saveSettingsDebounced();
+        }
+    });
+
     $('#claude_model_id').on('input', function () {
         oai_settings.claude_model = String($(this).val());
         saveSettingsDebounced();
@@ -8956,6 +9369,18 @@ export function initOpenAI() {
     $('#perplexity_model_id').on('input', function () {
         oai_settings.perplexity_model = String($(this).val());
         saveSettingsDebounced();
+    });
+    $('#makersuite_model_id').on('input', function () {
+        const value = String($(this).val());
+        oai_settings.google_model = value;
+
+        if (value) {
+            refreshModelIdSearchControlsForSource(chat_completion_sources.MAKERSUITE);
+            $('#model_google_select').val(value).trigger('change');
+        } else {
+            updateModelIdSearchFavoriteButtons();
+            saveSettingsDebounced();
+        }
     });
     $('#zai_model_id').on('input', function () {
         oai_settings.zai_model = String($(this).val());
@@ -9110,6 +9535,7 @@ export function initOpenAI() {
 
     if (!isMobile()) {
         $('#model_openai_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9117,6 +9543,7 @@ export function initOpenAI() {
             matcher: textValueMatcher,
         });
         $('#model_openrouter_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9125,6 +9552,7 @@ export function initOpenAI() {
             matcher: textValueMatcher,
         });
         $('#model_aimlapi_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9132,6 +9560,7 @@ export function initOpenAI() {
             templateResult: getAimlapiModelTemplate,
         });
         $('#model_electronhub_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9140,6 +9569,7 @@ export function initOpenAI() {
             matcher: textValueMatcher,
         });
         $('#model_chutes_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9148,6 +9578,7 @@ export function initOpenAI() {
             matcher: textValueMatcher,
         });
         $('#model_nanogpt_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9156,6 +9587,7 @@ export function initOpenAI() {
             matcher: textValueMatcher,
         });
         $('#model_workers_ai_select').select2({
+            dropdownParent: getApiSelect2DropdownParent(),
             placeholder: t`Select a model`,
             searchInputPlaceholder: t`Search models...`,
             searchInputCssClass: 'text_pole',
@@ -9163,6 +9595,7 @@ export function initOpenAI() {
             matcher: textValueMatcher,
         });
         $('#completion_prompt_manager_popup_entry_form_injection_trigger').select2({
+            dropdownParent: getPromptManagerSelect2DropdownParent(),
             placeholder: t`All types (default)`,
             width: '100%',
             closeOnSelect: false,

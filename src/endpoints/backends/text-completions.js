@@ -1,4 +1,3 @@
-import { Readable } from 'node:stream';
 import fetch from 'node-fetch';
 import express from 'express';
 import _ from 'lodash';
@@ -13,7 +12,7 @@ import {
     FEATHERLESS_KEYS,
     OPENAI_KEYS,
 } from '../../constants.js';
-import { forwardFetchResponse, abortOnResponseClose, trimV1, getConfigValue, summarizeLlmPayloadForLog } from '../../util.js';
+import { forwardFetchResponse, trimV1, getConfigValue, pollStreamingRequestConnection, summarizeLlmPayloadForLog } from '../../util.js';
 import { setAdditionalHeaders } from '../../additional-headers.js';
 import { createHash } from 'node:crypto';
 
@@ -24,16 +23,44 @@ export const router = express.Router();
  * @param {import('node-fetch').Response} jsonStream JSON stream
  * @param {import('express').Request} request Express request
  * @param {import('express').Response} response Express response
+ * @param {() => void} onDisconnect Upstream disconnect callback
  * @returns {Promise<any>} Nothing valuable
  */
-async function parseOllamaStream(jsonStream, request, response) {
+async function parseOllamaStream(jsonStream, request, response, onDisconnect = null) {
     try {
         if (!jsonStream.body) {
             throw new Error('No body in the response');
         }
 
+        let done = false;
+        function closeStream() {
+            if (done) {
+                return;
+            }
+
+            done = true;
+            stopPolling();
+            try {
+                onDisconnect?.();
+            } catch (error) {
+                console.warn('Error handling Ollama stream disconnect:', error);
+            }
+            try {
+                jsonStream.body?.destroy?.();
+            } catch {
+                // Best effort; the client response is already closing.
+            }
+            if (!response.writableEnded) {
+                response.end();
+            }
+        }
+        const stopPolling = pollStreamingRequestConnection(request, response, closeStream);
         let partialData = '';
         jsonStream.body.on('data', (data) => {
+            if (done) {
+                return;
+            }
+
             const chunk = data.toString();
             partialData += chunk;
             while (true) {
@@ -51,19 +78,22 @@ async function parseOllamaStream(jsonStream, request, response) {
             }
         });
 
-        response.on('close', function () {
-            if (response.writableEnded) {
+        request.socket.on('close', closeStream);
+
+        jsonStream.body.on('end', () => {
+            if (done) {
                 return;
             }
 
-            if (jsonStream.body instanceof Readable) jsonStream.body.destroy();
-            response.end();
-        });
-
-        jsonStream.body.on('end', () => {
+            done = true;
+            stopPolling();
             console.info('Streaming request finished');
             response.write('data: [DONE]\n\n');
             response.end();
+        });
+
+        jsonStream.body.on('error', () => {
+            stopPolling();
         });
     } catch (error) {
         console.error('Error forwarding streaming response:', error);
@@ -286,15 +316,14 @@ router.post('/generate', async function (request, response) {
         console.debug('Text completion request:', summarizeLlmPayloadForLog(request.body));
 
         const controller = new AbortController();
-        abortOnResponseClose(response, controller);
-        response.on('close', async function () {
-            if (response.writableEnded) {
-                return;
-            }
-
+        request.socket.removeAllListeners('close');
+        request.socket.on('close', async function () {
+            // SillyBunny: KoboldCpp needs its own upstream abort endpoint; other backends use the shared fetch abort/stream destroy path.
             if (request.body.api_type === TEXTGEN_TYPES.KOBOLDCPP && !response.writableEnded) {
                 await abortKoboldCppRequest(request, trimV1(baseUrl));
             }
+
+            controller.abort();
         });
 
         let url = trimV1(baseUrl);
@@ -406,11 +435,16 @@ router.post('/generate', async function (request, response) {
 
         if (request.body.api_type === TEXTGEN_TYPES.OLLAMA && request.body.stream) {
             const stream = await fetch(url, args);
-            parseOllamaStream(stream, request, response);
+            parseOllamaStream(stream, request, response, () => controller.abort());
         } else if (request.body.stream) {
             const completionsStream = await fetch(url, args);
             // Pipe remote SSE stream to Express response
-            await forwardFetchResponse(completionsStream, response);
+            await forwardFetchResponse(completionsStream, response, request, async () => {
+                if (request.body.api_type === TEXTGEN_TYPES.KOBOLDCPP && !response.writableEnded) {
+                    await abortKoboldCppRequest(request, trimV1(baseUrl));
+                }
+                controller.abort();
+            });
         } else {
             const completionsReply = await fetch(url, args);
 

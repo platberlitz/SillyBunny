@@ -13,6 +13,7 @@ import { simpleSend } from './scripts/simpleSend.js';
 
 const oldExtensionKey = 'GuidedGenerations-Extension';
 const oldExtensionName = 'third-party/GuidedGenerations-Extension';
+const legacySystemPromptPresetNames = new Set(['GGSystemPrompt', 'GGSytemPrompt']);
 
 const defaultSettings = {
     showGuidedResponse: true,
@@ -38,6 +39,34 @@ const defaultSettings = {
 let qrObserver;
 let qrPollTimer;
 
+function isLegacySystemPromptPreset(value) {
+    return typeof value === 'string' && legacySystemPromptPresetNames.has(value.trim());
+}
+
+function sanitizeLegacySettings(settings) {
+    let changed = false;
+
+    for (const key of Object.keys(settings)) {
+        if (key.startsWith('preset') && isLegacySystemPromptPreset(settings[key])) {
+            if (Object.hasOwn(defaultSettings, key)) {
+                settings[key] = defaultSettings[key];
+            } else {
+                delete settings[key];
+            }
+            changed = true;
+        }
+    }
+
+    for (const key of ['promptGuidedResponse', 'promptGuidedSwipe', 'promptGuidedCorrection', 'promptImpersonate1st']) {
+        if (isLegacySystemPromptPreset(settings[key])) {
+            settings[key] = defaultSettings[key];
+            changed = true;
+        }
+    }
+
+    return changed;
+}
+
 function getSettings() {
     return extension_settings[extensionName] ?? defaultSettings;
 }
@@ -45,6 +74,7 @@ function getSettings() {
 function loadSettings() {
     const existing = extension_settings[extensionName] ?? {};
     const settings = Object.assign({}, defaultSettings, existing);
+    let changed = false;
 
     if (extension_settings[oldExtensionKey] && !settings._migrated) {
         const old = extension_settings[oldExtensionKey];
@@ -55,10 +85,20 @@ function loadSettings() {
         }
 
         settings._migrated = true;
+        changed = true;
     }
 
-    delete settings.showRecoverInputButton;
+    if (Object.hasOwn(settings, 'showRecoverInputButton')) {
+        delete settings.showRecoverInputButton;
+        changed = true;
+    }
+
+    changed = sanitizeLegacySettings(settings) || changed;
     extension_settings[extensionName] = settings;
+
+    if (changed) {
+        saveSettingsDebounced();
+    }
 }
 
 function maybeWarnOldExtensionDeprecated() {

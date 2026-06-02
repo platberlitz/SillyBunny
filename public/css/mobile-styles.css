@@ -37,6 +37,122 @@
         flex-basis: 100%;
     }
 
+    #AdvancedFormatting > .flex-container.alignItemsBaseline:first-child {
+        align-items: center;
+        gap: 8px;
+        flex-wrap: nowrap;
+    }
+
+    #AdvancedFormatting > .flex-container.alignItemsBaseline:first-child > h3 {
+        min-width: 0;
+        font-size: calc(var(--mainFontSize) * 0.92);
+        line-height: 1.15;
+    }
+
+    #AdvancedFormatting > .flex-container.alignItemsBaseline:first-child > h3 span {
+        display: inline-block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #AdvancedFormatting > .flex-container.alignItemsBaseline:first-child > .flex-container {
+        flex: 0 0 auto;
+        gap: 4px;
+    }
+
+    #AdvancedFormatting #af_master_import,
+    #AdvancedFormatting #af_master_export {
+        width: var(--sb-mobile-touch-target, 44px);
+        min-width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+        padding: 0;
+        justify-content: center;
+    }
+
+    #AdvancedFormatting #af_master_import > span,
+    #AdvancedFormatting #af_master_export > span {
+        display: none;
+    }
+
+    #AdvancedFormatting .flex-container.spaceEvenly {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    #AdvancedFormatting .flex-container.spaceEvenly > div {
+        min-width: 0;
+    }
+
+    #InstructSettingsColumn > .margin0.title_restorable.standoutHeader {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: nowrap;
+    }
+
+    #InstructSettingsColumn > .margin0.title_restorable.standoutHeader > strong {
+        min-width: 0;
+        font-size: calc(var(--mainFontSize) * 0.88);
+        line-height: 1.15;
+    }
+
+    #InstructSettingsColumn > .margin0.title_restorable.standoutHeader > .flex-container {
+        flex: 0 0 auto;
+        gap: 4px;
+        flex-wrap: nowrap;
+    }
+
+    #InstructSettingsColumn > .margin0.title_restorable.standoutHeader .menu_button_icon {
+        width: var(--sb-mobile-touch-target, 44px);
+        min-width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+        padding: 0;
+        justify-content: center;
+    }
+
+    #InstructSettingsColumn > .margin0.title_restorable.standoutHeader .menu_button_icon > span {
+        display: none;
+    }
+
+    #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap {
+        gap: 6px;
+        flex-wrap: nowrap;
+        align-items: center;
+    }
+
+    #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap::before {
+        content: none !important;
+        display: none !important;
+    }
+
+    #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap > #instruct_presets {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap > .flex-container.marginLeft5 {
+        gap: 4px;
+        flex-wrap: nowrap;
+        flex: 0 0 auto;
+    }
+
+    #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap .menu_button_icon {
+        width: var(--sb-mobile-touch-target, 44px);
+        min-width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+        padding: 0;
+        justify-content: center;
+    }
+
+    #InstructSettingsColumn #instructSettingsBlock > .flex-container.flexNoGap .menu_button_icon > span {
+        display: none;
+    }
+
     #rm_button_panel_pin_div {
         display: none;
     }
@@ -794,8 +910,7 @@
     }
 
     /* .world_entry_thin_controls, */
-    #persona-management-block,
-    #character_popup .flex-container {
+    #persona-management-block {
         flex-direction: column;
     }
 
@@ -942,7 +1057,6 @@
 
 
     #sheld,
-    #character_popup,
     .drawer-content {
         width: 100dvw !important;
         margin: 0 auto;
@@ -971,12 +1085,10 @@
         display: block !important;
     }
 
-    #character_popup,
     #world_popup {
         overflow-y: auto;
     }
 
-    #character_popup,
     #send_form {
         border: 1px solid var(--SmartThemeBorderColor);
         backdrop-filter: blur(20px);
@@ -1138,14 +1250,6 @@
     /*     .avatar_div {
         margin-top: 5px;
     } */
-
-    #character_popup {
-        width: 100%;
-        border-radius: 0 0 20px 20px;
-        margin-top: 0px;
-        height: calc(100% - var(--topBarBlockSize));
-        transform: none;
-    }
 
     .drawer25pWidth {
         flex-basis: max(calc(100% / 4 - 10px), 190px);
@@ -1333,7 +1437,6 @@
 
     }
 
-    #character_popup,
     #world_popup,
     #left-nav-panel,
     #right-nav-panel,
@@ -1358,7 +1461,6 @@
         transform: none;
     }
 
-    #character_popup,
     #world_popup,
     .drawer-content {
         margin-top: 0;
@@ -1435,10 +1537,6 @@
         border-radius: 0 !important;
         backdrop-filter: blur(20px);
         background: var(--SmartThemeBlurTintColor);
-    }
-
-    #character_popup {
-        z-index: var(--sb-z-loader) !important;
     }
 
     /*
@@ -1937,6 +2035,95 @@
     #group_speaker_auto_dm:not(.selected) {
         opacity: 0.58 !important;
         background: color-mix(in srgb, var(--SmartThemeBodyColor) 8%, transparent) !important;
+    }
+
+    /* SillyBunny: Mobile-specific group member touch targets for Add Members screen */
+    #rm_group_add_members .group_member {
+        cursor: pointer;
+        padding: 8px 5px;
+    }
+
+    #rm_group_add_members .group_member:active {
+        background-color: var(--white30a);
+    }
+
+    /* Increase touch target size for action buttons on mobile */
+    #rm_group_add_members .right_menu_button,
+    #rm_group_members .right_menu_button {
+        min-width: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+        width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Adjust grid layout for mobile to accommodate larger touch targets */
+    #rm_group_add_members .group_member {
+        --sb-group-actions-width: calc(var(--sb-mobile-touch-target, 44px) + var(--sb-mobile-touch-target, 44px) + 4px);
+        grid-template-columns: auto minmax(0, 1fr) var(--sb-group-actions-width);
+        column-gap: 8px;
+    }
+
+    #rm_group_members .group_member {
+        --sb-group-actions-width: calc(var(--sb-mobile-touch-target, 44px) + var(--sb-mobile-touch-target, 44px) + var(--sb-mobile-touch-target, 44px) + 8px);
+        grid-template-columns: auto minmax(0, 1fr) minmax(var(--sb-mobile-touch-target, 44px), var(--sb-group-actions-width));
+        column-gap: 8px;
+    }
+
+    /* Hide model input and queue position on mobile to save space */
+    #rm_group_add_members .group_member_model,
+    #rm_group_add_members .queue_position,
+    #rm_group_members .group_member_model,
+    #rm_group_members .queue_position {
+        display: none;
+    }
+
+    /* Ensure action icons container has proper sizing */
+    #rm_group_add_members .group_member_icon,
+    #rm_group_members .group_member_icon {
+        min-width: var(--sb-mobile-touch-target, 44px);
+        gap: 4px;
+        justify-content: flex-end;
+    }
+
+    #rm_group_add_members .group_member_icon {
+        width: var(--sb-group-actions-width);
+    }
+
+    #rm_group_members .group_member_icon {
+        max-width: var(--sb-group-actions-width);
+        flex-wrap: wrap;
+    }
+
+    /* SillyBunny: Prevent text overflow on Generate Schedule button */
+    #rm_group_generate_schedule {
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    #rm_group_generate_schedule span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+
+    /* General fix for menu_button_icon with text on mobile */
+    .menu_button_icon:has(> span) {
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .menu_button_icon > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
     }
 
 }

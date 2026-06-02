@@ -1,13 +1,14 @@
 import { animation_duration } from '../../../../../script.js';
 import { dragElement } from '../../../../RossAscends-mods.js';
 import { loadMovingUIState } from '../../../../power-user.js';
-import { QuickReplySettings } from '../QuickReplySettings.js';
+import { getUniqueQuickReplySetLinksBySetName } from '../quick-reply-set-list.js';
 
 export class ButtonUi {
     /** @type {QuickReplySettings} */ settings;
 
     /**@type {HTMLElement}*/ dom;
     /**@type {HTMLElement}*/ popoutDom;
+    /**@type {MutationObserver}*/ placementObserver;
 
 
     constructor(/**@type {QuickReplySettings}*/settings) {
@@ -22,6 +23,7 @@ export class ButtonUi {
         return this.renderBar();
     }
     unrender() {
+        this.stopPlacementObserver();
         this.dom?.remove();
         this.dom = null;
         this.popoutDom?.remove();
@@ -36,12 +38,7 @@ export class ButtonUi {
             $(this.render()).fadeIn(animation_duration);
             dragElement($(this.render()));
         } else {
-            const sendForm = document.querySelector('#send_form');
-            if (sendForm.children.length > 0) {
-                sendForm.children[0].insertAdjacentElement('beforebegin', this.render());
-            } else {
-                sendForm.append(this.render());
-            }
+            this.showBar();
         }
     }
     hide() {
@@ -50,6 +47,58 @@ export class ButtonUi {
     refresh() {
         this.hide();
         this.show();
+    }
+
+    showBar() {
+        const bar = this.render();
+        if (this.placeBar(bar)) {
+            return;
+        }
+
+        this.startPlacementObserver();
+    }
+
+    placeBar(/**@type {HTMLElement}*/bar) {
+        const sendForm = document.querySelector('#send_form');
+        if (!sendForm) {
+            return false;
+        }
+
+        const nonQrFormItems = document.querySelector('#nonQRFormItems');
+        if (nonQrFormItems?.parentElement === sendForm) {
+            sendForm.insertBefore(bar, nonQrFormItems);
+        } else if (sendForm.firstElementChild) {
+            sendForm.insertBefore(bar, sendForm.firstElementChild);
+        } else {
+            sendForm.append(bar);
+        }
+
+        this.stopPlacementObserver();
+        return true;
+    }
+
+    startPlacementObserver() {
+        if (this.placementObserver || typeof MutationObserver === 'undefined' || !document.body) {
+            return;
+        }
+
+        this.placementObserver = new MutationObserver(() => {
+            this.placeBar(this.render());
+        });
+        this.placementObserver.observe(document.body, { childList: true, subtree: true });
+    }
+
+    stopPlacementObserver() {
+        this.placementObserver?.disconnect();
+        this.placementObserver = null;
+    }
+
+    getVisibleSetLinks() {
+        return getUniqueQuickReplySetLinksBySetName([
+            ...this.settings.config.setList,
+            ...(this.settings.chatConfig?.setList ?? []),
+            ...(this.settings.charConfig?.setList ?? []),
+        ].filter(link => link.isVisible && !link.set?.isDeleted));
     }
 
 
@@ -84,10 +133,7 @@ export class ButtonUi {
                         root.append(buttons);
                     }
                 }
-                [...this.settings.config.setList, ...(this.settings.chatConfig?.setList ?? []), ...(this.settings.charConfig?.setList ?? [])]
-                    .filter(link => link.isVisible)
-                    .forEach(link => buttonHolder.append(link.set.render()))
-                ;
+                this.getVisibleSetLinks().forEach(link => buttonHolder.append(link.set.render()));
             }
         }
         return this.dom;
@@ -142,10 +188,7 @@ export class ButtonUi {
                             body.append(buttons);
                         }
                     }
-                    [...this.settings.config.setList, ...(this.settings.chatConfig?.setList ?? []), ...(this.settings.charConfig?.setList ?? [])]
-                        .filter(link => link.isVisible)
-                        .forEach(link => buttonHolder.append(link.set.render()))
-                    ;
+                    this.getVisibleSetLinks().forEach(link => buttonHolder.append(link.set.render()));
                     root.append(body);
                 }
             }

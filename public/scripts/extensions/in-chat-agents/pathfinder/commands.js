@@ -2,9 +2,12 @@ import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { ARGUMENT_TYPE, SlashCommandArgument } from '../../../slash-commands/SlashCommandArgument.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 
+import { isPathfinderSubmoduleEnabled } from '../agent-store.js';
 import { getTree, findNodeById } from './tree-store.js';
 import { createEntry } from './entry-manager.js';
 import { getActiveTunnelVisionBooks } from './pathfinder-tool-bridge.js';
+
+const registeredCommands = [];
 
 function buildCommand(props) {
     return SlashCommand.fromProps({
@@ -19,15 +22,29 @@ function buildCommand(props) {
     });
 }
 
+export function removeCommands() {
+    for (const command of registeredCommands.splice(0)) {
+        for (const name of [command.name, ...(command.aliases || [])]) {
+            if (SlashCommandParser.commands?.[name] === command) {
+                delete SlashCommandParser.commands[name];
+            }
+        }
+    }
+}
+
 export function initCommands(registerSlashCommand) {
+    removeCommands();
+
     const registerCommand = (command) => {
         if (typeof SlashCommandParser?.addCommandObject === 'function') {
             SlashCommandParser.addCommandObject(command);
+            registeredCommands.push(command);
             return;
         }
 
         if (typeof registerSlashCommand === 'function') {
             registerSlashCommand(command.name, command.callback, command.aliases, command.helpString);
+            registeredCommands.push(command);
         }
     };
 
@@ -36,6 +53,9 @@ export function initCommands(registerSlashCommand) {
         helpString: 'Force Pathfinder to save something to memory.',
         argumentDescription: 'Content to remember',
         callback: async (_, content) => {
+            if (!isPathfinderSubmoduleEnabled()) {
+                return 'Pathfinder is disabled.';
+            }
             content = String(content || '').trim();
             if (!content) return 'Nothing to remember.';
             const books = getActiveTunnelVisionBooks();
@@ -55,6 +75,9 @@ export function initCommands(registerSlashCommand) {
         helpString: 'Force Pathfinder to search the waypoint map.',
         argumentDescription: 'Search query',
         callback: async (_, query) => {
+            if (!isPathfinderSubmoduleEnabled()) {
+                return 'Pathfinder is disabled.';
+            }
             query = String(query || '').trim();
             if (!query) return 'No search query.';
             const results = [];

@@ -114,7 +114,7 @@
         "type": "git",
         "url": "https://github.com/platberlitz/SillyBunny.git"
     },
-    "version": "1.6.0",
+    "version": "1.6.1",
     "scripts": {
         "start": "bun server.js",
         "start:node": "node --no-warnings server.js",
@@ -128,6 +128,7 @@
         "lint": "eslint \"src/**/*.js\" \"public/**/*.js\" \"scripts/**/*.js\" ./*.js",
         "lint:fix": "eslint \"src/**/*.js\" \"public/**/*.js\" \"scripts/**/*.js\" ./*.js --fix",
         "check:frontend-budgets": "node scripts/check-frontend-budgets.js",
+        "agents:bump-template-versions": "node scripts/bump-agent-template-versions.js",
         "changelog:merged-prs": "node scripts/update-changelog-merged-prs.js",
         "plugins:update": "bun plugins.js update",
         "plugins:install": "bun plugins.js install"

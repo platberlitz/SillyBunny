@@ -19,6 +19,7 @@ import {
 /**
  * @typedef {object} AgentPreProcess
  * @property {'inject'|'intercept'} mode - Inject is the existing setExtensionPrompt flow; intercept rewrites the assembled outgoing context.
+ * @property {'pre-generation'|'post-main-generation'} interceptTiming - When intercept mode runs.
  * @property {'replace'|'wrap'|'patch'} applyMode
  * @property {'before'|'after'} wrapPosition
  * @property {string} wrapPrefix
@@ -122,6 +123,7 @@ function createDefaultScopedEnabledAgentIds() {
 /** Global settings for the In-Chat Agents extension. */
 let globalSettings = {
     enabled: true,
+    pathfinderEnabled: true,
     separateRecentChats: false,
     enabledAgentIdsByChatType: createDefaultScopedEnabledAgentIds(),
     scopedEnabledAgentIdsInitialized: false,
@@ -132,7 +134,7 @@ let globalSettings = {
 
 /**
  * Returns the global settings.
- * @returns {{ enabled: boolean, separateRecentChats: boolean, enabledAgentIdsByChatType: Record<string, string[]>, scopedEnabledAgentIdsInitialized: boolean, connectionProfile: string, promptTransformShowNotifications: boolean, appendAgentsExecutionMode: 'parallel'|'sequential' }}
+ * @returns {{ enabled: boolean, pathfinderEnabled: boolean, separateRecentChats: boolean, enabledAgentIdsByChatType: Record<string, string[]>, scopedEnabledAgentIdsInitialized: boolean, connectionProfile: string, promptTransformShowNotifications: boolean, appendAgentsExecutionMode: 'parallel'|'sequential' }}
  */
 export function getGlobalSettings() {
     return globalSettings;
@@ -148,6 +150,7 @@ export function setGlobalSettings(update) {
     }
 
     Object.assign(globalSettings, update);
+    globalSettings.pathfinderEnabled = globalSettings.pathfinderEnabled !== false;
     globalSettings.enabledAgentIdsByChatType = normalizeScopedEnabledAgentIds(globalSettings.enabledAgentIdsByChatType);
 
     if (!globalSettings.scopedEnabledAgentIdsInitialized) {
@@ -428,6 +431,14 @@ export const PATHFINDER_TEMPLATE_ID = 'tpl-pathfinder';
 
 export function areAgentsGloballyEnabled() {
     return globalSettings.enabled !== false;
+}
+
+export function isPathfinderSubmoduleEnabled() {
+    return globalSettings.pathfinderEnabled !== false;
+}
+
+export function setPathfinderSubmoduleEnabled(enabled) {
+    setGlobalSettings({ pathfinderEnabled: enabled !== false });
 }
 
 function getAgentTemplateName(value) {
@@ -782,6 +793,7 @@ export function createDefaultAgent() {
         },
         preProcess: {
             mode: 'inject',
+            interceptTiming: 'pre-generation',
             applyMode: 'replace',
             wrapPosition: 'after',
             wrapPrefix: '',
@@ -880,6 +892,9 @@ export function normalizeAgent(rawAgent = {}) {
             mode: ['inject', 'intercept'].includes(String(rawPreProcess.mode))
                 ? String(rawPreProcess.mode)
                 : defaults.preProcess.mode,
+            interceptTiming: ['pre-generation', 'post-main-generation'].includes(String(rawPreProcess.interceptTiming))
+                ? String(rawPreProcess.interceptTiming)
+                : defaults.preProcess.interceptTiming,
             applyMode: ['replace', 'wrap', 'patch'].includes(String(rawPreProcess.applyMode))
                 ? String(rawPreProcess.applyMode)
                 : defaults.preProcess.applyMode,

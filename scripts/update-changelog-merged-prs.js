@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '..');
@@ -109,15 +109,21 @@ function readEventPrNumbers() {
     return prNumbers;
 }
 
-function extractMergedPrNumbers(message) {
-    const numbers = [];
-    const pattern = /^Merge pull request #(\d+)\b/gm;
+export function extractMergedPrNumbers(message) {
+    const numbers = new Set();
+    const text = String(message || '');
 
-    for (const match of String(message || '').matchAll(pattern)) {
-        numbers.push(match[1]);
+    for (const match of text.matchAll(/^Merge pull request #(\d+)\b/gm)) {
+        numbers.add(match[1]);
     }
 
-    return numbers;
+    const [subject = ''] = text.split(/\r?\n/, 1);
+    const squashMatch = /\(#(\d+)\)\s*$/.exec(subject);
+    if (squashMatch) {
+        numbers.add(squashMatch[1]);
+    }
+
+    return [...numbers];
 }
 
 function normalizePrNumbers(values) {
@@ -206,6 +212,10 @@ function formatPrEntry(pr) {
     return `- PR #${pr.number} (${date}) \`${escapeInlineCode(pr.title)}\``;
 }
 
+function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function mergePrLines(existingText, prs) {
     const byNumber = new Map();
 
@@ -231,7 +241,7 @@ function mergePrLines(existingText, prs) {
 }
 
 function updateVersionBlock(block, prs) {
-    const sectionPattern = /### Merged Staging PRs\n([\s\S]*?)(?=\n### |\n## |$)/;
+    const sectionPattern = /### Merged Staging PRs\r?\n([\s\S]*?)(?=\r?\n### |\r?\n## |$)/;
     const match = sectionPattern.exec(block);
 
     if (match) {
@@ -252,15 +262,17 @@ function updateVersionBlock(block, prs) {
 }
 
 function updateChangelog(changelog, version, prs) {
-    const versionHeading = `## ${version}\n`;
-    const versionStart = changelog.indexOf(versionHeading);
+    const versionHeadingPattern = new RegExp(`(^|\\r?\\n)## ${escapeRegExp(version)}\\r?\\n`);
+    const versionHeadingMatch = versionHeadingPattern.exec(changelog);
 
-    if (versionStart === -1) {
-        throw new Error(`Could not find changelog section: ${versionHeading.trim()}`);
+    if (!versionHeadingMatch) {
+        throw new Error(`Could not find changelog section: ## ${version}`);
     }
 
-    const nextVersionStart = changelog.indexOf('\n## ', versionStart + versionHeading.length);
-    const versionEnd = nextVersionStart === -1 ? changelog.length : nextVersionStart;
+    const versionStart = versionHeadingMatch.index + versionHeadingMatch[1].length;
+    const versionHeadingEnd = versionStart + versionHeadingMatch[0].length - versionHeadingMatch[1].length;
+    const nextVersionMatch = /\r?\n## /.exec(changelog.slice(versionHeadingEnd));
+    const versionEnd = nextVersionMatch ? versionHeadingEnd + nextVersionMatch.index : changelog.length;
     const block = changelog.slice(versionStart, versionEnd);
     const updatedBlock = updateVersionBlock(block, prs);
 
@@ -315,4 +327,6 @@ function main() {
     }
 }
 
-main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    main();
+}

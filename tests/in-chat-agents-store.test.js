@@ -145,6 +145,7 @@ describe('in-chat agent scoped enabled state', () => {
             name: 'Intercept Agent',
             preProcess: {
                 mode: 'intercept',
+                interceptTiming: 'post-main-generation',
                 applyMode: 'patch',
                 wrapPosition: 'before',
                 wrapPrefix: 'prefix',
@@ -157,6 +158,7 @@ describe('in-chat agent scoped enabled state', () => {
 
         expect(store.getAgentById('agent-intercept').preProcess).toEqual(expect.objectContaining({
             mode: 'intercept',
+            interceptTiming: 'post-main-generation',
             applyMode: 'patch',
             wrapPosition: 'before',
             wrapPrefix: 'prefix',
@@ -171,6 +173,7 @@ describe('in-chat agent scoped enabled state', () => {
             name: 'Invalid Intercept Agent',
             preProcess: {
                 mode: 'unknown',
+                interceptTiming: 'after-lunch',
                 applyMode: 'unknown',
                 wrapPosition: 'middle',
                 maxTokens: 'not-a-number',
@@ -179,6 +182,7 @@ describe('in-chat agent scoped enabled state', () => {
 
         expect(store.getAgentById('agent-invalid-intercept').preProcess).toEqual(expect.objectContaining({
             mode: 'inject',
+            interceptTiming: 'pre-generation',
             applyMode: 'replace',
             wrapPosition: 'after',
             maxTokens: store.DEFAULT_AGENT_MAX_TOKENS,

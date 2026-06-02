@@ -23,6 +23,7 @@ import { renderTemplateAsync } from './templates.js';
 import { t } from './i18n.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { getOrCreatePersonaDescriptor, setPersonaDescription, user_avatar } from './personas.js';
+import { normalizeCharacterBookPosition } from './world-info-character-book.js';
 
 export const world_info_insertion_strategy = {
     evenly: 0,
@@ -2156,23 +2157,35 @@ function syncWorldInfoDesktopEditorPopout() {
     setWorldInfoDesktopEditorPopout(isWorldInfoEditorPopoutRequested);
 }
 
+function openWorldInfoCharacterPanelTab() {
+    const sillyBunnyShell = /** @type {any} */ (globalThis.SillyBunnyShell);
+    if (sillyBunnyShell?.openTab) {
+        sillyBunnyShell.openTab('characters', 'world-info');
+        return;
+    }
+
+    if (!$('#WorldInfo').is(':visible')) {
+        $('#WIDrawerIcon').trigger('click');
+    }
+}
+
 function bindWorldInfoDesktopEditorPopoutShellSync() {
     if (isWorldInfoEditorPopoutShellSyncBound) {
         return;
     }
 
-    const leftShell = document.getElementById('left-nav-panel');
-    if (leftShell instanceof HTMLElement) {
+    const characterShell = document.getElementById('right-nav-panel');
+    if (characterShell instanceof HTMLElement) {
         new MutationObserver(() => {
-            if (!leftShell.classList.contains('openDrawer')) {
+            if (!characterShell.classList.contains('openDrawer')) {
                 setWorldInfoDesktopEditorPopout(false);
             }
-        }).observe(leftShell, { attributes: true, attributeFilter: ['class'] });
+        }).observe(characterShell, { attributes: true, attributeFilter: ['class'] });
     }
 
     document.addEventListener('sb:shell-tab-activated', (event) => {
         if (event instanceof CustomEvent
-            && event.detail?.shellKey === 'left'
+            && event.detail?.shellKey === 'characters'
             && event.detail?.tabId !== 'world-info') {
             setWorldInfoDesktopEditorPopout(false);
         }
@@ -5819,7 +5832,7 @@ export function convertCharacterBook(characterBook) {
             constant: entry.constant || false,
             selective: entry.selective || false,
             order: entry.insertion_order,
-            position: entry.extensions?.position ?? (entry.position === 'before_char' ? world_info_position.before : world_info_position.after),
+            position: normalizeCharacterBookPosition(entry.extensions?.position, entry.position, world_info_position),
             excludeRecursion: entry.extensions?.exclude_recursion ?? false,
             preventRecursion: entry.extensions?.prevent_recursion ?? false,
             delayUntilRecursion: entry.extensions?.delay_until_recursion ?? false,
@@ -5948,7 +5961,7 @@ export async function importEmbeddedWorldInfo(skipPopup = false) {
     const newIndex = world_names.indexOf(bookName);
     if (newIndex >= 0) {
         //show&draw the WI panel before..
-        $('#WIDrawerIcon').trigger('click');
+        openWorldInfoCharacterPanelTab();
         //..auto-opening the new imported WI
         $('#world_editor_select').val(newIndex).trigger('change');
     }
@@ -6123,9 +6136,7 @@ export async function importWorldInfo(file) {
  */
 export function openWorldInfoEditor(worldName) {
     console.log(`Opening lorebook for ${worldName}`);
-    if (!$('#WorldInfo').is(':visible')) {
-        $('#WIDrawerIcon').trigger('click');
-    }
+    openWorldInfoCharacterPanelTab();
     const index = world_names.indexOf(worldName);
     $('#world_editor_select').val(index).trigger('change');
 }
@@ -6597,7 +6608,7 @@ export function initWorldInfo() {
         $(this).prop('selectedIndex', 0);
 
         if (target === 'renameGroupButton') {
-            await globalThis.SillyBunnyShell?.renameOpenGroup?.();
+            await /** @type {any} */ (globalThis.SillyBunnyShell)?.renameOpenGroup?.();
             return;
         }
 
@@ -6606,9 +6617,34 @@ export function initWorldInfo() {
 
     // Not needed on mobile
     if (!isMobile()) {
+        const syncWorldInfoSelect2DropdownGeometry = (select) => {
+            const $select = $(select);
+            const select2 = $select.data('select2');
+            const $container = select2?.$container?.length ? select2.$container : $select.next('.select2-container');
+            const containerRect = $container[0]?.getBoundingClientRect();
+            const fallbackRect = select.closest('.world_popup_action_group')?.getBoundingClientRect();
+            const measuredWidth = containerRect?.width || fallbackRect?.width || select.getBoundingClientRect().width;
+            const maxViewportWidth = Math.max(240, (document.documentElement.clientWidth || window.innerWidth || measuredWidth) - 24);
+            const width = Math.min(Math.max(240, Math.ceil(measuredWidth || 0)), maxViewportWidth);
+            const $dropdown = select2?.dropdown?.$dropdown?.length
+                ? select2.dropdown.$dropdown
+                : $(`#select2-${select.id}-results`).closest('.select2-dropdown');
+
+            if (!$dropdown.length || !Number.isFinite(width)) {
+                return;
+            }
+
+            const dropdownWidth = `${width}px`;
+            const $dropdownContainer = $dropdown.closest('.select2-container--open');
+            $dropdown.css({ width: dropdownWidth, minWidth: dropdownWidth });
+            $dropdownContainer.css({ width: dropdownWidth, minWidth: dropdownWidth });
+        };
+
         $('#world_editor_select').select2({
+            width: '100%',
             placeholder: t`--- Pick to Edit ---`,
             searchInputPlaceholder: t`Search...`,
+            dropdownCssClass: 'sb-world-info-select2-dropdown',
             allowClear: true,
             closeOnSelect: true,
             multiple: false,
@@ -6617,9 +6653,16 @@ export function initWorldInfo() {
         $('#world_info').select2({
             width: '100%',
             placeholder: t`No Worlds active. Click here to select.`,
+            dropdownCssClass: 'sb-world-info-select2-dropdown',
             allowClear: true,
             closeOnSelect: false,
         });
+
+        $('#world_editor_select, #world_info')
+            .off('select2:open.sillybunnyWorldInfoGeometry')
+            .on('select2:open.sillybunnyWorldInfoGeometry', function () {
+                window.requestAnimationFrame(() => syncWorldInfoSelect2DropdownGeometry(this));
+            });
 
         // Subscribe world loading to the select2 multiselect items (We need to target the specific select2 control)
         select2ChoiceClickSubscribe($('#world_info'), target => {

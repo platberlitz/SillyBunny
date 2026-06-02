@@ -3,7 +3,7 @@ import process from 'node:process';
 import express from 'express';
 import fetch from 'node-fetch';
 import urlJoin from 'url-join';
-import { isLikelyLocalServerUrl } from '../../../public/scripts/local-url-utils.js';
+import { getLocalPromptCacheValue, isLikelyLocalServerUrl } from '../../../public/scripts/local-url-utils.js';
 
 import {
     AIMLAPI_HEADERS,
@@ -23,8 +23,9 @@ import {
 } from '../../constants.js';
 import {
     forwardFetchResponse,
-    abortOnResponseClose,
+    abortOnRequestClose,
     getConfigValue,
+    pollStreamingRequestConnection,
     tryParse,
     uuidv4,
     mergeObjectWithYaml,
@@ -66,7 +67,7 @@ import {
     webTokenizers,
     getWebTokenizer,
 } from '../tokenizers.js';
-import { getVertexAIAuth, getProjectIdFromServiceAccount } from '../google.js';
+import { getVertexAIAuth, getProjectIdFromServiceAccount, getGoogleApiBaseUrl } from '../google.js';
 
 const API_OPENAI = 'https://api.openai.com/v1';
 const API_CLAUDE = 'https://api.anthropic.com/v1';
@@ -271,12 +272,9 @@ function applyLocalPromptCacheScope(bodyParams, requestBody) {
         return;
     }
 
-    // SillyBunny: isolate helper generations so local prompt caches keep the main chat lane hot.
-    if (String(requestBody.cacheScope ?? 'auxiliary') === 'main') {
-        bodyParams.cache_prompt = true;
-    } else {
-        delete bodyParams.cache_prompt;
-    }
+    // SillyBunny: helper generations must explicitly opt out, because some
+    // local llama.cpp servers default to --cache-prompt for every request.
+    bodyParams.cache_prompt = getLocalPromptCacheValue(requestBody.cacheScope);
 }
 
 /**
@@ -313,7 +311,7 @@ async function sendClaudeRequest(request, response) {
 
     try {
         const controller = new AbortController();
-        abortOnResponseClose(response, controller);
+        abortOnRequestClose(request, controller);
         const additionalHeaders = {};
         const betaHeaders = ['output-128k-2025-02-19', 'context-1m-2025-08-07'];
         const useTools = Array.isArray(request.body.tools) && request.body.tools.length > 0;
@@ -472,7 +470,7 @@ async function sendClaudeRequest(request, response) {
 
         if (request.body.stream) {
             // Pipe remote SSE stream to Express response
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const generateResponseText = await generateResponse.text();
@@ -717,7 +715,7 @@ async function sendMakerSuiteRequest(request, response) {
 
     try {
         const controller = new AbortController();
-        abortOnResponseClose(response, controller);
+        abortOnRequestClose(request, controller);
 
         const apiVersion = getConfigValue('gemini.apiVersion', 'v1beta');
         const responseType = (stream ? 'streamGenerateContent' : 'generateContent');
@@ -766,11 +764,13 @@ async function sendMakerSuiteRequest(request, response) {
                 headers['Authorization'] = authHeader;
             } else {
                 // For proxy mode, use the original URL with Authorization header
-                url = `${apiUrl.toString().replace(/\/$/, '')}/v1/publishers/google/models/${model}:${responseType}${stream ? '?alt=sse' : ''}`;
+                const baseUrl = getGoogleApiBaseUrl(apiUrl.toString(), 'v1');
+                url = `${baseUrl}/publishers/google/models/${model}:${responseType}${stream ? '?alt=sse' : ''}`;
                 headers['Authorization'] = authHeader;
             }
         } else {
-            url = `${apiUrl.toString().replace(/\/$/, '')}/${apiVersion}/models/${model}:${responseType}?key=${apiKey}${stream ? '&alt=sse' : ''}`;
+            const baseUrl = getGoogleApiBaseUrl(apiUrl.toString(), apiVersion);
+            url = `${baseUrl}/models/${model}:${responseType}?key=${apiKey}${stream ? '&alt=sse' : ''}`;
         }
 
         const generateResponse = await fetch(url, {
@@ -783,7 +783,7 @@ async function sendMakerSuiteRequest(request, response) {
         if (stream) {
             try {
                 // Pipe remote SSE stream to Express response
-                forwardFetchResponse(generateResponse, response);
+                forwardFetchResponse(generateResponse, response, request, () => controller.abort());
             } catch (error) {
                 console.error('Error forwarding streaming response:', error);
                 if (!response.headersSent) {
@@ -851,7 +851,7 @@ async function sendAI21Request(request, response) {
 
     const bodyParams = {};
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
     // Hack to support JSON schema
     if (request.body.json_schema) {
         bodyParams.response_format = {
@@ -891,7 +891,7 @@ async function sendAI21Request(request, response) {
     try {
         const generateResponse = await fetch(API_AI21 + '/chat/completions', options);
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -930,7 +930,7 @@ async function sendMistralAIRequest(request, response) {
     try {
         const messages = convertMistralMessages(request.body.messages, getPromptNames(request));
         const controller = new AbortController();
-        abortOnResponseClose(response, controller);
+        abortOnRequestClose(request, controller);
 
         const requestBody = {
             'model': request.body.model,
@@ -978,7 +978,7 @@ async function sendMistralAIRequest(request, response) {
 
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -1008,7 +1008,7 @@ async function sendMistralAIRequest(request, response) {
 async function sendCohereRequest(request, response) {
     const apiKey = readSecret(request.user.directories, SECRET_KEYS.COHERE);
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     if (!apiKey) {
         console.warn('Cohere API key is missing.');
@@ -1074,7 +1074,7 @@ async function sendCohereRequest(request, response) {
 
         if (request.body.stream) {
             const stream = await fetch(apiUrl, config);
-            forwardFetchResponse(stream, response);
+            forwardFetchResponse(stream, response, request, () => controller.abort());
         } else {
             const generateResponse = await fetch(apiUrl, config);
             if (!generateResponse.ok) {
@@ -1112,7 +1112,7 @@ async function sendDeepSeekRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         let bodyParams = {};
@@ -1189,7 +1189,7 @@ async function sendDeepSeekRequest(request, response) {
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -1226,7 +1226,7 @@ async function sendXaiRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         let bodyParams = {};
@@ -1294,7 +1294,7 @@ async function sendXaiRequest(request, response) {
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -1331,7 +1331,7 @@ async function sendAimlapiRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         let bodyParams = {};
@@ -1396,7 +1396,7 @@ async function sendAimlapiRequest(request, response) {
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -1433,7 +1433,7 @@ async function sendElectronHubRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         let bodyParams = {};
@@ -1505,7 +1505,7 @@ async function sendElectronHubRequest(request, response) {
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -1542,7 +1542,7 @@ async function sendChutesRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         let bodyParams = {};
@@ -1603,7 +1603,7 @@ async function sendChutesRequest(request, response) {
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
         if (request.body.stream) {
-            forwardFetchResponse(generateResponse, response);
+            forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         } else {
             if (!generateResponse.ok) {
                 const errorText = await generateResponse.text();
@@ -1641,7 +1641,7 @@ async function sendMinimaxRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         // MiniMax does not allow consecutive messages with the same role.
@@ -1680,7 +1680,7 @@ async function sendMinimaxRequest(request, response) {
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
         if (request.body.stream) {
-            return forwardFetchResponse(generateResponse, response);
+            return forwardFetchResponse(generateResponse, response, request, () => controller.abort());
         }
 
         if (!generateResponse.ok) {
@@ -1757,7 +1757,7 @@ async function sendAzureOpenAIRequest(request, response) {
         : undefined;
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     const config = {
         method: 'POST',
@@ -1775,7 +1775,7 @@ async function sendAzureOpenAIRequest(request, response) {
         const fetchResponse = await fetch(endpointUrl, config);
 
         if (request.body.stream) {
-            return forwardFetchResponse(fetchResponse, response);
+            return forwardFetchResponse(fetchResponse, response, request, () => controller.abort());
         }
 
         if (fetchResponse.ok) {
@@ -1809,11 +1809,52 @@ router.post('/status', async function (request, statusResponse) {
 
         if ([CHAT_COMPLETION_SOURCES.OPENAI, CHAT_COMPLETION_SOURCES.OPENAI_RESPONSES].includes(request.body.chat_completion_source)) {
             apiUrl = new URL(request.body.reverse_proxy || API_OPENAI).toString();
-            apiKey = request.body.reverse_proxy ? request.body.proxy_password : readSecret(request.user.directories, SECRET_KEYS.OPENAI);
+            apiKey = request.body.reverse_proxy ? request.body.proxy_password : readSecret(request.user.directories, SECRET_KEYS.OPENAI, request.body.secret_id);
             headers = {};
+        } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.CLAUDE) {
+            apiUrl = new URL(request.body.reverse_proxy || API_CLAUDE).toString();
+            apiKey = request.body.reverse_proxy ? request.body.proxy_password : readSecret(request.user.directories, SECRET_KEYS.CLAUDE);
+
+            if (!apiKey && !request.body.reverse_proxy) {
+                console.warn('Claude API key is missing.');
+                return statusResponse.status(400).send({ error: true });
+            }
+
+            const modelsUrl = new URL(urlJoin(apiUrl, '/models'));
+            modelsUrl.searchParams.set('limit', '1000');
+            const anthropicHeaders = {
+                'anthropic-version': '2023-06-01',
+            };
+            if (apiKey) {
+                anthropicHeaders['x-api-key'] = apiKey;
+            }
+
+            try {
+                const response = await fetch(modelsUrl, {
+                    method: 'GET',
+                    headers: anthropicHeaders,
+                });
+
+                if (response.ok) {
+                    /** @type {any} */
+                    const data = await response.json();
+                    const models = Array.isArray(data?.data)
+                        ? data.data.filter(model => model?.id).map(model => ({ ...model, id: model.id }))
+                        : [];
+
+                    console.info('Available Claude models:', models.map(m => m.id));
+                    return statusResponse.send({ data: models });
+                }
+
+                console.warn('Claude models endpoint failed:', response.status, response.statusText);
+                return statusResponse.send({ error: true, bypass: true, data: [] });
+            } catch (error) {
+                console.error('Error fetching Claude models:', error);
+                return statusResponse.send({ error: true, bypass: true, data: [] });
+            }
         } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.OPENROUTER) {
             apiUrl = 'https://openrouter.ai/api/v1';
-            apiKey = readSecret(request.user.directories, SECRET_KEYS.OPENROUTER);
+            apiKey = readSecret(request.user.directories, SECRET_KEYS.OPENROUTER, request.body.secret_id);
             // OpenRouter needs to pass the Referer and X-Title: https://openrouter.ai/docs#requests
             headers = { ...OPENROUTER_HEADERS };
         } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.MISTRALAI) {
@@ -1879,9 +1920,10 @@ router.post('/status', async function (request, statusResponse) {
             apiKey = request.body.reverse_proxy ? request.body.proxy_password : readSecret(request.user.directories, SECRET_KEYS.MAKERSUITE);
             apiUrl = trimTrailingSlash(request.body.reverse_proxy || API_MAKERSUITE);
             const apiVersion = getConfigValue('gemini.apiVersion', 'v1beta');
+            const baseUrl = getGoogleApiBaseUrl(apiUrl, apiVersion);
             const modelsUrl = !apiKey && request.body.reverse_proxy
-                ? `${apiUrl}/${apiVersion}/models`
-                : `${apiUrl}/${apiVersion}/models?key=${apiKey}`;
+                ? `${baseUrl}/models`
+                : `${baseUrl}/models?key=${apiKey}`;
 
             if (!apiKey && !request.body.reverse_proxy) {
                 console.warn('Google AI Studio API key is missing.');
@@ -1910,6 +1952,87 @@ router.post('/status', async function (request, statusResponse) {
             } catch (error) {
                 console.error('Error fetching Google AI Studio models:', error);
                 return statusResponse.send({ error: true, bypass: true, data: { data: [] } });
+            }
+        } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.VERTEXAI) {
+            let auth;
+            try {
+                auth = await getVertexAIAuth(request);
+            } catch (error) {
+                console.warn(`Google Vertex AI authentication failed: ${error.message}`);
+                return statusResponse.status(400).send({ error: true, message: error.message });
+            }
+
+            const region = request.body.vertexai_region || 'us-central1';
+            const vertexHeaders = {};
+            let modelsUrl;
+
+            if (auth.authType === 'express') {
+                const apiKey = auth.authHeader.replace('Bearer ', '');
+                const projectId = request.body.vertexai_express_project_id;
+                const baseUrl = region === 'global'
+                    ? 'https://aiplatform.googleapis.com/v1'
+                    : `https://${region}-aiplatform.googleapis.com/v1`;
+                const parent = projectId
+                    ? `projects/${projectId}/locations/${region}/publishers/google`
+                    : 'publishers/google';
+                modelsUrl = new URL(`${baseUrl}/${parent}/models`);
+                vertexHeaders['x-goog-api-key'] = apiKey;
+            } else if (auth.authType === 'full') {
+                const serviceAccountJson = readSecret(request.user.directories, SECRET_KEYS.VERTEXAI_SERVICE_ACCOUNT);
+                if (!serviceAccountJson) {
+                    console.warn('Vertex AI Service Account JSON is missing.');
+                    return statusResponse.status(400).send({ error: true });
+                }
+
+                let projectId;
+                try {
+                    const serviceAccount = JSON.parse(serviceAccountJson);
+                    projectId = getProjectIdFromServiceAccount(serviceAccount);
+                } catch (error) {
+                    console.error('Failed to extract project ID from Service Account JSON:', error);
+                    return statusResponse.status(400).send({ error: true });
+                }
+
+                const baseUrl = region === 'global'
+                    ? 'https://aiplatform.googleapis.com/v1'
+                    : `https://${region}-aiplatform.googleapis.com/v1`;
+                modelsUrl = new URL(`${baseUrl}/projects/${projectId}/locations/${region}/publishers/google/models`);
+                vertexHeaders['Authorization'] = auth.authHeader;
+            } else {
+                const apiUrl = trimTrailingSlash(request.body.reverse_proxy || API_VERTEX_AI);
+                const baseUrl = getGoogleApiBaseUrl(apiUrl, 'v1');
+                modelsUrl = new URL(`${baseUrl}/publishers/google/models`);
+                vertexHeaders['Authorization'] = auth.authHeader;
+            }
+
+            modelsUrl.searchParams.set('pageSize', '1000');
+
+            try {
+                const response = await fetch(modelsUrl, {
+                    method: 'GET',
+                    headers: vertexHeaders,
+                });
+
+                if (response.ok) {
+                    /** @type {any} */
+                    const data = await response.json();
+                    const rawModels = Array.isArray(data) ? data : data?.publisherModels || data?.models || data?.data || [];
+                    const models = Array.isArray(rawModels)
+                        ? rawModels
+                            .map(model => ({ ...model, id: String(model?.id || model?.name || '').split('/').pop() }))
+                            .filter(model => /^(gemini|gemma|learnlm)-/.test(model.id))
+                            .filter(model => !Array.isArray(model.supportedGenerationMethods) || model.supportedGenerationMethods.includes('generateContent'))
+                        : [];
+
+                    console.info('Available Google Vertex AI models:', models.map(m => m.id));
+                    return statusResponse.send({ data: models });
+                }
+
+                console.warn('Google Vertex AI models endpoint failed:', response.status, response.statusText);
+                return statusResponse.send({ error: true, bypass: true, data: [] });
+            } catch (error) {
+                console.error('Error fetching Google Vertex AI models:', error);
+                return statusResponse.send({ error: true, bypass: true, data: [] });
             }
         } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.AZURE_OPENAI) {
             const { azure_base_url, azure_deployment_name, azure_api_version } = request.body;
@@ -2087,11 +2210,11 @@ router.post('/status', async function (request, statusResponse) {
                     });
             }
 
-            statusResponse.send(data);
-
             if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.COHERE && Array.isArray(data?.models)) {
                 data.data = data.models.map(model => ({ id: model.name, ...model }));
             }
+
+            statusResponse.send(data);
 
             if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.OPENROUTER && Array.isArray(data?.data)) {
                 let models = [];
@@ -2343,8 +2466,10 @@ function isExpectedStreamAbort(error) {
  * Transforms a Responses API SSE stream into Chat Completions SSE format.
  * @param {import('node-fetch').Response} fetchResponse The upstream Responses API response
  * @param {import('express').Response} expressResponse The Express response to write to
+ * @param {import('express').Request} request The Express request to poll for OS-level disconnects
+ * @param {() => void} onDisconnect Upstream disconnect callback
  */
-function forwardResponsesApiStream(fetchResponse, expressResponse) {
+function forwardResponsesApiStream(fetchResponse, expressResponse, request, onDisconnect = null) {
     let statusCode = fetchResponse.status;
     const statusText = fetchResponse.statusText;
 
@@ -2370,10 +2495,32 @@ function forwardResponsesApiStream(fetchResponse, expressResponse) {
 
     let buffer = '';
     let done = false;
+    const stopPolling = pollStreamingRequestConnection(request, expressResponse, closeStream);
+
+    function closeStream() {
+        if (done) {
+            return;
+        }
+
+        done = true;
+        stopPolling();
+        try {
+            onDisconnect?.();
+        } catch (error) {
+            console.warn('Error handling Responses API stream disconnect:', error);
+        }
+        if (fetchResponse.body && typeof fetchResponse.body.destroy === 'function') {
+            fetchResponse.body.destroy();
+        }
+        if (!expressResponse.destroyed && !expressResponse.writableEnded) {
+            expressResponse.end();
+        }
+    }
 
     function finishStream() {
         if (done) return;
         done = true;
+        stopPolling();
         if (!expressResponse.writableEnded) {
             expressResponse.write('data: [DONE]\n\n');
             expressResponse.end();
@@ -2423,6 +2570,7 @@ function forwardResponsesApiStream(fetchResponse, expressResponse) {
     });
 
     fetchResponse.body.on('error', (err) => {
+        stopPolling();
         if (done || isExpectedStreamAbort(err) || expressResponse.destroyed) {
             done = true;
             if (!expressResponse.destroyed && !expressResponse.writableEnded) {
@@ -2439,14 +2587,7 @@ function forwardResponsesApiStream(fetchResponse, expressResponse) {
     });
 
     expressResponse.on('close', () => {
-        if (done) {
-            return;
-        }
-
-        done = true;
-        if (fetchResponse.body && typeof fetchResponse.body.destroy === 'function') {
-            fetchResponse.body.destroy();
-        }
+        closeStream();
     });
 }
 
@@ -2503,7 +2644,7 @@ function convertResponsesEventToChatDelta(event) {
  */
 async function sendOpenAIResponsesRequest(request, response) {
     const apiUrl = new URL(request.body.reverse_proxy || API_OPENAI).toString();
-    const apiKey = request.body.reverse_proxy ? request.body.proxy_password : readSecret(request.user.directories, SECRET_KEYS.OPENAI);
+    const apiKey = request.body.reverse_proxy ? request.body.proxy_password : readSecret(request.user.directories, SECRET_KEYS.OPENAI, request.body.secret_id);
 
     if (!apiKey && !request.body.reverse_proxy) {
         console.warn('OpenAI API key is missing.');
@@ -2511,7 +2652,7 @@ async function sendOpenAIResponsesRequest(request, response) {
     }
 
     const controller = new AbortController();
-    abortOnResponseClose(response, controller);
+    abortOnRequestClose(request, controller);
 
     try {
         const { input, instructions } = convertMessagesToResponsesFormat(request.body.messages);
@@ -2575,7 +2716,7 @@ async function sendOpenAIResponsesRequest(request, response) {
 
         if (request.body.stream) {
             console.info('Streaming Responses API request in progress');
-            return forwardResponsesApiStream(fetchResponse, response);
+            return forwardResponsesApiStream(fetchResponse, response, request, () => controller.abort());
         }
 
         if (fetchResponse.ok) {
@@ -2649,7 +2790,7 @@ router.post('/generate', async function (request, response) {
 
         if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.OPENAI) {
             apiUrl = new URL(request.body.reverse_proxy || API_OPENAI).toString();
-            apiKey = request.body.reverse_proxy ? request.body.proxy_password : readSecret(request.user.directories, SECRET_KEYS.OPENAI);
+            apiKey = request.body.reverse_proxy ? request.body.proxy_password : readSecret(request.user.directories, SECRET_KEYS.OPENAI, request.body.secret_id);
             headers = {};
             bodyParams = {
                 logprobs: request.body.logprobs,
@@ -2669,7 +2810,7 @@ router.post('/generate', async function (request, response) {
             embedOpenRouterMedia(request.body.messages, { audio: true, video: false });
         } else if (request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.OPENROUTER) {
             apiUrl = 'https://openrouter.ai/api/v1';
-            apiKey = readSecret(request.user.directories, SECRET_KEYS.OPENROUTER);
+            apiKey = readSecret(request.user.directories, SECRET_KEYS.OPENROUTER, request.body.secret_id);
             // OpenRouter needs to pass the Referer and X-Title: https://openrouter.ai/docs#requests
             headers = { ...OPENROUTER_HEADERS };
             const includeReasoning = Boolean(request.body.include_reasoning);
@@ -2970,7 +3111,7 @@ router.post('/generate', async function (request, response) {
             `${apiUrl}/chat/completions`;
 
         const controller = new AbortController();
-        abortOnResponseClose(response, controller);
+        abortOnRequestClose(request, controller);
 
         if (!isTextCompletion && Array.isArray(request.body.tools) && request.body.tools.length > 0) {
             bodyParams['tools'] = request.body.tools;
@@ -3029,7 +3170,7 @@ router.post('/generate', async function (request, response) {
 
         if (request.body.stream) {
             console.info('Streaming request in progress');
-            return forwardFetchResponse(fetchResponse, response);
+            return forwardFetchResponse(fetchResponse, response, request, () => controller.abort());
         }
 
         if (fetchResponse.ok) {

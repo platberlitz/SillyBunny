@@ -11,8 +11,8 @@ frontend production build creates minified, fingerprinted assets in
 npm run build:frontend
 ```
 
-The build writes `dist/frontend/asset-manifest.json` and hashed asset names such
-as `script-0123456789ab.js`.
+The build writes `dist/frontend/asset-manifest.json` and hashed asset names for
+styles, fonts, images, and vendor assets.
 
 ## Enable
 
@@ -51,12 +51,13 @@ curl http://127.0.0.1:4444/ | grep frontend-assets
 Check cache headers on a hashed asset:
 
 ```sh
-curl -I http://127.0.0.1:4444/frontend-assets/script-0123456789ab.js
+curl -I http://127.0.0.1:4444/frontend-assets/style-0123456789ab.css
 ```
 
-Hashed files should return long-lived immutable cache headers. Unhashed fallback
-files under `/frontend-assets/` are not treated as immutable by the service
-worker, so a fresh build can safely update dependency modules during testing.
+Hashed files under `/frontend-assets/` should return long-lived immutable cache
+headers. Unhashed fallback JavaScript modules, such as raw boot or dependency
+modules served from their public paths, return `no-cache` so a fresh build can
+safely update module graphs during testing.
 
 ## Measure
 

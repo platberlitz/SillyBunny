@@ -1,3 +1,14 @@
+import { DEFAULT_SCROLL_EDGE_SETTLE_DELAYS, jumpScrollElementToEdge } from './chat-scroll-edges.js';
+import {
+    createMobileShellLifecycle,
+    MOBILE_SHELL_NAV_TOGGLE_ACTION,
+} from './mobile-shell-lifecycle/index.js';
+import { createPresetApiSyncLifecycle } from './preset-api-sync-lifecycle/index.js';
+import { flashHighlight, showFontAwesomePicker } from './utils.js';
+
+const sbMobileShellLifecycle = createMobileShellLifecycle();
+const sbPresetApiSyncLifecycle = createPresetApiSyncLifecycle();
+
 const SB_STORAGE_KEYS = Object.freeze({
     leftTab: 'sb-left-tab',
     rightTab: 'sb-right-tab',
@@ -18,12 +29,27 @@ const SB_STORAGE_KEYS = Object.freeze({
     shortcutRight: 'sb-shortcut-right',
     bottomBarScale: 'sb-bottom-bar-scale',
     bottomChatSecondaryOpen: 'sb-bottom-chat-secondary-open',
+    desktopButtonScale: 'sb-desktop-button-scale',
     mobileButtonScale: 'sb-mobile-button-scale',
+    desktopNavLayout: 'sb-desktop-nav-layout',
+    desktopNavIconOnly: 'sb-desktop-nav-icon-only',
+    desktopNavShowCustomize: 'sb-desktop-nav-show-customize',
+    desktopNavShowQuickActions: 'sb-desktop-nav-show-quick-actions',
+    desktopNavReplaceQuickActions: 'sb-desktop-nav-replace-quick-actions',
+    desktopNavReplacementTarget: 'sb-desktop-nav-replacement-target',
+    desktopQuickActions: 'sb-desktop-quick-actions-v2',
+    mobileNavLayout: 'sb-mobile-nav-layout',
+    mobileNavIconOnly: 'sb-mobile-nav-icon-only',
+    mobileNavShowCustomize: 'sb-mobile-nav-show-customize',
+    mobileNavShowQuickActions: 'sb-mobile-nav-show-quick-actions',
+    mobileNavReplaceQuickActions: 'sb-mobile-nav-replace-quick-actions',
+    mobileNavReplacementTarget: 'sb-mobile-nav-replacement-target',
     mobileQuickActions: 'sb-mobile-quick-actions-v2',
     mobileQuickActionsLegacy: 'sb-mobile-quick-actions',
     settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
     compactMode: 'sb-compact-mode',
     frontendIcon: 'sb-frontend-icon',
+    characterEditorSubTab: 'sb-character-editor-sub-tab',
 });
 
 const SB_SHORTCUT_TARGETS = Object.freeze([
@@ -31,7 +57,7 @@ const SB_SHORTCUT_TARGETS = Object.freeze([
     { value: 'left:api', label: 'API', icon: 'fa-plug' },
     { value: 'left:sampling', label: 'Sampling', icon: 'fa-wave-square' },
     { value: 'left:advanced-formatting', label: 'Formatting', icon: 'fa-text-height' },
-    { value: 'left:world-info', label: 'World Info', icon: 'fa-book-atlas' },
+    { value: 'characters:world-info', label: 'World Info', icon: 'fa-book-atlas' },
     { value: 'left:agents', label: 'Agents', icon: 'fa-robot' },
     { value: 'action:search', label: 'Search', icon: 'fa-magnifying-glass' },
     { value: 'right:settings', label: 'Settings', icon: 'fa-sliders' },
@@ -45,7 +71,7 @@ const SB_SHORTCUT_DEFAULTS = Object.freeze({
     right: 'action:search',
 });
 const SB_PANEL_STYLESHEETS = Object.freeze({
-    'left:world-info': [
+    'characters:world-info': [
         { href: 'css/world-info.css?v=20260425b', id: 'deferred-world-info-css' },
     ],
     'left:advanced-formatting': [
@@ -74,8 +100,6 @@ const SB_ACCOUNT_STORAGE_READY_MARKER = '__migrated';
 const SB_INLINE_DRAWER_CUSTOM_PERSISTENCE_SELECTOR = '.sb-openai-settings-drawer, .sb-openai-settings-subdrawer, [id$="prompt_manager_drawer"]';
 const SB_STORAGE_PREFIX = 'sb-';
 const SB_STORAGE_WRITE_DEBOUNCE_MS = 120;
-const SB_MOBILE_NAV_OPEN_GRACE_MS = 450;
-const SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX = 6;
 const SB_MOBILE_ACTION_DEBOUNCE_MS = 140;
 const SB_SHELL_FOCUSABLE_SELECTOR = [
     'a[href]',
@@ -95,6 +119,7 @@ let sbComposerControlsSyncQueued = false;
 let sbStorageFlushTimer = 0;
 let sbStorageFlushEventsBound = false;
 let sbMessageActionEventsBound = false;
+let sbPendingBottomChatScrollCancel = null;
 const sbStorageCache = new Map();
 const sbStoragePendingWrites = new Map();
 const SB_EXTENSION_ALIASES = {
@@ -119,13 +144,19 @@ function debounceAction(callback, wait = SB_MOBILE_ACTION_DEBOUNCE_MS) {
 }
 
 function getShortcutTarget(side) {
-    const stored = safeGetItem(side === 'left' ? SB_STORAGE_KEYS.shortcutLeft : SB_STORAGE_KEYS.shortcutRight);
+    const stored = migrateLegacyWorldInfoRoute(safeGetItem(side === 'left' ? SB_STORAGE_KEYS.shortcutLeft : SB_STORAGE_KEYS.shortcutRight));
     const valid = SB_SHORTCUT_TARGETS.some(t => t.value === stored);
     return valid ? stored : SB_SHORTCUT_DEFAULTS[side];
 }
 
 function getShortcutConfig(target) {
     return SB_SHORTCUT_TARGETS.find(t => t.value === target) || SB_SHORTCUT_TARGETS[0];
+}
+
+function migrateLegacyWorldInfoRoute(target) {
+    // SillyBunny: migrate saved pre-relocation World Info shortcuts to the
+    // Characters panel tab instead of reviving the old left-shell route.
+    return target === 'left:world-info' ? 'characters:world-info' : target;
 }
 
 function isSearchShortcutTarget(target) {
@@ -157,6 +188,7 @@ function activateShortcutTarget(target) {
         if (!tab || tab === 'characters') {
             void setCharacterListEntityView('characters');
         }
+        preloadPanelStylesheets('characters', tab);
         openCharacterPanelTab(tab);
         return;
     }
@@ -312,6 +344,12 @@ const SB_DESKTOP_SHELL_LAYOUT = Object.freeze({
     minWidth: 600,
     maxWidth: 900,
     ratio: 0.55,
+    laptopViewportMin: 1001,
+    laptopViewportMax: 1440,
+    laptopMinWidth: 680,
+    laptopMaxWidth: 920,
+    laptopRatio: 0.6,
+    laptopGutter: 28,
     compactMaxWidth: 900,
     compactViewportWidth: 1100,
     compactGap: 20,
@@ -369,6 +407,11 @@ const SB_CHARACTER_TAB_COPY = Object.freeze({
         subtitle: 'Edit or make changes to your selected character card or group chat here.',
         description: 'Manage your personal character cards, groups, and personas here.',
     },
+    'world-info': {
+        title: 'World Info',
+        subtitle: 'Manage lorebooks and world details from the character workspace.',
+        description: 'Create, edit, import, and activate World Info entries without leaving the Characters menu.',
+    },
     persona: {
         title: 'Persona',
         subtitle: 'Manage your in-chat persona details and other configuration options.',
@@ -380,6 +423,25 @@ const SB_CHARACTER_TAB_COPY = Object.freeze({
         description: 'Manage your personal character cards, groups, and personas here.',
     },
 });
+
+const SB_CHARACTER_EDITOR_SUB_TABS = Object.freeze([
+    'char-info',
+    'definitions',
+    'greetings',
+    'metadata',
+]);
+const SB_CHARACTER_EDITOR_DEFAULT_SUB_TAB = 'char-info';
+const SB_CHARACTER_EDITOR_SPOILER_FREE_VISIBLE_TABS = Object.freeze(['char-info', 'metadata']);
+
+const SB_CHARACTER_PANEL_TABS = Object.freeze([
+    { id: 'characters', label: 'Characters', icon: 'fa-address-book' },
+    { id: 'groups', label: 'Groups', icon: 'fa-users' },
+    { id: 'editor', label: 'Editor', icon: 'fa-pen-to-square' },
+    { id: 'world-info', label: 'World Info', icon: 'fa-book-atlas' },
+    { id: 'persona', label: 'Persona', icon: 'fa-face-smile' },
+    { id: 'import', label: 'Import', icon: 'fa-file-import' },
+]);
+const SB_CHARACTER_PANEL_DEFAULT_TAB = 'characters';
 
 const SB_PERSONA_HELP_LINK_HTML = '<a class="notes-link sb-character-title-help" href="https://docs.sillytavern.app/usage/core-concepts/personas/" target="_blank"><span class="fa-solid fa-circle-question note-link-span"></span></a>';
 
@@ -393,7 +455,7 @@ const SB_SHELLS = Object.freeze({
         proxyIcon: 'fa-bars',
         proxyLabel: 'Workspace',
         title: 'Workspace',
-        subtitle: 'Set up models, prompts, lore, and helpers, then get back to the scene.',
+        subtitle: '', // Removed redundant workspace subtext (PR #145 expansion)
         searchPlaceholder: 'Find presets, samplers, lore, or tools...',
         storageKey: SB_STORAGE_KEYS.leftTab,
         defaultTabId: 'presets',
@@ -401,7 +463,6 @@ const SB_SHELLS = Object.freeze({
             id: 'presets',
             label: 'Presets',
             icon: 'fa-sliders',
-            description: 'Choose presets and tune the prompts that shape each reply.',
         },
         embeddedTabs: [
             {
@@ -409,21 +470,12 @@ const SB_SHELLS = Object.freeze({
                 drawerId: 'sys-settings-button',
                 label: 'API',
                 icon: 'fa-plug',
-                description: 'Connect a provider, pick a model, and test the connection.',
             },
             {
                 id: 'advanced-formatting',
                 drawerId: 'advanced-formatting-button',
                 label: 'Formatting',
                 icon: 'fa-text-height',
-                description: 'Adjust how context, instructions, and reasoning are formatted.',
-            },
-            {
-                id: 'world-info',
-                drawerId: 'WI-SP-button',
-                label: 'World Info',
-                icon: 'fa-book-atlas',
-                description: 'Manage lorebooks and world details for the current story.',
             },
         ],
         customTabs: [
@@ -431,7 +483,6 @@ const SB_SHELLS = Object.freeze({
                 id: 'sampling',
                 label: 'Sampling',
                 icon: 'fa-wave-square',
-                description: 'Tune generation style, randomness, seeds, and token controls.',
                 searchPlaceholder: 'Search temperature, top p, repetition penalty, or backend samplers',
                 searchExamples: ['temperature', 'top p', 'repetition penalty'],
             },
@@ -439,7 +490,6 @@ const SB_SHELLS = Object.freeze({
                 id: 'agents',
                 label: 'Agents',
                 icon: 'fa-robot',
-                description: 'Manage helpers that can assist during the conversation.',
             },
         ],
     },
@@ -505,7 +555,7 @@ const SB_DRAWER_ROUTES = Object.freeze({
     'user-settings-button': { shell: 'right', tab: 'settings' },
     'sys-settings-button': { shell: 'left', tab: 'api' },
     'advanced-formatting-button': { shell: 'left', tab: 'advanced-formatting' },
-    'WI-SP-button': { shell: 'left', tab: 'world-info' },
+    'WI-SP-button': { shell: 'characters', tab: 'world-info' },
     'extensions-settings-button': { shell: 'right', tab: 'extensions' },
     'persona-management-button': { shell: 'characters', tab: 'persona' },
     'backgrounds-button': { shell: 'right', tab: 'background' },
@@ -536,13 +586,45 @@ const SB_UNIVERSAL_SEARCH_EMPTY_HINT = 'Could not find query. Try a broader term
 const SB_UNIVERSAL_SEARCH_RESULT_LIMIT = 10;
 const SB_MOBILE_QUICK_ACTION_LIMIT = 12;
 const SB_MOBILE_QUICK_ACTION_LABEL_MAX_LENGTH = 36;
+const SB_MOBILE_QUICK_ACTION_ICON_FALLBACK = 'fa-bolt';
+const SB_FONT_AWESOME_STYLE_CLASSES = Object.freeze(new Set(['fa-solid', 'fa-regular', 'fa-brands']));
+const SB_MOBILE_NAV_LAYOUTS = Object.freeze(['horizontal', 'vertical']);
 const SB_MOBILE_DEFAULT_QUICK_ACTIONS = Object.freeze([
     { type: 'tab', shellKey: 'left', tabId: 'presets', icon: 'fa-sliders', label: 'Presets' },
     { type: 'tab', shellKey: 'left', tabId: 'api', icon: 'fa-plug', label: 'API' },
     { type: 'tab', shellKey: 'left', tabId: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
     { type: 'tab', shellKey: 'left', tabId: 'advanced-formatting', icon: 'fa-text-height', label: 'Formatting' },
-    { type: 'tab', shellKey: 'left', tabId: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
+    { type: 'tab', shellKey: 'characters', tabId: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
     { type: 'tab', shellKey: 'left', tabId: 'agents', icon: 'fa-robot', label: 'Agents' },
+]);
+const SB_DESKTOP_DEFAULT_QUICK_ACTIONS = Object.freeze([
+    { type: 'tab', shellKey: 'characters', tabId: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
+]);
+const SB_MOBILE_RAIL_CUSTOMIZE_ACTIONS = Object.freeze([
+    { type: 'tab', shellKey: 'left', tabId: 'presets', icon: 'fa-sliders', label: 'Presets' },
+    { type: 'tab', shellKey: 'left', tabId: 'api', icon: 'fa-plug', label: 'API' },
+    { type: 'tab', shellKey: 'left', tabId: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
+    { type: 'tab', shellKey: 'left', tabId: 'advanced-formatting', icon: 'fa-text-height', label: 'Formatting' },
+    { type: 'tab', shellKey: 'left', tabId: 'agents', icon: 'fa-robot', label: 'Agents' },
+    { type: 'tab', shellKey: 'right', tabId: 'settings', icon: 'fa-gear', label: 'Settings' },
+    { type: 'tab', shellKey: 'right', tabId: 'extensions', icon: 'fa-cubes', label: 'Extensions' },
+    { type: 'tab', shellKey: 'right', tabId: 'background', icon: 'fa-panorama', label: 'Background' },
+    { type: 'tab', shellKey: 'right', tabId: 'server', icon: 'fa-server', label: 'Server' },
+    { type: 'tab', shellKey: 'right', tabId: 'console-logs', icon: 'fa-terminal', label: 'Console Logs' },
+]);
+const SB_MOBILE_NAV_PAGE_TARGET_DEFAULT = 'left:presets';
+const SB_MOBILE_NAV_PAGE_TARGETS = Object.freeze([
+    { value: 'left:presets', shellKey: 'left', tabId: 'presets', label: 'Presets', icon: 'fa-sliders' },
+    { value: 'left:api', shellKey: 'left', tabId: 'api', label: 'API', icon: 'fa-plug' },
+    { value: 'left:sampling', shellKey: 'left', tabId: 'sampling', label: 'Sampling', icon: 'fa-wave-square' },
+    { value: 'left:advanced-formatting', shellKey: 'left', tabId: 'advanced-formatting', label: 'Formatting', icon: 'fa-text-height' },
+    { value: 'characters:world-info', shellKey: 'characters', tabId: 'world-info', label: 'World Info', icon: 'fa-book-atlas' },
+    { value: 'left:agents', shellKey: 'left', tabId: 'agents', label: 'Agents', icon: 'fa-robot' },
+    { value: 'right:settings', shellKey: 'right', tabId: 'settings', label: 'Settings', icon: 'fa-sliders' },
+    { value: 'right:extensions', shellKey: 'right', tabId: 'extensions', label: 'Extensions', icon: 'fa-cubes' },
+    { value: 'right:background', shellKey: 'right', tabId: 'background', label: 'Background', icon: 'fa-panorama' },
+    { value: 'right:server', shellKey: 'right', tabId: 'server', label: 'Server', icon: 'fa-server' },
+    { value: 'right:console-logs', shellKey: 'right', tabId: 'console-logs', label: 'Console Logs', icon: 'fa-terminal' },
 ]);
 
 const sbState = {
@@ -558,6 +640,7 @@ const sbState = {
     surfaceTransparency: normalizeSurfaceTransparency(safeGetItem(SB_STORAGE_KEYS.surfaceTransparency)),
     compactMode: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), false),
     bottomBarScale: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.bottomBarScale)),
+    desktopButtonScale: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.desktopButtonScale)),
     mobileButtonScale: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.mobileButtonScale)),
     topbarScale: {
         desktop: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.topbarScaleDesktop)),
@@ -609,7 +692,24 @@ const sbState = {
     mobileNav: {
         lastOpenedAt: 0,
         quickActionContainer: null,
+        quickActionSection: null,
+        quickActionDivider: null,
+        layout: normalizeMobileNavLayout(safeGetItem(SB_STORAGE_KEYS.mobileNavLayout)),
+        iconOnly: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavIconOnly), true),
+        showCustomize: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowCustomize), true),
+        showQuickActions: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowQuickActions), false),
+        replaceQuickActions: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavReplaceQuickActions), false),
+        replacementTarget: normalizeMobileNavReplacementTarget(safeGetItem(SB_STORAGE_KEYS.mobileNavReplacementTarget)),
     },
+    desktopNav: {
+        layout: normalizeMobileNavLayout(safeGetItem(SB_STORAGE_KEYS.desktopNavLayout)),
+        iconOnly: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavIconOnly), true),
+        showCustomize: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavShowCustomize), true),
+        showQuickActions: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavShowQuickActions), false),
+        replaceQuickActions: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavReplaceQuickActions), false),
+        replacementTarget: normalizeMobileNavReplacementTarget(safeGetItem(SB_STORAGE_KEYS.desktopNavReplacementTarget)),
+    },
+    desktopQuickActions: [],
     mobileQuickActions: [],
     chatbar: {
         desktop: null,
@@ -657,6 +757,7 @@ const sbState = {
         secondaryRow: null,
         scrollTopButton: null,
         scrollBottomButton: null,
+        managerButton: null,
         massDeleteButton: null,
         autoNameButton: null,
         secondaryOpen: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.bottomChatSecondaryOpen), true),
@@ -775,6 +876,53 @@ function normalizeStoredBoolean(value, fallback = false) {
     return fallback;
 }
 
+function normalizeMobileNavLayout(value) {
+    const normalizedValue = normalizeText(value);
+    return SB_MOBILE_NAV_LAYOUTS.includes(normalizedValue) ? normalizedValue : 'vertical';
+}
+
+function getNavState(mode) {
+    return mode === 'desktop' ? sbState.desktopNav : sbState.mobileNav;
+}
+
+function getQuickActionState(mode) {
+    return mode === 'desktop' ? sbState.desktopQuickActions : sbState.mobileQuickActions;
+}
+
+function getActiveShellRailMode() {
+    return isMobileViewport() ? 'mobile' : 'desktop';
+}
+
+function getMobileNavCustomizeLocationLabel(mode = 'mobile') {
+    return getNavState(mode).layout === 'horizontal'
+        ? 'Show Workspace and Customize buttons in top bar'
+        : 'Show Workspace and Customize buttons in side rail';
+}
+
+function normalizeMobileNavReplacementTarget(value) {
+    const normalizedValue = String(value ?? '').trim();
+    return SB_MOBILE_NAV_PAGE_TARGETS.some(target => target.value === normalizedValue)
+        ? normalizedValue
+        : SB_MOBILE_NAV_PAGE_TARGET_DEFAULT;
+}
+
+function getMobileNavReplacementTargetConfig(target = sbState.mobileNav.replacementTarget) {
+    const normalizedTarget = normalizeMobileNavReplacementTarget(target);
+    return SB_MOBILE_NAV_PAGE_TARGETS.find(item => item.value === normalizedTarget)
+        ?? SB_MOBILE_NAV_PAGE_TARGETS[0];
+}
+
+function createNavReplacementQuickAction(target) {
+    const config = getMobileNavReplacementTargetConfig(target);
+    return normalizeMobileQuickAction({
+        type: 'tab',
+        shellKey: config.shellKey,
+        tabId: config.tabId,
+        icon: config.icon,
+        label: config.label,
+    });
+}
+
 function normalizeShellSize(value) {
     let source = value;
 
@@ -845,6 +993,10 @@ function normalizeTopbarOffset(value) {
 }
 
 function getMobileQuickActionTabConfig(shellKey, tabId) {
+    if (shellKey === 'characters') {
+        return getCharacterPanelTabConfig(tabId);
+    }
+
     const shellConfig = getShellConfig(shellKey);
     if (!shellConfig || !tabId) {
         return null;
@@ -857,38 +1009,60 @@ function getMobileQuickActionTabConfig(shellKey, tabId) {
     ].find(tab => tab?.id === tabId) || null;
 }
 
+function normalizeFontAwesomeIcon(value, fallback = SB_MOBILE_QUICK_ACTION_ICON_FALLBACK) {
+    const fallbackIcon = clampText(fallback || SB_MOBILE_QUICK_ACTION_ICON_FALLBACK, 60);
+    const iconClass = String(value ?? '')
+        .trim()
+        .split(/\s+/)
+        .find(token => /^fa-[a-z0-9-]+$/i.test(token) && !SB_FONT_AWESOME_STYLE_CLASSES.has(token.toLowerCase()));
+
+    return clampText(iconClass?.toLowerCase() || fallbackIcon, 60);
+}
+
 function normalizeMobileQuickAction(value) {
     if (!value || typeof value !== 'object') {
         return null;
     }
 
-    const shellKey = normalizeText(value.shellKey || value.shell);
-    const tabId = normalizeText(value.tabId || value.tab);
-    const shellConfig = getShellConfig(shellKey);
+    // SillyBunny: parse historical left/world-info quick actions as the
+    // relocated Characters tab before validating the shell/tab pair.
+    const legacyShellKey = normalizeText(value.shellKey || value.shell);
+    const legacyTabId = normalizeText(value.tabId || value.tab);
+    const shellKey = legacyShellKey === 'left' && legacyTabId === 'world-info' ? 'characters' : legacyShellKey;
+    const tabId = legacyShellKey === 'left' && legacyTabId === 'world-info' ? 'world-info' : legacyTabId;
+    const requestedType = normalizeText(value.type);
+    const isShellAction = requestedType === 'shell';
 
-    if (!shellConfig || !tabId) {
+    if ((isShellAction ? !shellKey : !tabId) || (shellKey !== 'characters' && !getShellConfig(shellKey))) {
         return null;
     }
 
-    const tabConfig = getMobileQuickActionTabConfig(shellKey, tabId);
+    const tabConfig = isShellAction ? null : getMobileQuickActionTabConfig(shellKey, tabId);
     const dedupeKey = clampText(value.dedupeKey, 160);
-    const type = dedupeKey ? 'custom' : 'tab';
+    const type = dedupeKey ? 'custom' : isShellAction ? 'shell' : 'tab';
     const displayText = clampText(value.displayText, 80);
     const sectionLabel = clampText(value.sectionLabel, 80);
     const fallbackLabel = type === 'custom'
         ? displayText || sectionLabel
-        : tabConfig?.label || tabId;
+        : type === 'shell'
+            ? getShellConfig(shellKey)?.title || shellKey
+            : tabConfig?.label || tabId;
     const label = clampText(value.label || fallbackLabel, SB_MOBILE_QUICK_ACTION_LABEL_MAX_LENGTH);
 
     if (!label) {
         return null;
     }
 
+    const fallbackIcon = type === 'custom'
+        ? SB_MOBILE_QUICK_ACTION_ICON_FALLBACK
+        : type === 'shell'
+            ? getShellConfig(shellKey)?.proxyIcon || 'fa-bars'
+            : tabConfig?.icon || 'fa-bars';
     const action = {
         type,
         shellKey,
         tabId,
-        icon: clampText(value.icon || (type === 'custom' ? 'fa-bolt' : tabConfig?.icon || 'fa-bars'), 60),
+        icon: normalizeFontAwesomeIcon(value.icon, fallbackIcon),
         label,
     };
 
@@ -935,6 +1109,30 @@ function getDefaultMobileQuickActions() {
     return normalizeMobileQuickActionList(SB_MOBILE_DEFAULT_QUICK_ACTIONS);
 }
 
+function getDefaultDesktopQuickActions() {
+    return normalizeMobileQuickActionList(SB_DESKTOP_DEFAULT_QUICK_ACTIONS);
+}
+
+function migrateLegacyMobileQuickAction(action) {
+    if (!action || typeof action !== 'object') {
+        return action;
+    }
+
+    // SillyBunny: account storage may still contain the pre-relocation mobile
+    // World Info route; normalize it to the Characters tab on read.
+    const legacyShellKey = normalizeText(action.shellKey || action.shell);
+    const legacyTabId = normalizeText(action.tabId || action.tab);
+    if (legacyShellKey !== 'left' || legacyTabId !== 'world-info') {
+        return action;
+    }
+
+    return {
+        ...action,
+        shellKey: 'characters',
+        tabId: 'world-info',
+    };
+}
+
 function parseMobileQuickActionStorage(storedValue) {
     if (storedValue === null) {
         return null;
@@ -946,7 +1144,7 @@ function parseMobileQuickActionStorage(storedValue) {
             return null;
         }
 
-        return normalizeMobileQuickActionList(parsedValue);
+        return normalizeMobileQuickActionList(parsedValue.map(migrateLegacyMobileQuickAction));
     } catch {
         return null;
     }
@@ -968,8 +1166,23 @@ function loadMobileQuickActions() {
     return nextActions;
 }
 
+function loadDesktopQuickActions() {
+    const storedActions = parseMobileQuickActionStorage(safeGetItem(SB_STORAGE_KEYS.desktopQuickActions));
+    if (storedActions) {
+        return storedActions;
+    }
+
+    const nextActions = getDefaultDesktopQuickActions();
+    safeSetItem(SB_STORAGE_KEYS.desktopQuickActions, JSON.stringify(nextActions));
+    return nextActions;
+}
+
 function saveMobileQuickActions() {
     safeSetItem(SB_STORAGE_KEYS.mobileQuickActions, JSON.stringify(sbState.mobileQuickActions));
+}
+
+function saveDesktopQuickActions() {
+    safeSetItem(SB_STORAGE_KEYS.desktopQuickActions, JSON.stringify(sbState.desktopQuickActions));
 }
 
 function getMobileQuickActionKey(action) {
@@ -991,7 +1204,7 @@ function createMobileQuickActionFromMatch(match) {
         type: 'custom',
         shellKey: match?.shellKey,
         tabId: match?.tabId,
-        icon: 'fa-bolt',
+        icon: SB_MOBILE_QUICK_ACTION_ICON_FALLBACK,
         sectionLabel: match?.sectionLabel,
         displayText: match?.displayText,
         dedupeKey: match?.dedupeKey,
@@ -1001,46 +1214,108 @@ function createMobileQuickActionFromMatch(match) {
     return normalizedMatch;
 }
 
-function setMobileQuickActions(actions, { persist = true } = {}) {
-    sbState.mobileQuickActions = normalizeMobileQuickActionList(actions);
+function setQuickActionsForMode(mode, actions, { persist = true } = {}) {
+    const normalizedActions = normalizeMobileQuickActionList(actions);
+
+    if (mode === 'desktop') {
+        sbState.desktopQuickActions = normalizedActions;
+
+        if (persist) {
+            saveDesktopQuickActions();
+        }
+
+        renderMobileQuickActionSettingsList('desktop');
+        refreshMobileQuickActionSearchResults('desktop');
+        syncMobileShellRailActions();
+        return;
+    }
+
+    sbState.mobileQuickActions = normalizedActions;
 
     if (persist) {
         saveMobileQuickActions();
     }
 
-    renderMobileQuickActionSettingsList();
-    refreshMobileQuickActionSearchResults();
+    renderMobileQuickActionSettingsList('mobile');
+    refreshMobileQuickActionSearchResults('mobile');
     refreshMobileNavQuickActions();
+    syncMobileShellRailActions();
 }
 
-function addMobileQuickActionFromMatch(match) {
+function setMobileQuickActions(actions, options = {}) {
+    setQuickActionsForMode('mobile', actions, options);
+}
+
+function setDesktopQuickActions(actions, options = {}) {
+    setQuickActionsForMode('desktop', actions, options);
+}
+
+function addQuickActionFromMatch(mode, match) {
     const action = createMobileQuickActionFromMatch(match);
     if (!action) {
         return false;
     }
 
-    if (sbState.mobileQuickActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT) {
+    const currentActions = getQuickActionState(mode);
+    if (currentActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT) {
         return false;
     }
 
     const actionKey = getMobileQuickActionKey(action);
-    if (sbState.mobileQuickActions.some(existingAction => getMobileQuickActionKey(existingAction) === actionKey)) {
+    if (currentActions.some(existingAction => getMobileQuickActionKey(existingAction) === actionKey)) {
         return false;
     }
 
-    setMobileQuickActions([...sbState.mobileQuickActions, action]);
+    setQuickActionsForMode(mode, [...currentActions, action]);
     return true;
 }
 
-function removeMobileQuickAction(actionKey) {
-    setMobileQuickActions(sbState.mobileQuickActions.filter(action => getMobileQuickActionKey(action) !== actionKey));
+function removeQuickAction(mode, actionKey) {
+    setQuickActionsForMode(mode, getQuickActionState(mode).filter(action => getMobileQuickActionKey(action) !== actionKey));
+}
+
+function setQuickActionIcon(mode, actionKey, iconClass) {
+    setQuickActionsForMode(mode, getQuickActionState(mode).map(action => {
+        if (getMobileQuickActionKey(action) !== actionKey) {
+            return action;
+        }
+
+        return {
+            ...action,
+            icon: normalizeFontAwesomeIcon(iconClass),
+        };
+    }));
+}
+
+async function chooseQuickActionIcon(mode, actionKey) {
+    const action = getQuickActionState(mode).find(action => getMobileQuickActionKey(action) === actionKey);
+    const normalizedAction = normalizeMobileQuickAction(action);
+
+    if (!normalizedAction || normalizedAction.type !== 'custom') {
+        return;
+    }
+
+    const iconClass = await showFontAwesomePicker();
+    if (iconClass === null) {
+        return;
+    }
+
+    setQuickActionIcon(mode, actionKey, iconClass);
 }
 
 function resetMobileQuickActions() {
     setMobileQuickActions(getDefaultMobileQuickActions());
 }
 
+function resetDesktopQuickActions() {
+    setDesktopQuickActions(getDefaultDesktopQuickActions());
+}
+
 function normalizeTopbarScale(value) {
+    if (value === null || value === undefined || value === '') {
+        return SB_TOPBAR_SCALE.defaultValue;
+    }
+
     const numericValue = Number(value);
 
     if (!Number.isFinite(numericValue)) {
@@ -1068,6 +1343,10 @@ function seedTopbarScaleDefaults() {
         safeSetItem(SB_STORAGE_KEYS.bottomBarScale, String(SB_TOPBAR_SCALE.defaultValue));
     }
 
+    if (safeGetItem(SB_STORAGE_KEYS.desktopButtonScale) === null) {
+        safeSetItem(SB_STORAGE_KEYS.desktopButtonScale, String(SB_TOPBAR_SCALE.defaultValue));
+    }
+
     if (safeGetItem(SB_STORAGE_KEYS.mobileButtonScale) === null) {
         safeSetItem(SB_STORAGE_KEYS.mobileButtonScale, String(SB_TOPBAR_SCALE.defaultValue));
     }
@@ -1077,6 +1356,7 @@ function restorePersistedTopbarState() {
     sbState.topbarScale.desktop = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.topbarScaleDesktop));
     sbState.topbarScale.mobile = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.topbarScaleMobile));
     sbState.bottomBarScale = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.bottomBarScale));
+    sbState.desktopButtonScale = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.desktopButtonScale));
     sbState.mobileButtonScale = normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.mobileButtonScale));
     sbState.frontendIcon = normalizeFrontendIcon(safeGetItem(SB_STORAGE_KEYS.frontendIcon));
     sbState.topbarLabel.desktopParts = safeGetItem(SB_STORAGE_KEYS.topbarLabelDesktopParts) === null
@@ -1089,6 +1369,19 @@ function restorePersistedTopbarState() {
     sbState.chatbar.visible = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.chatbarVisible), sbState.chatbar.visible);
     sbState.chatbar.topbarOffset = normalizeTopbarOffset(safeGetItem(SB_STORAGE_KEYS.topbarOffset));
     sbState.compactMode = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), sbState.compactMode);
+    sbState.mobileNav.layout = normalizeMobileNavLayout(safeGetItem(SB_STORAGE_KEYS.mobileNavLayout));
+    sbState.mobileNav.iconOnly = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavIconOnly), sbState.mobileNav.iconOnly);
+    sbState.mobileNav.showCustomize = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowCustomize), sbState.mobileNav.showCustomize);
+    sbState.mobileNav.showQuickActions = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavShowQuickActions), sbState.mobileNav.showQuickActions);
+    sbState.mobileNav.replaceQuickActions = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.mobileNavReplaceQuickActions), sbState.mobileNav.replaceQuickActions);
+    sbState.mobileNav.replacementTarget = normalizeMobileNavReplacementTarget(safeGetItem(SB_STORAGE_KEYS.mobileNavReplacementTarget));
+    sbState.desktopNav.layout = normalizeMobileNavLayout(safeGetItem(SB_STORAGE_KEYS.desktopNavLayout));
+    sbState.desktopNav.iconOnly = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavIconOnly), sbState.desktopNav.iconOnly);
+    sbState.desktopNav.showCustomize = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavShowCustomize), sbState.desktopNav.showCustomize);
+    sbState.desktopNav.showQuickActions = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavShowQuickActions), sbState.desktopNav.showQuickActions);
+    sbState.desktopNav.replaceQuickActions = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.desktopNavReplaceQuickActions), sbState.desktopNav.replaceQuickActions);
+    sbState.desktopNav.replacementTarget = normalizeMobileNavReplacementTarget(safeGetItem(SB_STORAGE_KEYS.desktopNavReplacementTarget));
+    sbState.desktopQuickActions = loadDesktopQuickActions();
     sbState.mobileQuickActions = loadMobileQuickActions();
     sbState.characterDrawer.rightLocked = normalizeStoredBoolean(
         getPersistentStorageItem(SB_STORAGE_KEYS.characterDrawerRightLocked),
@@ -1178,6 +1471,20 @@ function setBottomBarScale(value, { persist = true } = {}) {
     updateThemePickerUi();
 }
 
+function setDesktopButtonScale(value, { persist = true } = {}) {
+    const nextScale = normalizeTopbarScale(value);
+    const scaleFactor = Number((nextScale / 100).toFixed(2)).toString();
+
+    sbState.desktopButtonScale = nextScale;
+    document.documentElement.style.setProperty('--sb-desktop-button-scale', scaleFactor);
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopButtonScale, String(nextScale));
+    }
+
+    updateThemePickerUi();
+}
+
 function setMobileButtonScale(value, { persist = true } = {}) {
     const nextScale = normalizeTopbarScale(value);
     const scaleFactor = Number((nextScale / 100).toFixed(2)).toString();
@@ -1189,6 +1496,179 @@ function setMobileButtonScale(value, { persist = true } = {}) {
         safeSetItem(SB_STORAGE_KEYS.mobileButtonScale, String(nextScale));
     }
 
+    updateThemePickerUi();
+}
+
+function applyMobileNavPreferences() {
+    const quickActionsShown = sbState.mobileNav.showQuickActions;
+    document.documentElement.dataset.sbMobileNavLayout = sbState.mobileNav.layout;
+    document.documentElement.dataset.sbMobileNavMode = sbState.mobileNav.iconOnly ? 'icon-only' : 'labeled';
+    document.documentElement.dataset.sbMobileNavCustomize = sbState.mobileNav.showCustomize ? 'shown' : 'hidden';
+    document.documentElement.dataset.sbMobileNavQuickActions = quickActionsShown ? 'shown' : 'hidden';
+    document.documentElement.dataset.sbMobileNavReplacement = sbState.mobileNav.replaceQuickActions ? 'shown' : 'hidden';
+}
+
+function applyDesktopNavPreferences() {
+    const quickActionsShown = sbState.desktopNav.showQuickActions;
+    document.documentElement.dataset.sbDesktopNavLayout = sbState.desktopNav.layout;
+    document.documentElement.dataset.sbDesktopNavMode = sbState.desktopNav.iconOnly ? 'icon-only' : 'labeled';
+    document.documentElement.dataset.sbDesktopNavCustomize = sbState.desktopNav.showCustomize ? 'shown' : 'hidden';
+    document.documentElement.dataset.sbDesktopNavQuickActions = quickActionsShown ? 'shown' : 'hidden';
+    document.documentElement.dataset.sbDesktopNavReplacement = sbState.desktopNav.replaceQuickActions ? 'shown' : 'hidden';
+}
+
+function setMobileNavLayout(layout, { persist = true } = {}) {
+    const nextLayout = normalizeMobileNavLayout(layout);
+    sbState.mobileNav.layout = nextLayout;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavLayout, nextLayout);
+    }
+
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setMobileNavIconOnly(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.mobileNav.iconOnly = nextEnabled;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavIconOnly, String(nextEnabled));
+    }
+
+    updateThemePickerUi();
+}
+
+function setMobileNavShowCustomize(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.mobileNav.showCustomize = nextEnabled;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavShowCustomize, String(nextEnabled));
+    }
+
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setMobileNavShowQuickActions(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.mobileNav.showQuickActions = nextEnabled;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavShowQuickActions, String(nextEnabled));
+    }
+
+    refreshMobileNavQuickActions();
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setMobileNavReplaceQuickActions(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.mobileNav.replaceQuickActions = nextEnabled;
+    applyMobileNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavReplaceQuickActions, String(nextEnabled));
+    }
+
+    refreshMobileNavQuickActions();
+    syncMobileShellRailActions();
+    updateMobileNavButtonLabel();
+    updateThemePickerUi();
+}
+
+function setMobileNavReplacementTarget(target, { persist = true } = {}) {
+    const nextTarget = normalizeMobileNavReplacementTarget(target);
+    sbState.mobileNav.replacementTarget = nextTarget;
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.mobileNavReplacementTarget, nextTarget);
+    }
+
+    updateMobileNavButtonLabel();
+    updateThemePickerUi();
+}
+
+function setDesktopNavLayout(layout, { persist = true } = {}) {
+    const nextLayout = normalizeMobileNavLayout(layout);
+    sbState.desktopNav.layout = nextLayout;
+    applyDesktopNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopNavLayout, nextLayout);
+    }
+
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setDesktopNavIconOnly(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.desktopNav.iconOnly = nextEnabled;
+    applyDesktopNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopNavIconOnly, String(nextEnabled));
+    }
+
+    updateThemePickerUi();
+}
+
+function setDesktopNavShowCustomize(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.desktopNav.showCustomize = nextEnabled;
+    applyDesktopNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopNavShowCustomize, String(nextEnabled));
+    }
+
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setDesktopNavShowQuickActions(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.desktopNav.showQuickActions = nextEnabled;
+    applyDesktopNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopNavShowQuickActions, String(nextEnabled));
+    }
+
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setDesktopNavReplaceQuickActions(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.desktopNav.replaceQuickActions = nextEnabled;
+    applyDesktopNavPreferences();
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopNavReplaceQuickActions, String(nextEnabled));
+    }
+
+    syncMobileShellRailActions();
+    updateThemePickerUi();
+}
+
+function setDesktopNavReplacementTarget(target, { persist = true } = {}) {
+    const nextTarget = normalizeMobileNavReplacementTarget(target);
+    sbState.desktopNav.replacementTarget = nextTarget;
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.desktopNavReplacementTarget, nextTarget);
+    }
+
+    syncMobileShellRailActions();
     updateThemePickerUi();
 }
 
@@ -1406,6 +1886,29 @@ function normalizeText(value) {
         .toLowerCase();
 }
 
+function normalizeCharacterEditorSubTab(tabId) {
+    const normalizedTabId = normalizeText(tabId);
+    return SB_CHARACTER_EDITOR_SUB_TABS.includes(normalizedTabId) ? normalizedTabId : SB_CHARACTER_EDITOR_DEFAULT_SUB_TAB;
+}
+
+function isCharacterSpoilerFreeFieldsHidden() {
+    const form = document.getElementById('form_create');
+    return form instanceof HTMLElement && form.dataset.sbSpoilerFreeFieldsHidden === 'true';
+}
+
+function resolveCharacterEditorSubTab(tabId) {
+    const normalizedTabId = normalizeCharacterEditorSubTab(tabId);
+    if (!isCharacterSpoilerFreeFieldsHidden() || SB_CHARACTER_EDITOR_SPOILER_FREE_VISIBLE_TABS.includes(normalizedTabId)) {
+        return normalizedTabId;
+    }
+
+    return 'metadata';
+}
+
+function isCharacterEditorMenuType(menuType) {
+    return ['character_edit', 'create'].includes(menuType ?? '');
+}
+
 function clampText(value, maxLength = 120) {
     const normalizedValue = String(value ?? '').replace(/\s+/g, ' ').trim();
     if (normalizedValue.length <= maxLength) {
@@ -1568,6 +2071,32 @@ function getShellConfig(shellKey) {
     return SB_SHELLS[shellKey];
 }
 
+function getCharacterPanelTabConfig(tabId) {
+    return SB_CHARACTER_PANEL_TABS.find(tab => tab.id === tabId) ?? null;
+}
+
+function normalizeCharacterPanelTab(tabId) {
+    const normalizedTabId = normalizeText(tabId);
+    return getCharacterPanelTabConfig(normalizedTabId) ? normalizedTabId : SB_CHARACTER_PANEL_DEFAULT_TAB;
+}
+
+function getCharacterPanelSearchEntries() {
+    return SB_CHARACTER_PANEL_TABS.map((tab) => {
+        const button = document.querySelector(`#right-nav-panel [data-sb-character-tab="${CSS.escape(tab.id)}"]`);
+        const searchText = normalizeText([tab.label, tab.id, 'characters'].join(' '));
+
+        return {
+            element: button instanceof HTMLElement ? button : null,
+            searchText,
+            displayText: tab.label,
+            sectionLabel: tab.label,
+            tabId: tab.id,
+            tabLabel: tab.label,
+            dedupeKey: `characters::${tab.id}`,
+        };
+    });
+}
+
 function isMobileViewport() {
     return window.matchMedia(SB_MOBILE_MEDIA_QUERY).matches;
 }
@@ -1658,6 +2187,10 @@ function restoreShellFocus(shellKey) {
 
 function scrollShellTabButtonIntoView(nav, button, { smooth = false } = {}) {
     if (!(nav instanceof HTMLElement) || !(button instanceof HTMLElement)) {
+        return;
+    }
+
+    if (!isActuallyVisible(button)) {
         return;
     }
 
@@ -1801,6 +2334,25 @@ function getDesktopShellDimensions(shellKey = '') {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const maxShellWidth = shellKey === 'right' ? Math.min(SB_DESKTOP_SHELL_LAYOUT.maxWidth, 760) : SB_DESKTOP_SHELL_LAYOUT.maxWidth;
+
+    if (
+        ['left', 'right'].includes(shellKey)
+        && viewportWidth >= SB_DESKTOP_SHELL_LAYOUT.laptopViewportMin
+        && viewportWidth <= SB_DESKTOP_SHELL_LAYOUT.laptopViewportMax
+    ) {
+        const laptopWidth = clampNumber(
+            viewportWidth * SB_DESKTOP_SHELL_LAYOUT.laptopRatio,
+            SB_DESKTOP_SHELL_LAYOUT.laptopMinWidth,
+            SB_DESKTOP_SHELL_LAYOUT.laptopMaxWidth,
+        );
+        const maxWidth = Math.max(0, viewportWidth - SB_DESKTOP_SHELL_LAYOUT.laptopGutter);
+        const resolvedWidth = Math.min(laptopWidth, maxWidth);
+
+        return {
+            width: resolvedWidth,
+            maxWidth: resolvedWidth,
+        };
+    }
 
     if (isMobileViewport() || (viewportHeight <= SB_DESKTOP_SHELL_LAYOUT.fullWidthMaxHeight && shellKey !== 'characters')) {
         return {
@@ -2226,6 +2778,10 @@ function beginShellResize(shellKey, event) {
 }
 
 function ensureShellReady(shellKey) {
+    if (!getShellConfig(shellKey)) {
+        return false;
+    }
+
     if (getShellState(shellKey)) {
         return true;
     }
@@ -2239,11 +2795,14 @@ function syncExistingMobileNavQuickActions(overlay) {
         return;
     }
 
-    overlay.querySelectorAll('.sb-mobile-section-title').forEach(heading => heading.remove());
-
-    const list = overlay.querySelector('.sb-mobile-section-list');
+    const list = overlay.querySelector('.sb-mobile-quick-action-list')
+        ?? overlay.querySelector('.sb-mobile-section-list');
     if (list instanceof HTMLElement) {
         sbState.mobileNav.quickActionContainer = list;
+        const quickActionSection = list.closest('.sb-mobile-quick-action-section');
+        if (quickActionSection instanceof HTMLElement) {
+            sbState.mobileNav.quickActionSection = quickActionSection;
+        }
         refreshMobileNavQuickActions();
     }
 }
@@ -2845,7 +3404,7 @@ async function handleClearCookiesAndCacheClick(event) {
         const clearedCookieCount = clearAllBrowserCookies();
         globalThis.toastr?.success?.('Cookies and cache cleared. Reloading SillyBunny...', 'Cookies cleared');
         console.info(`[Cache] Expired ${clearedCookieCount} browser cookies and queued ${serverCookieResult?.expirationAttempts ?? 0} server cookie expirations before reload`);
-        window.setTimeout(() => window.location.reload(), 450);
+        window.setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
         console.error('Failed to clear cookies and cache', error);
         globalThis.toastr?.error?.(String(error?.message || error), 'Clear failed');
@@ -4116,7 +4675,16 @@ function getReducedMotionScrollBehavior() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
 }
 
+function cancelPendingBottomChatScroll() {
+    if (typeof sbPendingBottomChatScrollCancel === 'function') {
+        sbPendingBottomChatScrollCancel();
+        sbPendingBottomChatScrollCancel = null;
+    }
+}
+
 function scrollCurrentChatToTop() {
+    cancelPendingBottomChatScroll();
+
     const chatRoot = getChatScrollElement();
     if (!(chatRoot instanceof HTMLElement)) {
         return;
@@ -4129,21 +4697,18 @@ function scrollCurrentChatToTop() {
 }
 
 function scrollCurrentChatToBottom() {
+    cancelPendingBottomChatScroll();
+
     const context = getSillyTavernContext();
 
     if (typeof context?.scrollChatToBottom === 'function') {
         context.scrollChatToBottom({ force: true });
-        context.scrollChatToBottom({ waitForFrame: true, force: true });
-        return;
     }
 
     const chatRoot = getChatScrollElement();
-    if (chatRoot instanceof HTMLElement) {
-        chatRoot.scrollTo({
-            top: chatRoot.scrollHeight,
-            behavior: getReducedMotionScrollBehavior(),
-        });
-    }
+    sbPendingBottomChatScrollCancel = jumpScrollElementToEdge(chatRoot, 'bottom', {
+        settleDelays: DEFAULT_SCROLL_EDGE_SETTLE_DELAYS,
+    });
 }
 
 function countRegexMatches(value, regex) {
@@ -4505,12 +5070,15 @@ function syncConnectionProfileSelection(value) {
         return;
     }
 
-    const nextValue = String(value ?? '').trim();
-    if (!nextValue || sourceSelect.value === nextValue) {
+    const syncState = sbPresetApiSyncLifecycle.connectionProfiles.resolveSelectionSync({
+        requestedValue: value,
+        currentValue: sourceSelect.value,
+    });
+    if (!syncState.shouldSync) {
         return;
     }
 
-    sourceSelect.value = nextValue;
+    sourceSelect.value = syncState.nextValue;
     sourceSelect.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
@@ -4534,25 +5102,16 @@ function setConnectionStripOpenState(shouldOpen) {
 
 function getCurrentMainApiValue() {
     const mainApiSelect = document.getElementById('main_api');
-
-    if (mainApiSelect instanceof HTMLSelectElement && mainApiSelect.value) {
-        return String(mainApiSelect.value).trim().toLowerCase();
-    }
-
     const context = getSillyTavernContext();
-    return String(context?.mainApi ?? '').trim().toLowerCase();
+
+    return sbPresetApiSyncLifecycle.api.resolveMainValue({
+        selectValue: mainApiSelect instanceof HTMLSelectElement ? mainApiSelect.value : '',
+        contextMainApi: context?.mainApi,
+    });
 }
 
 function resolveActiveApiConnectButton() {
-    const selectorMap = {
-        kobold: '#api_button',
-        koboldhorde: '#api_button',
-        horde: '#api_button',
-        novel: '#api_button_novel',
-        openai: '#api_button_openai',
-        textgenerationwebui: '#api_button_textgenerationwebui',
-    };
-    const selector = selectorMap[getCurrentMainApiValue()];
+    const selector = sbPresetApiSyncLifecycle.api.resolveConnectButtonSelector(getCurrentMainApiValue());
 
     if (!selector) {
         return null;
@@ -4652,11 +5211,16 @@ async function ensureChatMessageRendered(messageId) {
 
     const context = getSillyTavernContext();
     const chatLength = Array.isArray(context?.chat) ? context.chat.length : 0;
-    const firstRenderedId = Number(document.querySelector('#chat .mes[mesid]')?.getAttribute('mesid') ?? NaN);
+    const renderedMessages = Array.from(document.querySelectorAll('#chat .mes[mesid]'));
+    const firstRenderedId = Number(renderedMessages.at(0)?.getAttribute('mesid') ?? NaN);
+    const lastRenderedId = Number(renderedMessages.at(-1)?.getAttribute('mesid') ?? NaN);
     const chatModule = await getChatScriptModule().catch(() => null);
     const showMoreMessages = typeof context?.showMoreMessages === 'function'
         ? context.showMoreMessages
         : chatModule?.showMoreMessages;
+    const showNewerMessages = typeof context?.showNewerMessages === 'function'
+        ? context.showNewerMessages
+        : chatModule?.showNewerMessages;
     const redisplayChat = typeof context?.redisplayChat === 'function'
         ? context.redisplayChat
         : chatModule?.redisplayChat;
@@ -4670,12 +5234,22 @@ async function ensureChatMessageRendered(messageId) {
         }
     }
 
+    if (typeof showNewerMessages === 'function' && Number.isInteger(lastRenderedId) && messageId > lastRenderedId) {
+        await showNewerMessages(messageId - lastRenderedId);
+        await waitForNextAnimationFrame();
+        messageElement = getChatMessageElement(messageId);
+        if (messageElement instanceof HTMLElement) {
+            return messageElement;
+        }
+    }
+
     if (typeof redisplayChat === 'function' && chatLength > 0) {
-        if (!getChatMessageElement(0)) {
-            getChatScrollElement()?.querySelectorAll('.mes, #show_more_messages').forEach(element => element.remove());
+        const fallbackStartIndex = Math.max(0, Math.min(messageId, chatLength - 1));
+        if (!getChatMessageElement(fallbackStartIndex)) {
+            getChatScrollElement()?.querySelectorAll('.mes, #show_more_messages, #show_newer_messages').forEach(element => element.remove());
         }
 
-        await redisplayChat({ startIndex: 0, fade: false });
+        await redisplayChat({ startIndex: fallbackStartIndex, fade: false });
         await waitForNextAnimationFrame();
         return getChatMessageElement(messageId);
     }
@@ -5270,22 +5844,30 @@ async function refreshChatbarState() {
 
     const connectionProfilesSource = document.getElementById('connection_profiles');
     const hasConnectionProfiles = connectionProfilesSource instanceof HTMLSelectElement;
+    const connectionMirrorState = sbPresetApiSyncLifecycle.connectionProfiles.resolveMirrorState({
+        hasConnectionProfiles,
+        isConnectionStripOpen: isConnectionStripOpen(),
+        hasActiveConnectButton: hasConnectionProfiles && Boolean(resolveActiveApiConnectButton()),
+    });
 
     if (desktopRefs) {
-        desktopRefs.toggleConnectionButton.hidden = !hasConnectionProfiles;
-        desktopRefs.connectionStrip.hidden = !hasConnectionProfiles || !isConnectionStripOpen();
+        desktopRefs.toggleConnectionButton.hidden = !connectionMirrorState.shouldShowToggle;
+        desktopRefs.connectionStrip.hidden = !connectionMirrorState.shouldShowDesktopStrip;
     }
 
-    if (!hasConnectionProfiles) {
+    if (connectionMirrorState.shouldCloseDesktopStrip) {
         setConnectionStripOpenState(false);
+    }
+
+    if (connectionMirrorState.shouldClearMirrors) {
         if (desktopRefs) {
             desktopRefs.connectionSelect.replaceChildren();
             desktopRefs.connectionStatus.textContent = '';
-            setButtonDisabled(desktopRefs.connectionConnectButton, true);
+            setButtonDisabled(desktopRefs.connectionConnectButton, connectionMirrorState.shouldDisableConnectButton);
         }
 
         if (mobileRefs?.connectionSection instanceof HTMLElement) {
-            mobileRefs.connectionSection.hidden = true;
+            mobileRefs.connectionSection.hidden = !connectionMirrorState.shouldShowMobileSection;
             mobileRefs.connectionSelect.replaceChildren();
             mobileRefs.connectionStatus.textContent = '';
         }
@@ -5295,11 +5877,11 @@ async function refreshChatbarState() {
             desktopRefs.connectionSelect.innerHTML = optionsMarkup;
             desktopRefs.connectionSelect.value = connectionProfilesSource.value;
             desktopRefs.connectionStatus.textContent = connectionStatusText;
-            setButtonDisabled(desktopRefs.connectionConnectButton, !resolveActiveApiConnectButton());
+            setButtonDisabled(desktopRefs.connectionConnectButton, connectionMirrorState.shouldDisableConnectButton);
         }
 
         if (mobileRefs?.connectionSection instanceof HTMLElement) {
-            mobileRefs.connectionSection.hidden = false;
+            mobileRefs.connectionSection.hidden = !connectionMirrorState.shouldShowMobileSection;
             mobileRefs.connectionSelect.innerHTML = optionsMarkup;
             mobileRefs.connectionSelect.value = connectionProfilesSource.value;
             mobileRefs.connectionStatus.textContent = connectionStatusText;
@@ -5612,18 +6194,19 @@ function setMobileModalRootA11y(root, isActiveRoot) {
 
 function syncMobileModalState() {
     const activeRoots = getActiveMobileModalRoots();
-    const hasActiveMobileModal = activeRoots.length > 0;
     const activeRootSet = new Set(activeRoots);
-    const shouldInertTopBar = activeRoots.some(root => root.id !== 'sb-mobile-nav');
+    const modalState = sbMobileShellLifecycle.modal.resolveA11yState({
+        activeRootIds: activeRoots.map(root => root.id),
+    });
 
-    document.body?.classList.toggle('sb-mobile-modal-open', hasActiveMobileModal);
+    document.body?.classList.toggle('sb-mobile-modal-open', modalState.hasActiveMobileModal);
 
     for (const root of getMobileModalRootCandidates()) {
         setMobileModalRootA11y(root, activeRootSet.has(root));
     }
 
-    setElementInertForMobileModal(document.getElementById('sheld'), hasActiveMobileModal);
-    setElementInertForMobileModal(document.getElementById('top-bar'), shouldInertTopBar);
+    setElementInertForMobileModal(document.getElementById('sheld'), modalState.shouldInertShell);
+    setElementInertForMobileModal(document.getElementById('top-bar'), modalState.shouldInertTopBar);
 }
 
 function queueMobileModalStateSync() {
@@ -5779,13 +6362,12 @@ async function showCharacterListView(view = 'characters') {
     setCharacterEditorEmptyState(false);
     setCharacterPersonaPanelVisible(false);
     setCharacterImportPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
     const panel = document.getElementById('right-nav-panel');
     const normalizedView = view === 'groups' ? 'groups' : 'characters';
     sbState.characterDrawer.lastTab = normalizedView;
 
-    if (panel instanceof HTMLElement) {
-        panel.dataset.menuType = normalizedView;
-    }
+    setCharacterPanelMenuType(panel, normalizedView);
 
     syncCharacterListControls(normalizedView);
     await setCharacterListEntityView(normalizedView);
@@ -5794,18 +6376,14 @@ async function showCharacterListView(view = 'characters') {
 
     if (backButton instanceof HTMLElement) {
         backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        if (panel instanceof HTMLElement) {
-            panel.dataset.menuType = normalizedView;
-        }
+        setCharacterPanelMenuType(panel, normalizedView);
         syncCharacterListControls(normalizedView);
         syncCharacterShellTabs(normalizedView);
         return true;
     }
 
     resetCharacterPanelView();
-    if (panel instanceof HTMLElement) {
-        panel.dataset.menuType = normalizedView;
-    }
+    setCharacterPanelMenuType(panel, normalizedView);
     syncCharacterListControls(normalizedView);
     syncCharacterShellTabs(normalizedView);
     return true;
@@ -5819,9 +6397,10 @@ function showCharacterEditorEmptyState() {
     const groupEditor = document.getElementById('rm_group_chats_block');
     const characterList = document.getElementById('rm_characters_block');
 
-    panel?.setAttribute('data-menu-type', 'editor_empty');
+    setCharacterPanelMenuType(panel, 'editor_empty');
     setCharacterPersonaPanelVisible(false);
     setCharacterImportPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
     syncCharacterListControls('characters');
     setCharacterEditorEmptyState(true);
 
@@ -5875,8 +6454,9 @@ function syncCharacterTitlebarVisibility() {
         return;
     }
 
-    const shouldHide = ['characters', 'groups', 'editor_empty', 'persona', 'import'].includes(panel.dataset.menuType ?? '');
+    const shouldHide = ['characters', 'groups', 'editor_empty', 'world-info', 'persona', 'import'].includes(panel.dataset.menuType ?? '');
     pinAndTabs.style.display = shouldHide ? 'none' : '';
+    syncCharacterEditorFullscreenAvailability();
 }
 
 function ensureCharacterPersonaPanel() {
@@ -5901,11 +6481,42 @@ function ensureCharacterPersonaPanel() {
     return host;
 }
 
+function ensureCharacterWorldInfoPanel() {
+    const host = document.getElementById('sb_character_world_info_panel');
+    const drawer = document.getElementById('WI-SP-button');
+    const content = document.getElementById('WorldInfo');
+
+    if (!(host instanceof HTMLElement) || !(drawer instanceof HTMLElement) || !(content instanceof HTMLElement)) {
+        return null;
+    }
+
+    host.setAttribute('role', 'tabpanel');
+    host.setAttribute('aria-labelledby', 'sb_character_tab_world_info');
+    drawer.classList.add('sb-embedded-drawer');
+    drawer.querySelector(':scope > .drawer-toggle')?.classList.add('sb-hidden-toggle');
+    content.classList.remove('drawer-content', 'openDrawer', 'closedDrawer', 'fillLeft', 'fillRight', 'pinnedOpen');
+    content.classList.add('sb-managed', 'sb-shell-embedded-content');
+    content.removeAttribute('style');
+    content.removeAttribute('data-dragged');
+    content.setAttribute('role', 'tabpanel');
+    content.setAttribute('aria-labelledby', 'sb_character_tab_world_info');
+    content.setAttribute('aria-hidden', String(host.hidden));
+
+    if (drawer.parentElement !== host) {
+        host.appendChild(drawer);
+    }
+
+    drawer.querySelector('#WI_panel_pin_div')?.classList.add('sb-shell-hidden-control');
+    preloadPanelStylesheets('characters', 'world-info');
+    return host;
+}
+
 function setCharacterPersonaPanelVisible(visible) {
     const host = ensureCharacterPersonaPanel() ?? document.getElementById('sb_character_persona_panel');
 
     if (host instanceof HTMLElement) {
         host.hidden = !visible;
+        host.setAttribute('aria-hidden', String(!visible));
     }
 }
 
@@ -5914,7 +6525,249 @@ function setCharacterImportPanelVisible(visible) {
 
     if (host instanceof HTMLElement) {
         host.hidden = !visible;
+        host.setAttribute('aria-hidden', String(!visible));
     }
+}
+
+function setCharacterWorldInfoPanelVisible(visible) {
+    const host = ensureCharacterWorldInfoPanel() ?? document.getElementById('sb_character_world_info_panel');
+    const content = document.getElementById('WorldInfo');
+
+    if (host instanceof HTMLElement) {
+        host.hidden = !visible;
+        host.setAttribute('aria-hidden', String(!visible));
+    }
+
+    if (content instanceof HTMLElement) {
+        content.setAttribute('aria-hidden', String(!visible));
+    }
+}
+
+function getCharacterEditorSubTabState() {
+    const storedTab = safeGetItem(SB_STORAGE_KEYS.characterEditorSubTab);
+    return normalizeCharacterEditorSubTab(storedTab);
+}
+
+function saveCharacterEditorSubTab(tabId) {
+    safeSetItem(SB_STORAGE_KEYS.characterEditorSubTab, normalizeCharacterEditorSubTab(tabId));
+}
+
+function updateCharacterEditorSubTabButtons(activeTabId) {
+    const activeSubTab = resolveCharacterEditorSubTab(activeTabId);
+
+    for (const tabButton of document.querySelectorAll('#sb_character_editor_subtabs [data-sb-character-editor-tab]')) {
+        if (!(tabButton instanceof HTMLElement)) {
+            continue;
+        }
+
+        const isActive = tabButton.dataset.sbCharacterEditorTab === activeSubTab;
+        tabButton.classList.toggle('is-active', isActive);
+        tabButton.setAttribute('aria-selected', String(isActive));
+        tabButton.setAttribute('tabindex', isActive ? '0' : '-1');
+    }
+}
+
+function updateCharacterEditorSubTabPanels(activeTabId) {
+    const activeSubTab = resolveCharacterEditorSubTab(activeTabId);
+
+    for (const panel of document.querySelectorAll('#form_create [data-sb-character-editor-panel]')) {
+        if (!(panel instanceof HTMLElement)) {
+            continue;
+        }
+
+        const isActive = panel.dataset.sbCharacterEditorPanel === activeSubTab;
+        panel.hidden = !isActive;
+        panel.setAttribute('aria-hidden', String(!isActive));
+    }
+}
+
+function syncCharacterEditorSubTabs(activeTabId = getCharacterEditorSubTabState()) {
+    const normalizedTab = resolveCharacterEditorSubTab(activeTabId);
+    saveCharacterEditorSubTab(normalizedTab);
+    updateCharacterEditorSubTabButtons(normalizedTab);
+    updateCharacterEditorSubTabPanels(normalizedTab);
+}
+
+function focusCharacterEditorSubTab(tabId) {
+    const button = document.querySelector(`#sb_character_editor_subtabs [data-sb-character-editor-tab="${tabId}"]`);
+    if (button instanceof HTMLElement) {
+        button.focus({ preventScroll: true });
+    }
+}
+
+function setCharacterEditorSubTab(tabId, { focusButton = false } = {}) {
+    const normalizedTab = normalizeCharacterEditorSubTab(tabId);
+    syncCharacterEditorSubTabs(normalizedTab);
+
+    if (focusButton) {
+        focusCharacterEditorSubTab(normalizedTab);
+    }
+}
+
+function setCharacterEditorFullscreenState(expanded, { focusButton = false } = {}) {
+    const panel = document.getElementById('right-nav-panel');
+    const toggleButton = document.getElementById('sb_character_editor_fullscreen_toggle');
+    const wasExpanded = panel instanceof HTMLElement && panel.classList.contains('sb-character-editor-fullscreen');
+    const canExpand = panel instanceof HTMLElement
+        && panel.classList.contains('openDrawer')
+        && isCharacterEditorMenuType(panel.dataset.menuType);
+    const isExpanded = Boolean(expanded) && canExpand;
+
+    if (panel instanceof HTMLElement) {
+        panel.classList.toggle('sb-character-editor-fullscreen', isExpanded);
+        panel.dataset.sbCharacterEditorFullscreen = String(isExpanded);
+    }
+
+    if (toggleButton instanceof HTMLButtonElement) {
+        setButtonPressed(toggleButton, isExpanded);
+        toggleButton.title = isExpanded ? 'Exit editor fullscreen' : 'Enter editor fullscreen';
+        toggleButton.setAttribute('aria-label', toggleButton.title);
+        toggleButton.setAttribute('aria-expanded', String(isExpanded));
+        toggleButton.dataset.i18n = isExpanded
+            ? '[title]Exit editor fullscreen;[aria-label]Exit editor fullscreen'
+            : '[title]Enter editor fullscreen;[aria-label]Enter editor fullscreen';
+
+        if (focusButton) {
+            toggleButton.focus({ preventScroll: true });
+        }
+    }
+
+    if (isExpanded && !wasExpanded) {
+        document.getElementById('sb_character_editor_subtabs')?.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function setCharacterPanelMenuType(panel, menuType) {
+    if (!(panel instanceof HTMLElement)) {
+        return;
+    }
+
+    if (!isCharacterEditorMenuType(menuType)) {
+        setCharacterEditorFullscreenState(false);
+    }
+
+    panel.dataset.menuType = menuType;
+    if (panel.dataset.menuType !== menuType) {
+        panel.setAttribute('data-menu-type', menuType);
+    }
+}
+
+function toggleCharacterEditorFullscreen() {
+    const panel = document.getElementById('right-nav-panel');
+    if (!(panel instanceof HTMLElement) || !panel.classList.contains('openDrawer') || !isCharacterEditorMenuType(panel.dataset.menuType)) {
+        return;
+    }
+
+    setCharacterEditorFullscreenState(!panel.classList.contains('sb-character-editor-fullscreen'), { focusButton: true });
+}
+
+function syncCharacterEditorFullscreenAvailability() {
+    const panel = document.getElementById('right-nav-panel');
+    const toggleButton = document.getElementById('sb_character_editor_fullscreen_toggle');
+    const canUseFullscreen = panel instanceof HTMLElement
+        && isCharacterEditorMenuType(panel.dataset.menuType)
+        && panel.classList.contains('openDrawer');
+
+    if (toggleButton instanceof HTMLButtonElement) {
+        toggleButton.hidden = !canUseFullscreen;
+    }
+
+    if (!canUseFullscreen) {
+        setCharacterEditorFullscreenState(false);
+    }
+}
+
+function bindCharacterEditorFullscreenToggle() {
+    const toggleButton = document.getElementById('sb_character_editor_fullscreen_toggle');
+    if (!(toggleButton instanceof HTMLButtonElement) || toggleButton.dataset.sbBound === 'true') {
+        return;
+    }
+
+    toggleButton.dataset.sbBound = 'true';
+    toggleButton.addEventListener('click', () => toggleCharacterEditorFullscreen());
+
+    const panel = document.getElementById('right-nav-panel');
+    if (panel instanceof HTMLElement && panel.dataset.sbEditorFullscreenKeyBound !== 'true') {
+        panel.dataset.sbEditorFullscreenKeyBound = 'true';
+        panel.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape' || !panel.classList.contains('sb-character-editor-fullscreen')) {
+                return;
+            }
+
+            setCharacterEditorFullscreenState(false, { focusButton: true });
+            event.preventDefault();
+            event.stopPropagation();
+        });
+    }
+
+    syncCharacterEditorFullscreenAvailability();
+}
+
+function focusCharacterPanelTab(tabId) {
+    const normalizedTabId = normalizeCharacterPanelTab(tabId);
+    const button = document.querySelector(`#right-nav-panel [data-sb-character-tab="${CSS.escape(normalizedTabId)}"]`);
+
+    if (button instanceof HTMLElement) {
+        button.focus({ preventScroll: true });
+    }
+}
+
+function bindCharacterEditorSubTabs() {
+    const tablist = document.getElementById('sb_character_editor_subtabs');
+    if (!(tablist instanceof HTMLElement) || tablist.dataset.sbBound === 'true') {
+        return;
+    }
+
+    tablist.dataset.sbBound = 'true';
+
+    tablist.addEventListener('click', (event) => {
+        const target = event.target instanceof HTMLElement ? event.target.closest('[data-sb-character-editor-tab]') : null;
+        if (!(target instanceof HTMLButtonElement)) {
+            return;
+        }
+
+        setCharacterEditorSubTab(target.dataset.sbCharacterEditorTab, { focusButton: false });
+    });
+
+    tablist.addEventListener('keydown', (event) => {
+        if (!(event.target instanceof HTMLElement)) {
+            return;
+        }
+
+        const targetButton = event.target.closest('[data-sb-character-editor-tab]');
+        if (!(targetButton instanceof HTMLButtonElement)) {
+            return;
+        }
+
+        const buttons = Array.from(tablist.querySelectorAll('[data-sb-character-editor-tab]'));
+        const currentIndex = buttons.indexOf(targetButton);
+        if (currentIndex === -1) {
+            return;
+        }
+
+        const lastIndex = buttons.length - 1;
+        let nextIndex = currentIndex;
+
+        if (event.key === 'ArrowRight') {
+            nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+        } else if (event.key === 'ArrowLeft') {
+            nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+        } else if (event.key === 'Home') {
+            nextIndex = 0;
+        } else if (event.key === 'End') {
+            nextIndex = lastIndex;
+        } else {
+            return;
+        }
+
+        event.preventDefault();
+        const nextButton = buttons[nextIndex];
+        if (nextButton instanceof HTMLButtonElement) {
+            setCharacterEditorSubTab(nextButton.dataset.sbCharacterEditorTab, { focusButton: true });
+        }
+    });
+
+    syncCharacterEditorSubTabs();
 }
 
 function hideCharacterMainPanels() {
@@ -5951,13 +6804,36 @@ function hideCharacterMainPanels() {
     }
 }
 
+function openCharacterWorldInfoTab() {
+    const panel = document.getElementById('right-nav-panel');
+    sbState.characterDrawer.lastTab = 'world-info';
+
+    closeMobileNav();
+    closeShell('left');
+    closeShell('right');
+    setCharacterPanelMenuType(panel, 'world-info');
+    preloadPanelStylesheets('characters', 'world-info');
+    setCharacterEditorEmptyState(false);
+    setCharacterPersonaPanelVisible(false);
+    setCharacterImportPanelVisible(false);
+    syncCharacterListControls('characters');
+    setCharacterWorldInfoPanelVisible(true);
+    hideCharacterMainPanels();
+
+    syncDrawerIconState('#WIDrawerIcon', true);
+    syncCharacterShellTabs('world-info');
+    syncCharacterTitlebarVisibility();
+    window.requestAnimationFrame(() => focusCharacterPanelTab('world-info'));
+}
+
 function openCharacterPersonaTab() {
     const panel = document.getElementById('right-nav-panel');
     sbState.characterDrawer.lastTab = 'persona';
 
-    panel?.setAttribute('data-menu-type', 'persona');
+    setCharacterPanelMenuType(panel, 'persona');
     setCharacterEditorEmptyState(false);
     setCharacterImportPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
     syncCharacterListControls('characters');
     setCharacterPersonaPanelVisible(true);
     hideCharacterMainPanels();
@@ -5970,9 +6846,10 @@ function openCharacterImportTab() {
     const panel = document.getElementById('right-nav-panel');
     sbState.characterDrawer.lastTab = 'import';
 
-    panel?.setAttribute('data-menu-type', 'import');
+    setCharacterPanelMenuType(panel, 'import');
     setCharacterEditorEmptyState(false);
     setCharacterPersonaPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
     syncCharacterListControls('characters');
     setCharacterImportPanelVisible(true);
     hideCharacterMainPanels();
@@ -5990,6 +6867,7 @@ function preserveCharacterImportTab() {
 
     setCharacterEditorEmptyState(false);
     setCharacterPersonaPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
     syncCharacterListControls('characters');
     setCharacterImportPanelVisible(true);
     hideCharacterMainPanels();
@@ -5998,28 +6876,50 @@ function preserveCharacterImportTab() {
 }
 
 function openCharacterPanelTab(tabId) {
-    const normalizedTabId = ['persona', 'import', 'groups', 'editor'].includes(tabId) ? tabId : 'characters';
+    const normalizedTabId = normalizeCharacterPanelTab(tabId);
     sbState.characterDrawer.lastTab = normalizedTabId;
 
+    if (normalizedTabId !== 'editor') {
+        setCharacterEditorFullscreenState(false);
+    }
+
+    if (normalizedTabId === 'world-info') {
+        preloadPanelStylesheets('characters', 'world-info');
+    }
+
     if (!isCharacterPanelOpen()) {
-        toggleCharacterPanel();
+        toggleCharacterPanel({ preferredTab: normalizedTabId });
     } else {
+        closeMobileNav();
         closeShell('left');
         closeShell('right');
     }
 
-    window.requestAnimationFrame(() => {
-        if (tabId === 'persona') {
+    const activateRequestedTab = () => {
+        const panel = document.getElementById('right-nav-panel');
+        if (normalizedTabId === 'persona') {
+            setCharacterPanelMenuType(panel, 'persona');
             openCharacterPersonaTab();
-        } else if (tabId === 'import') {
+        } else if (normalizedTabId === 'import') {
+            setCharacterPanelMenuType(panel, 'import');
             openCharacterImportTab();
-        } else if (tabId === 'groups') {
+        } else if (normalizedTabId === 'groups') {
+            setCharacterPanelMenuType(panel, 'groups');
             void showCharacterListView('groups');
-        } else if (tabId === 'editor') {
+        } else if (normalizedTabId === 'editor') {
+            setCharacterPanelMenuType(panel, 'character_edit');
             openCharacterEditorTab();
+        } else if (normalizedTabId === 'world-info') {
+            setCharacterPanelMenuType(panel, 'world-info');
+            openCharacterWorldInfoTab();
         } else {
+            setCharacterPanelMenuType(panel, 'characters');
             void showCharacterListView();
         }
+    };
+
+    window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(activateRequestedTab);
     });
 }
 
@@ -6030,6 +6930,8 @@ function restoreLastCharacterPanelView() {
         openCharacterPersonaTab();
     } else if (lastTab === 'import') {
         openCharacterImportTab();
+    } else if (lastTab === 'world-info') {
+        openCharacterWorldInfoTab();
     } else if (lastTab === 'groups') {
         void showCharacterListView('groups');
     } else if (lastTab === 'editor') {
@@ -6044,6 +6946,7 @@ function openCharacterEditorTab() {
     setCharacterEditorEmptyState(false);
     setCharacterPersonaPanelVisible(false);
     setCharacterImportPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
 
     if (showActiveCharacterEditor()) {
         syncCharacterShellTabs('editor');
@@ -6062,9 +6965,13 @@ function syncCharacterShellTabs(activeTab = null) {
             ? 'persona'
             : menuType === 'import'
                 ? 'import'
-                : menuType === 'groups'
-                    ? 'groups'
-                    : ['character_edit', 'group_edit', 'create', 'group_create', 'editor_empty'].includes(menuType) ? 'editor' : 'characters');
+                : menuType === 'world-info'
+                    ? 'world-info'
+                    : menuType === 'groups'
+                        ? 'groups'
+                        : ['character_edit', 'group_edit', 'create', 'group_create', 'editor_empty'].includes(menuType) ? 'editor' : 'characters');
+
+    sbState.characterDrawer.lastTab = normalizedTab;
 
     if (menuType === 'characters' || menuType === 'groups') {
         syncCharacterListControls(menuType);
@@ -6080,7 +6987,33 @@ function syncCharacterShellTabs(activeTab = null) {
         const isActive = tab.dataset.sbCharacterTab === normalizedTab;
         tab.classList.toggle('is-active', isActive);
         tab.setAttribute('aria-selected', String(isActive));
+        tab.setAttribute('tabindex', isActive ? '0' : '-1');
     });
+
+    document.querySelectorAll('[data-sb-rail-shell-key="characters"]').forEach(button => {
+        if (!(button instanceof HTMLElement)) {
+            return;
+        }
+
+        const isActive = button.dataset.sbRailTabId === normalizedTab;
+        button.classList.toggle('is-active', isActive);
+        if (isActive) {
+            button.setAttribute('aria-current', 'page');
+        } else {
+            button.removeAttribute('aria-current');
+        }
+    });
+
+    if (panel instanceof HTMLElement && panel.classList.contains('openDrawer')) {
+        const tabConfig = getCharacterPanelTabConfig(normalizedTab);
+        document.dispatchEvent(new CustomEvent('sb:shell-tab-activated', {
+            detail: {
+                shellKey: 'characters',
+                tabId: normalizedTab,
+                label: tabConfig?.label || normalizedTab,
+            },
+        }));
+    }
 }
 
 function syncCharacterHeaderCopy(activeTab = 'characters') {
@@ -6120,6 +7053,7 @@ function showActiveCharacterEditor() {
     setCharacterEditorEmptyState(false);
     setCharacterPersonaPanelVisible(false);
     setCharacterImportPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
     syncCharacterShellTabs('editor');
     return true;
 }
@@ -6136,20 +7070,17 @@ function resetCharacterPanelView() {
     setCharacterEditorEmptyState(false);
     setCharacterPersonaPanelVisible(false);
     setCharacterImportPanelVisible(false);
+    setCharacterWorldInfoPanelVisible(false);
 
     if (listButton instanceof HTMLElement) {
         listButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        if (panel instanceof HTMLElement) {
-            panel.dataset.menuType = 'characters';
-        }
+        setCharacterPanelMenuType(panel, 'characters');
         syncCharacterListControls('characters');
         syncCharacterShellTabs('characters');
         return;
     }
 
-    if (panel instanceof HTMLElement) {
-        panel.dataset.menuType = 'characters';
-    }
+    setCharacterPanelMenuType(panel, 'characters');
 
     const infoPanel = document.getElementById('result_info');
     const characterEditor = document.getElementById('rm_ch_create_block');
@@ -6197,6 +7128,8 @@ function syncCharacterDrawerStateFromDom({ force = false } = {}) {
     sbState.characterDrawer.observedOpen = isOpen;
     setCharacterDrawerHostOverflow(isOpen);
     syncDrawerIconState('#rightNavDrawerIcon', isOpen);
+    syncDrawerIconState('#WIDrawerIcon', isOpen && panel.dataset.menuType === 'world-info');
+    syncCharacterEditorFullscreenAvailability();
 
     if (!isOpen && document.activeElement instanceof HTMLElement && panel.contains(document.activeElement)) {
         document.activeElement.blur();
@@ -6221,6 +7154,8 @@ function bindCharacterDrawerStateObserver() {
             setCharacterEditorEmptyState(panel.dataset.menuType === 'editor_empty');
             setCharacterPersonaPanelVisible(panel.dataset.menuType === 'persona');
             setCharacterImportPanelVisible(panel.dataset.menuType === 'import');
+            setCharacterWorldInfoPanelVisible(panel.dataset.menuType === 'world-info');
+            syncCharacterEditorFullscreenAvailability();
             syncCharacterTitlebarVisibility();
             syncCharacterShellTabs();
         }
@@ -6235,12 +7170,15 @@ function bindCharacterDrawerStateObserver() {
 function closeCharacterPanel() {
     const panel = document.getElementById('right-nav-panel');
 
+    setCharacterEditorFullscreenState(false);
+
     if (panel instanceof HTMLElement && panel.classList.contains('openDrawer')) {
         forceDrawerState(panel, false, '#rightNavDrawerIcon');
     } else if (panel instanceof HTMLElement && document.activeElement instanceof HTMLElement && panel.contains(document.activeElement)) {
         document.activeElement.blur();
     }
 
+    syncDrawerIconState('#WIDrawerIcon', false);
     setCharacterDrawerHostOverflow(false);
     syncChatbarVisibilityState();
     queueMobileModalStateSync();
@@ -6269,13 +7207,18 @@ function ensureCharacterResizeHandle() {
     return handle;
 }
 
-function toggleCharacterPanel() {
+function toggleCharacterPanel({ preferredTab = null } = {}) {
     injectCharacterDrawerControls();
     ensureCharacterResizeHandle();
 
     if (isCharacterPanelOpen()) {
         closeCharacterPanel();
         return;
+    }
+
+    const normalizedPreferredTab = preferredTab ? normalizeCharacterPanelTab(preferredTab) : '';
+    if (normalizedPreferredTab) {
+        sbState.characterDrawer.lastTab = normalizedPreferredTab;
     }
 
     closeAllDropdowns({ except: 'characters' });
@@ -6318,6 +7261,18 @@ function closeAllDropdowns({ except = '' } = {}) {
 }
 
 function toggleShellPanel(shellKey, tabId = null) {
+    if (shellKey === 'characters') {
+        openCharacterPanelTab(tabId);
+        return;
+    }
+
+    if (shellKey === 'left' && tabId === 'world-info') {
+        // SillyBunny: final guard for old code paths that still ask for the
+        // removed left-shell World Info route.
+        openCharacterPanelTab('world-info');
+        return;
+    }
+
     if (!ensureShellReady(shellKey)) {
         return;
     }
@@ -6339,8 +7294,13 @@ function toggleShellPanel(shellKey, tabId = null) {
 }
 
 function preloadPanelStylesheets(shellKey, tabId = null) {
+    // SillyBunny: old saved/configured left-shell World Info routes should only
+    // preload assets for the relocated Characters tab, never recreate a left tab.
+    const normalizedTabId = shellKey === 'left' && tabId === 'world-info' ? 'world-info' : tabId;
+    const normalizedShellKey = shellKey === 'left' && tabId === 'world-info' ? 'characters' : shellKey;
     const key = `${shellKey}:${tabId || ''}`;
-    const stylesheets = SB_PANEL_STYLESHEETS[key];
+    const normalizedKey = `${normalizedShellKey}:${normalizedTabId || ''}`;
+    const stylesheets = SB_PANEL_STYLESHEETS[normalizedKey] ?? SB_PANEL_STYLESHEETS[key];
 
     if (!stylesheets || !window.SillyBunnyAssets?.loadStylesheetAsync) {
         return;
@@ -6729,6 +7689,12 @@ function hideHostToggles() {
     const characterDrawer = document.getElementById('rightNavHolder');
     characterDrawer?.classList.add('sb-drawer-host');
     characterDrawer?.querySelector(':scope > .drawer-toggle')?.classList.add('sb-hidden-toggle');
+
+    // SillyBunny: World Info is no longer a left/top-level drawer, but keeping
+    // the upstream drawer ID preserves legacy selectors until runtime reparents it.
+    const worldInfoDrawer = document.getElementById('WI-SP-button');
+    worldInfoDrawer?.classList.add('sb-drawer-host');
+    worldInfoDrawer?.querySelector(':scope > .drawer-toggle')?.classList.add('sb-hidden-toggle');
 }
 
 function createShellPanel(tabConfig) {
@@ -6898,7 +7864,26 @@ const SB_SAMPLING_BACKENDS = Object.freeze([
         apiIds: ['novel'],
         title: 'NovelAI',
         description: 'Uses NovelAI preset sampling fields without changing the backend request format.',
-        controls: ['#temp_novel', '#top_p_novel', '#rep_pen_novel'],
+        controls: [
+            '#temp_novel',
+            '#rep_pen_novel',
+            '#rep_pen_size_novel',
+            '#rep_pen_slope_novel',
+            '#rep_pen_freq_novel',
+            '#rep_pen_presence_novel',
+            '#min_p_novel',
+            '#tail_free_sampling_novel',
+            '#top_p_novel',
+            '#top_a_novel',
+            '#top_k_novel',
+            '#mirostat_tau_novel',
+            '#mirostat_lr_novel',
+            '#typical_p_novel',
+            '#math1_temp_novel',
+            '#math1_quad_novel',
+            '#math1_quad_entropy_scale_novel',
+            '#min_length_novel',
+        ],
     },
 ]);
 
@@ -9457,8 +10442,12 @@ function getMobileQuickActionContextLabel(action) {
         return '';
     }
 
-    const shellLabel = getShellConfig(normalizedAction.shellKey)?.title || normalizedAction.shellKey;
-    const tabLabel = getShellState(normalizedAction.shellKey)?.tabs?.get(normalizedAction.tabId)?.label
+    const shellLabel = normalizedAction.shellKey === 'characters'
+        ? 'Characters'
+        : getShellConfig(normalizedAction.shellKey)?.title || normalizedAction.shellKey;
+    const tabLabel = normalizedAction.shellKey === 'characters'
+        ? getCharacterPanelTabConfig(normalizedAction.tabId)?.label || normalizedAction.tabId
+        : getShellState(normalizedAction.shellKey)?.tabs?.get(normalizedAction.tabId)?.label
         || getMobileQuickActionTabConfig(normalizedAction.shellKey, normalizedAction.tabId)?.label
         || normalizedAction.tabId;
     const labels = [shellLabel, tabLabel];
@@ -9472,34 +10461,79 @@ function getMobileQuickActionContextLabel(action) {
     return labels.join(' · ');
 }
 
-function updateMobileQuickActionSettingsStatus() {
-    const status = document.getElementById('sb-mobile-quick-action-status');
-    if (status instanceof HTMLElement) {
-        status.textContent = `${sbState.mobileQuickActions.length}/${SB_MOBILE_QUICK_ACTION_LIMIT} selected. This list replaces the Workspace drawer shortcuts.`;
+function createMobileQuickActionIconElement(iconClass) {
+    return createElement('i', {
+        className: `fa-solid ${normalizeFontAwesomeIcon(iconClass)}`,
+        attrs: {
+            'aria-hidden': 'true',
+        },
+    });
+}
+
+function createMobileQuickActionIconControl(action, actionKey, mode = 'mobile') {
+    const normalizedAction = normalizeMobileQuickAction(action);
+    const iconClass = normalizedAction?.icon || SB_MOBILE_QUICK_ACTION_ICON_FALLBACK;
+
+    if (normalizedAction?.type === 'custom') {
+        const button = createElement('button', {
+            className: 'menu_button menu_button_icon sb-mobile-quick-action-icon-picker',
+            attrs: {
+                type: 'button',
+                title: `Choose icon for ${normalizedAction.label}`,
+                'aria-label': `Choose icon for ${normalizedAction.label}`,
+            },
+        });
+        button.appendChild(createMobileQuickActionIconElement(iconClass));
+        button.addEventListener('click', () => {
+            void chooseQuickActionIcon(mode, actionKey);
+        });
+        return button;
     }
 
-    const resetButton = document.getElementById('sb-mobile-quick-action-reset');
+    const preview = createElement('span', {
+        className: 'sb-mobile-quick-action-icon-preview',
+        attrs: {
+            title: normalizedAction ? `${normalizedAction.label} icon` : 'Quick Action icon',
+            'aria-hidden': 'true',
+        },
+    });
+    preview.appendChild(createMobileQuickActionIconElement(iconClass));
+    return preview;
+}
+
+function updateMobileQuickActionSettingsStatus(mode = 'mobile') {
+    const currentActions = getQuickActionState(mode);
+    const status = document.getElementById(`sb-${mode}-quick-action-status`);
+    if (status instanceof HTMLElement) {
+        status.textContent = mode === 'desktop'
+            ? `${currentActions.length}/${SB_MOBILE_QUICK_ACTION_LIMIT} selected. This list controls the desktop side rail shortcuts.`
+            : `${currentActions.length}/${SB_MOBILE_QUICK_ACTION_LIMIT} selected. This list replaces the mobile quick shortcuts.`;
+    }
+
+    const resetButton = document.getElementById(`sb-${mode}-quick-action-reset`);
     if (resetButton instanceof HTMLButtonElement) {
-        const currentKeys = sbState.mobileQuickActions.map(getMobileQuickActionKey);
-        const defaultKeys = getDefaultMobileQuickActions().map(getMobileQuickActionKey);
+        const currentKeys = currentActions.map(getMobileQuickActionKey);
+        const defaultKeys = (mode === 'desktop' ? getDefaultDesktopQuickActions() : getDefaultMobileQuickActions()).map(getMobileQuickActionKey);
         resetButton.disabled = currentKeys.length === defaultKeys.length
             && currentKeys.every((key, index) => key === defaultKeys[index]);
     }
 }
 
-function refreshMobileQuickActionSearchResults() {
-    const searchInput = document.getElementById('sb-mobile-quick-action-search');
-    const results = document.getElementById('sb-mobile-quick-action-results');
+function refreshMobileQuickActionSearchResults(mode = 'mobile') {
+    const searchInput = document.getElementById(`sb-${mode}-quick-action-search`);
+    const results = document.getElementById(`sb-${mode}-quick-action-results`);
 
     if (searchInput instanceof HTMLInputElement && results instanceof HTMLElement) {
-        renderMobileQuickActionResults(searchInput.value, results);
+        renderMobileQuickActionResults(searchInput.value, results, mode);
     }
 }
 
-function renderMobileQuickActionResults(query, resultsElement) {
+function renderMobileQuickActionResults(query, resultsElement, mode = 'mobile') {
     if (!(resultsElement instanceof HTMLElement)) {
         return;
     }
+
+    const modeLabel = mode === 'desktop' ? 'desktop' : 'mobile';
 
     resultsElement.replaceChildren();
 
@@ -9521,7 +10555,8 @@ function renderMobileQuickActionResults(query, resultsElement) {
         return;
     }
 
-    const currentKeys = new Set(sbState.mobileQuickActions.map(getMobileQuickActionKey));
+    const currentActions = getQuickActionState(mode);
+    const currentKeys = new Set(currentActions.map(getMobileQuickActionKey));
     for (const match of matches) {
         const action = createMobileQuickActionFromMatch(match);
         if (!action) {
@@ -9530,7 +10565,7 @@ function renderMobileQuickActionResults(query, resultsElement) {
 
         const actionKey = getMobileQuickActionKey(action);
         const isAdded = currentKeys.has(actionKey);
-        const isFull = sbState.mobileQuickActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT;
+        const isFull = currentActions.length >= SB_MOBILE_QUICK_ACTION_LIMIT;
         const buttonText = isAdded ? 'Added' : isFull ? 'Full' : 'Add';
         const row = createElement('div', { className: 'sb-mobile-quick-action-result' });
         const copy = createElement('span', { className: 'sb-mobile-quick-action-copy' });
@@ -9544,13 +10579,13 @@ function renderMobileQuickActionResults(query, resultsElement) {
             attrs: {
                 type: 'button',
                 'aria-label': isAdded
-                    ? `${action.label} is already in mobile Quick Actions`
-                    : `Add ${action.label} to mobile Quick Actions`,
+                    ? `${action.label} is already in ${modeLabel} Quick Actions`
+                    : `Add ${action.label} to ${modeLabel} Quick Actions`,
             },
         });
 
         button.disabled = isAdded || isFull;
-        button.addEventListener('click', () => addMobileQuickActionFromMatch(match));
+        button.addEventListener('click', () => addQuickActionFromMatch(mode, match));
 
         copy.append(title, detail);
         row.append(copy, button);
@@ -9558,60 +10593,71 @@ function renderMobileQuickActionResults(query, resultsElement) {
     }
 }
 
-function renderMobileQuickActionSettingsList() {
-    updateMobileQuickActionSettingsStatus();
+function renderMobileQuickActionSettingsList(mode = 'mobile') {
+    updateMobileQuickActionSettingsStatus(mode);
 
-    const list = document.getElementById('sb-mobile-quick-action-list');
+    const list = document.getElementById(`sb-${mode}-quick-action-list`);
     if (!(list instanceof HTMLElement)) {
         return;
     }
 
+    const modeLabel = mode === 'desktop' ? 'desktop' : 'mobile';
+    const currentActions = getQuickActionState(mode);
+
     list.replaceChildren();
 
-    if (!sbState.mobileQuickActions.length) {
+    if (!currentActions.length) {
         list.appendChild(createElement('div', {
             className: 'sb-mobile-quick-action-empty',
-            text: 'No mobile Quick Actions selected. Add one from search or reset to defaults.',
+            text: `No ${modeLabel} Quick Actions selected. Add one from search or reset to defaults.`,
         }));
         return;
     }
 
-    for (const action of sbState.mobileQuickActions) {
+    for (const action of currentActions) {
         const actionKey = getMobileQuickActionKey(action);
         const row = createElement('div', { className: 'sb-mobile-quick-action-current' });
         const copy = createElement('span', { className: 'sb-mobile-quick-action-copy' });
         const title = createElement('strong', { text: action.label });
         const detail = createElement('small', { text: getMobileQuickActionContextLabel(action) });
+        const controls = createElement('span', { className: 'sb-mobile-quick-action-controls' });
+        const iconControl = createMobileQuickActionIconControl(action, actionKey, mode);
         const removeButton = createElement('button', {
             className: 'menu_button sb-mobile-quick-action-remove',
             text: 'Remove',
             attrs: {
                 type: 'button',
-                'aria-label': `Remove ${action.label} from mobile Quick Actions`,
+                'aria-label': `Remove ${action.label} from ${modeLabel} Quick Actions`,
             },
         });
 
-        removeButton.addEventListener('click', () => removeMobileQuickAction(actionKey));
+        removeButton.addEventListener('click', () => removeQuickAction(mode, actionKey));
 
         copy.append(title, detail);
-        row.append(copy, removeButton);
+        controls.append(iconControl, removeButton);
+        row.append(copy, controls);
         list.appendChild(row);
     }
 }
 
-function createMobileQuickActionSettingsGroup() {
+function createMobileQuickActionSettingsGroup(mode = 'mobile') {
+    const isDesktop = mode === 'desktop';
+    const modeTitle = isDesktop ? 'Desktop' : 'Mobile';
+    const modeLabel = isDesktop ? 'desktop' : 'mobile';
     const group = createElement('section', {
-        className: 'sb-theme-slider-group sb-mobile-quick-actions-group',
+        className: `sb-theme-slider-group sb-mobile-quick-actions-group sb-${mode}-quick-actions-group`,
     });
     const header = createElement('div', { className: 'sb-mobile-quick-action-header' });
     const heading = createElement('div', { className: 'sb-mobile-quick-action-heading' });
-    const title = createElement('strong', { text: 'Mobile Quick Actions' });
+    const title = createElement('strong', { text: `${modeTitle} Quick Actions` });
     const description = createElement('p', {
         className: 'sb-theme-slider-caption',
-        text: 'Choose the shortcuts shown in the mobile Workspace drawer. Defaults can be removed or restored.',
+        text: isDesktop
+            ? 'Choose the shortcuts shown below Customize in the desktop side rail. Defaults can be removed or restored.'
+            : 'Choose the shortcuts shown in the mobile quick drawer. Defaults can be removed or restored.',
     });
     const resetButton = createElement('button', {
-        id: 'sb-mobile-quick-action-reset',
+        id: `sb-${mode}-quick-action-reset`,
         className: 'menu_button sb-mobile-quick-action-reset',
         text: 'Reset to defaults',
         attrs: {
@@ -9620,60 +10666,62 @@ function createMobileQuickActionSettingsGroup() {
     });
 
     const searchInput = createElement('input', {
-        id: 'sb-mobile-quick-action-search',
+        id: `sb-${mode}-quick-action-search`,
         className: 'text_pole sb-mobile-quick-action-search',
         attrs: {
             type: 'search',
             placeholder: 'Search settings or extensions...',
             autocomplete: 'off',
-            'aria-label': 'Search settings and extensions to add as mobile Quick Actions',
+            'aria-label': `Search settings and extensions to add as ${modeLabel} Quick Actions`,
         },
     });
     const results = createElement('div', {
-        id: 'sb-mobile-quick-action-results',
+        id: `sb-${mode}-quick-action-results`,
         className: 'sb-mobile-quick-action-results',
     });
     const list = createElement('div', {
-        id: 'sb-mobile-quick-action-list',
+        id: `sb-${mode}-quick-action-list`,
         className: 'sb-mobile-quick-action-list',
     });
     const status = createElement('p', {
-        id: 'sb-mobile-quick-action-status',
+        id: `sb-${mode}-quick-action-status`,
         className: 'sb-theme-slider-caption',
     });
 
     heading.append(title, description);
     header.append(heading, resetButton);
 
-    resetButton.addEventListener('click', resetMobileQuickActions);
+    resetButton.addEventListener('click', isDesktop ? resetDesktopQuickActions : resetMobileQuickActions);
 
     searchInput.addEventListener('input', event => {
         const input = event.currentTarget;
-        renderMobileQuickActionResults(input instanceof HTMLInputElement ? input.value : '', results);
+        renderMobileQuickActionResults(input instanceof HTMLInputElement ? input.value : '', results, mode);
     });
 
     group.append(header, searchInput, results, list, status);
-    renderMobileQuickActionResults('', results);
+    renderMobileQuickActionResults('', results, mode);
 
-    window.requestAnimationFrame(renderMobileQuickActionSettingsList);
+    window.requestAnimationFrame(() => renderMobileQuickActionSettingsList(mode));
     return group;
 }
 
-function createCompactModeSettingsGroup() {
+function createCompactModeSettingsGroup(mode = 'mobile') {
+    const inputId = mode === 'desktop' ? 'sb-desktop-compact-mode-input' : 'sb-mobile-compact-mode-input';
     const group = createElement('section', {
         className: 'sb-theme-slider-group sb-compact-mode-group',
     });
     const label = createElement('label', {
         className: 'sb-compact-mode-option',
         attrs: {
-            for: 'sb-compact-mode-input',
+            for: inputId,
         },
     });
     const checkbox = createElement('input', {
-        id: 'sb-compact-mode-input',
+        id: inputId,
         className: 'sb-compact-mode-checkbox',
         attrs: {
             type: 'checkbox',
+            'data-sb-compact-mode-input': mode,
         },
     });
     const copy = createElement('span', { className: 'sb-compact-mode-copy' });
@@ -9691,6 +10739,187 @@ function createCompactModeSettingsGroup() {
     label.append(checkbox, copy);
     group.appendChild(label);
     return group;
+}
+
+function createMobileNavChoice({ id, type = 'radio', name = '', value = '', label, icon, onChange }) {
+    const choice = createElement('label', {
+        className: 'sb-mobile-nav-choice',
+        attrs: {
+            for: id,
+        },
+    });
+    const inputAttrs = {
+        type,
+        value,
+    };
+
+    if (name) {
+        inputAttrs.name = name;
+    }
+
+    const input = createElement('input', {
+        id,
+        className: 'sb-mobile-nav-choice-input',
+        attrs: inputAttrs,
+    });
+    const iconElement = createElement('i', {
+        className: `fa-solid ${icon} sb-mobile-nav-choice-icon`,
+        attrs: {
+            'aria-hidden': 'true',
+        },
+    });
+    const copy = createElement('span', { className: 'sb-mobile-nav-choice-copy' });
+    const title = createElement('strong', { text: label });
+
+    input.addEventListener('change', event => {
+        const target = event.currentTarget;
+        if (!(target instanceof HTMLInputElement)) {
+            return;
+        }
+
+        if (target.type === 'radio' && !target.checked) {
+            return;
+        }
+
+        onChange?.(target);
+    });
+
+    copy.appendChild(title);
+    choice.append(input, iconElement, copy);
+    return choice;
+}
+
+function createMobileNavDivider(label = '') {
+    const divider = createElement('div', {
+        className: 'sb-mobile-nav-settings-divider',
+        attrs: label ? { role: 'separator', 'aria-label': label } : { role: 'separator' },
+    });
+    if (label) {
+        divider.appendChild(createElement('span', { text: label }));
+    }
+    return divider;
+}
+
+function createNavigationSettingsGroup(mode = 'mobile') {
+    const isDesktop = mode === 'desktop';
+    const modeTitle = isDesktop ? 'Desktop' : 'Mobile';
+    const modePrefix = isDesktop ? 'desktop' : 'mobile';
+    const group = createElement('section', {
+        className: `sb-theme-slider-group sb-mobile-nav-layout-group sb-${modePrefix}-nav-layout-group`,
+    });
+    const header = createElement('div', { className: 'sb-mobile-nav-settings-header' });
+    const title = createElement('strong', { text: `${modeTitle} Navigation` });
+    const layoutGrid = createElement('div', {
+        className: 'sb-mobile-nav-choice-grid',
+        attrs: {
+            role: 'radiogroup',
+            'aria-label': `${modeTitle} navigation layout`,
+        },
+    });
+    const iconOnlyChoice = createMobileNavChoice({
+        id: `sb-${modePrefix}-nav-icon-only-input`,
+        type: 'checkbox',
+        value: 'icon-only',
+        label: 'Icons only in shell tabs',
+        icon: 'fa-icons',
+        onChange: input => isDesktop ? setDesktopNavIconOnly(input.checked) : setMobileNavIconOnly(input.checked),
+    });
+    const showCustomizeChoice = createMobileNavChoice({
+        id: `sb-${modePrefix}-nav-show-customize-input`,
+        type: 'checkbox',
+        value: 'show-customize',
+        label: getMobileNavCustomizeLocationLabel(mode),
+        icon: 'fa-sliders',
+        onChange: input => isDesktop ? setDesktopNavShowCustomize(input.checked) : setMobileNavShowCustomize(input.checked),
+    });
+    const showQuickActionsChoice = createMobileNavChoice({
+        id: `sb-${modePrefix}-nav-show-quick-actions-input`,
+        type: 'checkbox',
+        value: 'show-quick-actions',
+        label: 'Show Custom Quick Actions below Customize',
+        icon: 'fa-bolt',
+        onChange: input => isDesktop ? setDesktopNavShowQuickActions(input.checked) : setMobileNavShowQuickActions(input.checked),
+    });
+    const replaceQuickActionsChoice = createMobileNavChoice({
+        id: `sb-${modePrefix}-nav-replace-quick-actions-input`,
+        type: 'checkbox',
+        value: 'replace-quick-actions',
+        label: 'Use a chosen page instead of Quick Actions',
+        icon: 'fa-map-location-dot',
+        onChange: input => isDesktop ? setDesktopNavReplaceQuickActions(input.checked) : setMobileNavReplaceQuickActions(input.checked),
+    });
+    const replacementField = createElement('label', {
+        className: 'sb-mobile-nav-replacement-field',
+        attrs: {
+            for: `sb-${modePrefix}-nav-replacement-select`,
+        },
+    });
+    const replacementLabel = createElement('span', { text: 'Replacement page' });
+    const replacementSelect = createElement('select', {
+        id: `sb-${modePrefix}-nav-replacement-select`,
+        className: 'text_pole sb-mobile-nav-replacement-select',
+    });
+
+    for (const target of SB_MOBILE_NAV_PAGE_TARGETS) {
+        const option = createElement('option', {
+            attrs: {
+                value: target.value,
+            },
+        });
+        option.textContent = target.label;
+        replacementSelect.appendChild(option);
+    }
+
+    replacementSelect.addEventListener('change', event => {
+        const select = event.currentTarget;
+        const nextValue = select instanceof HTMLSelectElement ? select.value : '';
+        if (isDesktop) {
+            setDesktopNavReplacementTarget(nextValue);
+        } else {
+            setMobileNavReplacementTarget(nextValue);
+        }
+    });
+
+    layoutGrid.append(
+        createMobileNavChoice({
+            id: `sb-${modePrefix}-nav-layout-horizontal`,
+            name: `sb-${modePrefix}-nav-layout`,
+            value: 'horizontal',
+            label: 'Horizontal top bar',
+            icon: 'fa-grip-lines',
+            onChange: input => isDesktop ? setDesktopNavLayout(input.value) : setMobileNavLayout(input.value),
+        }),
+        createMobileNavChoice({
+            id: `sb-${modePrefix}-nav-layout-vertical`,
+            name: `sb-${modePrefix}-nav-layout`,
+            value: 'vertical',
+            label: 'Vertical side rail',
+            icon: 'fa-table-columns',
+            onChange: input => isDesktop ? setDesktopNavLayout(input.value) : setMobileNavLayout(input.value),
+        }),
+    );
+
+    header.appendChild(title);
+    replacementField.append(replacementLabel, replacementSelect);
+    group.append(
+        header,
+        layoutGrid,
+        iconOnlyChoice,
+        createMobileNavDivider(),
+        showCustomizeChoice,
+        showQuickActionsChoice,
+        replaceQuickActionsChoice,
+        replacementField,
+    );
+    return group;
+}
+
+function createMobileNavLayoutSettingsGroup() {
+    return createNavigationSettingsGroup('mobile');
+}
+
+function createDesktopNavLayoutSettingsGroup() {
+    return createNavigationSettingsGroup('desktop');
 }
 
 function createFrontendIconSettingsGroup() {
@@ -9878,6 +11107,19 @@ function injectThemePicker() {
         caption: 'Resize the bottom chat bar, send form, and action buttons without editing CSS.',
         onInput: nextValue => setBottomBarScale(nextValue),
     });
+    const desktopButtonSliderGroup = createThemeSliderGroup({
+        title: 'Desktop Button Size',
+        valueId: 'sb-desktop-button-scale-value',
+        inputId: 'sb-desktop-button-scale-input',
+        value: sbState.desktopButtonScale,
+        min: SB_TOPBAR_SCALE.min,
+        max: SB_TOPBAR_SCALE.max,
+        step: SB_TOPBAR_SCALE.step,
+        ariaLabel: 'Desktop button size',
+        caption: 'Increase or decrease the desktop top bar and shell navigation buttons without changing mobile controls.',
+        onInput: nextValue => setDesktopButtonScale(nextValue),
+        className: 'sb-desktop-setting',
+    });
     const mobileButtonSliderGroup = createThemeSliderGroup({
         title: 'Mobile Button Size',
         valueId: 'sb-mobile-button-scale-value',
@@ -9892,10 +11134,18 @@ function injectThemePicker() {
         className: 'sb-mobile-only-setting',
     });
     const topbarLabelSettingsGroup = createTopbarLabelSettingsGroup();
-    const compactModeSettingsGroup = createCompactModeSettingsGroup();
+    const desktopNavLayoutSettingsGroup = createDesktopNavLayoutSettingsGroup();
+    const mobileNavLayoutSettingsGroup = createMobileNavLayoutSettingsGroup();
+    const desktopSettingsDivider = createMobileNavDivider();
+    const mobileSettingsDivider = createMobileNavDivider();
+    const desktopCompactModeSettingsGroup = createCompactModeSettingsGroup('desktop');
+    const mobileCompactModeSettingsGroup = createCompactModeSettingsGroup('mobile');
     const frontendIconSettingsGroup = createFrontendIconSettingsGroup();
     const shortcutSettingsGroup = createShortcutSettingsGroup();
+    const desktopQuickActionSettingsGroup = createMobileQuickActionSettingsGroup('desktop');
     const mobileQuickActionSettingsGroup = createMobileQuickActionSettingsGroup();
+    const desktopSettingsOutlet = document.getElementById('sb-desktop-settings-outlet');
+    const mobileSettingsOutlet = document.getElementById('sb-mobile-settings-outlet');
     header.append(title, description);
 
     for (const theme of SB_THEMES) {
@@ -9919,7 +11169,46 @@ function injectThemePicker() {
     getMessageStyleSelect()?.addEventListener('change', updateThemePickerUi);
     document.addEventListener('sb:chat-style-updated', updateThemePickerUi);
 
-    card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup, mobileQuickActionSettingsGroup);
+    if (desktopSettingsOutlet instanceof HTMLElement) {
+        desktopSettingsOutlet.replaceChildren(
+            desktopNavLayoutSettingsGroup,
+            desktopSettingsDivider,
+            desktopButtonSliderGroup,
+            desktopCompactModeSettingsGroup,
+            desktopQuickActionSettingsGroup,
+        );
+    }
+
+    if (mobileSettingsOutlet instanceof HTMLElement) {
+        mobileSettingsOutlet.replaceChildren(
+            mobileNavLayoutSettingsGroup,
+            mobileSettingsDivider,
+            mobileButtonSliderGroup,
+            mobileCompactModeSettingsGroup,
+            mobileQuickActionSettingsGroup,
+        );
+    }
+
+    card.append(header, optionRow, frontendIconSettingsGroup, surfaceSliderGroup, bottomBarSliderGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
+    if (!(desktopSettingsOutlet instanceof HTMLElement)) {
+        card.append(
+            desktopNavLayoutSettingsGroup,
+            desktopSettingsDivider,
+            desktopButtonSliderGroup,
+            desktopCompactModeSettingsGroup,
+            desktopQuickActionSettingsGroup,
+        );
+    }
+
+    if (!(mobileSettingsOutlet instanceof HTMLElement)) {
+        card.append(
+            mobileNavLayoutSettingsGroup,
+            mobileSettingsDivider,
+            mobileButtonSliderGroup,
+            mobileCompactModeSettingsGroup,
+            mobileQuickActionSettingsGroup,
+        );
+    }
     themeBlock.prepend(card);
     updateThemePickerUi();
 }
@@ -9931,10 +11220,21 @@ function updateThemePickerUi() {
     const desktopTopbarScaleValue = document.getElementById('sb-topbar-scale-desktop-value');
     const bottomBarScaleInput = document.getElementById('sb-bottom-bar-scale-input');
     const bottomBarScaleValue = document.getElementById('sb-bottom-bar-scale-value');
+    const desktopButtonScaleInput = document.getElementById('sb-desktop-button-scale-input');
+    const desktopButtonScaleValue = document.getElementById('sb-desktop-button-scale-value');
     const mobileButtonScaleInput = document.getElementById('sb-mobile-button-scale-input');
     const mobileButtonScaleValue = document.getElementById('sb-mobile-button-scale-value');
     const customTextInput = document.getElementById('sb-topbar-custom-text-input');
-    const compactModeInput = document.getElementById('sb-compact-mode-input');
+    const desktopNavIconOnlyInput = document.getElementById('sb-desktop-nav-icon-only-input');
+    const desktopNavShowCustomizeInput = document.getElementById('sb-desktop-nav-show-customize-input');
+    const desktopNavShowQuickActionsInput = document.getElementById('sb-desktop-nav-show-quick-actions-input');
+    const desktopNavReplaceQuickActionsInput = document.getElementById('sb-desktop-nav-replace-quick-actions-input');
+    const desktopNavReplacementSelect = document.getElementById('sb-desktop-nav-replacement-select');
+    const mobileNavIconOnlyInput = document.getElementById('sb-mobile-nav-icon-only-input');
+    const mobileNavShowCustomizeInput = document.getElementById('sb-mobile-nav-show-customize-input');
+    const mobileNavShowQuickActionsInput = document.getElementById('sb-mobile-nav-show-quick-actions-input');
+    const mobileNavReplaceQuickActionsInput = document.getElementById('sb-mobile-nav-replace-quick-actions-input');
+    const mobileNavReplacementSelect = document.getElementById('sb-mobile-nav-replacement-select');
 
     for (const button of document.querySelectorAll('[data-sb-theme-option]')) {
         const themeId = button.getAttribute('data-sb-theme-option');
@@ -9977,6 +11277,14 @@ function updateThemePickerUi() {
         bottomBarScaleValue.textContent = formatTopbarScale(sbState.bottomBarScale);
     }
 
+    if (desktopButtonScaleInput instanceof HTMLInputElement) {
+        desktopButtonScaleInput.value = String(sbState.desktopButtonScale);
+    }
+
+    if (desktopButtonScaleValue instanceof HTMLElement) {
+        desktopButtonScaleValue.textContent = formatTopbarScale(sbState.desktopButtonScale);
+    }
+
     if (mobileButtonScaleInput instanceof HTMLInputElement) {
         mobileButtonScaleInput.value = String(sbState.mobileButtonScale);
     }
@@ -10004,9 +11312,111 @@ function updateThemePickerUi() {
         customTextInput.value = sbState.topbarLabel.customText;
     }
 
-    if (compactModeInput instanceof HTMLInputElement) {
-        compactModeInput.checked = sbState.compactMode;
-        compactModeInput.closest('.sb-compact-mode-option')?.classList.toggle('is-selected', sbState.compactMode);
+    for (const input of document.querySelectorAll('[data-sb-compact-mode-input]')) {
+        if (!(input instanceof HTMLInputElement)) {
+            continue;
+        }
+
+        input.checked = sbState.compactMode;
+        input.closest('.sb-compact-mode-option')?.classList.toggle('is-selected', sbState.compactMode);
+    }
+
+    for (const input of document.querySelectorAll('input[name="sb-desktop-nav-layout"]')) {
+        if (!(input instanceof HTMLInputElement)) {
+            continue;
+        }
+
+        const isChecked = input.value === sbState.desktopNav.layout;
+        input.checked = isChecked;
+        input.closest('.sb-mobile-nav-choice')?.classList.toggle('is-selected', isChecked);
+    }
+
+    for (const input of document.querySelectorAll('input[name="sb-mobile-nav-layout"]')) {
+        if (!(input instanceof HTMLInputElement)) {
+            continue;
+        }
+
+        const isChecked = input.value === sbState.mobileNav.layout;
+        input.checked = isChecked;
+        input.closest('.sb-mobile-nav-choice')?.classList.toggle('is-selected', isChecked);
+    }
+
+    if (desktopNavIconOnlyInput instanceof HTMLInputElement) {
+        desktopNavIconOnlyInput.checked = sbState.desktopNav.iconOnly;
+        const choice = desktopNavIconOnlyInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.desktopNav.iconOnly);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (desktopNavShowCustomizeInput instanceof HTMLInputElement) {
+        desktopNavShowCustomizeInput.checked = sbState.desktopNav.showCustomize;
+        desktopNavShowCustomizeInput.disabled = false;
+        const choice = desktopNavShowCustomizeInput.closest('.sb-mobile-nav-choice');
+        const label = choice?.querySelector('.sb-mobile-nav-choice-copy > strong');
+        if (label instanceof HTMLElement) {
+            label.textContent = getMobileNavCustomizeLocationLabel('desktop');
+        }
+        choice?.classList.toggle('is-selected', sbState.desktopNav.showCustomize);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (desktopNavShowQuickActionsInput instanceof HTMLInputElement) {
+        desktopNavShowQuickActionsInput.checked = sbState.desktopNav.showQuickActions;
+        desktopNavShowQuickActionsInput.disabled = false;
+        const choice = desktopNavShowQuickActionsInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.desktopNav.showQuickActions);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (desktopNavReplaceQuickActionsInput instanceof HTMLInputElement) {
+        desktopNavReplaceQuickActionsInput.checked = sbState.desktopNav.replaceQuickActions;
+        const choice = desktopNavReplaceQuickActionsInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.desktopNav.replaceQuickActions);
+    }
+
+    if (desktopNavReplacementSelect instanceof HTMLSelectElement) {
+        desktopNavReplacementSelect.value = normalizeMobileNavReplacementTarget(sbState.desktopNav.replacementTarget);
+        desktopNavReplacementSelect.disabled = !sbState.desktopNav.replaceQuickActions;
+        desktopNavReplacementSelect.closest('.sb-mobile-nav-replacement-field')?.classList.toggle('is-disabled', !sbState.desktopNav.replaceQuickActions);
+    }
+
+    if (mobileNavIconOnlyInput instanceof HTMLInputElement) {
+        mobileNavIconOnlyInput.checked = sbState.mobileNav.iconOnly;
+        const choice = mobileNavIconOnlyInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.mobileNav.iconOnly);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (mobileNavShowCustomizeInput instanceof HTMLInputElement) {
+        mobileNavShowCustomizeInput.checked = sbState.mobileNav.showCustomize;
+        mobileNavShowCustomizeInput.disabled = false;
+        const choice = mobileNavShowCustomizeInput.closest('.sb-mobile-nav-choice');
+        const label = choice?.querySelector('.sb-mobile-nav-choice-copy > strong');
+        if (label instanceof HTMLElement) {
+            label.textContent = getMobileNavCustomizeLocationLabel();
+        }
+        choice?.classList.toggle('is-selected', sbState.mobileNav.showCustomize);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (mobileNavShowQuickActionsInput instanceof HTMLInputElement) {
+        mobileNavShowQuickActionsInput.checked = sbState.mobileNav.showQuickActions;
+        mobileNavShowQuickActionsInput.disabled = false;
+        const choice = mobileNavShowQuickActionsInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.mobileNav.showQuickActions);
+        choice?.classList.toggle('is-disabled', false);
+    }
+
+    if (mobileNavReplaceQuickActionsInput instanceof HTMLInputElement) {
+        mobileNavReplaceQuickActionsInput.checked = sbState.mobileNav.replaceQuickActions;
+        const choice = mobileNavReplaceQuickActionsInput.closest('.sb-mobile-nav-choice');
+        choice?.classList.toggle('is-selected', sbState.mobileNav.replaceQuickActions);
+    }
+
+    if (mobileNavReplacementSelect instanceof HTMLSelectElement) {
+        mobileNavReplacementSelect.value = normalizeMobileNavReplacementTarget(sbState.mobileNav.replacementTarget);
+        mobileNavReplacementSelect.disabled = !sbState.mobileNav.replaceQuickActions;
+        mobileNavReplacementSelect.closest('.sb-mobile-nav-replacement-field')?.classList.toggle('is-disabled', !sbState.mobileNav.replaceQuickActions);
     }
 
     for (const button of document.querySelectorAll('[data-sb-message-style]')) {
@@ -10025,7 +11435,7 @@ function createSearchIndex(tabState, { includeThemeCard = false } = {}) {
     const entries = [];
     const seen = new Set();
     const excludedSelector = includeThemeCard
-        ? '.sb-search-result, .sb-legacy-search-hidden, .sb-mobile-quick-actions-group'
+        ? '.sb-search-result, .sb-legacy-search-hidden, .sb-mobile-quick-actions-group, .sb-desktop-quick-actions-group'
         : '.sb-search-result, .sb-theme-card, .sb-legacy-search-hidden';
 
     for (const element of searchRoot.querySelectorAll(SB_SEARCH_TARGET_SELECTOR)) {
@@ -10163,7 +11573,11 @@ function collectGlobalSearchMatches(query) {
                 tabState.searchIndex = createSearchIndex(tabState);
             }
 
-            const extraEntries = tabState.id === 'persona' ? getPersonaSearchEntries(tabState) : [];
+            const extraEntries = tabState.id === 'persona'
+                ? getPersonaSearchEntries(tabState)
+                : tabState.id === 'characters'
+                    ? getCharacterPanelSearchEntries()
+                    : [];
 
             for (const entry of [...tabState.searchIndex, ...extraEntries]) {
                 if (!searchTerms.every(term => entry.searchText.includes(term))) {
@@ -10214,7 +11628,11 @@ function getTabSearchEntries(tabState, { includeThemeCard = false } = {}) {
 
     return [
         ...(searchIndex || tabState.searchIndex),
-        ...(tabState.id === 'persona' ? getPersonaSearchEntries(tabState) : []),
+        ...(tabState.id === 'persona'
+            ? getPersonaSearchEntries(tabState)
+            : tabState.id === 'characters'
+                ? getCharacterPanelSearchEntries()
+                : []),
     ];
 }
 
@@ -10287,18 +11705,60 @@ function findMobileQuickActionMatch(action) {
     return {
         ...fallbackMatch,
         shellKey: normalizedAction.shellKey,
-        shellLabel: getShellConfig(normalizedAction.shellKey)?.title || normalizedAction.shellKey,
+        shellLabel: normalizedAction.shellKey === 'characters'
+            ? 'Characters'
+            : getShellConfig(normalizedAction.shellKey)?.title || normalizedAction.shellKey,
     };
 }
 
 function activateMobileQuickAction(action) {
     const match = findMobileQuickActionMatch(action);
     if (!match) {
+        if (action.shellKey === 'characters') {
+            openCharacterPanelTab(action.tabId);
+            return;
+        }
+
         openShell(action.shellKey, action.tabId);
         return;
     }
 
+    if (action.shellKey === 'characters') {
+        revealSearchMatch(action.shellKey, match);
+        return;
+    }
+
     revealSearchMatch(action.shellKey, match);
+}
+
+function activateMobileNavAction(action) {
+    const normalizedAction = normalizeMobileQuickAction(action);
+    if (!normalizedAction) {
+        return;
+    }
+
+    if (isMobileViewport()) {
+        closeMobileNav();
+    }
+
+    if (normalizedAction.type === 'custom') {
+        activateMobileQuickAction(normalizedAction);
+        return;
+    }
+
+    if (normalizedAction.type === 'shell') {
+        closeAllDropdowns({ except: normalizedAction.shellKey });
+        openShell(normalizedAction.shellKey);
+        return;
+    }
+
+    if (normalizedAction.shellKey === 'characters') {
+        openCharacterPanelTab(normalizedAction.tabId);
+        return;
+    }
+
+    closeAllDropdowns({ except: normalizedAction.shellKey });
+    openShell(normalizedAction.shellKey, normalizedAction.tabId);
 }
 
 function renderUniversalSearchResults(query) {
@@ -10448,16 +11908,9 @@ function expandHiddenAccordions(target) {
 }
 
 function pulseSearchTarget(target) {
-    document.querySelectorAll('.sb-search-hit').forEach(element => {
-        element.classList.remove('sb-search-hit');
-    });
-
     if (!(target instanceof HTMLElement)) {
         return;
     }
-
-    target.classList.add('sb-search-hit');
-    window.setTimeout(() => target.classList.remove('sb-search-hit'), 2200);
 }
 
 function revealSearchMatch(shellKey, match) {
@@ -10466,6 +11919,23 @@ function revealSearchMatch(shellKey, match) {
     // Entries with a custom action (e.g. persona results) bypass DOM scrolling
     if (typeof match.action === 'function') {
         match.action();
+        return;
+    }
+
+    if (shellKey === 'characters') {
+        openCharacterPanelTab(match.tabId);
+
+        if (match.element instanceof HTMLElement) {
+            window.setTimeout(() => {
+                expandHiddenAccordions(match.element);
+                match.element.scrollIntoView({
+                    block: 'center',
+                    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                });
+                pulseSearchTarget(match.element);
+            }, 40);
+        }
+
         return;
     }
 
@@ -10485,6 +11955,13 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
     const shellState = getShellState(shellKey);
     const shellConfig = getShellConfig(shellKey);
 
+    if (shellKey === 'left' && tabId === 'world-info') {
+        // SillyBunny: final guard for old code paths that still ask for the
+        // removed left-shell World Info route.
+        openCharacterPanelTab('world-info');
+        return;
+    }
+
     if (!shellState || !shellState.tabs.has(tabId)) {
         return;
     }
@@ -10497,22 +11974,25 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
 
     for (const [currentTabId, tabState] of shellState.tabs.entries()) {
         const isActive = currentTabId === tabId;
+        const isHiddenRailDuplicate = tabState.button?.classList.contains('sb-shell-tab-mobile-rail-hidden') ?? false;
         tabState.button?.classList.toggle('is-active', isActive);
         tabState.button?.setAttribute('aria-selected', String(isActive));
-        tabState.button?.setAttribute('tabindex', isActive ? '0' : '-1');
+        tabState.button?.setAttribute('tabindex', isActive && !isHiddenRailDuplicate ? '0' : '-1');
         tabState.panel.classList.toggle('sb-shell-panel-active', isActive);
         tabState.panel.setAttribute('aria-hidden', String(!isActive));
         // Invalidate search index when switching to a tab so stale DOM isn't searched
         if (isActive) tabState.searchIndex = null;
     }
 
+    syncMobileShellRailActionState(shellKey, tabId);
+
     const activeTab = shellState.tabs.get(tabId);
     shellState.headerTitle.textContent = activeTab.label;
-    shellState.headerSubtitle.textContent = activeTab.description;
+    shellState.headerSubtitle.textContent = activeTab.description ?? '';
     scrollShellTabButtonIntoView(shellState.nav, activeTab.button, { smooth: focusButton });
     shellState.updateNavScrollIndicators?.();
 
-    if (focusButton) {
+    if (focusButton && isActuallyVisible(activeTab.button)) {
         activeTab.button?.focus();
     } else if (isShellOpen(shellKey)) {
         window.requestAnimationFrame(() => focusShellPanel(shellKey, { force: true }));
@@ -10530,6 +12010,13 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
 }
 
 function openShell(shellKey, tabId = null) {
+    if (shellKey === 'left' && tabId === 'world-info') {
+        // SillyBunny: final guard for old code paths that still ask for the
+        // removed left-shell World Info route.
+        openCharacterPanelTab('world-info');
+        return;
+    }
+
     const shellConfig = getShellConfig(shellKey);
     const shellState = getShellState(shellKey);
     const shellRoot = document.getElementById(shellConfig.rootPanelId);
@@ -10648,10 +12135,13 @@ function buildShell(shellKey) {
     navWrapper.append(navScrollLeft, nav, navScrollRight);
 
     const scrollNavByPage = direction => {
-        nav.scrollBy({
-            left: direction * Math.max(nav.clientWidth * 0.72, 160),
-            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        const scrollRequest = sbMobileShellLifecycle.nav.resolvePageScroll({
+            direction,
+            clientWidth: nav.clientWidth,
+            prefersReducedMotion: prefersReducedMotion(),
         });
+
+        nav.scrollBy(scrollRequest);
     };
 
     let navTouchDrag = null;
@@ -10662,28 +12152,30 @@ function buildShell(shellKey) {
     };
 
     const finishNavTouchDrag = event => {
-        if (navTouchDrag?.dragging) {
-            suppressNavClickUntil = Date.now() + 350;
+        const dragEnd = sbMobileShellLifecycle.nav.resolveDragEnd({
+            dragState: navTouchDrag,
+            nowMs: Date.now(),
+        });
+
+        if (dragEnd.suppressClickUntil) {
+            suppressNavClickUntil = dragEnd.suppressClickUntil;
+        }
+
+        if (dragEnd.shouldStopPropagation) {
             event.stopPropagation();
         }
 
-        clearNavTouchDrag();
+        navTouchDrag = dragEnd.dragState;
     };
 
     const beginNavTouchDrag = event => {
         const touch = event.touches?.[0];
 
-        if (!isMobileViewport() || !touch) {
-            clearNavTouchDrag();
-            return;
-        }
-
-        navTouchDrag = {
-            x: touch.clientX,
-            y: touch.clientY,
+        navTouchDrag = sbMobileShellLifecycle.nav.createDragState({
+            isMobileViewport: isMobileViewport(),
+            touch,
             scrollLeft: nav.scrollLeft,
-            dragging: false,
-        };
+        });
     };
 
     const updateNavTouchDrag = event => {
@@ -10691,35 +12183,35 @@ function buildShell(shellKey) {
             return;
         }
 
-        const touch = event.touches?.[0];
+        const dragMove = sbMobileShellLifecycle.nav.resolveDragMove({
+            dragState: navTouchDrag,
+            touch: event.touches?.[0],
+        });
+        navTouchDrag = dragMove.dragState;
 
-        if (!touch) {
-            clearNavTouchDrag();
+        if (!navTouchDrag) {
             return;
         }
 
-        const deltaX = touch.clientX - navTouchDrag.x;
-        const deltaY = touch.clientY - navTouchDrag.y;
-
-        navTouchDrag.dragging = navTouchDrag.dragging
-            || Math.abs(deltaX) > SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX
-            || Math.abs(deltaY) > SB_SHELL_NAV_TOUCH_DRAG_THRESHOLD_PX;
-
-        if (!navTouchDrag.dragging) {
-            return;
-        }
-
-        if (event.cancelable) {
+        if (dragMove.shouldPreventDefault && event.cancelable) {
             event.preventDefault();
         }
 
-        event.stopPropagation();
-        nav.scrollLeft = navTouchDrag.scrollLeft - deltaX;
-        updateNavScrollIndicators();
+        if (dragMove.shouldStopPropagation) {
+            event.stopPropagation();
+        }
+
+        if (dragMove.nextScrollLeft !== null) {
+            nav.scrollLeft = dragMove.nextScrollLeft;
+            updateNavScrollIndicators();
+        }
     };
 
     const suppressClickAfterNavDrag = event => {
-        if (Date.now() >= suppressNavClickUntil) {
+        if (!sbMobileShellLifecycle.nav.shouldSuppressClick({
+            nowMs: Date.now(),
+            suppressClickUntil: suppressNavClickUntil,
+        })) {
             return;
         }
 
@@ -10728,8 +12220,12 @@ function buildShell(shellKey) {
     };
 
     const updateNavScrollIndicators = () => {
-        const canScrollLeft = nav.scrollLeft > 0;
-        const canScrollRight = Math.ceil(nav.scrollLeft + nav.clientWidth) < nav.scrollWidth;
+        const { canScrollLeft, canScrollRight } = sbMobileShellLifecycle.nav.resolveScrollIndicators({
+            scrollLeft: nav.scrollLeft,
+            clientWidth: nav.clientWidth,
+            scrollWidth: nav.scrollWidth,
+        });
+
         navWrapper.classList.toggle('sb-can-scroll-left', canScrollLeft);
         navWrapper.classList.toggle('sb-can-scroll-right', canScrollRight);
         navScrollLeft.disabled = !canScrollLeft;
@@ -10760,7 +12256,7 @@ function buildShell(shellKey) {
     });
     const eyebrow = createElement('div', { className: 'sb-shell-kicker', text: shellConfig.title });
     const title = createElement('h2', { className: 'sb-shell-title', text: shellConfig.baseTab.label, attrs: { tabindex: '-1' } });
-    const subtitle = createElement('p', { className: 'sb-shell-subtitle', text: shellConfig.baseTab.description });
+    const subtitle = createElement('p', { className: 'sb-shell-subtitle', text: shellConfig.baseTab.description ?? '' });
     const shellDescription = createElement('p', { className: 'sb-shell-description', text: shellConfig.subtitle });
     const panelBody = createElement('div', { className: 'sb-shell-body' });
     const resizeHandle = createElement('div', {
@@ -10815,7 +12311,9 @@ function buildShell(shellKey) {
 
         if (isOpen) {
             shellState.lastOpenedAt = performance.now();
-            closeMobileNav();
+            if (isMobileViewport()) {
+                closeMobileNav();
+            }
             const activeTab = shellState.tabs.get(shellState.activeTabId);
             activeTab?.onActivate?.();
             dispatchShellTabActivated(shellKey, activeTab);
@@ -10889,7 +12387,7 @@ function buildShell(shellKey) {
 
     panelBody.append(...Array.from(shellState.tabs.values()).map(tabState => tabState.panel));
 
-    const storedTabId = safeGetItem(shellConfig.storageKey);
+    const storedTabId = migrateLegacyWorldInfoRoute(safeGetItem(shellConfig.storageKey));
     const nextActiveTab = shellState.tabs.has(storedTabId) ? storedTabId : shellConfig.defaultTabId;
     setActiveTab(shellKey, nextActiveTab);
 
@@ -10913,6 +12411,8 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
             role: 'tab',
             tabindex: '-1',
             'aria-selected': 'false',
+            'aria-label': tabConfig.label,
+            title: tabConfig.label,
             'data-sb-tab': tabConfig.id,
         },
     });
@@ -10930,7 +12430,9 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
     });
 
     button.addEventListener('keydown', event => {
-        const buttons = Array.from(shellState.nav.querySelectorAll('.sb-shell-tab'));
+        const buttons = Array.from(shellState.nav.querySelectorAll('.sb-shell-tab[data-sb-tab]')).filter(
+            item => item instanceof HTMLElement && !item.classList.contains('sb-shell-tab-mobile-rail-hidden'),
+        );
         const currentIndex = buttons.indexOf(button);
 
         if (currentIndex === -1) {
@@ -10961,8 +12463,6 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
         }
     });
 
-    shellState.nav.appendChild(button);
-    shellState.updateNavScrollIndicators?.();
     shellState.tabs.set(tabConfig.id, {
         ...tabConfig,
         button,
@@ -10972,6 +12472,224 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
         onActivate: panelBundle.onActivate ?? tabConfig.onActivate ?? null,
         onDeactivate: panelBundle.onDeactivate ?? tabConfig.onDeactivate ?? null,
     });
+    shellState.nav.appendChild(button);
+    shellState.updateNavScrollIndicators?.();
+    syncMobileShellRailActions(shellKey);
+}
+
+function createMobileShellRailDivider(label) {
+    return createElement('div', {
+        className: 'sb-shell-rail-divider',
+        attrs: {
+            role: 'separator',
+            'aria-label': label,
+        },
+    });
+}
+
+function createMobileShellRailButton(item, actionHandler, className = '') {
+    const action = normalizeMobileQuickAction({
+        type: item.type || 'tab',
+        shellKey: item.shellKey,
+        tabId: item.tabId,
+        icon: item.icon,
+        label: item.label,
+        sectionLabel: item.sectionLabel,
+        displayText: item.displayText,
+        dedupeKey: item.dedupeKey,
+    });
+
+    if (!action) {
+        return null;
+    }
+
+    const buttonAttrs = {
+        type: 'button',
+        title: action.label,
+        'aria-label': action.label,
+        'data-sb-rail-action': getMobileQuickActionKey(action),
+        'data-sb-rail-type': action.type,
+        'data-sb-rail-shell-key': action.shellKey,
+    };
+
+    if (action.tabId) {
+        buttonAttrs['data-sb-rail-tab-id'] = action.tabId;
+    }
+
+    const button = createElement('button', {
+        className: ['sb-shell-tab', 'sb-shell-rail-action', className].filter(Boolean).join(' '),
+        attrs: buttonAttrs,
+    });
+    const icon = createElement('i', {
+        className: `fa-solid ${action.icon || SB_MOBILE_QUICK_ACTION_ICON_FALLBACK}`,
+        attrs: {
+            'aria-hidden': 'true',
+        },
+    });
+    const copy = createElement('span', { className: 'sb-shell-tab-copy' });
+    const label = createElement('strong', { text: action.label });
+
+    copy.appendChild(label);
+    button.append(icon, copy);
+    button.addEventListener('click', () => actionHandler(action));
+    return button;
+}
+
+function createCustomizeGroup() {
+    const customizeGroup = createElement('div', {
+        className: 'sb-shell-rail-group sb-shell-rail-group-customize',
+        attrs: {
+            'aria-label': 'Customize',
+        },
+    });
+
+    let previousShellKey = '';
+    for (const action of SB_MOBILE_RAIL_CUSTOMIZE_ACTIONS) {
+        if (previousShellKey && action.shellKey !== previousShellKey) {
+            customizeGroup.appendChild(createMobileShellRailDivider('Settings'));
+        }
+
+        const button = createMobileShellRailButton(action, activateMobileNavAction, 'sb-shell-rail-customize-action');
+        if (button) {
+            customizeGroup.appendChild(button);
+        }
+
+        previousShellKey = action.shellKey;
+    }
+
+    return customizeGroup;
+}
+
+function syncMobileShellRailActionState(activeShellKey = '', activeTabId = '') {
+    document.querySelectorAll('.sb-shell-rail-action[data-sb-rail-shell-key]').forEach(button => {
+        if (!(button instanceof HTMLElement)) {
+            return;
+        }
+
+        const isActive = button.dataset.sbRailShellKey === activeShellKey && button.dataset.sbRailTabId === activeTabId;
+        button.classList.toggle('is-active', isActive);
+        button.setAttribute('aria-selected', String(isActive));
+        if (isActive) {
+            button.setAttribute('aria-current', 'page');
+        } else {
+            button.removeAttribute('aria-current');
+        }
+    });
+}
+
+function syncMobileShellRailTabVisibility(shellState, currentShellKey, hideCustomizeTabs) {
+    const hiddenTabIds = new Set(
+        hideCustomizeTabs
+            ? SB_MOBILE_RAIL_CUSTOMIZE_ACTIONS
+                .filter(action => action.shellKey === currentShellKey)
+                .map(action => action.tabId)
+            : [],
+    );
+
+    for (const tabState of shellState.tabs.values()) {
+        if (!(tabState.button instanceof HTMLElement)) {
+            continue;
+        }
+
+        const shouldHide = hiddenTabIds.has(tabState.id);
+        const isActive = tabState.id === shellState.activeTabId;
+        tabState.button.classList.toggle('sb-shell-tab-mobile-rail-hidden', shouldHide);
+        tabState.button.setAttribute('aria-hidden', String(shouldHide));
+        tabState.button.setAttribute('tabindex', isActive && !shouldHide ? '0' : '-1');
+        tabState.button.toggleAttribute('inert', shouldHide);
+    }
+}
+
+function syncMobileShellRailActions(shellKey = null) {
+    const shellKeys = shellKey ? [shellKey] : ['left', 'right'];
+    const railMode = getActiveShellRailMode();
+    const navState = getNavState(railMode);
+    const hasVerticalRail = navState.layout === 'vertical';
+    const railQuickActionState = getQuickActionState(railMode);
+
+    for (const currentShellKey of shellKeys) {
+        const shellState = getShellState(currentShellKey);
+        if (!(shellState?.nav instanceof HTMLElement)) {
+            continue;
+        }
+
+        shellState.nav.querySelectorAll('.sb-shell-rail-shortcuts').forEach(element => element.remove());
+        const showCustomize = hasVerticalRail && navState.showCustomize;
+        const shouldHideCustomizeTabs = showCustomize;
+        syncMobileShellRailTabVisibility(shellState, currentShellKey, shouldHideCustomizeTabs);
+
+        const createRailBlock = (position) => createElement('div', {
+            className: `sb-shell-rail-shortcuts sb-shell-rail-shortcuts-${position}`,
+            attrs: {
+                'aria-hidden': 'false',
+            },
+        });
+
+        if (!hasVerticalRail) {
+            shellState.updateNavScrollIndicators?.();
+            continue;
+        }
+
+        const builtInRailActionKeys = showCustomize
+            ? new Set(SB_MOBILE_RAIL_CUSTOMIZE_ACTIONS.map(getMobileQuickActionKey))
+            : new Set();
+        const replacementAction = railMode === 'desktop' && navState.replaceQuickActions
+            ? createNavReplacementQuickAction(navState.replacementTarget)
+            : null;
+        const railQuickActions = replacementAction
+            ? [replacementAction]
+            : railQuickActionState.filter(action => !builtInRailActionKeys.has(getMobileQuickActionKey(action)));
+        const createQuickActionsGroup = () => {
+            const quickActionsGroup = createElement('div', {
+                className: 'sb-shell-rail-group sb-shell-rail-group-quick-actions',
+                attrs: {
+                    'aria-label': 'Quick Actions',
+                },
+            });
+
+            if (railQuickActions.length) {
+                for (const action of railQuickActions) {
+                    const button = createMobileShellRailButton(action, activateMobileNavAction, 'sb-shell-rail-quick-action');
+                    if (button) {
+                        quickActionsGroup.appendChild(button);
+                    }
+                }
+            } else {
+                quickActionsGroup.appendChild(createElement('div', {
+                    className: 'sb-shell-rail-empty',
+                    text: 'No Quick Actions',
+                }));
+            }
+
+            return quickActionsGroup;
+        };
+
+        const beforeBlock = createRailBlock('before');
+
+        if (showCustomize) {
+            beforeBlock.appendChild(createMobileShellRailDivider('Workspace'));
+            beforeBlock.appendChild(createCustomizeGroup());
+        }
+
+        if (beforeBlock.children.length > 0) {
+            shellState.nav.prepend(beforeBlock);
+        }
+
+        if (navState.showQuickActions && railQuickActions.length > 0) {
+            const afterBlock = createRailBlock('after');
+            afterBlock.append(
+                createMobileShellRailDivider('Quick Actions'),
+                createQuickActionsGroup(),
+            );
+            shellState.nav.appendChild(afterBlock);
+        }
+
+        shellState.updateNavScrollIndicators?.();
+    }
+
+    const activeShellKey = ['left', 'right'].find(currentShellKey => isShellOpen(currentShellKey)) ?? (shellKeys.length === 1 ? shellKeys[0] : '');
+    const activeShellState = activeShellKey ? getShellState(activeShellKey) : null;
+    syncMobileShellRailActionState(activeShellKey, activeShellState?.activeTabId ?? '');
 }
 
 function routeDrawerTarget(targetId) {
@@ -10981,19 +12699,11 @@ function routeDrawerTarget(targetId) {
     }
 
     if (route.shell === 'characters') {
-        if (!isCharacterPanelOpen()) {
-            toggleCharacterPanel();
-        } else {
-            closeShell('left');
-            closeShell('right');
-        }
-
-        if (route.tab === 'persona') {
-            openCharacterPersonaTab();
-        }
+        openCharacterPanelTab(route.tab);
         return true;
     }
 
+    preloadPanelStylesheets(route.shell, route.tab);
     openShell(route.shell, route.tab);
     return true;
 }
@@ -11088,30 +12798,63 @@ function bindWorldInfoRoute() {
         return;
     }
 
-    window.jQuery('#WIDrawerIcon').on('click.sbShellRoute', function (event) {
-        const leftShell = getShellState('left');
-        const leftRoot = document.getElementById(getShellConfig('left').rootPanelId);
-        const worldInfoPanel = document.getElementById('WorldInfo');
+    window.jQuery('#WIDrawerIcon, #WI-SP-button > .drawer-toggle')
+        .off('click.sbShellRoute')
+        .on('click.sbShellRoute', function (event) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
 
-        if (!leftShell || !(leftRoot instanceof HTMLElement)) {
-            return;
-        }
+            const characterPanel = document.getElementById('right-nav-panel');
+            const worldInfoVisible = characterPanel instanceof HTMLElement
+                && characterPanel.classList.contains('openDrawer')
+                && characterPanel.dataset.menuType === 'world-info';
 
-        event.preventDefault();
-        event.stopImmediatePropagation();
+            if (worldInfoVisible) {
+                closeCharacterPanel();
+            } else {
+                openCharacterPanelTab('world-info');
+            }
 
-        const worldInfoVisible = leftRoot.classList.contains('openDrawer')
-            && leftShell.activeTabId === 'world-info'
-            && isActuallyVisible(worldInfoPanel);
+            return false;
+        });
+}
 
-        if (worldInfoVisible) {
-            closeShell('left');
-        } else {
-            openShell('left', 'world-info');
-        }
+function activateMobileNavPageTarget(target) {
+    const config = getMobileNavReplacementTargetConfig(target);
 
-        return false;
-    });
+    closeMobileNav();
+
+    if (config.shellKey === 'characters') {
+        openCharacterPanelTab(config.tabId);
+        return;
+    }
+
+    if (config.shellKey && config.tabId) {
+        openShell(config.shellKey, config.tabId);
+    }
+}
+
+function updateMobileNavButtonLabel() {
+    const button = document.getElementById('sb-hamburger');
+    if (!(button instanceof HTMLElement)) {
+        return;
+    }
+
+    const overlay = document.getElementById('sb-mobile-nav');
+    const isOpen = overlay instanceof HTMLElement
+        && !overlay.hidden
+        && overlay.getAttribute('aria-hidden') === 'false';
+    const replacement = getMobileNavReplacementTargetConfig();
+    let title = 'Open navigation';
+
+    if (isOpen) {
+        title = 'Close navigation';
+    } else if (sbState.mobileNav.replaceQuickActions) {
+        title = `Open ${replacement.label}`;
+    }
+
+    button.title = title;
+    button.setAttribute('aria-label', title);
 }
 
 function createMobileQuickActionButton(item) {
@@ -11124,10 +12867,12 @@ function createMobileQuickActionButton(item) {
         className: 'sb-nav-item',
         attrs: {
             type: 'button',
+            title: `Open ${action.label}`,
+            'aria-label': `Open ${action.label}`,
         },
     });
     const icon = createElement('i', {
-        className: `fa-solid ${action.icon || 'fa-bolt'}`,
+        className: `fa-solid ${action.icon || SB_MOBILE_QUICK_ACTION_ICON_FALLBACK}`,
         attrs: {
             'aria-hidden': 'true',
         },
@@ -11140,6 +12885,10 @@ function createMobileQuickActionButton(item) {
 
         if (action.type === 'custom') {
             activateMobileQuickAction(action);
+        } else if (action.type === 'shell') {
+            openShell(action.shellKey);
+        } else if (action.shellKey === 'characters') {
+            openCharacterPanelTab(action.tabId);
         } else {
             toggleShellPanel(action.shellKey, action.tabId);
         }
@@ -11150,13 +12899,21 @@ function createMobileQuickActionButton(item) {
 
 function refreshMobileNavQuickActions() {
     const list = sbState.mobileNav.quickActionContainer
-        ?? document.querySelector('#sb-mobile-nav .sb-mobile-section-list');
+        ?? document.querySelector('#sb-mobile-nav .sb-mobile-quick-action-list');
     if (!(list instanceof HTMLElement)) {
         return;
     }
 
     sbState.mobileNav.quickActionContainer = list;
     list.replaceChildren();
+
+    if (!sbState.mobileQuickActions.length) {
+        list.appendChild(createElement('div', {
+            className: 'sb-mobile-quick-action-empty',
+            text: 'No mobile Quick Actions selected yet.',
+        }));
+        return;
+    }
 
     for (const action of sbState.mobileQuickActions) {
         const button = createMobileQuickActionButton(action);
@@ -11188,10 +12945,15 @@ function buildMobileNav() {
     }
 
     const sectionBlock = createElement('section', { className: 'sb-mobile-section' });
-    const list = createElement('div', { className: 'sb-mobile-section-list' });
-    sectionBlock.appendChild(list);
-    content.appendChild(sectionBlock);
+    const quickActionTitle = createElement('span', { className: 'sb-mobile-section-title', text: 'Quick Actions' });
+    const list = createElement('div', { className: 'sb-mobile-section-list sb-mobile-quick-action-list' });
+
+    sectionBlock.classList.add('sb-mobile-quick-action-section');
+    sectionBlock.append(quickActionTitle, list);
+    content.append(sectionBlock);
     sbState.mobileNav.quickActionContainer = list;
+    sbState.mobileNav.quickActionSection = sectionBlock;
+    sbState.mobileNav.quickActionDivider = null;
     refreshMobileNavQuickActions();
 
     const header = createElement('div', { className: 'sb-mobile-panel-header' });
@@ -11204,11 +12966,11 @@ function buildMobileNav() {
         },
     });
     const headerCopy = createElement('div', { className: 'sb-mobile-panel-copy' });
-    const eyebrow = createElement('div', { className: 'sb-shell-kicker', text: 'Workspace' });
+    const eyebrow = createElement('div', { className: 'sb-shell-kicker', text: 'Menu' });
     const title = createElement('h2', {
         id: 'sb-mobile-nav-title',
         className: 'sb-shell-title',
-        text: 'Quick Actions',
+        text: 'Navigation',
         attrs: {
             tabindex: '-1',
         },
@@ -11236,6 +12998,7 @@ function buildMobileNav() {
     });
 
     document.body.appendChild(overlay);
+    updateMobileNavButtonLabel();
 
     // Auto-close mobile nav when clicking on main content areas
     const autoCloseSelectors = [
@@ -11247,39 +13010,22 @@ function buildMobileNav() {
     ];
 
     document.addEventListener('click', event => {
-        if (!overlay.classList.contains('sb-nav-open')) {
-            return;
-        }
-
         const target = event.target;
         if (!(target instanceof HTMLElement)) {
             return;
         }
 
-        if (!event.isTrusted) {
-            return;
-        }
+        const shouldClose = sbMobileShellLifecycle.nav.shouldAutoClose({
+            isNavOpen: overlay.classList.contains('sb-nav-open'),
+            isTrusted: event.isTrusted,
+            elapsedSinceOpenedMs: performance.now() - sbState.mobileNav.lastOpenedAt,
+            isHamburgerTarget: Boolean(target.closest('#sb-hamburger')),
+            isInsideNav: Boolean(target.closest('#sb-mobile-nav')),
+            isAutoCloseArea: autoCloseSelectors.some(selector => target.matches(selector) || target.closest(selector)),
+        });
 
-        if (performance.now() - sbState.mobileNav.lastOpenedAt < SB_MOBILE_NAV_OPEN_GRACE_MS) {
-            return;
-        }
-
-        // Don't close if clicking the hamburger button itself
-        if (target.closest('#sb-hamburger')) {
-            return;
-        }
-
-        // Don't close if clicking inside the mobile nav
-        if (target.closest('#sb-mobile-nav')) {
-            return;
-        }
-
-        // Close if clicking any of the auto-close areas
-        for (const selector of autoCloseSelectors) {
-            if (target.matches(selector) || target.closest(selector)) {
-                closeMobileNav();
-                return;
-            }
+        if (shouldClose) {
+            closeMobileNav();
         }
     }, { passive: false });
 }
@@ -11287,40 +13033,49 @@ function buildMobileNav() {
 function setMobileNavOpenState(isOpen) {
     const overlay = ensureMobileNavReady();
     const button = document.getElementById('sb-hamburger');
-    const shouldOpen = Boolean(isOpen) && isMobileViewport();
 
     if (!(overlay instanceof HTMLElement) || !(button instanceof HTMLElement)) {
         return;
     }
 
-    if (shouldOpen) {
+    const wasOpen = !overlay.hidden && overlay.getAttribute('aria-hidden') === 'false';
+    const navState = sbMobileShellLifecycle.nav.resolveOpenState({
+        requestedOpen: isOpen,
+        isMobileViewport: isMobileViewport(),
+        wasOpen,
+        focusedInside: Boolean(document.activeElement && overlay.contains(document.activeElement)),
+    });
+
+    if (navState.shouldRecordOpenedAt) {
         sbState.mobileNav.lastOpenedAt = performance.now();
     }
 
-    const wasOpen = !overlay.hidden && overlay.getAttribute('aria-hidden') === 'false';
-
-    overlay.hidden = !shouldOpen;
-    overlay.classList.toggle('sb-nav-open', shouldOpen);
-    overlay.setAttribute('aria-hidden', String(!shouldOpen));
+    overlay.hidden = navState.overlayHidden;
+    overlay.classList.toggle('sb-nav-open', navState.shouldOpen);
+    overlay.setAttribute('aria-hidden', navState.overlayAriaHidden);
 
     if ('inert' in overlay) {
-        overlay.inert = !shouldOpen;
+        overlay.inert = navState.overlayInert;
     }
 
-    button.classList.toggle('is-open', shouldOpen);
-    button.setAttribute('aria-expanded', String(shouldOpen));
-    button.innerHTML = shouldOpen
+    button.classList.toggle('is-open', navState.shouldOpen);
+    button.setAttribute('aria-expanded', navState.buttonExpanded);
+    button.innerHTML = navState.buttonIcon === 'close'
         ? '<i class="fa-solid fa-xmark" aria-hidden="true"></i>'
         : '<i class="fa-solid fa-bars" aria-hidden="true"></i>';
+    updateMobileNavButtonLabel();
 
     queueMobileModalStateSync();
 
-    if (shouldOpen) {
+    if (navState.shouldRefreshQuickActions) {
         refreshMobileNavQuickActions();
+    }
+
+    if (navState.shouldFocusTitle) {
         window.requestAnimationFrame(() => {
             overlay.querySelector('#sb-mobile-nav-title')?.focus?.({ preventScroll: true });
         });
-    } else if (wasOpen && document.activeElement && overlay.contains(document.activeElement)) {
+    } else if (navState.shouldRestoreButtonFocus) {
         button.focus({ preventScroll: true });
     }
 }
@@ -11333,9 +13088,18 @@ function toggleMobileNav() {
     }
 
     const isOpen = !overlay.hidden && overlay.getAttribute('aria-hidden') === 'false';
+    const toggleIntent = sbMobileShellLifecycle.nav.resolveToggleIntent({
+        isMobileViewport: isMobileViewport(),
+        isReplacementEnabled: sbState.mobileNav.replaceQuickActions,
+        isOpen,
+    });
 
-    // If opening mobile nav, close any open shells first
-    if (!isOpen) {
+    if (toggleIntent.action === MOBILE_SHELL_NAV_TOGGLE_ACTION.ACTIVATE_PAGE_TARGET) {
+        activateMobileNavPageTarget(sbState.mobileNav.replacementTarget);
+        return;
+    }
+
+    if (toggleIntent.shouldCloseCompetingPanels) {
         closeShell('left');
         closeShell('right');
         closeCharacterPanel();
@@ -11343,7 +13107,7 @@ function toggleMobileNav() {
         setConnectionStripOpenState(false);
     }
 
-    setMobileNavOpenState(!isOpen);
+    setMobileNavOpenState(toggleIntent.action === MOBILE_SHELL_NAV_TOGGLE_ACTION.OPEN_NAV);
 }
 
 function closeMobileNav() {
@@ -11353,6 +13117,7 @@ function closeMobileNav() {
 function injectCharacterDrawerControls() {
     document.getElementById('right-nav-panel')?.classList.add('sb-character-drawer-root');
     ensureCharacterListToolbarLayout();
+    bindCharacterEditorFullscreenToggle();
 
     const shellCloseButton = document.getElementById('sb_character_shell_close');
     if (shellCloseButton instanceof HTMLButtonElement && shellCloseButton.dataset.sbBound !== 'true') {
@@ -11382,6 +13147,12 @@ function injectCharacterDrawerControls() {
     if (personaTab instanceof HTMLButtonElement && personaTab.dataset.sbBound !== 'true') {
         personaTab.dataset.sbBound = 'true';
         personaTab.addEventListener('click', () => openCharacterPersonaTab());
+    }
+
+    const worldInfoTab = document.getElementById('sb_character_tab_world_info');
+    if (worldInfoTab instanceof HTMLButtonElement && worldInfoTab.dataset.sbBound !== 'true') {
+        worldInfoTab.dataset.sbBound = 'true';
+        worldInfoTab.addEventListener('click', () => openCharacterWorldInfoTab());
     }
 
     const importTab = document.getElementById('sb_character_tab_import');
@@ -11426,12 +13197,14 @@ function injectCharacterDrawerControls() {
             setCharacterEditorEmptyState(false);
             setCharacterPersonaPanelVisible(false);
             setCharacterImportPanelVisible(false);
+            setCharacterWorldInfoPanelVisible(false);
             document.getElementById('rm_button_create')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             syncCharacterShellTabs('editor');
         });
     }
 
     ensureCharacterPersonaPanel();
+    ensureCharacterWorldInfoPanel();
 
     const target = document.getElementById('CharListButtonAndHotSwaps');
     if (!(target instanceof HTMLElement)) {
@@ -11449,6 +13222,7 @@ function bindCharacterEditorExitButton() {
 
     button.dataset.sbBound = 'true';
     button.addEventListener('click', () => {
+        setCharacterEditorFullscreenState(false);
         closeCharacterPanel();
     });
 }
@@ -11698,6 +13472,7 @@ function syncMobileViewportState() {
         closeMobileChatTools();
     }
 
+    syncMobileShellRailActions();
     syncDesktopShellSizing();
     applyTopbarOffset();
     syncChatbarVisibilityState();
@@ -11735,7 +13510,11 @@ function reinitSelect2AfterShell() {
         }
     } else {
         // On desktop, reinitialize Select2 after DOM reparenting
-        const select2Defaults = { dropdownParent: $(document.body), minimumResultsForSearch: 0 };
+        const apiDropdownParent = $('#rm_api_block');
+        const select2Defaults = {
+            dropdownParent: apiDropdownParent.length ? apiDropdownParent : $(document.body),
+            minimumResultsForSearch: 0,
+        };
         const allSelectors = [...modelSelectors, '.openrouter_quantizations', '.openrouter_providers'];
         for (const selector of allSelectors) {
             const $el = $(selector);
@@ -11841,6 +13620,7 @@ function buildBottomChatBar() {
 
     const topBtn = createBottomChatButton({ icon: 'fa-arrow-up', title: 'Go to top of chat' }, scrollCurrentChatToTop);
     const bottomBtn = createBottomChatButton({ icon: 'fa-arrow-down', title: 'Go to bottom of chat' }, scrollCurrentChatToBottom);
+    const chatManagerBtn = createBottomChatButton({ icon: 'fa-address-book', title: 'View chat files' }, handleChatManagerClick);
     const newBtn = createBottomChatButton({ icon: 'fa-plus', title: 'New chat' }, handleNewChat);
     const massDeleteBtn = createBottomChatButton({ icon: 'fa-list-check', title: 'Mass delete chats' }, () => { void handleMassDeleteChats(); });
     const autoNameBtn = createBottomChatButton({ icon: 'fa-wand-magic-sparkles', title: 'Ask the LLM to name this chat' }, () => { void handleAutoNameChat(); });
@@ -11848,7 +13628,7 @@ function buildBottomChatBar() {
     const deleteBtn = createBottomChatButton({ icon: 'fa-trash', title: 'Delete chat' }, () => { void handleDeleteChat(); });
 
     navCluster.append(topBtn, bottomBtn);
-    managementCluster.append(newBtn, massDeleteBtn, autoNameBtn, renameBtn, searchToggleBtn, deleteBtn);
+    managementCluster.append(chatManagerBtn, newBtn, massDeleteBtn, autoNameBtn, renameBtn, searchToggleBtn, deleteBtn);
     secondaryRow.append(managementCluster);
     container.append(personaBubble, chatSelect, search.field, navCluster, collapseToggleBtn, secondaryRow);
 
@@ -11864,6 +13644,7 @@ function buildBottomChatBar() {
         secondaryRow,
         scrollTopButton: topBtn,
         scrollBottomButton: bottomBtn,
+        managerButton: chatManagerBtn,
         massDeleteButton: massDeleteBtn,
         autoNameButton: autoNameBtn,
     });
@@ -11909,6 +13690,7 @@ async function refreshBottomChatSelect() {
     setButtonDisabled(sbState.bottomChatBar?.searchToggleButton, !chatContext.hasChat);
     setButtonDisabled(sbState.bottomChatBar?.scrollTopButton, !chatContext.hasChat);
     setButtonDisabled(sbState.bottomChatBar?.scrollBottomButton, !chatContext.hasChat);
+    setButtonDisabled(sbState.bottomChatBar?.managerButton, !chatContext.canBrowseChats);
     setButtonDisabled(sbState.bottomChatBar?.massDeleteButton, !chatContext.canBrowseChats);
     setButtonDisabled(sbState.bottomChatBar?.autoNameButton, !chatContext.hasChat);
 
@@ -12359,7 +14141,10 @@ function initAll() {
     setTopbarScale('desktop', sbState.topbarScale.desktop, { persist: false });
     setTopbarScale('mobile', sbState.topbarScale.mobile, { persist: false });
     setBottomBarScale(sbState.bottomBarScale, { persist: false });
+    setDesktopButtonScale(sbState.desktopButtonScale, { persist: false });
     setMobileButtonScale(sbState.mobileButtonScale, { persist: false });
+    applyDesktopNavPreferences();
+    applyMobileNavPreferences();
     bindComposerControlPlacement();
     initChatAvatarVariables();
     syncDesktopShellSizing();
@@ -12378,6 +14163,7 @@ function initAll() {
     scheduleChatbarRefresh(0);
     interceptDrawerOpeners();
     bindWorldInfoRoute();
+    bindCharacterEditorSubTabs();
     applyDefaultDrawerStates();
     bindInlineDrawerAutoCloseToggle();
     syncMobileViewportState();
@@ -12398,7 +14184,8 @@ function initAll() {
     // Group Advanced Formatting sections into collapsible drawers
     groupAdvancedFormattingIntoDrawers();
 
-    globalThis.SillyBunnyShell = Object.assign(globalThis.SillyBunnyShell || {}, {
+    const sillyBunnyShell = /** @type {any} */ (globalThis.SillyBunnyShell || {});
+    globalThis.SillyBunnyShell = Object.assign(sillyBunnyShell, {
         openTab(shellKey, tabId) {
             if (shellKey === 'characters') {
                 openCharacterPanelTab(tabId);
@@ -12414,6 +14201,13 @@ function initAll() {
         },
         closeCharacters() {
             closeCharacterPanel();
+        },
+        isMobileViewport,
+        highlightCharacterEditorTab() {
+            const editorTab = document.querySelector('[data-sb-character-tab="editor"]');
+            if (editorTab instanceof HTMLElement) {
+                flashHighlight($(editorTab), 1000);
+            }
         },
         openGlobalSearch({ focusInput = true } = {}) {
             closeAllDropdowns({ except: 'search' });
@@ -12433,6 +14227,9 @@ function initAll() {
         },
         setMobileButtonScale(value) {
             setMobileButtonScale(value);
+        },
+        setDesktopButtonScale(value) {
+            setDesktopButtonScale(value);
         },
         setCompactMode(value) {
             setCompactMode(value);
@@ -12472,6 +14269,9 @@ function initAll() {
         },
         getMobileButtonScale() {
             return sbState.mobileButtonScale;
+        },
+        getDesktopButtonScale() {
+            return sbState.desktopButtonScale;
         },
         getCompactMode() {
             return sbState.compactMode;

@@ -1,7 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import process from 'node:process';
-import { Readable } from 'node:stream';
 import { createRequire } from 'node:module';
 import { Buffer } from 'node:buffer';
 import { promises as dnsPromise } from 'node:dns';
@@ -22,6 +21,9 @@ import { LOG_LEVELS, CHAT_COMPLETION_SOURCES, MEDIA_REQUEST_TYPE } from './const
 import { serverDirectory } from './server-directory.js';
 import { sync as writeFileAtomicSync } from 'write-file-atomic';
 import { isFirefox } from './express-common.js';
+import { pollSocketConnection } from './connection-state-checker.js';
+
+const DEFAULT_STREAMING_CONNECTION_POLLING_INTERVAL_MS = 150;
 
 /**
  * Parsed config object.
@@ -689,13 +691,65 @@ export function getImages(directoryPath, sortBy = 'name', type = MEDIA_REQUEST_T
         .sort(getSortFunction());
 }
 
+function getStreamingConnectionPollingInterval() {
+    if (CONFIG_PATH === null) {
+        return DEFAULT_STREAMING_CONNECTION_POLLING_INTERVAL_MS;
+    }
+
+    const enabled = getConfigValue('performance.streaming.enableConnectionPolling', true, 'boolean');
+    if (!enabled) {
+        return null;
+    }
+
+    const intervalMs = getConfigValue('performance.streaming.connectionPollingInterval', DEFAULT_STREAMING_CONNECTION_POLLING_INTERVAL_MS, 'number');
+
+    return Number.isFinite(intervalMs) && intervalMs > 0
+        ? intervalMs
+        : DEFAULT_STREAMING_CONNECTION_POLLING_INTERVAL_MS;
+}
+
+/**
+ * Starts OS-level polling for a streaming request socket.
+ * @param {import('express').Request} request The Express request to observe.
+ * @param {import('express').Response} response The Express response being streamed.
+ * @param {() => void | Promise<void>} onDisconnect Disconnect callback.
+ * @returns {() => void} Stops polling.
+ */
+export function pollStreamingRequestConnection(request, response, onDisconnect) {
+    if (!request?.socket || response?.writableEnded || response?.destroyed) {
+        return () => undefined;
+    }
+
+    const intervalMs = getStreamingConnectionPollingInterval();
+    if (!intervalMs) {
+        return () => undefined;
+    }
+
+    return pollSocketConnection(request.socket, intervalMs, () => {
+        if (response?.writableEnded || response?.destroyed) {
+            return;
+        }
+
+        try {
+            const disconnectResult = onDisconnect?.();
+            if (disconnectResult && typeof disconnectResult.catch === 'function') {
+                disconnectResult.catch(error => console.warn('Error handling streaming client disconnect:', error));
+            }
+        } catch (error) {
+            console.warn('Error handling streaming client disconnect:', error);
+        }
+    });
+}
+
 /**
  * Pipe a fetch() response to an Express.js Response, including status code.
  * @param {import('node-fetch').Response} from The Fetch API response to pipe from.
  * @param {import('express').Response} to The Express response to pipe to.
+ * @param {import('express').Request} [request] The Express request to poll for OS-level disconnects.
+ * @param {() => void | Promise<void>} [onDisconnect] Additional disconnect callback.
  * @returns {Promise<void>}
  */
-export async function forwardFetchResponse(from, to) {
+export async function forwardFetchResponse(from, to, request = null, onDisconnect = null) {
     let statusCode = from.status;
     let statusText = from.statusText;
 
@@ -727,21 +781,53 @@ export async function forwardFetchResponse(from, to) {
     }
 
     if (from.body && to.socket) {
+        const stopPolling = pollStreamingRequestConnection(request, to, () => {
+            try {
+                const disconnectResult = onDisconnect?.();
+                if (disconnectResult && typeof disconnectResult.catch === 'function') {
+                    disconnectResult.catch(error => console.warn('Error handling streaming client disconnect:', error));
+                }
+            } catch (error) {
+                console.warn('Error handling streaming client disconnect:', error);
+            }
+
+            try {
+                from.body?.destroy?.();
+            } catch {
+                // Best effort; the client response is already gone.
+            }
+
+            if (!to.writableEnded) {
+                to.end();
+            }
+        });
+
         from.body.pipe(to);
 
         to.on('close', function () {
+            stopPolling();
+
             if (to.writableEnded) {
                 return;
             }
 
-            if (from.body instanceof Readable) from.body.destroy(); // Close the remote stream
+            try {
+                from.body?.destroy?.(); // Close the remote stream
+            } catch {
+                // Best effort; the client response is already closing.
+            }
 
             to.end(); // End the Express response
         });
 
         from.body.on('end', function () {
+            stopPolling();
             console.info('Streaming request finished');
             to.end();
+        });
+
+        from.body.on('error', function () {
+            stopPolling();
         });
     } else {
         to.end();
@@ -749,15 +835,14 @@ export async function forwardFetchResponse(from, to) {
 }
 
 /**
- * Aborts an upstream request if the client closes the Express response early.
- * @param {import('express').Response} response The Express response to observe.
+ * Aborts an upstream request if the client connection closes early.
+ * @param {import('express').Request} request The Express request to observe.
  * @param {AbortController} controller Abort controller for the upstream request.
  */
-export function abortOnResponseClose(response, controller) {
-    response.on('close', () => {
-        if (!response.writableEnded) {
-            controller.abort();
-        }
+export function abortOnRequestClose(request, controller) {
+    request.socket.removeAllListeners('close');
+    request.socket.on('close', () => {
+        controller.abort();
     });
 }
 

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import express from 'express';
 import fetch from 'node-fetch';
 
-import { forwardFetchResponse, abortOnResponseClose, delay, summarizeLlmPayloadForLog } from '../../util.js';
+import { forwardFetchResponse, delay, summarizeLlmPayloadForLog } from '../../util.js';
 import { getOverrideHeaders, setAdditionalHeaders, setAdditionalHeadersByType } from '../../additional-headers.js';
 import { TEXTGEN_TYPES } from '../../constants.js';
 
@@ -17,12 +17,8 @@ router.post('/generate', async function (request, response_generate) {
 
     const request_prompt = request.body.prompt;
     const controller = new AbortController();
-    abortOnResponseClose(response_generate, controller);
-    response_generate.on('close', async function () {
-        if (response_generate.writableEnded) {
-            return;
-        }
-
+    request.socket.removeAllListeners('close');
+    request.socket.on('close', async function () {
         if (request.body.can_abort && !response_generate.writableEnded) {
             try {
                 console.info('Aborting Kobold generation...');
@@ -38,6 +34,7 @@ router.post('/generate', async function (request, response_generate) {
                 console.error(error);
             }
         }
+        controller.abort();
     });
 
     let this_settings = {
@@ -102,7 +99,23 @@ router.post('/generate', async function (request, response_generate) {
 
             if (request.body.streaming) {
                 // Pipe remote SSE stream to Express response
-                await forwardFetchResponse(response, response_generate);
+                await forwardFetchResponse(response, response_generate, request, async () => {
+                    if (request.body.can_abort && !response_generate.writableEnded) {
+                        try {
+                            console.info('Aborting Kobold generation...');
+                            const abortResponse = await fetch(`${request.body.api_server}/extra/abort`, {
+                                method: 'POST',
+                            });
+
+                            if (!abortResponse.ok) {
+                                console.error('Error sending abort request to Kobold:', abortResponse.status);
+                            }
+                        } catch (error) {
+                            console.error(error);
+                        }
+                    }
+                    controller.abort();
+                });
                 return;
             } else {
                 if (!response.ok) {

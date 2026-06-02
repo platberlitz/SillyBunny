@@ -1,5 +1,5 @@
 <div class="flex-container flexFlowColumn marginBot10">
-    <h3 data-i18n="Do you want to export connection data with the preset?">
+    <h3 id="export_connection_data_prompt" data-i18n="Do you want to export connection data with the preset?">
         Do you want to export connection data with the preset?
     </h3>
 
@@ -11,14 +11,14 @@
         Your stored API keys are never exported.
     </strong>
 </div>
-<div class="flex-container flexFlowColumn">
-    <label class="checkbox_label" for="export_connection_data_yes">
+<div class="sb-boolean-radio-group" role="radiogroup" aria-labelledby="export_connection_data_prompt">
+    <label class="checkbox_label sb-boolean-radio-option" for="export_connection_data_yes">
         <input type="radio" id="export_connection_data_yes" name="export_connection_data" value="true">
         <span data-i18n="Export connection data">
             Export connection data
         </span>
     </label>
-    <label class="checkbox_label" for="export_connection_data_no">
+    <label class="checkbox_label sb-boolean-radio-option" for="export_connection_data_no">
         <input type="radio" id="export_connection_data_no" name="export_connection_data" value="false" checked>
         <span data-i18n="Do not export connection data">
             Do not export connection data

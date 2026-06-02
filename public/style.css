@@ -943,10 +943,6 @@ body .panelControlBar {
     flex-direction: column;
     z-index: 30;
     flex-grow: 1;
-}
-
-/* macOS browser scroll anchoring fights chat scroll preservation during message loads. */
-body.is-macos #chat {
     overflow-anchor: none;
 }
 
@@ -1296,14 +1292,9 @@ body.is-macos #chat {
     vertical-align: middle;
 }
 
-.auto_hide {
-    content-visibility: auto;
-}
-
 .mes {
     display: flex;
     align-items: flex-start;
-    content-visibility: auto;
     contain: layout paint style;
     contain-intrinsic-size: auto 180px;
     padding: 12px 14px 4px 14px;
@@ -2732,18 +2723,6 @@ body[data-stscript-style] .hljs.language-stscript {
     padding: 2px;
 }
 
-#character_popup .editor_maximize {
-    cursor: pointer;
-    margin: 3px;
-    opacity: 0.75;
-    filter: grayscale(1);
-    transition: all var(--animation-duration-2x) ease-in-out;
-}
-
-#character_popup .editor_maximize:hover {
-    opacity: 1;
-}
-
 .text_pole::placeholder,
 textarea::placeholder {
     color: var(--SmartThemeEmColor) !important;
@@ -2791,18 +2770,6 @@ textarea::placeholder {
 
 #character_name_pole {
     margin-bottom: 0;
-}
-
-#character_cross {
-    appearance: none;
-    background: transparent;
-    border: 0;
-    color: inherit;
-    cursor: pointer;
-    opacity: 0.6;
-    font-size: 24px;
-    padding: 0;
-    margin: 0;
 }
 
 
@@ -2871,6 +2838,11 @@ h3 {
 #top-bar h4 {
     margin: 0;
     padding: 5px 0;
+}
+
+h4,
+h5 {
+    margin: 5px 0;
 }
 
 input[type="file"] {
@@ -4891,6 +4863,19 @@ input[type="range"]::-webkit-slider-thumb {
     opacity: 1;
 }
 
+.card-script-sandbox-frame {
+    display: none !important;
+}
+
+.mes_run_card_scripts.script-running {
+    opacity: 0.85;
+    color: var(--SmartThemeQuoteColor);
+}
+
+.mes_run_card_scripts.script-ran {
+    opacity: 0.6;
+}
+
 .mes_bookmark {
     display: none;
 }
@@ -5007,7 +4992,11 @@ input[type="range"]::-webkit-slider-thumb {
     margin: 0;
 }
 
-.sb-message-screenshot-surface :is(.mes_button, .mes_buttons, .mes_edit_buttons, .mes_reasoning_actions, .for_checkbox, .del_checkbox, .swipe_left, .swipe_right, .swipes-counter, .right_menu_button, .code-copy) {
+.sb-message-screenshot-surface .last_mes:not(.smallSysMes) .mesAvatarWrapper {
+    padding-bottom: 0 !important;
+}
+
+.sb-message-screenshot-surface :is(.mes_button, .mes_buttons, .extraMesButtons, .extraMesButtonsHint, .mes_edit_buttons, .mes_reasoning_actions, .for_checkbox, .del_checkbox, .swipe_left, .swipe_right, .swipeRightBlock, .swipes-counter, .right_menu_button, .code-copy) {
     display: none !important;
 }
 
@@ -5058,114 +5047,6 @@ body:is([data-generating="true"], [data-swiping="true"]) :is(
     flex: 1;
     display: flex;
     flex-direction: column;
-}
-
-#shadow_character_popup {
-    backdrop-filter: blur(var(--SmartThemeBlurStrength));
-    background-color: var(--black70a);
-    -webkit-backdrop-filter: blur(var(--SmartThemeBlurStrength));
-    display: none;
-    opacity: 1.0;
-    position: fixed;
-    width: 100%;
-    height: 100vh;
-    height: 100dvh;
-    inset: 0;
-    z-index: 4000;
-}
-
-#character_popup {
-    display: none;
-    background-color: var(--SmartThemeBlurTintColor);
-    backdrop-filter: blur(calc(var(--SmartThemeBlurStrength)*2));
-    -webkit-backdrop-filter: blur(calc(var(--SmartThemeBlurStrength)*2));
-
-    width: min(var(--sheldWidth), calc(100dvw - 24px));
-    max-width: calc(100dvw - 24px);
-    height: calc(100dvh - var(--topBarBlockSize) - 16px);
-    min-height: min(520px, calc(100dvh - var(--topBarBlockSize) - 16px));
-    max-height: calc(100dvh - var(--topBarBlockSize) - 16px);
-    position: fixed;
-    z-index: 4010;
-    left: 50%;
-    transform: translateX(-50%);
-    top: calc(var(--topBarBlockSize) + 8px);
-    box-shadow: 0 0 20px var(--black70a);
-    padding: 10px;
-    border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: 0 0 10px 10px;
-    overflow-y: auto;
-}
-
-#character_popup_header {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    background: inherit;
-    padding-bottom: 10px;
-}
-
-#character_popup h3 {
-    margin: 0;
-    display: inline;
-}
-
-h4 {
-    margin: 5px 0;
-}
-
-h5 {
-    margin: 5px 0;
-}
-
-#character_popup h5 {
-    color: var(--grey50);
-}
-
-
-#character_popup_text {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-}
-
-#personality_textarea {
-    width: 100%;
-}
-
-#mes_example_div {
-    height: 100%;
-    display: flex;
-    flex-grow: 1;
-}
-
-#scenario_pole {
-    width: 100%;
-    margin-left: 0;
-}
-
-#mes_example_textarea {
-    width: 100%;
-    height: 100%;
-    margin-left: 0;
-}
-
-#character_popup_ok {
-    cursor: pointer;
-    display: none;
-    height: 40px;
-    margin-top: 15px;
-    margin-left: 36px;
-    backdrop-filter: blur(var(--SmartThemeBlurStrength));
-    background-color: var(--black70a);
-    -webkit-backdrop-filter: blur(var(--SmartThemeBlurStrength));
-    width: 110px;
-    text-align: center;
 }
 
 #shadow_select_chat_popup {
@@ -6098,10 +5979,6 @@ body:not(.caption) .mes_img_caption {
 
 body:has(.drawer-content.maximized) #top-settings-holder:has(.drawer-content.openDrawer:not(.fillLeft):not(.fillRight)),
 body:has(.drawer-content.open) #top-settings-holder:has(.drawer-content.openDrawer:not(.fillLeft):not(.fillRight)),
-body:has(#character_popup.open) #top-settings-holder:has(.drawer-content.openDrawer:not(.fillLeft):not(.fillRight)) {
-    z-index: 3005;
-}
-
 .drawer {
     align-items: center;
     justify-content: center;
@@ -6737,11 +6614,11 @@ body:not(.movingUI) .drawer-content.maximized {
     align-self: center;
 }
 
-#show_more_messages {
+#show_more_messages,
+#show_newer_messages {
     text-align: center;
     margin: 10px auto;
     font-weight: 500;
-    order: -1;
     cursor: pointer;
     padding: 0.5em 1em;
     background-color: var(--SmartThemeBlurTintColor);
@@ -6751,7 +6628,12 @@ body:not(.movingUI) .drawer-content.maximized {
     transition: filter var(--animation-duration-2x) ease-in-out;
 }
 
-#show_more_messages:hover {
+#show_more_messages {
+    order: -1;
+}
+
+#show_more_messages:hover,
+#show_newer_messages:hover {
     filter: brightness(1.25);
 }
 

@@ -45,6 +45,9 @@
                     <i class="fa-solid fa-wand-magic-sparkles"></i>
                     <span>Refine</span>
                 </button>
+                <button type="button" id="ica--editor-fullscreen" class="menu_button menu_button_icon" title="Toggle fullscreen editor" aria-pressed="false">
+                    <i class="fa-solid fa-maximize"></i>
+                </button>
             </div>
         </div>
         <div class="ica--editor-row">
@@ -101,6 +104,14 @@
             </label>
         </div>
         <div id="ica--pre-intercept-options" style="display:none">
+            <div class="ica--editor-row">
+                <label>Timing
+                    <select id="ica--editor-pre-interceptTiming" class="text_pole">
+                        <option value="pre-generation">Pre-generation</option>
+                        <option value="post-main-generation">Post-main generation</option>
+                    </select>
+                </label>
+            </div>
             <div class="ica--editor-row flex-container flexGap5">
                 <label class="flex1">Apply Mode
                     <select id="ica--editor-pre-applyMode" class="text_pole">
@@ -143,7 +154,7 @@
                     </label>
                 </div>
             </div>
-            <div class="ica--regex-note">Intercept mode runs this agent before the main model receives the assembled context. Agents run by Order. Replace mode expects a full replacement context; for chat completion that must be a JSON array of chat messages. Wrap and patch add a new message on chat-completion APIs using the Role below.</div>
+            <div class="ica--regex-note">Pre-generation timing runs before the main model receives the assembled context. Post-main timing runs after the main model finishes and before the response is shown or saved. Agents run by Order. Replace mode expects a full replacement context in pre-generation timing; for chat completion that must be a JSON array of chat messages. Wrap and patch add a new message on chat-completion APIs using the Role below.</div>
         </div>
         <div class="ica--regex-note" id="ica--pre-injection-note">Inject mode uses the existing extension prompt path. Position, Depth, Role, and World Info scanning control where the prompt is inserted.</div>
         <div class="ica--editor-row flex-container flexGap5">

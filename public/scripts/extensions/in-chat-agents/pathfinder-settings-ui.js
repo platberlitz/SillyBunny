@@ -6,7 +6,7 @@ import { renderExtensionTemplateAsync, getContext } from '../../extensions.js';
 import { saveSettingsDebounced } from '../../../script.js';
 import { escapeHtml } from '../../utils.js';
 import { world_names, loadWorldInfo } from '../../world-info.js';
-import { isAgentEnabledForCurrentScope, persistAgentGlobalSettings, saveAgent, setAgentEnabledForCurrentScope } from './agent-store.js';
+import { isAgentEnabledForCurrentScope, isPathfinderSubmoduleEnabled, persistAgentGlobalSettings, saveAgent, setAgentEnabledForCurrentScope } from './agent-store.js';
 import {
     getPathfinderSettings,
     setPathfinderSettings,
@@ -36,6 +36,7 @@ import { createSeparateSummaryMemoryEntry, createSummaryMemoryEntry, deriveSumma
 const MODULE_NAME = 'in-chat-agents';
 const PATHFINDER_LOG_PREFIX = '[Pathfinder]';
 const PATHFINDER_LOG_MODE_KEY = 'pathfinder-retrieval-log-mode';
+const PATHFINDER_QUICKSTART_DISMISSED_KEY = 'pathfinder-quickstart-dismissed';
 const DEFAULT_PIPELINE_MAX_TOKENS = 32000;
 
 let settingsEl = null;
@@ -45,6 +46,16 @@ let summaryMemoryUnsubscribe = null;
 
 function logPathfinder(message, ...details) {
     console.log(`${PATHFINDER_LOG_PREFIX} ${message}`, ...details);
+}
+
+function isQuickstartDismissed() {
+    return localStorage.getItem(PATHFINDER_QUICKSTART_DISMISSED_KEY) === 'true';
+}
+
+function applyQuickstartDismissalState() {
+    if (isQuickstartDismissed()) {
+        settingsEl.find('#pf--quickstart').hide();
+    }
 }
 
 function ensureEnabledLorebooks(settings) {
@@ -221,6 +232,11 @@ async function syncAutoAttachedLorebooks(lorebooks, settings) {
  * @param {Object} agent - The Pathfinder agent object
  */
 export async function openPathfinderSettings(agent) {
+    if (!isPathfinderSubmoduleEnabled()) {
+        toastr.warning('Pathfinder is disabled in In-Chat Agents settings.');
+        return null;
+    }
+
     currentAgent = agent;
     const existingSettings = getPathfinderSettings();
     setPathfinderSettings({
@@ -248,6 +264,7 @@ export async function openPathfinderSettings(agent) {
 
     // Initialize UI
     await refreshLorebookList();
+    applyQuickstartDismissalState();
     loadSettingsIntoUI();
     bindEvents();
     settingsEl.find('#pf--log-mode').val(retrievalLogMode);
@@ -742,6 +759,12 @@ ${recentChat}`;
  * Bind all event handlers
  */
 function bindEvents() {
+    settingsEl.find('#pf--quickstart-dismiss').on('click', () => {
+        localStorage.setItem(PATHFINDER_QUICKSTART_DISMISSED_KEY, 'true');
+        settingsEl.find('#pf--quickstart').slideUp(180);
+        logPathfinder('Dismissed Pathfinder introduction card.');
+    });
+
     settingsEl.find('#pf--master-enable').on('change', async function () {
         if (!currentAgent) {
             return;
@@ -802,6 +825,7 @@ function bindEvents() {
         logPathfinder(`Tool Mode ${enabled ? 'enabled' : 'disabled'}.`);
         updateModeCardStates();
         updateDualModeWarning();
+        updateStatusBanner();
         updateAgentSettings();
         syncToolAgentRegistrations();
     });
@@ -814,6 +838,7 @@ function bindEvents() {
         setPathfinderSettings(s);
         logPathfinder(`Predictive Pipeline ${enabled ? 'enabled' : 'disabled'}.`);
         updateModeCardStates();
+        updateStatusBanner();
         updateAgentSettings();
     });
 
@@ -1442,16 +1467,21 @@ function formatRetrievalLogItem(item) {
 function updateModeCardStates() {
     const s = getPathfinderSettings();
 
+    const toolEnabled = Boolean(s.sidecarEnabled);
+    const pipelineEnabled = Boolean(s.pipelineEnabled);
     const toolCard = settingsEl.find('.pf--mode-card[data-mode="tools"]');
     const pipelineCard = settingsEl.find('.pf--mode-card[data-mode="pipeline"]');
 
-    toolCard.toggleClass('active', s.sidecarEnabled || false);
-    pipelineCard.toggleClass('active', s.pipelineEnabled || false);
+    settingsEl.find('#pf--enable-tools').prop('checked', toolEnabled);
+    settingsEl.find('#pf--enable-pipeline').prop('checked', pipelineEnabled);
+
+    toolCard.toggleClass('active', toolEnabled);
+    pipelineCard.toggleClass('active', pipelineEnabled);
 
     // Show/hide settings sections
-    settingsEl.find('#pf--tool-settings').toggle(s.sidecarEnabled || false);
-    settingsEl.find('#pf--pipeline-settings').toggle(s.pipelineEnabled || false);
-    settingsEl.find('#pf--prompt-editor-section').toggle(s.pipelineEnabled || false);
+    settingsEl.find('#pf--tool-settings').toggle(toolEnabled);
+    settingsEl.find('#pf--pipeline-settings').toggle(pipelineEnabled);
+    settingsEl.find('#pf--prompt-editor-section').toggle(pipelineEnabled);
 
     // Update dual-mode warning
     updateDualModeWarning();

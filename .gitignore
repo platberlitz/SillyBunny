@@ -63,6 +63,7 @@ yarn.lock
 test-results/
 .playwright-cli/
 /output/
+/AGENTS.md
 
 # Local UI/performance screenshots
 screenshots/layout-clean-desktop-workspace-20260505.png

@@ -43,6 +43,7 @@
   z-index: 30000;
   overflow-x: clip;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border-radius: 10px;
   aspect-ratio: unset;
   padding: 5px;
@@ -51,15 +52,22 @@
   background-color: var(--secondaryBg, var(--SmartThemeBlurTintColor));
   container-type: inline-size;
   position: absolute;
-  top: calc(100% + 4px);
+  top: auto;
+  bottom: calc(100% + 4px);
   left: 0;
   min-height: 2em;
   max-height: calc(50dvh);
   width: min(420px, calc(100vw - 16px));
   transition: 200ms;
-  transform-origin: 0 0;
+  transform-origin: 0 100%;
   scale: 1 0;
   font-size: calc(var(--bottomFormIconSize, 20px) * 0.5);
+}
+#send_form:has(.stih--history),
+.gg-action-buttons-container:has(> .stih--buttons .stih--history) {
+  /* SillyBunny: the composer-bound history menu opens upward and must not
+     create scrollable overflow below the chat input. */
+  overflow: visible;
 }
 .stih--history.stih--active {
   scale: 1;

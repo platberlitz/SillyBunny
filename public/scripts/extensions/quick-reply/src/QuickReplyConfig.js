@@ -1,6 +1,7 @@
 import { getSortableDelay } from '../../../utils.js';
 import { QuickReplySetLink } from './QuickReplySetLink.js';
 import { QuickReplySet } from './QuickReplySet.js';
+import { getQuickReplySetLinkNameKey, getQuickReplySetNameKey, getUniqueQuickReplySetLinksBySetName, getUniqueQuickReplySetsByName } from './quick-reply-set-list.js';
 
 export class QuickReplyConfig {
     /**@type {QuickReplySetLink[]}*/ setList = [];
@@ -14,7 +15,7 @@ export class QuickReplyConfig {
 
 
     static from(props) {
-        props.setList = props.setList?.map(it => QuickReplySetLink.from(it))?.filter(it => it.set) ?? [];
+        props.setList = getUniqueQuickReplySetLinksBySetName(props.setList?.map(it => QuickReplySetLink.from(it))?.filter(it => it.set) ?? []);
         const instance = Object.assign(new this(), props);
         instance.init();
         return instance;
@@ -27,7 +28,8 @@ export class QuickReplyConfig {
 
 
     hasSet(qrs) {
-        return this.setList.find(it => it.set == qrs) != null;
+        const key = getQuickReplySetNameKey(qrs);
+        return this.setList.find(it => getQuickReplySetLinkNameKey(it) === key) != null;
     }
     addSet(qrs, isVisible = true) {
         if (!this.hasSet(qrs)) {
@@ -41,9 +43,10 @@ export class QuickReplyConfig {
         }
     }
     removeSet(qrs) {
-        const idx = this.setList.findIndex(it => it.set == qrs);
-        if (idx > -1) {
-            this.setList.splice(idx, 1);
+        const key = getQuickReplySetNameKey(qrs);
+        const nextSetList = this.setList.filter(it => getQuickReplySetLinkNameKey(it) !== key);
+        if (nextSetList.length !== this.setList.length) {
+            this.setList = nextSetList;
             this.update();
             this.updateSetListDom();
         }
@@ -54,7 +57,7 @@ export class QuickReplyConfig {
         /**@type {HTMLElement}*/
         this.setListDom = root.querySelector('.qr--setList');
         root.querySelector('.qr--setListAdd').addEventListener('click', () => {
-            const newSet = QuickReplySet.list.find(qr => !this.setList.find(qrl => qrl.set == qr));
+            const newSet = getUniqueQuickReplySetsByName(QuickReplySet.list).find(qr => !this.hasSet(qr));
             if (newSet) {
                 this.addSet(newSet);
             } else {
@@ -70,7 +73,7 @@ export class QuickReplyConfig {
             delay: getSortableDelay(),
             stop: () => this.onSetListSort(),
         });
-        this.setList.filter(it => !it.set.isDeleted).forEach((qrl, idx) => this.setListDom.append(qrl.renderSettings(idx)));
+        getUniqueQuickReplySetLinksBySetName(this.setList).filter(it => !it.set.isDeleted).forEach((qrl, idx) => this.setListDom.append(qrl.renderSettings(idx)));
     }
 
 

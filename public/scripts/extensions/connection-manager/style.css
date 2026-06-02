@@ -48,7 +48,135 @@
     margin-left: 5px;
 }
 
-#connection_profiles ~ .menu_button {
+.connection-profile-picker {
+    align-items: stretch;
+    gap: 8px;
+}
+
+.connection-profile-picker #connection_profiles {
+    width: 100%;
+}
+
+.connection-profile-actions {
+    --connection-profile-action-size: 30px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: start;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+}
+
+.connection-profile-actions > .menu_button {
+    flex: 0 0 var(--connection-profile-action-size);
+    width: var(--connection-profile-action-size) !important;
+    min-width: var(--connection-profile-action-size) !important;
+    max-width: var(--connection-profile-action-size) !important;
+    min-height: 28px !important;
+    height: 28px !important;
+    max-height: 28px !important;
+    padding: 0;
+    border-radius: 8px;
+    font-size: calc(var(--mainFontSize) * 0.78);
     user-select: none;
     -webkit-user-select: none;
+}
+
+@media screen and (max-width: 450px) {
+    .connection-profile-actions {
+        --connection-profile-action-size: clamp(24px, calc((100% - 16px) / 9), 30px);
+        flex-wrap: nowrap;
+        gap: 2px;
+    }
+
+    .connection-profile-actions > .menu_button {
+        min-height: var(--connection-profile-action-size) !important;
+        height: var(--connection-profile-action-size) !important;
+        max-height: var(--connection-profile-action-size) !important;
+        border-radius: 8px;
+        font-size: calc(var(--mainFontSize) * 0.72);
+    }
+}
+
+#toggle_profile_favorite.is_fav {
+    color: var(--SmartThemeQuoteColor, gold);
+    opacity: 1;
+}
+
+#toggle_profile_favorite:not(.is_fav) {
+    opacity: 0.55;
+}
+
+.connection-profile-folder-manager {
+    min-width: min(420px, 100%);
+}
+
+.connection-profile-folder-manager .folder-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.connection-profile-folder-manager .folder-item,
+.connection-profile-folder-manager .folder-add-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.connection-profile-folder-manager .folder-item {
+    padding: 8px;
+    background: var(--black30a);
+    border-radius: 4px;
+}
+
+.connection-profile-folder-manager .folder-name-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.connection-profile-folder-manager .folder-profile-count {
+    color: var(--grey70);
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.connection-profile-folder-manager .folder-delete-btn {
+    cursor: pointer;
+    padding: 4px 8px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.connection-profile-folder-manager .folder-delete-btn:hover {
+    color: var(--crimson70a);
+    opacity: 1;
+}
+
+.connection-profile-folder-manager .folder-empty-message {
+    opacity: 0.75;
+}
+
+#connection_profiles optgroup {
+    font-style: normal;
+    font-weight: bold;
+}
+
+#connection_profiles optgroup option {
+    padding-left: 20px;
+}
+
+@media screen and (max-width: 700px) {
+    .connection-profile-folder-manager .folder-add-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .connection-profile-folder-manager .folder-add-row .menu_button {
+        width: 100%;
+    }
 }

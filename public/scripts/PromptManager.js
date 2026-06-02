@@ -2,9 +2,9 @@
 
 import { DOMPurify } from '../lib.js';
 
-import { event_types, eventSource, is_send_press, main_api, substituteParams } from '../script.js';
+import { event_types, eventSource, is_send_press, main_api, saveSettingsDebounced, substituteParams } from '../script.js';
 import { is_group_generating } from './group-chats.js';
-import { Message, MessageCollection, TokenHandler } from './openai.js';
+import { getCurrentOpenAIPresetPromptOrder, Message, MessageCollection, TokenHandler } from './openai.js';
 import { power_user } from './power-user.js';
 import { debounce, waitUntilCondition, escapeHtml, uuidv4 } from './utils.js';
 import { debounce_timeout } from './constants.js';
@@ -13,7 +13,12 @@ import { Popup } from './popup.js';
 import { t } from './i18n.js';
 import { isMobile } from './RossAscends-mods.js';
 import { accountStorage } from './util/AccountStorage.js';
-import { getPromptDisplayTokenCounts } from './prompt-token-counts.js';
+import { getPromptDisplayTokenCounts, getPromptSourceTokenCounts } from './prompt-token-counts.js';
+import { getRenderedMarkerPrompt } from './prompt-manager-marker-preview.js';
+import {
+    resolvePromptManagerRenderState,
+    resolvePromptManagerScrollRestore,
+} from './prompt-manager-lifecycle/index.js';
 
 function debouncePromise(func, delay) {
     let timeoutId;
@@ -373,6 +378,13 @@ class PromptManager {
         // Prompt row token counts of last dry run/live generation.
         this.promptTokenCounts = {};
 
+        // One-shot scroll restore captured before save-time layout changes.
+        this.pendingPromptManagerScrollPosition = null;
+
+        // Prompt row token counts calculated from enabled preset prompt source text.
+        this.sourcePromptTokenCounts = {};
+        this.sourcePromptTokenUsage = 0;
+
         // Error state, contains error message.
         this.error = null;
 
@@ -688,6 +700,7 @@ class PromptManager {
                 '.drag-handle',
                 '.prompt-manager-detach-action',
                 '.prompt-manager-edit-action',
+                '.prompt-manager-inspect-action',
                 '.prompt-manager-toggle-action',
                 '.prompt-manager-send-to-agents-action',
                 'input',
@@ -766,6 +779,7 @@ class PromptManager {
             const promptId = event.target.dataset.pmPrompt;
             const prompt = this.getPromptById(promptId);
             const isDesktopSplit = this.isDesktopSplitLayout();
+            this.#queuePromptManagerScrollRestore();
 
             if (null === prompt) {
                 const newPrompt = {};
@@ -999,8 +1013,12 @@ class PromptManager {
                 .then(userChoice => {
                     if (!userChoice) return;
 
+                    // SillyBunny: reset to the selected preset's saved order before falling back to the upstream default.
+                    const presetPromptOrder = getCurrentOpenAIPresetPromptOrder(this.activeCharacter?.id);
+                    const resetPromptOrder = presetPromptOrder.length ? presetPromptOrder : promptManagerDefaultPromptOrder;
+
                     this.removePromptOrderForCharacter(this.activeCharacter);
-                    this.addPromptOrderForCharacter(this.activeCharacter, promptManagerDefaultPromptOrder);
+                    this.addPromptOrderForCharacter(this.activeCharacter, resetPromptOrder);
 
                     this.render();
                     this.saveServiceSettings();
@@ -1140,11 +1158,35 @@ class PromptManager {
      * @returns {number} - Scroll position of the prompt manager
      */
     #getScrollPosition() {
-        // SillyBunny: prefer .sb-shell-panel-scroller (the actual scroll container inside
-        // the SillyBunny shell) before falling back to upstream .scrollableInner, which is
-        // set to overflow:visible inside the shell and always reports scrollTop 0.
-        return document.getElementById(this.configuration.prefix + 'prompt_manager')
-            ?.closest('.sb-shell-panel-scroller, .scrollableInner')?.scrollTop;
+        if (this.pendingPromptManagerScrollPosition !== null) {
+            const scrollPosition = this.pendingPromptManagerScrollPosition;
+            this.pendingPromptManagerScrollPosition = null;
+            return scrollPosition;
+        }
+
+        return this.#readScrollPosition();
+    }
+
+    #readScrollPosition() {
+        return this.#getScrollContainer()?.scrollTop;
+    }
+
+    #getScrollContainer() {
+        const promptManager = document.getElementById(this.configuration.prefix + 'prompt_manager');
+        const listElement = this.listElement ?? promptManager?.querySelector(`#${this.configuration.prefix}prompt_manager_list`);
+
+        // SillyBunny: desktop split scrolls the constrained prompt list itself; mobile
+        // still scrolls through the shell/upstream panel container.
+        if (this.isDesktopSplitLayout() && listElement instanceof HTMLElement) {
+            return listElement;
+        }
+
+        return promptManager?.closest('.sb-shell-panel-scroller, .scrollableInner') ?? null;
+    }
+
+    #queuePromptManagerScrollRestore() {
+        const restoreState = resolvePromptManagerScrollRestore({ scrollPosition: this.#readScrollPosition() });
+        this.pendingPromptManagerScrollPosition = restoreState.shouldRestore ? restoreState.scrollPosition : null;
     }
 
     /**
@@ -1152,14 +1194,16 @@ class PromptManager {
      * @param {number} scrollPosition - The scroll position to set
      */
     #setScrollPosition(scrollPosition) {
-        if (scrollPosition === undefined || scrollPosition === null) return;
-        const container = document.getElementById(this.configuration.prefix + 'prompt_manager')
-            ?.closest('.sb-shell-panel-scroller, .scrollableInner');
+        const restoreState = resolvePromptManagerScrollRestore({ scrollPosition });
+        if (!restoreState.shouldRestore) return;
+        const container = this.#getScrollContainer();
         if (!container) return;
-        container.scrollTo(0, scrollPosition);
+        container.scrollTo(0, restoreState.scrollPosition);
         // Defer a second restore to handle the reflow that occurs when renderPromptManager
         // clears innerHTML; the browser may reset scrollTop before content is re-added.
-        requestAnimationFrame(() => container.scrollTo(0, scrollPosition));
+        if (restoreState.shouldRestoreAfterAnimationFrame) {
+            requestAnimationFrame(() => container.scrollTo(0, restoreState.scrollPosition));
+        }
     }
 
     /**
@@ -1168,19 +1212,36 @@ class PromptManager {
      * @param afterTryGenerate - Whether a dry run should be attempted before rendering
      */
     render(afterTryGenerate = true) {
-        if (main_api !== 'openai') return;
-
-        if ('character' === this.configuration.promptOrder.strategy && null === this.activeCharacter) return;
+        const renderState = resolvePromptManagerRenderState({
+            mainApi: main_api,
+            promptOrderStrategy: this.configuration.promptOrder.strategy,
+            hasActiveCharacter: this.activeCharacter !== null,
+            afterTryGenerate,
+            isSendPressed: is_send_press,
+            isGroupGenerating: is_group_generating,
+        });
+        if (!renderState.shouldRender && !renderState.shouldWaitForGeneration) return;
         this.error = null;
 
         waitUntilCondition(() => !is_send_press && !is_group_generating, 1024 * 1024, 100).then(async () => {
-            if (true === afterTryGenerate) {
+            const readyRenderState = resolvePromptManagerRenderState({
+                mainApi: main_api,
+                promptOrderStrategy: this.configuration.promptOrder.strategy,
+                hasActiveCharacter: this.activeCharacter !== null,
+                afterTryGenerate,
+            });
+            if (!readyRenderState.shouldRender) {
+                return;
+            }
+
+            if (readyRenderState.shouldRunDryGenerate) {
                 // Executed during dry-run for determining context composition
                 this.profileStart('filling context');
                 this.tryGenerate().finally(async () => {
                     this.profileEnd('filling context');
                     this.profileStart('render');
                     const scrollPosition = this.#getScrollPosition();
+                    await this.populateSourcePromptTokenCounts();
                     await this.renderPromptManager();
                     await this.renderPromptManagerListItems();
                     this.makeDraggable();
@@ -1191,6 +1252,7 @@ class PromptManager {
                 // Executed during live communication
                 this.profileStart('render');
                 const scrollPosition = this.#getScrollPosition();
+                await this.populateSourcePromptTokenCounts();
                 await this.renderPromptManager();
                 await this.renderPromptManagerListItems();
                 this.makeDraggable();
@@ -1805,10 +1867,22 @@ class PromptManager {
         if (!roleField || !promptField || !roleValue || !tokenCount || !previewText) return;
 
         const previewRequest = ++this.previewTokenCountRequest;
-        const preparedPrompt = this.preparePrompt({
-            role: roleField.value || 'system',
-            content: promptField.value || '',
-        });
+        const selectedPrompt = this.getPromptById(this.selectedPromptId);
+        // SillyBunny: marker prompt definitions are usually empty placeholders.
+        // Preview their latest rendered message from the dry-run prompt assembly instead.
+        const renderedMarkerPrompt = selectedPrompt?.marker
+            ? getRenderedMarkerPrompt(selectedPrompt.identifier, this.messages)
+            : null;
+        const preparedPrompt = renderedMarkerPrompt?.content
+            ? {
+                role: renderedMarkerPrompt.role,
+                content: renderedMarkerPrompt.content,
+                identifier: selectedPrompt.identifier,
+            }
+            : this.preparePrompt({
+                role: roleField.value || 'system',
+                content: promptField.value || '',
+            });
         const previewContent = preparedPrompt.content || '';
 
         roleValue.textContent = preparedPrompt.role || 'system';
@@ -1959,6 +2033,36 @@ class PromptManager {
         this.log('Updated token usage with ' + this.tokenUsage);
     }
 
+    hasRuntimePromptTokenCounts() {
+        return Object.values(this.promptTokenCounts ?? {}).some(tokens => Number(tokens) > 0);
+    }
+
+    getActivePromptTokenCounts() {
+        return this.hasRuntimePromptTokenCounts() ? this.promptTokenCounts : this.sourcePromptTokenCounts;
+    }
+
+    getDisplayTokenUsage() {
+        return this.hasRuntimePromptTokenCounts() ? this.tokenUsage : this.sourcePromptTokenUsage;
+    }
+
+    async populateSourcePromptTokenCounts() {
+        if (this.hasRuntimePromptTokenCounts() || !this.activeCharacter || !this.tokenHandler) {
+            this.sourcePromptTokenCounts = {};
+            this.sourcePromptTokenUsage = 0;
+            return;
+        }
+
+        const prompts = this.getPromptsForCharacter(this.activeCharacter, true)
+            .filter(prompt => this.shouldTrigger(prompt))
+            .map(prompt => this.preparePrompt(prompt));
+
+        this.sourcePromptTokenCounts = await getPromptSourceTokenCounts(prompts, message => this.tokenHandler.countUntrackedAsync(message));
+        this.sourcePromptTokenUsage = Object.values(this.sourcePromptTokenCounts).reduce((total, tokens) => {
+            const tokenCount = Number(tokens);
+            return total + (Number.isFinite(tokenCount) ? tokenCount : 0);
+        }, 0);
+    }
+
     /**
      * Empties, then re-assembles the container containing the prompt list.
      */
@@ -1978,9 +2082,9 @@ class PromptManager {
                 </div>
         ` : '';
 
-        const totalActiveTokens = this.tokenUsage;
+        const totalActiveTokens = this.getDisplayTokenUsage();
 
-        const headerHtml = await renderTemplateAsync('promptManagerHeader', { error: this.error, errorDiv, prefix: this.configuration.prefix, totalActiveTokens });
+        const headerHtml = await renderTemplateAsync('promptManagerHeader', { error: this.error, errorDiv, prefix: this.configuration.prefix, totalActiveTokens, dragLocked: power_user.prompt_manager_drag_locked });
         promptManagerDiv.insertAdjacentHTML('beforeend', headerHtml);
 
         this.listElement = promptManagerDiv.querySelector(`#${this.configuration.prefix}prompt_manager_list`);
@@ -2014,6 +2118,7 @@ class PromptManager {
             const footerDiv = promptManagerDiv.querySelector(`.${this.configuration.prefix}prompt_manager_footer`);
             if (!(footerDiv instanceof HTMLElement)) {
                 this.bindDrawerPersistence();
+                this.bindDragLockButton();
                 return;
             }
 
@@ -2029,9 +2134,25 @@ class PromptManager {
         }
 
         this.bindDrawerPersistence();
+        this.bindDragLockButton();
         this.syncPopupPlacement();
         this.syncEditorPaneState();
         this.syncListSelection();
+    }
+
+    bindDragLockButton() {
+        const dragLockButton = this.containerElement?.querySelector(`#${this.configuration.prefix}prompt_manager_drag_lock`);
+        if (!(dragLockButton instanceof HTMLElement)) {
+            return;
+        }
+
+        dragLockButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            power_user.prompt_manager_drag_locked = !power_user.prompt_manager_drag_locked;
+            this.updateDragLockState();
+            saveSettingsDebounced();
+        });
     }
 
     /**
@@ -2044,6 +2165,7 @@ class PromptManager {
         promptManagerList.innerHTML = '';
 
         const { prefix } = this.configuration;
+        const displayTokenCounts = this.getActivePromptTokenCounts();
 
         let listItemHtml = await renderTemplateAsync('promptManagerListHeader', { prefix });
 
@@ -2054,7 +2176,7 @@ class PromptManager {
             const enabledClass = listEntry.enabled ? '' : `${prefix}prompt_manager_prompt_disabled`;
             const draggableClass = `${prefix}prompt_manager_prompt_draggable`;
             const markerClass = prompt.marker ? `${prefix}prompt_manager_marker` : '';
-            const tokens = this.promptTokenCounts?.[prompt.identifier] ?? this.tokenHandler?.getCounts()[prompt.identifier] ?? 0;
+            const tokens = displayTokenCounts?.[prompt.identifier] ?? this.tokenHandler?.getCounts()[prompt.identifier] ?? 0;
 
             // Warn the user if the chat history goes below certain token thresholds.
             let warningClass = '';
@@ -2338,6 +2460,36 @@ class PromptManager {
                 this.saveServiceSettings();
             },
         });
+        this.updateDragLockState();
+    }
+
+    updateDragLockState() {
+        const locked = Boolean(power_user.prompt_manager_drag_locked);
+        const promptList = this.listElement ?? this.containerElement?.querySelector(`#${this.configuration.prefix}prompt_manager_list`);
+        const $promptList = $(`#${this.configuration.prefix}prompt_manager_list`);
+
+        if ($promptList.length && $promptList.data('ui-sortable')) {
+            $promptList.sortable(locked ? 'disable' : 'enable');
+        }
+
+        if (promptList instanceof HTMLElement) {
+            promptList.classList.toggle('prompt-manager-drag-locked', locked);
+            promptList.classList.toggle('prompt-manager-drag-unlocked', !locked);
+        }
+
+        const dragLockButton = this.containerElement?.querySelector(`#${this.configuration.prefix}prompt_manager_drag_lock`);
+        if (dragLockButton instanceof HTMLElement) {
+            dragLockButton.classList.toggle('toggled', locked);
+            dragLockButton.setAttribute('aria-pressed', String(locked));
+
+            const icon = dragLockButton.querySelector('i');
+            if (icon instanceof HTMLElement) {
+                icon.classList.toggle('fa-lock', locked);
+                icon.classList.toggle('fa-unlock', !locked);
+            }
+        }
+
+        this.log(`Prompt reordering ${locked ? 'locked' : 'unlocked'}.`);
     }
 
     /**

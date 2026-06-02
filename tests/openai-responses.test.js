@@ -1,6 +1,9 @@
 /* eslint-disable playwright/no-duplicate-hooks */
 import { beforeAll, afterAll, describe, expect, jest, test } from '@jest/globals';
 import express from 'express';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { setConfigFilePath } from '../src/util.js';
@@ -9,6 +12,39 @@ import { MockServer } from './util/mock-server.js';
 
 setConfigFilePath(fileURLToPath(new URL('../default/config.yaml', import.meta.url)));
 
+const actualNodeFetch = (await import('node-fetch')).default;
+const nodeFetchMock = jest.fn((url, options) => actualNodeFetch(url, options));
+await jest.unstable_mockModule('node-fetch', () => ({
+    default: nodeFetchMock,
+}));
+
+function resetNodeFetchMock() {
+    nodeFetchMock.mockImplementation((url, options) => actualNodeFetch(url, options));
+}
+
+function createProviderFetchSpy(handler) {
+    nodeFetchMock.mockClear();
+    nodeFetchMock.mockImplementation((url, options) => {
+        const href = typeof url === 'string'
+            ? url
+            : url instanceof URL
+                ? url.toString()
+                : url?.url ?? String(url);
+        if (href.startsWith('http://127.0.0.1:3001')) {
+            return actualNodeFetch(url, options);
+        }
+        return handler(href, options);
+    });
+    return nodeFetchMock;
+}
+
+function jsonResponse(body) {
+    return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
+
 describe('OpenAI Responses integration', () => {
     /** @type {import('express').Router} */
     let chatCompletionsRouter;
@@ -16,20 +52,30 @@ describe('OpenAI Responses integration', () => {
     let upstream;
     /** @type {import('http').Server} */
     let appServer;
+    /** @type {import('../src/users.js').UserDirectoryList} */
+    let userDirectories;
+    let SecretManager;
+    let SECRET_KEYS;
+    const tempDirs = [];
 
     beforeAll(async () => {
+        ({ SecretManager, SECRET_KEYS } = await import('../src/endpoints/secrets.js'));
         ({ router: chatCompletionsRouter } = await import('../src/endpoints/backends/chat-completions.js'));
 
         upstream = new MockServer({ port: 3001, host: '127.0.0.1' });
         await upstream.start();
+        const userRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sillybunny-openai-responses-'));
+        tempDirs.push(userRoot);
+        userDirectories = {
+            root: userRoot,
+            backups: userRoot,
+        };
 
         const app = express();
         app.use(express.json());
         app.use((req, _res, next) => {
             req.user = {
-                directories: {
-                    root: '/tmp/sillybunny-test-user',
-                },
+                directories: userDirectories,
             };
             next();
         });
@@ -47,6 +93,10 @@ describe('OpenAI Responses integration', () => {
             await new Promise((resolve, reject) => {
                 appServer.close((err) => err ? reject(err) : resolve());
             });
+        }
+
+        for (const dir of tempDirs.splice(0)) {
+            fs.rmSync(dir, { recursive: true, force: true });
         }
     });
 
@@ -115,6 +165,108 @@ describe('OpenAI Responses integration', () => {
                 total_tokens: 17,
             },
         });
+    });
+
+    test('generate resolves OpenAI Responses profile secrets by secret_id', async () => {
+        const manager = new SecretManager(userDirectories);
+        const profileSecretId = manager.writeSecret(SECRET_KEYS.OPENAI, 'profile-openai-key', 'Profile OpenAI');
+        manager.writeSecret(SECRET_KEYS.OPENAI, 'active-openai-key', 'Active OpenAI');
+        const providerFetch = createProviderFetchSpy((url, options) => {
+            expect(url).toBe('https://api.openai.com/v1/responses');
+            expect(options.headers.Authorization).toBe('Bearer profile-openai-key');
+            return Promise.resolve(jsonResponse({
+                id: 'resp-secret-test',
+                model: 'gpt-5.4',
+                status: 'completed',
+                output: [
+                    {
+                        type: 'message',
+                        content: [
+                            {
+                                type: 'output_text',
+                                text: 'Used selected profile secret.',
+                            },
+                        ],
+                    },
+                ],
+            }));
+        });
+
+        try {
+            const response = await fetch('http://127.0.0.1:3010/api/backends/chat-completions/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_completion_source: CHAT_COMPLETION_SOURCES.OPENAI_RESPONSES,
+                    secret_id: profileSecretId,
+                    model: 'gpt-5.4',
+                    stream: false,
+                    temperature: 1,
+                    max_tokens: 32,
+                    top_p: 1,
+                    messages: [
+                        { role: 'user', content: 'Use the profile secret.' },
+                    ],
+                }),
+            });
+
+            expect(response.status).toBe(200);
+            expect(providerFetch).toHaveBeenCalledTimes(1);
+            const json = await response.json();
+            expect(json.choices[0].message.content).toBe('Used selected profile secret.');
+        } finally {
+            resetNodeFetchMock();
+        }
+    });
+
+    test('generate resolves OpenRouter profile secrets by secret_id', async () => {
+        const manager = new SecretManager(userDirectories);
+        const profileSecretId = manager.writeSecret(SECRET_KEYS.OPENROUTER, 'profile-openrouter-key', 'Profile OpenRouter');
+        manager.writeSecret(SECRET_KEYS.OPENROUTER, 'active-openrouter-key', 'Active OpenRouter');
+        const providerFetch = createProviderFetchSpy((url, options) => {
+            expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
+            expect(options.headers.Authorization).toBe('Bearer profile-openrouter-key');
+            return Promise.resolve(jsonResponse({
+                choices: [
+                    {
+                        finish_reason: 'stop',
+                        index: 0,
+                        message: {
+                            role: 'assistant',
+                            content: 'Used selected OpenRouter secret.',
+                        },
+                    },
+                ],
+                created: 0,
+                model: 'openrouter/test',
+            }));
+        });
+
+        try {
+            const response = await fetch('http://127.0.0.1:3010/api/backends/chat-completions/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_completion_source: CHAT_COMPLETION_SOURCES.OPENROUTER,
+                    secret_id: profileSecretId,
+                    model: 'openrouter/test',
+                    stream: false,
+                    temperature: 1,
+                    max_tokens: 32,
+                    top_p: 1,
+                    messages: [
+                        { role: 'user', content: 'Use the OpenRouter profile secret.' },
+                    ],
+                }),
+            });
+
+            expect(response.status).toBe(200);
+            expect(providerFetch).toHaveBeenCalledTimes(1);
+            const json = await response.json();
+            expect(json.choices[0].message.content).toBe('Used selected OpenRouter secret.');
+        } finally {
+            resetNodeFetchMock();
+        }
     });
 
     test('streams Responses API chunks as Chat Completions SSE', async () => {

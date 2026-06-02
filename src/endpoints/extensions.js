@@ -28,7 +28,8 @@ const CORE_EXTENSIONS = new Set([
     'in-chat-agents',
 ]);
 const BUNDLED_THIRD_PARTY_EXTENSIONS = new Set([
-    'BunnyPresetTools',
+    'bunnypresettools',
+    'chatcompletiontabs',
 ]);
 const MANUAL_SYNC_EXTENSIONS = new Map([
     ['quick-image-gen', {
@@ -185,8 +186,9 @@ async function ensureExtensionRepo(extensionPath, isGlobal = false) {
     }
 }
 
-function isBundledThirdPartyExtension(extensionName) {
-    return BUNDLED_THIRD_PARTY_EXTENSIONS.has(sanitize(extensionName));
+export function isBundledThirdPartyExtension(extensionName) {
+    const sanitizedName = sanitize(String(extensionName).split(/[\\/]/).pop() ?? '');
+    return BUNDLED_THIRD_PARTY_EXTENSIONS.has(sanitizedName.toLowerCase());
 }
 
 function getBuiltInExtensionType(extensionName) {
@@ -194,7 +196,7 @@ function getBuiltInExtensionType(extensionName) {
     return CORE_EXTENSIONS.has(sanitizedName) ? 'core' : 'system';
 }
 
-function rejectBundledThirdPartyExtension(extensionName, response, action) {
+export function rejectBundledThirdPartyExtension(extensionName, response, action) {
     if (!isBundledThirdPartyExtension(extensionName)) {
         return false;
     }

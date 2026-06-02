@@ -27,6 +27,7 @@ import {
     getEnabledToolAgents,
     getGlobalSettings,
     getPromptTransformMode,
+    isPathfinderSubmoduleEnabled,
     saveAgent,
     isToolAgent,
     normalizePreProcessMaxTokens,
@@ -52,10 +53,13 @@ const PROMPT_KEY_PREFIX = 'inchat_agent_';
 const PATHFINDER_AUTO_SUMMARY_PROMPT_KEY = 'pathfinder_zz_auto_summary';
 const MESSAGE_EXTRA_KEY = 'inChatAgents';
 const POST_PROCESSING_RUNS_EXTRA_KEY = 'inChatAgentPostRuns';
+const PATHFINDER_RETRIEVAL_CACHE_EXTRA_KEY = 'pathfinderRetrievalCache';
 export const PROMPT_RUNS_EXTRA_KEY = 'inChatAgentPromptRuns';
 export const PROMPT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
 export const PRE_GENERATION_INTERCEPT_HISTORY_KEY = 'inChatAgentPreGenerationInterceptHistory';
 const MAX_TRANSFORM_HISTORY = 10;
+const MAX_PATHFINDER_RETRIEVAL_CACHE = 6;
+const PATHFINDER_RETRIEVAL_CONTEXT_MESSAGE_LIMIT = 10;
 const pendingRefreshTimeouts = new Map();
 const pendingRegexSnapshotSaves = new WeakSet();
 const GREETING_GENERATION_TYPE = 'first_message';
@@ -63,6 +67,9 @@ const IMPERSONATE_GENERATION_TYPE = 'impersonate';
 const PREPEND_PROMPT_TRANSFORM_TEMPLATE_IDS = new Set([
     'tpl-scene-tracker',
     'tpl-time-tracker',
+]);
+const IMPERSONATE_PROMPT_TRANSFORM_TEMPLATE_IDS = new Set([
+    'tpl-prose-polisher',
 ]);
 const PREPEND_PROMPT_TRANSFORM_TAG_RE = /\[(?:SCENE|TIME)\|/;
 const ASSISTANT_RESPONSE_WRAPPER_RE = /^\s*<assistant_response>\s*([\s\S]*?)\s*<\/assistant_response>\s*$/i;
@@ -72,6 +79,8 @@ const DEFERRED_POST_PROCESSING_RETRY_MS = 50;
 const LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS = 30000;
 const MISSED_GENERATION_END_RECOVERY_MS = 200;
 const PATHFINDER_SUMMARIZE_TOOL_NAME = 'Pathfinder_Summarize';
+const PRE_GENERATION_INTERCEPT_TIMING = 'pre-generation';
+const POST_MAIN_GENERATION_INTERCEPT_TIMING = 'post-main-generation';
 
 /** @type {{ generationType: string, activeAgentIds: string[], chatId: string } | null} */
 let pendingGenerationSnapshot = null;
@@ -84,6 +93,7 @@ let latestAssistantPostProcessingFallbackTimeout = null;
 let latestAssistantPostProcessingFallbackDeadline = 0;
 let postGenerationRecoveryTimeout = null;
 let missedGenerationEndRecoveryTimeout = null;
+let agentRunnerInitialized = false;
 let postGenerationRecoveryHooksInitialized = false;
 let postGenerationRecoveryObserver = null;
 const activePromptTransformToasts = new Set();
@@ -109,6 +119,7 @@ let postProcessingGenerationRunId = 0;
 let swipeNavigationPending = false;
 const activePathfinderRetrievalAbortControllers = new Set();
 let activePathfinderRetrievalToast = null;
+let activeInitialGenerationToast = null;
 
 /** Track which tool names were registered by the agent system so we can cleanly unregister only our own. */
 const agentRegisteredToolNames = new Set();
@@ -123,6 +134,8 @@ let toolRecursionDepth = 0;
 const processedPostProcessingRuns = new WeakMap();
 const processedPostProcessingRunsByIndex = new Map();
 const postProcessingInFlightKeys = new Set();
+const stoppedStreamingMessageIndexes = new Set();
+let stoppedGenerationRunId = -1;
 
 function escapeToastHtml(value) {
     return String(value ?? '')
@@ -205,6 +218,7 @@ export function cancelAgentGeneration() {
     clearDeferredPostProcessing();
     clearMissedGenerationEndRecoveryCheck();
     clearAllPromptTransformRunningToasts();
+    clearInitialGenerationToast();
     clearPathfinderRetrievalToast();
     abortActivePathfinderRetrieval('Pathfinder retrieval cancelled by user.');
 
@@ -245,6 +259,23 @@ function clearPathfinderRetrievalToast() {
 
     toastr.clear(activePathfinderRetrievalToast);
     activePathfinderRetrievalToast = null;
+}
+
+function showInitialGenerationToast() {
+    if (activeInitialGenerationToast) {
+        return;
+    }
+
+    activeInitialGenerationToast = toastr.info('Generating initial message', 'In-Chat Agents', { timeOut: 0, extendedTimeOut: 0 });
+}
+
+function clearInitialGenerationToast() {
+    if (!activeInitialGenerationToast) {
+        return;
+    }
+
+    toastr.clear(activeInitialGenerationToast);
+    activeInitialGenerationToast = null;
 }
 
 function shouldShowPathfinderRetrievalToast(pathfinderAgent) {
@@ -352,6 +383,10 @@ function isPathfinderToolAgent(agent) {
 }
 
 export function getPathfinderRuntimeAgent(agents = getEnabledToolAgents()) {
+    if (!isPathfinderSubmoduleEnabled()) {
+        return null;
+    }
+
     return agents.find(isPathfinderToolAgent) ?? null;
 }
 
@@ -396,6 +431,10 @@ function syncPathfinderRuntimeSettings(agent = getPathfinderRuntimeAgent()) {
 
 function getRegisterableAgentTools(agent) {
     if (isPathfinderToolAgent(agent)) {
+        if (!isPathfinderSubmoduleEnabled()) {
+            return [];
+        }
+
         const enabledTools = getPathfinderToolDefinitions()
             .filter(tool => isPathfinderToolEnabledForAgent(agent, tool.name));
 
@@ -422,6 +461,10 @@ export function getToolRecursionState() {
 }
 
 export async function syncPathfinderAgentLorebooksForCurrentChat(agent = getPathfinderRuntimeAgent(), { persist = false } = {}) {
+    if (!isPathfinderSubmoduleEnabled()) {
+        return false;
+    }
+
     if (!agent || !isPathfinderToolAgent(agent)) {
         return false;
     }
@@ -609,16 +652,31 @@ function isMainGenerationStillActive() {
 }
 
 function wasStreamingMessageStopped(messageIndex) {
+    const numericMessageIndex = Number(messageIndex);
+    if (!Number.isInteger(numericMessageIndex)) {
+        return false;
+    }
+
+    if (stoppedStreamingMessageIndexes.has(numericMessageIndex)) {
+        return true;
+    }
+
     const liveStreamingProcessor = getStreamingTarget(messageIndex);
     if (!liveStreamingProcessor) {
         return false;
     }
 
-    return Boolean(
+    const isStopped = Boolean(
         generationStopRequested ||
         liveStreamingProcessor.isStopped ||
         liveStreamingProcessor.abortController?.signal?.aborted,
     );
+
+    if (isStopped) {
+        stoppedStreamingMessageIndexes.add(numericMessageIndex);
+    }
+
+    return isStopped;
 }
 
 function clearDeferredPostProcessing(messageIndex = null) {
@@ -904,6 +962,218 @@ function getMessageRevisionKey(message) {
     ].join('|');
 }
 
+function getPathfinderRetrievalCacheTarget(generationType) {
+    if (normalizeGenerationType(generationType) !== 'normal') {
+        return null;
+    }
+
+    if (generationStartLastAssistantIndex < 0 || generationStartLastAssistantIndex !== chat.length - 1) {
+        return null;
+    }
+
+    const message = chat[generationStartLastAssistantIndex];
+    if (!message || message !== generationStartLastAssistantMessage || message.is_user || message.is_system) {
+        return null;
+    }
+
+    return {
+        message,
+        messageIndex: generationStartLastAssistantIndex,
+    };
+}
+
+function getPathfinderCacheMessageRole(message) {
+    if (message?.is_system) {
+        return 'system';
+    }
+
+    return message?.is_user ? 'user' : 'assistant';
+}
+
+function getPathfinderRetrievalContextSnapshot(targetMessageIndex) {
+    const endIndex = Math.max(0, Number(targetMessageIndex));
+    const startIndex = Math.max(0, endIndex - PATHFINDER_RETRIEVAL_CONTEXT_MESSAGE_LIMIT);
+
+    return chat.slice(startIndex, endIndex).map((message, offset) => ({
+        index: startIndex + offset,
+        role: getPathfinderCacheMessageRole(message),
+        name: normalizeMessageRunValue(message?.name),
+        mes: normalizeMessageRunValue(message?.mes),
+        swipeId: normalizeMessageRunValue(message?.swipe_id),
+        sendDate: normalizeMessageRunValue(message?.send_date),
+        genStarted: normalizeMessageRunValue(message?.gen_started),
+        genFinished: normalizeMessageRunValue(message?.gen_finished),
+    }));
+}
+
+function normalizePathfinderCacheValue(value, seen = new WeakSet()) {
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+
+    if (Array.isArray(value)) {
+        return value.map(item => normalizePathfinderCacheValue(item, seen));
+    }
+
+    if (value && typeof value === 'object') {
+        if (seen.has(value)) {
+            return '[Circular]';
+        }
+
+        seen.add(value);
+        const normalized = {};
+        for (const key of Object.keys(value).sort()) {
+            const item = value[key];
+            if (typeof item === 'function' || item === undefined) {
+                continue;
+            }
+
+            normalized[key] = normalizePathfinderCacheValue(item, seen);
+        }
+        seen.delete(value);
+        return normalized;
+    }
+
+    if (typeof value === 'bigint') {
+        return String(value);
+    }
+
+    return value ?? null;
+}
+
+function getPathfinderRetrievalSettingsSnapshot(pathfinderAgent) {
+    let runtimeSettings = {};
+    try {
+        runtimeSettings = getPathfinderRuntimeSettings() ?? {};
+    } catch {
+        runtimeSettings = {};
+    }
+
+    return normalizePathfinderCacheValue({
+        agentId: pathfinderAgent?.id ?? '',
+        settings: pathfinderAgent?.settings ?? {},
+        runtimeSettings,
+    });
+}
+
+function buildPathfinderRetrievalCacheSignature(pathfinderAgent, activationSnapshot, generationType, cacheTarget) {
+    if (!cacheTarget) {
+        return '';
+    }
+
+    const signaturePayload = normalizePathfinderCacheValue({
+        version: 1,
+        chatId: normalizeSnapshotChatId(activationSnapshot?.chatId ?? getCurrentSnapshotChatId()),
+        generationType: normalizeGenerationType(generationType),
+        targetMessageIndex: cacheTarget.messageIndex,
+        promptKeys: PATHFINDER_RETRIEVAL_PROMPT_KEYS,
+        context: getPathfinderRetrievalContextSnapshot(cacheTarget.messageIndex),
+        pathfinder: getPathfinderRetrievalSettingsSnapshot(pathfinderAgent),
+    });
+
+    try {
+        return JSON.stringify(signaturePayload);
+    } catch {
+        return '';
+    }
+}
+
+function isPathfinderRetrievalCacheEntry(value) {
+    return Boolean(
+        value &&
+        typeof value === 'object' &&
+        typeof value.signature === 'string' &&
+        Array.isArray(value.prompts),
+    );
+}
+
+function appendPathfinderRetrievalCaches(target, value) {
+    if (Array.isArray(value)) {
+        target.push(...value.filter(isPathfinderRetrievalCacheEntry));
+    }
+}
+
+function getStoredPathfinderRetrievalCaches(message) {
+    const caches = [];
+    appendPathfinderRetrievalCaches(caches, message?.extra?.[PATHFINDER_RETRIEVAL_CACHE_EXTRA_KEY]);
+
+    if (Array.isArray(message?.swipe_info)) {
+        for (const swipeInfo of message.swipe_info) {
+            appendPathfinderRetrievalCaches(caches, swipeInfo?.extra?.[PATHFINDER_RETRIEVAL_CACHE_EXTRA_KEY]);
+        }
+    }
+
+    const deduped = new Map();
+    for (const cache of caches) {
+        deduped.set(cache.signature, cache);
+    }
+
+    return [...deduped.values()];
+}
+
+function findPathfinderRetrievalCache(message, signature) {
+    if (!signature) {
+        return null;
+    }
+
+    return getStoredPathfinderRetrievalCaches(message).find(cache => cache.signature === signature) ?? null;
+}
+
+function getPathfinderPromptValue(key) {
+    const prompt = extension_prompts[key];
+    if (!prompt || prompt.value === undefined || prompt.value === null) {
+        return '';
+    }
+
+    return String(prompt.value);
+}
+
+function capturePathfinderRetrievalPromptSnapshot() {
+    return PATHFINDER_RETRIEVAL_PROMPT_KEYS
+        .map(key => ({ key, value: getPathfinderPromptValue(key) }))
+        .filter(prompt => prompt.value.trim());
+}
+
+function restorePathfinderRetrievalPromptSnapshot(cache) {
+    if (!isPathfinderRetrievalCacheEntry(cache)) {
+        return false;
+    }
+
+    for (const prompt of cache.prompts) {
+        if (!PATHFINDER_RETRIEVAL_PROMPT_KEYS.includes(prompt?.key) || typeof prompt.value !== 'string' || !prompt.value.trim()) {
+            continue;
+        }
+
+        setExtensionPrompt(
+            prompt.key,
+            prompt.value,
+            extension_prompt_types.IN_PROMPT,
+            4,
+            false,
+            extension_prompt_roles.SYSTEM,
+        );
+    }
+
+    return true;
+}
+
+function storePathfinderRetrievalCache(message, signature) {
+    if (!message || !signature) {
+        return;
+    }
+
+    const cacheEntry = {
+        signature,
+        prompts: capturePathfinderRetrievalPromptSnapshot(),
+        savedAt: Date.now(),
+    };
+    const caches = getStoredPathfinderRetrievalCaches(message).filter(cache => cache.signature !== signature);
+    caches.push(cacheEntry);
+
+    setAgentExtraValue(message, PATHFINDER_RETRIEVAL_CACHE_EXTRA_KEY, caches.slice(-MAX_PATHFINDER_RETRIEVAL_CACHE));
+    saveChatDebounced();
+}
+
 function hasProcessedPostProcessingRun(message, runKey, messageIndex = null, indexRunKey = '') {
     const numericMessageIndex = Number(messageIndex);
     const indexRuns = Number.isInteger(numericMessageIndex)
@@ -977,6 +1247,7 @@ function deferPostProcessing(messageIndex, generationType, activationSnapshot = 
         generationType: snapshot.generationType,
         message: chat[numericMessageIndex] ?? null,
         activationSnapshot: snapshot,
+        wasStreamingStopped: wasStreamingMessageStopped(numericMessageIndex),
     });
 
     if (!isGenerationInProgress) {
@@ -1052,14 +1323,14 @@ function scheduleDeferredPostProcessingFlush(delayMs = 0) {
                 continue;
             }
 
+            if (pendingMessage.wasStreamingStopped || wasStreamingMessageStopped(pendingMessage.messageIndex)) {
+                deferredPostProcessingQueue.delete(pendingMessage.messageIndex);
+                continue;
+            }
+
             if (isStreamingMessageStillActive(pendingMessage.messageIndex)) {
                 scheduleDeferredPostProcessingFlush(DEFERRED_POST_PROCESSING_RETRY_MS);
                 return;
-            }
-
-            if (wasStreamingMessageStopped(pendingMessage.messageIndex)) {
-                deferredPostProcessingQueue.delete(pendingMessage.messageIndex);
-                continue;
             }
 
             deferredPostProcessingQueue.delete(pendingMessage.messageIndex);
@@ -1258,6 +1529,7 @@ function recoverMissedGenerationEnd(reason = 'fallback') {
     toolSyncDuringGeneration = false;
     generationStopRequested = false;
     clearMissedGenerationEndRecoveryCheck();
+    clearInitialGenerationToast();
     queueLatestAssistantPostProcessingFromSnapshot();
     scheduleDeferredPostProcessingFlush();
     schedulePostGenerationRecoveryCheck();
@@ -1438,6 +1710,10 @@ function queueLatestAssistantPostProcessingFromSnapshot() {
         return { queued: false, retry: true };
     }
 
+    if (wasStreamingMessageStopped(messageIndex)) {
+        return { queued: false, retry: false };
+    }
+
     const runKey = getPostProcessingRunKey(message, activationSnapshot.generationType, activationSnapshot);
     const indexRunKey = getPostProcessingIndexRunKey(message, messageIndex, activationSnapshot.generationType, activationSnapshot);
 
@@ -1585,6 +1861,113 @@ function ensureMessageRegexSnapshot(messageIndex, generationType, activationSnap
     return true;
 }
 
+function isRegexRefreshAgentCandidate(agent, generationType, { respectGenerationTypes = true } = {}) {
+    if (!agent || getAgentRegexScripts(agent).length === 0) {
+        return false;
+    }
+
+    if (!respectGenerationTypes) {
+        return true;
+    }
+
+    const normalizedGenerationType = normalizeGenerationType(generationType);
+    const generationTypes = agent.conditions?.generationTypes;
+    return !Array.isArray(generationTypes)
+        || generationTypes.length === 0
+        || generationTypes.includes(normalizedGenerationType);
+}
+
+function getRegexSnapshotRefreshAgents(message, agentId, generationType, { includeForcedAgent = false, respectGenerationTypes = true } = {}) {
+    const enabledAgentsById = new Map(getEnabledAgents().map(agent => [agent.id, agent]));
+    const previousSnapshot = getAgentExtraValue(message, MESSAGE_EXTRA_KEY);
+    const agentIds = new Set(Array.isArray(previousSnapshot?.activeAgentIds) ? previousSnapshot.activeAgentIds : []);
+
+    if (agentId) {
+        agentIds.add(agentId);
+    }
+
+    const refreshAgents = [];
+    for (const id of agentIds) {
+        let agent = enabledAgentsById.get(id);
+
+        if (!agent && includeForcedAgent && id === agentId) {
+            agent = getAgentById(id);
+        }
+
+        if (isRegexRefreshAgentCandidate(agent, generationType, { respectGenerationTypes })) {
+            refreshAgents.push(agent);
+        }
+    }
+
+    return refreshAgents;
+}
+
+function refreshRegexSnapshotForAgentOnMessage(agentId, messageIndex, options = {}) {
+    const {
+        generationType = 'normal',
+        includeForcedAgent = false,
+        refresh = true,
+        respectGenerationTypes = true,
+        save = true,
+        markPendingSave = !save,
+    } = options;
+    const normalizedGenerationType = normalizeGenerationType(generationType);
+    if (!isAssistantPostProcessingGenerationType(normalizedGenerationType)) {
+        return false;
+    }
+
+    const numericMessageIndex = Number(messageIndex);
+    if (!Number.isInteger(numericMessageIndex)) {
+        return false;
+    }
+
+    const message = chat[numericMessageIndex];
+    if (!message || message.is_user || message.is_system) {
+        return false;
+    }
+
+    const activeAgents = getRegexSnapshotRefreshAgents(message, agentId, normalizedGenerationType, {
+        includeForcedAgent,
+        respectGenerationTypes,
+    });
+
+    if (!updateMessageRegexSnapshot(message, activeAgents, normalizedGenerationType)) {
+        return false;
+    }
+
+    if (save) {
+        pendingRegexSnapshotSaves.delete(message);
+        saveChatDebounced();
+    } else if (markPendingSave) {
+        pendingRegexSnapshotSaves.add(message);
+    }
+
+    if (refresh) {
+        scheduleMessageRefresh(numericMessageIndex, message);
+    }
+
+    return true;
+}
+
+export function refreshRegexSnapshotsForAgent(agentId, { generationType = 'normal' } = {}) {
+    let refreshed = 0;
+    for (let messageIndex = 0; messageIndex < chat.length; messageIndex++) {
+        if (refreshRegexSnapshotForAgentOnMessage(agentId, messageIndex, {
+            generationType,
+            markPendingSave: false,
+            save: false,
+        })) {
+            refreshed++;
+        }
+    }
+
+    if (refreshed > 0) {
+        saveChatDebounced();
+    }
+
+    return refreshed;
+}
+
 function resolveAgentConnectionProfile(agent) {
     return resolveConnectionProfile(agent?.connectionProfile);
 }
@@ -1611,7 +1994,14 @@ function getPromptTransformAgentsForMessage(activeAgents, generationType) {
 }
 
 function getPromptTransformAgentsForImpersonate(activeAgents) {
-    return getPromptTransformAgents(activeAgents).filter(agent => Boolean(agent?.conditions?.runOnImpersonate));
+    return getPromptTransformAgents(activeAgents).filter(agent => {
+        if (agent?.conditions?.runOnImpersonate) {
+            return true;
+        }
+
+        const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+        return IMPERSONATE_PROMPT_TRANSFORM_TEMPLATE_IDS.has(sourceTemplateId);
+    });
 }
 
 function getPreGenerationInterceptAgents(activeAgents) {
@@ -1619,6 +2009,17 @@ function getPreGenerationInterceptAgents(activeAgents) {
         !isToolAgent(agent) &&
         (agent.phase === 'pre' || agent.phase === 'both') &&
         agent.preProcess?.mode === 'intercept' &&
+        agent.preProcess?.interceptTiming !== POST_MAIN_GENERATION_INTERCEPT_TIMING &&
+        String(agent.prompt ?? '').trim(),
+    ).sort((a, b) => Number(a?.injection?.order ?? 100) - Number(b?.injection?.order ?? 100));
+}
+
+function getPostMainGenerationInterceptAgents(activeAgents) {
+    return activeAgents.filter(agent =>
+        !isToolAgent(agent) &&
+        (agent.phase === 'pre' || agent.phase === 'both') &&
+        agent.preProcess?.mode === 'intercept' &&
+        agent.preProcess?.interceptTiming === POST_MAIN_GENERATION_INTERCEPT_TIMING &&
         String(agent.prompt ?? '').trim(),
     ).sort((a, b) => Number(a?.injection?.order ?? 100) - Number(b?.injection?.order ?? 100));
 }
@@ -1691,13 +2092,17 @@ function showPromptTransformRunningToast(agent, mode, profileId = '', options = 
     const targetLabel = describePromptTransformTarget(profileId, profileId ? 'profile' : 'main');
     const metadata = getPromptTransformRunMetadata(agent, profileId);
     const cancelButtonClass = 'ica--toast-cancel-agent';
-    const kind = options?.kind === 'preIntercept' ? 'preIntercept' : 'postGen';
+    const kind = ['preIntercept', 'postMainIntercept'].includes(String(options?.kind))
+        ? String(options.kind)
+        : 'postGen';
     const applyMode = ['wrap', 'patch'].includes(String(options?.applyMode))
         ? String(options.applyMode)
         : 'replace';
     const runningLabel = kind === 'preIntercept'
         ? `Running pre-generation ${applyMode} intercept...`
-        : `Running ${modeLabel} via ${targetLabel}...`;
+        : kind === 'postMainIntercept'
+            ? `Running post-main ${applyMode} intercept...`
+            : `Running ${modeLabel} via ${targetLabel}...`;
     const messageHtml = `
         <div>${escapeToastHtml(runningLabel)}</div>
         <div>${escapeToastHtml(`Order ${metadata.order} | Model: ${metadata.modelLabel}`)}</div>
@@ -2102,7 +2507,20 @@ function buildPromptTransformMessages(agentPrompt, messageText, assistantName, g
     ];
 }
 
-function buildContextInterceptMessages(agentPrompt, contextText, generationType, contextFormat) {
+function buildContextInterceptMessages(agentPrompt, contextText, generationType, contextFormat, timing = PRE_GENERATION_INTERCEPT_TIMING) {
+    if (timing === POST_MAIN_GENERATION_INTERCEPT_TIMING) {
+        return [
+            {
+                role: 'system',
+                content: `${agentPrompt}\n\nYou are modifying the assistant response after the main model generated it, before it is shown or saved. Return only the final assistant response requested by the instructions above. Do not add commentary, labels, or code fences unless they are part of the response itself. If no changes are needed, return the original response verbatim.`,
+            },
+            {
+                role: 'user',
+                content: `Generation type: ${generationType}\n\nMain model output:\n<assistant_response>\n${contextText}\n</assistant_response>`,
+            },
+        ];
+    }
+
     const formatLabel = contextFormat === 'chat' ? 'JSON array of chat-completion messages' : 'plain text completion prompt';
 
     return [
@@ -2192,6 +2610,9 @@ function sanitizePreGenerationInterceptRunForStorage(result) {
         agentId: result.agentId,
         agentName: result.agentName,
         applyMode: result.applyMode,
+        timing: result.timing === POST_MAIN_GENERATION_INTERCEPT_TIMING
+            ? POST_MAIN_GENERATION_INTERCEPT_TIMING
+            : PRE_GENERATION_INTERCEPT_TIMING,
         contextFormat: result.contextFormat,
         status: result.status,
         changed: Boolean(result.changed),
@@ -2265,6 +2686,54 @@ function consolidateAppendPromptTransformOutputs(baseText, agents, results) {
         text: mergedText,
         changed: mergedText !== normalizedBaseText,
         beforeText: normalizedBaseText,
+    };
+}
+
+function getUserFinalPromptTransformMessages(promptMessages) {
+    const messages = (Array.isArray(promptMessages) ? promptMessages : [])
+        .filter(message => message && typeof message === 'object')
+        .map(message => ({
+            ...message,
+            role: String(message.role ?? 'user').trim().toLowerCase() || 'user',
+        }));
+
+    if (messages.length === 0) {
+        return [{ role: 'user', content: 'Return only the requested transformed text.' }];
+    }
+
+    const hasToolCallContext = messages.some(message => message.role === 'tool' || Array.isArray(message.tool_calls));
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage.role === 'user' || hasToolCallContext) {
+        return messages;
+    }
+
+    // Prompt-transform helper prompts are synthetic requests, not real chat/tool-call tails.
+    // Keep providers that reject assistant-prefill tails happy by appending a tiny user turn
+    // instead of role-flipping any existing assistant content.
+    return [
+        ...messages,
+        { role: 'user', content: 'Return only the requested transformed text.' },
+    ];
+}
+
+function canUseMainChatCompletionHelper(context) {
+    return context?.mainApi === 'openai' && typeof context?.generateRaw === 'function';
+}
+
+async function requestMainChatCompletionPromptTransform(context, promptMessages, maxTokens) {
+    const output = await context.generateRaw({
+        prompt: getUserFinalPromptTransformMessages(promptMessages),
+        api: 'openai',
+        instructOverride: true,
+        responseLength: maxTokens,
+        trimNames: false,
+        cacheScope: 'auxiliary',
+    });
+
+    return {
+        output: extractProfileResponseText({ content: output }),
+        runner: 'main',
+        profileId: '',
     };
 }
 
@@ -2351,6 +2820,12 @@ async function requestPromptTransform(agent, promptMessages, maxTokens) {
 
         return await runAsInternalPromptTransform(async () =>
             await requestProfilePromptTransform(CMRS, profileId, promptMessages, maxTokens, modelOverride),
+        );
+    }
+
+    if (canUseMainChatCompletionHelper(context)) {
+        return await runAsInternalPromptTransform(async () =>
+            await requestMainChatCompletionPromptTransform(context, promptMessages, maxTokens),
         );
     }
 
@@ -2682,10 +3157,27 @@ function scheduleMessageRefresh(messageIndex, expectedMessage) {
 
 function clearInChatAgentExtensionPrompts() {
     for (const key of Object.keys(extension_prompts)) {
-        if (key.startsWith(PROMPT_KEY_PREFIX) || PATHFINDER_RETRIEVAL_PROMPT_KEYS.includes(key) || key === PATHFINDER_AUTO_SUMMARY_PROMPT_KEY) {
+        if (key.startsWith(PROMPT_KEY_PREFIX)) {
             delete extension_prompts[key];
         }
     }
+    clearPathfinderExtensionPrompts();
+}
+
+function clearPathfinderExtensionPrompts() {
+    for (const key of Object.keys(extension_prompts)) {
+        if (PATHFINDER_RETRIEVAL_PROMPT_KEYS.includes(key) || key === PATHFINDER_AUTO_SUMMARY_PROMPT_KEY) {
+            delete extension_prompts[key];
+        }
+    }
+}
+
+export function deactivatePathfinderRuntime() {
+    clearPathfinderRetrievalToast();
+    abortActivePathfinderRetrieval('Pathfinder disabled.');
+    clearPathfinderExtensionPrompts();
+    toolRecursionDepth = 0;
+    syncToolAgentRegistrations();
 }
 
 function injectPreGenerationAgentPrompts(activeAgents, generationType) {
@@ -2737,10 +3229,13 @@ function onGenerationStarted(generationType, _options, dryRun) {
     generationStartedAt = Date.now();
     lastMainGenerationEndedAt = 0;
     postProcessingGenerationRunId++;
+    stoppedGenerationRunId = -1;
+    stoppedStreamingMessageIndexes.clear();
     clearLatestAssistantPostProcessingFallback();
     clearPostGenerationRecoveryCheck();
     clearMissedGenerationEndRecoveryCheck();
     clearAllPromptTransformRunningToasts();
+    clearInitialGenerationToast();
     takePendingPreGenerationInterceptRuns();
     pendingGenerationSnapshot = buildActivationSnapshot(currentMainGenerationType);
     generationStartChatLength = chat.length;
@@ -2763,6 +3258,20 @@ function onGenerationStarted(generationType, _options, dryRun) {
 
 function onGenerationEnded() {
     if (internalPromptTransformDepth > 0) {
+        return;
+    }
+
+    clearInitialGenerationToast();
+
+    if (stoppedGenerationRunId === postProcessingGenerationRunId) {
+        isGenerationInProgress = false;
+        lastMainGenerationEndedAt = Date.now();
+        toolSyncDuringGeneration = false;
+        clearLatestAssistantPostProcessingFallback();
+        clearPostGenerationRecoveryCheck();
+        clearMissedGenerationEndRecoveryCheck();
+        clearDeferredPostProcessing();
+        clearAllPromptTransformRunningToasts();
         return;
     }
 
@@ -2794,6 +3303,11 @@ function onGenerationStopped() {
     }
 
     generationStopRequested = true;
+    stoppedGenerationRunId = postProcessingGenerationRunId;
+    const stoppedMessageIndex = Number(streamingProcessor?.messageId);
+    if (Number.isInteger(stoppedMessageIndex) && stoppedMessageIndex >= 0) {
+        stoppedStreamingMessageIndexes.add(stoppedMessageIndex);
+    }
     isGenerationInProgress = false;
     lastMainGenerationEndedAt = Date.now();
     clearLatestAssistantPostProcessingFallback();
@@ -2802,6 +3316,7 @@ function onGenerationStopped() {
     clearDeferredPostProcessing();
     clearAllPromptTransformRunningToasts();
     clearPathfinderRetrievalToast();
+    clearInitialGenerationToast();
     takePendingPreGenerationInterceptRuns();
     abortActivePathfinderRetrieval('Pathfinder retrieval cancelled because generation stopped.');
 }
@@ -2846,21 +3361,34 @@ async function onGenerationAfterCommands(generationType, _options, dryRun) {
 
     if (!dryRun && pathfinderAgent) {
         const retrievalCancelRevision = agentGenerationCancelRevision;
-        const retrievalAbortController = new AbortController();
         syncPathfinderRuntimeSettings(pathfinderAgent);
-        activePathfinderRetrievalAbortControllers.add(retrievalAbortController);
+        const retrievalCacheTarget = getPathfinderRetrievalCacheTarget(normalizedGenerationType);
+        const retrievalCacheSignature = buildPathfinderRetrievalCacheSignature(pathfinderAgent, activationSnapshot, normalizedGenerationType, retrievalCacheTarget);
+        const cachedRetrieval = findPathfinderRetrievalCache(retrievalCacheTarget?.message, retrievalCacheSignature);
+        let retrievalAbortController = null;
 
-        try {
-            if (shouldShowPathfinderRetrievalToast(pathfinderAgent)) {
-                showPathfinderRetrievalToast();
+        if (cachedRetrieval) {
+            restorePathfinderRetrievalPromptSnapshot(cachedRetrieval);
+        } else {
+            retrievalAbortController = new AbortController();
+            activePathfinderRetrievalAbortControllers.add(retrievalAbortController);
+
+            try {
+                if (shouldShowPathfinderRetrievalToast(pathfinderAgent)) {
+                    showPathfinderRetrievalToast();
+                }
+                await runSidecarRetrieval(setExtensionPrompt, extension_prompt_types, extension_prompt_roles, retrievalAbortController.signal);
+            } finally {
+                clearPathfinderRetrievalToast();
+                activePathfinderRetrievalAbortControllers.delete(retrievalAbortController);
             }
-            await runSidecarRetrieval(setExtensionPrompt, extension_prompt_types, extension_prompt_roles, retrievalAbortController.signal);
-        } finally {
-            clearPathfinderRetrievalToast();
-            activePathfinderRetrievalAbortControllers.delete(retrievalAbortController);
+
+            if (!generationStopRequested && agentGenerationCancelRevision === retrievalCancelRevision && !retrievalAbortController.signal.aborted) {
+                storePathfinderRetrievalCache(retrievalCacheTarget?.message, retrievalCacheSignature);
+            }
         }
 
-        if (generationStopRequested || agentGenerationCancelRevision !== retrievalCancelRevision || retrievalAbortController.signal.aborted) {
+        if (generationStopRequested || agentGenerationCancelRevision !== retrievalCancelRevision || retrievalAbortController?.signal.aborted) {
             return;
         }
 
@@ -3109,13 +3637,13 @@ async function onMessageReceived(messageIndex, generationType) {
 
     ensureMessageRegexSnapshot(numericMessageIndex, generationType);
 
-    if (isStreamingMessageStillActive(numericMessageIndex)) {
-        deferPostProcessing(numericMessageIndex, generationType);
+    if (generationStopRequested || wasStreamingMessageStopped(numericMessageIndex)) {
+        clearDeferredPostProcessing(numericMessageIndex);
         return;
     }
 
-    if (wasStreamingMessageStopped(numericMessageIndex)) {
-        clearDeferredPostProcessing(numericMessageIndex);
+    if (isStreamingMessageStillActive(numericMessageIndex)) {
+        deferPostProcessing(numericMessageIndex, generationType);
         return;
     }
 
@@ -3268,7 +3796,10 @@ async function runPromptTransformAgentsForText(promptTransformAgents, initialTex
     };
 }
 
-async function runContextInterceptAgent(agent, currentContextText, generationType, contextFormat) {
+async function runContextInterceptAgent(agent, currentContextText, generationType, contextFormat, options = {}) {
+    const timing = options.timing === POST_MAIN_GENERATION_INTERCEPT_TIMING
+        ? POST_MAIN_GENERATION_INTERCEPT_TIMING
+        : PRE_GENERATION_INTERCEPT_TIMING;
     const beforeText = normalizeContentText(currentContextText);
     const applyMode = ['wrap', 'patch'].includes(String(agent?.preProcess?.applyMode))
         ? String(agent.preProcess.applyMode)
@@ -3278,6 +3809,7 @@ async function runContextInterceptAgent(agent, currentContextText, generationTyp
         agentId: agent.id,
         agentName: agent.name,
         applyMode,
+        timing,
         contextFormat,
         changed: false,
         beforeText,
@@ -3299,10 +3831,13 @@ async function runContextInterceptAgent(agent, currentContextText, generationTyp
         };
     }
 
-    const promptMessages = buildContextInterceptMessages(expandedPrompt, currentContextText, generationType, contextFormat);
+    const promptMessages = buildContextInterceptMessages(expandedPrompt, currentContextText, generationType, contextFormat, timing);
     const cancelRevision = agentGenerationCancelRevision;
     const runningToast = shouldShowPreInterceptNotifications(agent)
-        ? showPromptTransformRunningToast(agent, applyMode, profileId, { kind: 'preIntercept', applyMode })
+        ? showPromptTransformRunningToast(agent, applyMode, profileId, {
+            kind: timing === POST_MAIN_GENERATION_INTERCEPT_TIMING ? 'postMainIntercept' : 'preIntercept',
+            applyMode,
+        })
         : null;
 
     try {
@@ -3399,6 +3934,7 @@ async function runPreGenerationInterceptorsOnText(initialContextText, generation
                 agentId: agent.id,
                 agentName: agent.name,
                 applyMode: ['wrap', 'patch'].includes(String(agent?.preProcess?.applyMode)) ? String(agent.preProcess.applyMode) : 'replace',
+                timing: PRE_GENERATION_INTERCEPT_TIMING,
                 contextFormat,
                 changed: false,
                 status: 'error',
@@ -3510,6 +4046,7 @@ async function runPreGenerationInterceptorsOnChat(initialChatMessages, generatio
                 agentId: agent.id,
                 agentName: agent.name,
                 applyMode: ['wrap', 'patch'].includes(String(agent?.preProcess?.applyMode)) ? String(agent.preProcess.applyMode) : 'replace',
+                timing: PRE_GENERATION_INTERCEPT_TIMING,
                 contextFormat: 'chat',
                 changed: false,
                 status: 'error',
@@ -3525,6 +4062,93 @@ async function runPreGenerationInterceptorsOnChat(initialChatMessages, generatio
     }
 
     return { chat: currentChatMessages, runs };
+}
+
+async function runPostMainGenerationInterceptorsOnText(initialOutputText, generationType) {
+    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
+        return { text: initialOutputText, runs: [], cancelled: false };
+    }
+
+    let currentOutputText = String(initialOutputText ?? '');
+    if (!currentOutputText.trim()) {
+        return { text: currentOutputText, runs: [], cancelled: false };
+    }
+
+    if (generationStopRequested) {
+        return { text: currentOutputText, runs: [], cancelled: true };
+    }
+
+    const activationSnapshot = getGenerationContextSnapshot(generationType);
+    const interceptAgents = getPostMainGenerationInterceptAgents(getSnapshotAgents(activationSnapshot));
+    if (interceptAgents.length === 0) {
+        return { text: currentOutputText, runs: [], cancelled: false };
+    }
+
+    const runs = [];
+    for (const agent of interceptAgents) {
+        if (generationStopRequested) {
+            return { text: currentOutputText, runs, cancelled: true };
+        }
+
+        try {
+            const result = await runContextInterceptAgent(
+                agent,
+                currentOutputText,
+                activationSnapshot.generationType,
+                'text',
+                { timing: POST_MAIN_GENERATION_INTERCEPT_TIMING },
+            );
+
+            if (generationStopRequested || result.status === 'cancelled') {
+                runs.push({ ...result, status: 'cancelled', changed: false, afterText: currentOutputText });
+                return { text: currentOutputText, runs, cancelled: true };
+            }
+
+            if (result.status !== 'changed') {
+                runs.push(result);
+                continue;
+            }
+
+            currentOutputText = applyContextInterceptText(currentOutputText, result.outputText, agent.preProcess);
+            result.afterText = currentOutputText;
+            result.changed = result.afterText !== result.beforeText;
+            result.status = result.changed ? 'changed' : 'unchanged';
+            runs.push(result);
+        } catch (error) {
+            console.warn(`[InChatAgents] Post-main intercept agent "${agent.name}" failed. Leaving generated output unchanged for this agent.`, error);
+            runs.push({
+                agentId: agent.id,
+                agentName: agent.name,
+                applyMode: ['wrap', 'patch'].includes(String(agent?.preProcess?.applyMode)) ? String(agent.preProcess.applyMode) : 'replace',
+                timing: POST_MAIN_GENERATION_INTERCEPT_TIMING,
+                contextFormat: 'text',
+                changed: false,
+                status: 'error',
+                error: error instanceof Error ? error.message : String(error),
+                beforeText: currentOutputText,
+                afterText: currentOutputText,
+                outputText: '',
+                profileId: '',
+                runner: 'error',
+                timestamp: new Date().toISOString(),
+            });
+
+            if (generationStopRequested) {
+                return { text: currentOutputText, runs, cancelled: true };
+            }
+        }
+    }
+
+    return { text: currentOutputText, runs, cancelled: false };
+}
+
+function getPostMainGenerationInterceptorsForGeneration(generationType) {
+    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
+        return [];
+    }
+
+    const activationSnapshot = getGenerationContextSnapshot(generationType);
+    return getPostMainGenerationInterceptAgents(getSnapshotAgents(activationSnapshot));
 }
 
 async function onGenerateAfterCombinePrompts(eventData) {
@@ -3564,6 +4188,48 @@ async function onChatCompletionPromptReady(eventData) {
 
     originalChat.splice(0, originalChat.length, ...nextChat);
     eventData.chat = originalChat;
+}
+
+async function onGenerationOutputBufferingDecision(eventData) {
+    if (!eventData || eventData.dryRun || internalPromptTransformDepth > 0 || !isGenerationInProgress) {
+        return;
+    }
+
+    const interceptAgents = getPostMainGenerationInterceptorsForGeneration(eventData.type ?? currentMainGenerationType);
+    if (interceptAgents.length > 0) {
+        eventData.hasPostMainInterceptors = true;
+        if (interceptAgents.some(shouldShowPreInterceptNotifications)) {
+            showInitialGenerationToast();
+        }
+    }
+}
+
+async function onMainGenerationOutputReady(eventData) {
+    if (!eventData || eventData.dryRun || internalPromptTransformDepth > 0) {
+        return;
+    }
+
+    clearInitialGenerationToast();
+
+    if (generationStopRequested) {
+        eventData.cancelled = true;
+        return;
+    }
+
+    if (!isGenerationInProgress || typeof eventData.text !== 'string') {
+        return;
+    }
+
+    const generationType = eventData.type ?? currentMainGenerationType;
+    const result = await runPostMainGenerationInterceptorsOnText(eventData.text, generationType);
+    pendingPreGenerationInterceptRuns.push(...result.runs);
+
+    if (result.cancelled || generationStopRequested) {
+        eventData.cancelled = true;
+        return;
+    }
+
+    eventData.text = result.text;
 }
 
 async function onImpersonateReady(text = '') {
@@ -3766,6 +4432,11 @@ export async function redoPromptTransform(messageIndex) {
  * Registers all event listeners for the agent runner.
  */
 export function initAgentRunner() {
+    if (agentRunnerInitialized) {
+        return;
+    }
+
+    agentRunnerInitialized = true;
     initPostGenerationRecoveryHooks();
 
     eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
@@ -3807,6 +4478,14 @@ export function initAgentRunner() {
         eventSource.on(event_types.CHAT_COMPLETION_PROMPT_READY, onChatCompletionPromptReady);
     }
 
+    if (event_types.GENERATION_OUTPUT_BUFFERING_DECISION) {
+        eventSource.on(event_types.GENERATION_OUTPUT_BUFFERING_DECISION, onGenerationOutputBufferingDecision);
+    }
+
+    if (event_types.MAIN_GENERATION_OUTPUT_READY) {
+        eventSource.on(event_types.MAIN_GENERATION_OUTPUT_READY, onMainGenerationOutputReady);
+    }
+
     if (event_types.WORLDINFO_ENTRIES_LOADED) {
         eventSource.on(event_types.WORLDINFO_ENTRIES_LOADED, onWorldInfoEntriesLoaded);
     }
@@ -3835,6 +4514,13 @@ async function executeManualAgentRun(agentId, messageIndex, cancelRevision = age
     }
 
     const generationType = 'normal';
+    const regexSnapshotChanged = refreshRegexSnapshotForAgentOnMessage(agent.id, messageIndex, {
+        generationType,
+        includeForcedAgent: true,
+        markPendingSave: false,
+        respectGenerationTypes: false,
+        save: false,
+    });
     const result = await runPromptTransformAgent(agent, message, generationType, null, messageIndex, {
         applyToMessage: false,
     });
@@ -3847,7 +4533,8 @@ async function executeManualAgentRun(agentId, messageIndex, cancelRevision = age
         await syncPromptTransformMessageStateAsync(message, messageIndex);
     }
 
-    if (updatePromptTransformRuns(message, [result])) {
+    const promptTransformRunsChanged = updatePromptTransformRuns(message, [result]);
+    if (regexSnapshotChanged || promptTransformRunsChanged) {
         saveChatDebounced();
     }
 
@@ -3857,7 +4544,7 @@ async function executeManualAgentRun(agentId, messageIndex, cancelRevision = age
         saveChatDebounced();
     }
 
-    if (result.changed) {
+    if (result.changed || regexSnapshotChanged) {
         scheduleMessageRefresh(messageIndex, message);
     }
 

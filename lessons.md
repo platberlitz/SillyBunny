@@ -190,6 +190,16 @@ The current project instructions already point agents toward runtime, verificati
 
 Future optimization should add deeper, linked artifacts only when they can stay short, owned, and mechanically useful.
 
+## Card Script Sandbox Invariants
+
+- Card scripts must never auto-run on message render.
+- Card scripts run only after explicit user action when the global setting is enabled.
+- Iframe sandbox must not use `allow-same-origin`.
+- Parent code must validate event source, nonce, messageId, schema, allowlist, and rate limit.
+- Sandbox code must not receive command results, chat contents, settings, or parent DOM access.
+- Unknown slash commands must fail closed.
+- Sandbox state must be torn down on chat/message lifecycle changes.
+
 ## Commit History Clusters
 
 ### 2026-04-04 to 2026-04-05: bootstrap and first mobile stabilization

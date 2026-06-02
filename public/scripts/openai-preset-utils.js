@@ -43,3 +43,49 @@ export function getChatCompletionConnectionPresetKeys(settingsMap) {
 export function shouldIncludeConnectionFieldsInPreset(settings) {
     return Boolean(settings?.bind_preset_to_connection);
 }
+
+/**
+ * Builds a Chat Completion preset body using the current linked-preset mode.
+ *
+ * @param {Record<string, any>} settings Live OpenAI settings
+ * @param {Record<string, [string, string, boolean, boolean]>} settingsMap OpenAI preset setting map
+ * @returns {Record<string, any>} Preset body
+ */
+export function buildChatCompletionPresetForSave(settings, settingsMap) {
+    return buildChatCompletionPreset(settings, settingsMap, {
+        includeConnection: shouldIncludeConnectionFieldsInPreset(settings),
+    });
+}
+
+/**
+ * Normalizes a reverse proxy preset while preserving legacy presets that do not
+ * yet have a source binding.
+ *
+ * @param {Record<string, any>} preset Reverse proxy preset
+ * @param {object} [options] Normalize options
+ * @param {string[]} [options.supportedSources=[]] Chat Completion sources that can use reverse proxies
+ * @returns {{name: string, url: string, password: string, source: string}}
+ */
+export function normalizeReverseProxyPreset(preset, { supportedSources = [] } = {}) {
+    const name = String(preset?.name ?? 'None');
+    const source = String(preset?.source ?? '');
+
+    return {
+        name,
+        url: String(preset?.url ?? ''),
+        password: String(preset?.password ?? ''),
+        source: name === 'None' || !supportedSources.includes(source) ? '' : source,
+    };
+}
+
+/**
+ * Builds a reverse proxy preset from the current proxy form and backend source.
+ *
+ * @param {Record<string, any>} preset Reverse proxy preset data
+ * @param {object} [options] Build options
+ * @param {string[]} [options.supportedSources=[]] Chat Completion sources that can use reverse proxies
+ * @returns {{name: string, url: string, password: string, source: string}}
+ */
+export function buildReverseProxyPresetForSave(preset, { supportedSources = [] } = {}) {
+    return normalizeReverseProxyPreset(preset, { supportedSources });
+}

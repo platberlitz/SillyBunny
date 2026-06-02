@@ -8,6 +8,7 @@ import {
     max_context,
     online_status,
     resultCheckStatus,
+    saveSettings,
     saveSettingsDebounced,
     setGenerationParamsFromPreset,
     setOnlineStatus,
@@ -20,10 +21,17 @@ import { autoSelectInstructPreset, selectContextPreset, selectInstructPreset } f
 import { BIAS_CACHE, createNewLogitBiasEntry, displayLogitBias, getLogitBiasListResult } from './logit-bias.js';
 
 import { power_user, registerDebugFunction } from './power-user.js';
-import { getActiveManualApiSamplers, loadApiSelectedSamplers, isSamplerManualPriorityEnabled } from './samplerSelect.js';
+import {
+    getActiveManualApiSamplers,
+    getApiSamplerVisibilityState,
+    isSamplerManualPriorityEnabled,
+    loadApiSelectedSamplers,
+    saveApiSelectedSamplers,
+    setApiSamplerVisibilityState,
+} from './samplerSelect.js';
 import { SECRET_KEYS, writeSecret } from './secrets.js';
 import { getEventSourceStream } from './sse-stream.js';
-import { isLikelyLocalServerUrl } from './local-url-utils.js';
+import { getLocalPromptCacheValue, isLikelyLocalServerUrl } from './local-url-utils.js';
 import { getCurrentDreamGenModelTokenizer, getCurrentOpenRouterModelTokenizer, loadAphroditeModels, loadDreamGenModels, loadFeatherlessModels, loadGenericModels, loadInfermaticAIModels, loadLlamaCppModels, loadMancerModels, loadOllamaModels, loadOpenRouterModels, loadTabbyModels, loadTogetherAIModels, loadVllmModels, updateOpenRouterProvidersWarning } from './textgen-models.js';
 import { ENCODE_TOKENIZERS, TEXTGEN_TOKENIZERS, TOKENIZER_SUPPORTED_KEY, getTextTokens, getTokenizerBestMatch, tokenizers } from './tokenizers.js';
 import { AbortReason } from './util/AbortReason.js';
@@ -46,6 +54,37 @@ export const textgen_types = {
     HUGGINGFACE: 'huggingface',
     GENERIC: 'generic',
 };
+
+function initSamplerOrderLock(sortableSelector) {
+    const button = document.querySelector(`[data-sampler-order-lock="${sortableSelector.slice(1)}"]`);
+    const $sortable = $(sortableSelector);
+
+    if (!button || !$sortable.length) {
+        return;
+    }
+
+    const setLocked = (locked) => {
+        button.classList.toggle('is-locked', locked);
+        button.classList.toggle('fa-lock', locked);
+        button.classList.toggle('fa-lock-open', !locked);
+        button.setAttribute('aria-pressed', String(locked));
+        button.setAttribute('aria-label', locked ? t`Sampler reordering locked` : t`Sampler reordering unlocked`);
+        button.title = locked ? t`Unlock sampler reordering` : t`Lock sampler reordering`;
+        $sortable.sortable(locked ? 'disable' : 'enable');
+        $sortable.toggleClass('is-sampler-order-locked', locked);
+    };
+
+    setLocked(true);
+    button.addEventListener('click', () => setLocked(!button.classList.contains('is-locked')));
+    button.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+
+        event.preventDefault();
+        button.click();
+    });
+}
 
 const {
     GENERIC,
@@ -117,6 +156,7 @@ export const APHRODITE_DEFAULT_ORDER = [
     'xtc',
 ];
 const BIAS_KEY = '#textgenerationwebui_api-settings';
+const SAMPLER_VISIBILITY_EXTENSION_KEY = 'samplerVisibility';
 
 // Maybe let it be configurable in the future?
 // (7 days later) The future has come.
@@ -392,7 +432,35 @@ async function selectPreset(name) {
     setGenerationParamsFromPreset(preset);
     BIAS_CACHE.delete(BIAS_KEY);
     displayLogitBias(preset.logit_bias, BIAS_KEY);
-    saveSettingsDebounced();
+    await applyPresetSamplerVisibility(preset);
+    await saveSettings();
+}
+
+function getPresetSamplerVisibility(preset) {
+    const samplerVisibility = preset?.extensions?.[SAMPLER_VISIBILITY_EXTENSION_KEY];
+    return samplerVisibility && typeof samplerVisibility === 'object' && !Array.isArray(samplerVisibility)
+        ? samplerVisibility
+        : null;
+}
+
+async function applyPresetSamplerVisibility(preset) {
+    const samplerVisibility = getPresetSamplerVisibility(preset);
+
+    if (!samplerVisibility) {
+        return;
+    }
+
+    if (setApiSamplerVisibilityState(samplerVisibility)) {
+        await saveApiSelectedSamplers();
+        showSamplerControls();
+    }
+}
+
+export function getTextCompletionPresetSettings() {
+    const settings = structuredClone(textgenerationwebui_settings);
+    settings.extensions = settings.extensions || {};
+    settings.extensions[SAMPLER_VISIBILITY_EXTENSION_KEY] = getApiSamplerVisibilityState();
+    return settings;
 }
 
 export function formatTextGenURL(value) {
@@ -667,7 +735,7 @@ function sortAphroditeItemsByOrder(orderArray) {
     });
 }
 
-async function getStatusTextgen() {
+export async function getStatusTextgen() {
     const url = '/api/backends/text-completions/status';
 
     const endpoint = getTextGenServer();
@@ -842,6 +910,7 @@ export function initTextGenSettings() {
             saveSettingsDebounced();
         },
     });
+    initSamplerOrderLock('#koboldcpp_order');
 
     $('#koboldcpp_default_order').on('click', function () {
         textgenerationwebui_settings.sampler_order = KOBOLDCPP_ORDER;
@@ -861,6 +930,7 @@ export function initTextGenSettings() {
             saveSettingsDebounced();
         },
     });
+    initSamplerOrderLock('#llamacpp_samplers_sortable');
 
     $('#llamacpp_samplers_default_order').on('click', function () {
         sortLlamacppItemsByOrder(LLAMACPP_DEFAULT_ORDER);
@@ -881,6 +951,7 @@ export function initTextGenSettings() {
             saveSettingsDebounced();
         },
     });
+    initSamplerOrderLock('#sampler_priority_container');
 
     $('#sampler_priority_container_aphrodite').sortable({
         delay: getSortableDelay(),
@@ -894,6 +965,7 @@ export function initTextGenSettings() {
             saveSettingsDebounced();
         },
     });
+    initSamplerOrderLock('#sampler_priority_container_aphrodite');
 
     $('#tabby_json_schema').on('input', function () {
         const json_schema_string = String($(this).val());
@@ -1839,13 +1911,9 @@ export function createTextGenGenerationData(settings, model, finalPrompt = null,
     }
 
     if (shouldUseLocalPromptCache(settings)) {
-        // SillyBunny: helper generations use the auxiliary cache lane unless the
-        // caller explicitly requests the main chat lane.
-        if (cacheScope === 'main') {
-            params.cache_prompt = true;
-        } else {
-            delete params.cache_prompt;
-        }
+        // SillyBunny: helper generations must explicitly opt out, because some
+        // local llama.cpp servers default to --cache-prompt for every request.
+        params.cache_prompt = getLocalPromptCacheValue(cacheScope);
     }
 
     // Grammar conflicts with with json_schema

@@ -324,6 +324,7 @@ export const power_user = {
     auto_clear_cache_on_update: true,
     send_on_enter: send_on_enter_options.AUTO,
     console_log_prompts: false,
+    prompt_manager_drag_locked: true,
     request_token_probabilities: false,
     show_group_chat_queue: false,
     allow_name1_display: false,
@@ -1125,25 +1126,63 @@ function switchWaifuMode() {
     scrollChatToBottom();
 }
 
-function switchSpoilerMode() {
-    if (power_user.spoiler_free_mode) {
-        $('#descriptionWrapper').hide();
-        $('#firstMessageWrapper').hide();
-        $('#spoiler_free_desc').addClass('flex1');
-        $('#creators_note_desc_hidden').show();
-    } else {
-        $('#descriptionWrapper').show();
-        $('#firstMessageWrapper').show();
-        $('#spoiler_free_desc').removeClass('flex1');
-        $('#creators_note_desc_hidden').hide();
+const characterSpoilerFreePanelSelector = '#form_create [data-sb-character-editor-panel]:not([data-sb-character-editor-panel="char-info"]):not([data-sb-character-editor-panel="metadata"])';
+
+function showCharacterEditorMetadataPanel() {
+    const metadataTab = document.querySelector('#sb_character_editor_subtabs [data-sb-character-editor-tab="metadata"]');
+
+    if (metadataTab instanceof HTMLElement) {
+        metadataTab.click();
     }
 }
 
+function syncActiveCharacterEditorPanel() {
+    const activeTab = document.querySelector('#sb_character_editor_subtabs [data-sb-character-editor-tab][aria-selected="true"]');
+
+    if (activeTab instanceof HTMLElement) {
+        activeTab.click();
+    }
+}
+
+function setCharacterSpoilerFreeFieldsHidden(hidden) {
+    const form = document.getElementById('form_create');
+    const activePanel = form?.querySelector('[data-sb-character-editor-panel]:not([hidden])');
+    const activePanelCanRemainVisible = activePanel instanceof HTMLElement
+        && ['char-info', 'metadata'].includes(activePanel.dataset.sbCharacterEditorPanel ?? '');
+
+    if (form instanceof HTMLElement) {
+        form.dataset.sbSpoilerFreeFieldsHidden = String(hidden);
+    }
+
+    if (hidden) {
+        document.querySelectorAll(characterSpoilerFreePanelSelector).forEach(panel => {
+            if (!(panel instanceof HTMLElement)) {
+                return;
+            }
+
+            panel.hidden = true;
+            panel.setAttribute('aria-hidden', 'true');
+        });
+    } else {
+        syncActiveCharacterEditorPanel();
+    }
+
+    $('#spoiler_free_desc').toggleClass('flex1', hidden);
+    $('#creators_note_desc_hidden').toggle(hidden);
+
+    if (hidden && !activePanelCanRemainVisible) {
+        showCharacterEditorMetadataPanel();
+    }
+}
+
+function switchSpoilerMode() {
+    setCharacterSpoilerFreeFieldsHidden(power_user.spoiler_free_mode);
+}
+
 function peekSpoilerMode() {
-    $('#descriptionWrapper').toggle();
-    $('#firstMessageWrapper').toggle();
-    $('#spoiler_free_desc').toggleClass('flex1');
-    $('#creators_note_desc_hidden').toggle();
+    const form = document.getElementById('form_create');
+    const isHidden = form instanceof HTMLElement && form.dataset.sbSpoilerFreeFieldsHidden === 'true';
+    setCharacterSpoilerFreeFieldsHidden(!isHidden);
 }
 
 function switchMovingUI() {
@@ -1449,7 +1488,7 @@ function buildGoogleFontHref(fontName) {
         return '';
     }
 
-    const encodedFamily = family.split(/\s+/).filter(Boolean).join('+');
+    const encodedFamily = family.split(/\s+/).filter(Boolean).join(' ');
     return `https://fonts.googleapis.com/css2?family=${encodeURIComponent(encodedFamily)}:wght@400;500;600;700&display=swap`;
 }
 
@@ -1785,6 +1824,10 @@ export async function loadPowerUserSettings(settings, data) {
         delete power_user.import_card_tags;
     }
 
+    if (power_user.vertical_chat_layout !== undefined) {
+        delete power_user.vertical_chat_layout;
+    }
+
     if (power_user?.instruct?.derived === true) {
         power_user.instruct_derived = true;
         delete power_user.instruct.derived;
@@ -1992,6 +2035,7 @@ function loadCharListState() {
 }
 
 const movingUIPixelStyles = new Set(['width', 'height', 'top', 'right', 'bottom', 'left']);
+const movingUIBoundsTolerance = 1;
 
 function normalizeMovingUIStateStyle(property, value) {
     if (value === null || value === undefined || value === '') {
@@ -2024,11 +2068,112 @@ function applyMovingUIStateStyles(element, state) {
     }
 }
 
+function parseMovingUIStatePixel(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmedValue = value.trim();
+    if (!/^-?\d+(?:\.\d+)?(?:px)?$/.test(trimmedValue)) {
+        return null;
+    }
+
+    return Number.parseFloat(trimmedValue);
+}
+
+function getMovingUIViewportSize() {
+    return {
+        width: window.innerWidth || document.documentElement.clientWidth || 0,
+        height: window.innerHeight || document.documentElement.clientHeight || 0,
+    };
+}
+
+function getMovingUIStateBounds(state) {
+    const { width: viewportWidth, height: viewportHeight } = getMovingUIViewportSize();
+    const width = parseMovingUIStatePixel(state?.width);
+    const height = parseMovingUIStatePixel(state?.height);
+    const right = parseMovingUIStatePixel(state?.right);
+    const bottom = parseMovingUIStatePixel(state?.bottom);
+    let left = parseMovingUIStatePixel(state?.left);
+    let top = parseMovingUIStatePixel(state?.top);
+
+    if (left === null && right !== null && width !== null) {
+        left = viewportWidth - right - width;
+    }
+
+    if (top === null && bottom !== null && height !== null) {
+        top = viewportHeight - bottom - height;
+    }
+
+    if (left === null || top === null || width === null || height === null) {
+        return null;
+    }
+
+    return {
+        left,
+        top,
+        right: left + width,
+        bottom: top + height,
+        width,
+        height,
+    };
+}
+
+function getMovingUIElementBounds(element) {
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+        return null;
+    }
+
+    return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+    };
+}
+
+function isMovingUIBoundsOutOfViewport(bounds) {
+    const { width: viewportWidth, height: viewportHeight } = getMovingUIViewportSize();
+    if (!bounds || viewportWidth <= 0 || viewportHeight <= 0 || bounds.width <= 0 || bounds.height <= 0) {
+        return false;
+    }
+
+    return bounds.left < -movingUIBoundsTolerance
+        || bounds.top < -movingUIBoundsTolerance
+        || bounds.right > viewportWidth + movingUIBoundsTolerance
+        || bounds.bottom > viewportHeight + movingUIBoundsTolerance;
+}
+
+function isMovingUIStateOutOfViewport(element, state) {
+    const elementBounds = getMovingUIElementBounds(element);
+
+    if (elementBounds) {
+        return isMovingUIBoundsOutOfViewport(elementBounds);
+    }
+
+    return isMovingUIBoundsOutOfViewport(getMovingUIStateBounds(state));
+}
+
+function syncMovingUIOffscreenWarning(showWarning) {
+    const warning = document.getElementById('movingUIOffscreenWarning');
+    if (warning) {
+        warning.classList.toggle('displayNone', !showWarning);
+    }
+}
+
 export function loadMovingUIState() {
     if (!isMobile()
         && power_user.movingUIState
         && power_user.movingUI === true) {
         console.debug('loading movingUI state');
+        let hasOffscreenPanel = false;
         for (var elmntName of Object.keys(power_user.movingUIState)) {
             var elmntState = power_user.movingUIState[elmntName];
             try {
@@ -2039,6 +2184,8 @@ export function loadMovingUIState() {
                     if (elmnt.length) {
                         console.debug(`loading state for ${targetName} from ${elmntName}`);
                         applyMovingUIStateStyles(elmnt[0], elmntState);
+                        // SillyBunny: make bad persisted panel geometry recoverable from Settings.
+                        hasOffscreenPanel = isMovingUIStateOutOfViewport(elmnt[0], elmntState) || hasOffscreenPanel;
                         applied = true;
                     }
                 }
@@ -2049,8 +2196,10 @@ export function loadMovingUIState() {
                 console.debug(`error occurred while processing ${elmntName}: ${err}`);
             }
         }
+        syncMovingUIOffscreenWarning(hasOffscreenPanel);
     } else {
         console.debug('skipping movingUI state load');
+        syncMovingUIOffscreenWarning(false);
         return;
     }
 }
@@ -2817,7 +2966,6 @@ async function resetMovablePanels(type) {
         'sheld',
         'left-nav-panel',
         'right-nav-panel',
-        'WorldInfo',
         'floatingPrompt',
         'expression-holder',
         'groupMemberListPopout',
@@ -2860,6 +3008,7 @@ async function resetMovablePanels(type) {
     await delay(50);
 
     power_user.movingUIState = {};
+    syncMovingUIOffscreenWarning(false);
 
     //if user manually resets panels, deselect the current preset
     if (type !== 'quiet' && type !== 'resize') {
@@ -3278,7 +3427,6 @@ export function forceCharacterEditorTokenize() {
         $(document.getElementById($(this).data('token-counter'))).data('last-value-hash', '');
     });
     $('#rm_ch_create_block').trigger('input');
-    $('#character_popup').trigger('input');
 }
 
 jQuery(async () => {
@@ -3547,7 +3695,7 @@ jQuery(async () => {
         saveSettingsDebounced();
     });
 
-    $('#movingUIreset').on('click', resetMovablePanels);
+    $('#movingUIreset, #movingUIOffscreenReset').on('click', () => resetMovablePanels());
 
     $('#avatar_style').on('change', function () {
         const value = $(this).find(':selected').val();

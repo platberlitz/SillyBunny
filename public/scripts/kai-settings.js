@@ -49,6 +49,41 @@ export const kai_settings = {
     extensions: {},
 };
 
+let syncKoboldSamplerOrderLock = () => {};
+
+function initKoboldSamplerOrderLock() {
+    const button = document.querySelector('[data-sampler-order-lock="kobold_order"]');
+    const $sortable = $('#kobold_order');
+
+    if (!button || !$sortable.length) {
+        return;
+    }
+
+    const canEditSamplerOrder = () => $('#settings_preset').find(':selected').val() !== 'gui';
+    const setLocked = (locked) => {
+        button.classList.toggle('is-locked', locked);
+        button.classList.toggle('fa-lock', locked);
+        button.classList.toggle('fa-lock-open', !locked);
+        button.setAttribute('aria-pressed', String(locked));
+        button.setAttribute('aria-label', locked ? t`Sampler reordering locked` : t`Sampler reordering unlocked`);
+        button.title = locked ? t`Unlock sampler reordering` : t`Lock sampler reordering`;
+        $sortable.sortable((locked || !canEditSamplerOrder()) ? 'disable' : 'enable');
+        $sortable.toggleClass('is-sampler-order-locked', locked);
+    };
+
+    syncKoboldSamplerOrderLock = () => setLocked(button.classList.contains('is-locked'));
+    setLocked(true);
+    button.addEventListener('click', () => setLocked(!button.classList.contains('is-locked')));
+    button.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+
+        event.preventDefault();
+        button.click();
+    });
+}
+
 /**
  * Stable version of KoboldAI has a nasty payload validation.
  * It will reject any payload that has a key that is not in the whitelist.
@@ -501,6 +536,7 @@ export function initKoboldSettings() {
             saveSettingsDebounced();
         },
     });
+    initKoboldSamplerOrderLock();
 
     $('#samplers_order_recommended').on('click', function () {
         kai_settings.sampler_order = KOBOLDCPP_ORDER;
@@ -517,8 +553,8 @@ export function initKoboldSettings() {
             $('#kobold_api-settings, #sb-sampling-kobold').find('input').prop('disabled', false);
             $('#kobold_api-settings, #sb-sampling-kobold').css('opacity', 1.0);
             $('#kobold_order')
-                .css('opacity', 1)
-                .sortable('enable');
+                .css('opacity', 1);
+            syncKoboldSamplerOrderLock();
         } else {
             kai_settings.preset_settings = 'gui';
 

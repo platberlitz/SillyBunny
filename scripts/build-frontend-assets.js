@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { minify } from 'terser';
+import webpack from 'webpack';
+import getPublicLibConfig from '../webpack.config.js';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const publicRoot = path.join(repoRoot, 'public');
@@ -70,8 +73,62 @@ function minifyCss(source) {
         .trim();
 }
 
-async function optimizeAsset(inputPath, relativePath, ext, warnings) {
-    const buffer = await fs.readFile(inputPath);
+async function runWebpackCompiler(config) {
+    const compiler = webpack(config);
+
+    return new Promise((resolve, reject) => {
+        compiler.run((error, stats) => {
+            const output = stats?.toString(config.stats);
+            if (output) {
+                console.log(output);
+            }
+
+            compiler.close((closeError) => {
+                const compileError = error ?? closeError;
+                if (compileError) {
+                    reject(compileError);
+                    return;
+                }
+
+                if (stats?.hasErrors()) {
+                    reject(new Error('Webpack failed to compile frontend libraries.'));
+                    return;
+                }
+
+                resolve();
+            });
+        });
+    });
+}
+
+async function buildPublicLibBundle() {
+    const temporaryOutputPath = await fs.mkdtemp(path.join(os.tmpdir(), 'sillybunny-public-lib-'));
+    const config = getPublicLibConfig({
+        forceDist: true,
+        outputPath: temporaryOutputPath,
+    });
+
+    try {
+        await runWebpackCompiler(config);
+        return await fs.readFile(path.join(temporaryOutputPath, 'lib.js'));
+    } finally {
+        await fs.rm(temporaryOutputPath, { recursive: true, force: true });
+    }
+}
+
+async function writeFile(inputPath, outputRelativePath, buffer = null) {
+    const outputPath = path.join(distRoot, outputRelativePath);
+    await fs.mkdir(path.dirname(outputPath), { recursive: true });
+
+    if (buffer) {
+        await fs.writeFile(outputPath, buffer);
+    } else {
+        await fs.copyFile(inputPath, outputPath);
+    }
+}
+
+async function optimizeAsset(inputPath, relativePath, ext, warnings, sourceBuffer = null) {
+    const buffer = sourceBuffer ?? await fs.readFile(inputPath);
 
     if (ext === '.js' || ext === '.mjs') {
         const source = buffer.toString('utf8');
@@ -123,17 +180,14 @@ async function walk(directory, files = []) {
     return files;
 }
 
-async function copyFile(inputPath, outputRelativePath) {
-    const outputPath = path.join(distRoot, outputRelativePath);
-    await fs.mkdir(path.dirname(outputPath), { recursive: true });
-    await fs.copyFile(inputPath, outputPath);
-}
-
 async function build() {
     await fs.rm(distRoot, { recursive: true, force: true });
     await fs.mkdir(distRoot, { recursive: true });
 
     const files = await walk(publicRoot);
+    const assetSourceBuffers = new Map([
+        ['lib.js', await buildPublicLibBundle()],
+    ]);
     const assets = {};
     const skipped = [];
     const warnings = [];
@@ -144,10 +198,11 @@ async function build() {
         const source = toPosix(relativePath);
 
         if (hashedExtensions.has(ext)) {
-            const buffer = await optimizeAsset(inputPath, relativePath, ext, warnings);
+            const sourceBuffer = assetSourceBuffers.get(source) ?? null;
+            const buffer = await optimizeAsset(inputPath, relativePath, ext, warnings, sourceBuffer);
             const hash = getHash(buffer);
             const output = getOutputName(relativePath, hash);
-            await copyFile(inputPath, relativePath);
+            await writeFile(inputPath, relativePath, sourceBuffer ? buffer : null);
             await fs.mkdir(path.dirname(path.join(distRoot, output)), { recursive: true });
             await fs.writeFile(path.join(distRoot, output), buffer);
             assets[source] = {
@@ -159,7 +214,7 @@ async function build() {
         }
 
         if (copyExtensions.has(ext)) {
-            await copyFile(inputPath, relativePath);
+            await writeFile(inputPath, relativePath);
             assets[source] = {
                 output: source,
                 bytes: (await fs.stat(inputPath)).size,

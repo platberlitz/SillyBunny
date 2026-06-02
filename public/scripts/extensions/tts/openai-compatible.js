@@ -4,6 +4,20 @@ import { getPreviewString, saveTtsProviderSettings } from './index.js';
 
 export { OpenAICompatibleTtsProvider };
 
+// SillyBunny: expose OpenAI-compatible response formats instead of forcing MP3.
+const OPENAI_COMPATIBLE_TTS_RESPONSE_FORMATS = [
+    { value: 'wav', label: 'WAV' },
+    { value: 'mp3', label: 'MP3' },
+    { value: 'opus', label: 'Opus' },
+    { value: 'aac', label: 'AAC' },
+    { value: 'flac', label: 'FLAC' },
+];
+
+function getOpenAiCompatibleTtsResponseFormat(value) {
+    const responseFormat = String(value ?? 'wav').toLowerCase();
+    return OPENAI_COMPATIBLE_TTS_RESPONSE_FORMATS.some(format => format.value === responseFormat) ? responseFormat : 'wav';
+}
+
 class OpenAICompatibleTtsProvider {
     settings;
     voices = [];
@@ -15,6 +29,7 @@ class OpenAICompatibleTtsProvider {
         voiceMap: {},
         model: 'tts-1',
         speed: 1,
+        response_format: 'wav',
         available_voices: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'],
         provider_endpoint: 'http://127.0.0.1:8000/v1/audio/speech',
     };
@@ -33,6 +48,10 @@ class OpenAICompatibleTtsProvider {
         </div>
         <label for="openai_compatible_model">Model:</label>
         <input id="openai_compatible_model" type="text" class="text_pole" maxlength="500" value="${this.defaultSettings.model}"/>
+        <label for="openai_compatible_tts_response_format">Output format:</label>
+        <select id="openai_compatible_tts_response_format">
+            ${OPENAI_COMPATIBLE_TTS_RESPONSE_FORMATS.map(format => `<option value="${format.value}">${format.label}</option>`).join('')}
+        </select>
         <label for="openai_compatible_tts_voices">Available Voices (comma separated):</label>
         <input id="openai_compatible_tts_voices" type="text" class="text_pole" value="${this.defaultSettings.available_voices.join()}"/>
         <label for="openai_compatible_tts_speed">Speed: <span id="openai_compatible_tts_speed_output"></span></label>
@@ -71,11 +90,16 @@ class OpenAICompatibleTtsProvider {
             }
         }
 
+        this.settings.response_format = getOpenAiCompatibleTtsResponseFormat(this.settings.response_format);
+
         $('#openai_compatible_tts_endpoint').val(this.settings.provider_endpoint);
         $('#openai_compatible_tts_endpoint').on('input', () => { this.onSettingsChange(); });
 
-        $('#openai_compatible_model').val(this.defaultSettings.model);
+        $('#openai_compatible_model').val(this.settings.model);
         $('#openai_compatible_model').on('input', () => { this.onSettingsChange(); });
+
+        $('#openai_compatible_tts_response_format').val(this.settings.response_format);
+        $('#openai_compatible_tts_response_format').on('change', () => { this.onSettingsChange(); });
 
         $('#openai_compatible_tts_voices').val(this.settings.available_voices.join());
         $('#openai_compatible_tts_voices').on('input', () => { this.onSettingsChange(); });
@@ -101,6 +125,7 @@ class OpenAICompatibleTtsProvider {
         // Update dynamically
         this.settings.provider_endpoint = String($('#openai_compatible_tts_endpoint').val());
         this.settings.model = String($('#openai_compatible_model').val());
+        this.settings.response_format = getOpenAiCompatibleTtsResponseFormat($('#openai_compatible_tts_response_format').find(':selected').val());
         this.settings.available_voices = String($('#openai_compatible_tts_voices').val()).split(',');
         this.settings.speed = Number($('#openai_compatible_tts_speed').val());
         $('#openai_compatible_tts_speed_output').text(this.settings.speed);
@@ -166,7 +191,7 @@ class OpenAICompatibleTtsProvider {
                 model: this.settings.model,
                 input: inputText,
                 voice: voiceId,
-                response_format: 'mp3',
+                response_format: this.settings.response_format,
                 speed: this.settings.speed,
             }),
         });

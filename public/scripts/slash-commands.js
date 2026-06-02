@@ -31,6 +31,7 @@ import {
     getOneCharacter,
     getRequestHeaders,
     getThumbnailUrl,
+    refreshCharacterAvatar,
     is_send_press,
     main_api,
     name1,
@@ -55,6 +56,7 @@ import {
     setCharacterName,
     setExtensionPrompt,
     showMoreMessages,
+    showNewerMessages,
     swipe,
     stopGeneration,
     substituteParams,
@@ -3308,7 +3310,7 @@ export function initDefaultSlashCommands() {
     }));
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'chat-render',
-        helpString: t`Renders a specified number of messages into the chat window. Displays all messages if no argument is provided.`,
+        helpString: t`Renders a specified number of messages into the chat window, bounded by the chat render window cap.`,
         callback: async (args, number) => {
             await showMoreMessages(number && !isNaN(Number(number)) ? Number(number) : Number.MAX_SAFE_INTEGER);
             if (isTrueBoolean(String(args?.scroll ?? ''))) {
@@ -3498,10 +3500,18 @@ export function initDefaultSlashCommands() {
             }
 
             // Load more messages if needed
-            const firstDisplayedMessageId = getFirstDisplayedMessageId();
+            const renderedMessageIds = Array.from(document.querySelectorAll('#chat .mes[mesid]'))
+                .map(element => Number(element.getAttribute('mesid')))
+                .filter(Number.isInteger);
+            const firstDisplayedMessageId = renderedMessageIds.length ? Math.min(...renderedMessageIds) : getFirstDisplayedMessageId();
+            const lastDisplayedMessageId = renderedMessageIds.length ? Math.max(...renderedMessageIds) : NaN;
             if (isFinite(firstDisplayedMessageId) && messageIndex < firstDisplayedMessageId) {
                 const needToLoadCount = firstDisplayedMessageId - messageIndex;
                 await showMoreMessages(needToLoadCount);
+                await delay(debounce_timeout.quick);
+            } else if (isFinite(lastDisplayedMessageId) && messageIndex > lastDisplayedMessageId) {
+                const needToLoadCount = messageIndex - lastDisplayedMessageId;
+                await showNewerMessages(needToLoadCount);
                 await delay(debounce_timeout.quick);
             }
 
@@ -5207,22 +5217,7 @@ async function uploadCharacterAvatar(avatarKey, base64Data, { resizePrompt = fal
             throw new Error(errorText); // Will be caught and logged below
         }
 
-        // Bust cache for the avatar thumbnail and character image
-        const thumbnailUrl = getThumbnailUrl('avatar', avatarKey);
-        await fetch(thumbnailUrl, { method: 'GET', cache: 'reload' });
-        await fetch(`/characters/${avatarKey}`, { method: 'GET', cache: 'reload' });
-
-        // Refresh all visible avatar images that use this thumbnail URL
-        // This handles messages, character list, and any other place using the thumbnail
-        const avatarImages = document.querySelectorAll(`img[src^="${thumbnailUrl}"]`);
-        for (const img of avatarImages) {
-            if (img instanceof HTMLImageElement) {
-                const originalSrc = img.src;
-                img.src = '';
-                img.src = originalSrc;
-            }
-        }
-        console.debug(`Refreshed ${avatarImages.length} avatar images for ${avatarKey}`);
+        await refreshCharacterAvatar(avatarKey);
 
         return true;
     } catch (error) {
@@ -5480,6 +5475,7 @@ async function updateCharacterCallback(args) {
         // Update the side panel if this is the currently selected character
         if (characterIndex === this_chid) {
             select_selected_character(this_chid, { switchMenu: false });
+            await refreshCharacterAvatar(character.avatar);
         }
 
         toastr.success(t`Character "${character.name}" updated successfully`);
@@ -6323,11 +6319,12 @@ function getModelOptions(quiet) {
         { id: 'tabby_model', api: 'textgenerationwebui', type: textgen_types.TABBY },
         { id: 'llamacpp_model', api: 'textgenerationwebui', type: textgen_types.LLAMACPP },
         { id: 'featherless_model', api: 'textgenerationwebui', type: textgen_types.FEATHERLESS },
-        { id: 'model_openai_select', api: 'openai', type: chat_completion_sources.OPENAI },
+        { id: 'openai_model_id', api: 'openai', type: chat_completion_sources.OPENAI },
+        { id: 'openai_model_id', api: 'openai', type: chat_completion_sources.OPENAI_RESPONSES },
         { id: 'model_claude_select', api: 'openai', type: chat_completion_sources.CLAUDE },
         { id: 'model_openrouter_select', api: 'openai', type: chat_completion_sources.OPENROUTER },
         { id: 'model_ai21_select', api: 'openai', type: chat_completion_sources.AI21 },
-        { id: 'model_google_select', api: 'openai', type: chat_completion_sources.MAKERSUITE },
+        { id: 'makersuite_model_id', api: 'openai', type: chat_completion_sources.MAKERSUITE },
         { id: 'model_vertexai_select', api: 'openai', type: chat_completion_sources.VERTEXAI },
         { id: 'model_mistralai_select', api: 'openai', type: chat_completion_sources.MISTRALAI },
         { id: 'custom_model_id', api: 'openai', type: chat_completion_sources.CUSTOM },

@@ -34,7 +34,10 @@ import {
     parseTextgenLogprobs,
     parseTabbyLogprobs,
     initTextGenSettings,
+    getTextGenServer,
+    getStatusTextgen,
 } from './scripts/textgen-settings.js';
+import { shouldRestoreTextGenStatusOnStartup } from './scripts/textgen-startup-status.js';
 
 import {
     world_info,
@@ -198,10 +201,17 @@ import {
     loadFileToDocument,
     getSanitizedFilename,
 } from './scripts/utils.js';
+import {
+    TOOLING_UI_HYDRATION_STATUS,
+    buildToolingCaptureFilename,
+    normalizeToolingCaptureRange,
+    resolveLazyToolingLibraryHydration,
+    resolveToolingAssetWait,
+} from './scripts/tooling-ui-hydration/index.js';
 import { debounce_timeout, GENERATION_TYPE_TRIGGERS, IGNORE_SYMBOL, inject_ids, MEDIA_DISPLAY, MEDIA_SOURCE, MEDIA_TYPE, OVERSWIPE_BEHAVIOR, SCROLL_BEHAVIOR, SWIPE_DIRECTION, SWIPE_SOURCE, SWIPE_STATE } from './scripts/constants.js';
 
 import { cancelDebouncedMetadataSave, doDailyExtensionUpdatesCheck, extension_settings, initExtensions, loadExtensionSettings, runGenerationInterceptors } from './scripts/extensions.js';
-import { COMMENT_NAME_DEFAULT, CONNECT_API_MAP, executeSlashCommandsOnChatInput, initDefaultSlashCommands, initSlashCommandAutoComplete, isExecutingCommandsFromChatInput, pauseScriptExecution, stopScriptExecution, UNIQUE_APIS } from './scripts/slash-commands.js';
+import { COMMENT_NAME_DEFAULT, CONNECT_API_MAP, executeSlashCommandsOnChatInput, executeSlashCommandsWithOptions, initDefaultSlashCommands, initSlashCommandAutoComplete, isExecutingCommandsFromChatInput, pauseScriptExecution, stopScriptExecution, UNIQUE_APIS } from './scripts/slash-commands.js';
 import { initMacroAutoComplete } from './scripts/autocomplete/MacroAutoComplete.js';
 import {
     tag_map,
@@ -304,7 +314,34 @@ import { onboardingExperimentalMacroEngine } from './scripts/macros/engine/Macro
 import { compressRequest, setRequestCompressionConfig } from './scripts/request-compression.js';
 import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker } from './scripts/swipe-picker.js';
 import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
-import { getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
+import { getMobileStreamingBottomPinBehavior, getStreamingUpdateInterval } from './scripts/mobile-streaming.js';
+import {
+    CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY,
+    CHAT_RENDER_LIFECYCLE_ROUTE,
+    CHAT_SCROLL_ACTION,
+    CHAT_SCROLL_INTENT,
+    captureVisibleMessageAnchor,
+    createDelegatedResizeObserver,
+    createMessageUpdateQueue,
+    createMobileViewportObserver,
+    createStreamWriteBuffer,
+    getChatHistoryPageSize,
+    getChatRenderWindowStartIndex,
+    normalizeChatRenderWindowSize,
+    renderMessagesInBatches,
+    resolveChatBottomScrollAction,
+    resolveChatRenderLifecycleRollout,
+    resolveChatScrollAction,
+    restoreVisibleMessageAnchor,
+    settleVisibleMessageAnchor,
+    shouldApplyChatBottomScrollAction,
+} from './scripts/chat-render-lifecycle/index.js';
+import {
+    resolveGenerationUiLockState,
+    resolveGenerationOutputBufferState,
+    resolveGenerationUnblockState,
+    resolveStopGenerationState,
+} from './scripts/generation-lifecycle/index.js';
 import {
     CARD_SCRIPT_MARKER_TAG,
     buildCardScriptToastKey,
@@ -314,6 +351,7 @@ import {
     markCardScriptHtml,
     markCardScriptToastShown,
 } from './scripts/card-script-detection.js';
+import { configureCardScriptRuntime, initCardScriptRuntime } from './scripts/card-script-runtime.js';
 
 const DEFERRED_STARTUP_STYLESHEETS = Object.freeze([
     { href: 'css/bright.min.css', id: 'deferred-highlight-theme-css' },
@@ -460,13 +498,14 @@ export let chat = [];
  * @type {import('./scripts/constants.js').SWIPE_STATE}
  */
 export let swipeState = SWIPE_STATE.NONE;
-let chatSaveTimeout;
+let chatSaveTimeout = null;
+let chatSavePromise = null;
 let importFlashTimeout;
 export let isChatSaving = false;
 export let firstRun = false;
 export let settingsReady = false;
 let currentVersion = '0.0.0';
-const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.6.0';
+const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.6.1';
 
 export let displayVersion = SILLYBUNNY_UI_VERSION;
 
@@ -509,7 +548,7 @@ export function getSillyBunnyFrontendIconSrc({ absolute = false } = {}) {
 export let system_avatar = getSillyBunnyFrontendIconSrc();
 export const comment_avatar = 'img/quill.png';
 export const default_user_avatar = 'img/user-default.png';
-export let CLIENT_VERSION = 'SillyBunny:v1.6.0:platberlitz'; // For Horde header
+export let CLIENT_VERSION = 'SillyBunny:v1.6.1:platberlitz'; // For Horde header
 
 function applySillyBunnyFrontendIcon(iconId = getStoredSillyBunnyFrontendIcon()) {
     const normalizedIconId = normalizeSillyBunnyFrontendIcon(iconId);
@@ -568,17 +607,26 @@ const MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS = 400;
 const MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS = 1400;
 const MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS = 500;
 const MOBILE_CHAT_BOTTOM_PIN_MS = 1500;
-const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 8;
+const MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS = 750;
+const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 24;
+const CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS = 250;
+const CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS = Object.freeze([80, 250, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS, 900, 1600, 2400]);
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 const SHOW_MORE_TOUCH_MOVE_CANCEL_PX = 12;
+const ENTITY_SELECTION_PULSE_CLEANUP_MS = 900;
 let isLoadingMoreMessages = false;
 let lastShowMoreTouchEventAt = 0;
 let showMoreTouchStart = null;
+let entitySelectionPulseId = 0;
 let showMoreTouchMoved = false;
 let pendingMobileMessageUpdateFrame = 0;
 let pendingMobileMessageUpdateTimer = 0;
-/** @type {Map<number, { message: object, rerenderMessage: boolean }>} */
-const pendingMobileMessageUpdates = new Map();
+let messageUpdateQueue = null;
+let mobileMessageUpdateQueue = null;
+let streamingVisibleWriteBuffer = null;
+let chatMessageResizeObserver = null;
+let mobileChatViewportObserver = null;
+const chatMessageResizeStates = new Map();
 
 let dialogueResolve = null;
 let dialogueCloseStop = false;
@@ -594,9 +642,24 @@ let scrollLockImmunityUntil = 0;
 let mobileChatTouchScrolling = false;
 let mobileChatManualScrollSuppressedUntil = 0;
 let mobileChatBottomPinUntil = 0;
+let mobileStreamingBottomPinFrame = 0;
+let mobileStreamingBottomPinTimer = 0;
+let mobileStreamingBottomPinSettle = false;
+let mobileStreamingBottomPinSmooth = false;
+let lastMobileStreamingBottomPinAt = 0;
+let chatLoadBottomLockUntil = 0;
+let chatLoadBottomPinFrame = 0;
 export let abortStatusCheck = new AbortController();
 export let charDragDropHandler = null;
 export let chatDragDropHandler = null;
+
+try {
+    if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+    }
+} catch {
+    // Ignore browsers that deny access to history state during early startup.
+}
 
 /** @type {debounce_timeout} The debounce timeout used for chat/settings save. debounce_timeout.long: 1.000 ms */
 export const DEFAULT_SAVE_EDIT_TIMEOUT = debounce_timeout.relaxed;
@@ -613,6 +676,62 @@ export const saveCharacterDebounced = debounce(() => $('#create_button').trigger
  * The printing will also always reprint all filter options of the global list, to keep them up to date.
  */
 export const printCharactersDebounced = debounce(() => { printCharacters(false); }, DEFAULT_PRINT_TIMEOUT);
+
+function pulseSelectedEntityCard(card) {
+    const charactersBlock = card?.closest?.('#rm_print_characters_block');
+    if (!(charactersBlock instanceof HTMLElement) || !(card instanceof HTMLElement)) {
+        return;
+    }
+
+    charactersBlock.querySelectorAll('.sb-just-selected').forEach(element => {
+        element.classList.remove('sb-just-selected');
+        element.removeAttribute('data-sb-selection-pulse');
+    });
+
+    const pulseToken = String(++entitySelectionPulseId);
+    let cleanupTimer = 0;
+    const cleanupPulse = () => {
+        window.clearTimeout(cleanupTimer);
+        card.removeEventListener('animationend', cleanupPulseOnAnimationEnd);
+        if (card.dataset.sbSelectionPulse !== pulseToken) {
+            return;
+        }
+
+        card.classList.remove('sb-just-selected');
+        card.removeAttribute('data-sb-selection-pulse');
+    };
+    const cleanupPulseOnAnimationEnd = (event) => {
+        if (event.target !== card || event.animationName !== 'sb-entity-select-pulse') {
+            return;
+        }
+
+        cleanupPulse();
+    };
+
+    card.dataset.sbSelectionPulse = pulseToken;
+    card.classList.add('sb-just-selected');
+    card.addEventListener('animationend', cleanupPulseOnAnimationEnd, { once: true });
+    cleanupTimer = window.setTimeout(cleanupPulse, ENTITY_SELECTION_PULSE_CLEANUP_MS);
+}
+
+export function syncCharacterMenuActiveEntity() {
+    const charactersBlock = document.getElementById('rm_print_characters_block');
+    if (!(charactersBlock instanceof HTMLElement)) {
+        return;
+    }
+
+    const activeGroupId = selected_group === null || selected_group === undefined ? null : String(selected_group);
+    const activeCharacterId = activeGroupId === null && this_chid !== undefined && this_chid !== null ? String(this_chid) : null;
+
+    for (const card of charactersBlock.querySelectorAll('.character_select, .group_select')) {
+        const characterId = card.getAttribute('data-chid');
+        const groupId = card.getAttribute('data-grid') || card.getAttribute('data-chid');
+        const isActiveCharacter = activeCharacterId !== null && card.classList.contains('character_select') && characterId === activeCharacterId;
+        const isActiveGroup = activeGroupId !== null && card.classList.contains('group_select') && groupId === activeGroupId;
+
+        card.classList.toggle('is-active-entity', isActiveCharacter || isActiveGroup);
+    }
+}
 
 /**
  * @enum {number} Extension prompt types
@@ -682,9 +801,6 @@ export const talkativeness_default = 0.5;
 export const depth_prompt_depth_default = 4;
 export const depth_prompt_role_default = 'system';
 const per_page_default = 50;
-
-var is_advanced_char_open = false;
-let previousAdvancedCharacterFocus = null;
 
 /**
  * The type of the right menu
@@ -834,7 +950,11 @@ function registerSillyBunnyServiceWorker() {
     }
 
     const register = () => {
-        navigator.serviceWorker.register('/sw.js').catch((error) => {
+        navigator.serviceWorker.register('/sw.js?v=20260522g', { updateViaCache: 'none' }).then((registration) => {
+            return registration.update().catch((error) => {
+                console.warn('Failed to update SillyBunny service worker.', error);
+            });
+        }).catch((error) => {
             console.warn('Failed to register SillyBunny service worker.', error);
         });
     };
@@ -929,6 +1049,11 @@ async function firstLoadInit() {
         addDOMPurifyHooks();
         // SillyBunny: card script detection - see #94.
         eventSource.on(event_types.CHAT_CHANGED, forgetAllCardScripts);
+        configureCardScriptRuntime({
+            getPowerUser: () => power_user,
+            executeSlashCommandsWithOptions,
+        });
+        initCardScriptRuntime();
         reloadMarkdownProcessor();
         applyBrowserFixes();
         await getClientVersion();
@@ -1078,42 +1203,50 @@ export function resultCheckStatus() {
  * If the character is different from the currently selected one, it will clear the chat and reset any selected character or group.
  * @param {number} id The ID of the character to switch to.
  * @param {object} [options] Options for the switch.
- * @param {boolean} [options.switchMenu=true] Whether to switch the right menu to the character edit menu if the character is already selected.
- * @returns {Promise<void>} A promise that resolves when the character is switched.
+ * @param {boolean} [options.switchMenu=true] Whether to switch the right menu to the character edit menu.
+ * @returns {Promise<boolean>} A promise that resolves to true when the character was selected.
  */
 export async function selectCharacterById(id, { switchMenu = true } = {}) {
     if (characters[id] === undefined) {
-        return;
+        return false;
     }
 
     if (isChatSaving) {
         toastr.info(t`Please wait until the chat is saved before switching characters.`, t`Your chat is still saving...`);
-        return;
+        return false;
     }
 
     if (selected_group && is_group_generating) {
-        return;
+        return false;
     }
 
     if (selected_group || String(this_chid) !== String(id)) {
         //if clicked on a different character from what was currently selected
-        if (!is_send_press) {
-            setCharacterId(undefined);
-            setCharacterName('');
-            resetSelectedGroup();
-            await clearChat({ clearData: true });
-            cancelTtsPlay();
-            this_edit_mes_id = undefined;
-            selected_button = 'character_edit';
-            setCharacterId(id);
-            chat_metadata = {};
-            await getChat();
+        if (is_send_press) {
+            return false;
         }
+
+        setCharacterId(undefined);
+        setCharacterName('');
+        resetSelectedGroup();
+        await clearChat({ clearData: true });
+        cancelTtsPlay();
+        this_edit_mes_id = undefined;
+        if (switchMenu) {
+            selected_button = 'character_edit';
+        }
+        setCharacterId(id);
+        chat_metadata = {};
+        await getChat({ switchMenu });
+        syncCharacterMenuActiveEntity();
+        return true;
     } else {
         //if clicked on character that was already selected
         switchMenu && (selected_button = 'character_edit');
         await unshallowCharacter(this_chid);
         select_selected_character(this_chid, { switchMenu });
+        syncCharacterMenuActiveEntity();
+        return true;
     }
 }
 
@@ -1745,12 +1878,62 @@ function isChatScrolledNearBottom(threshold = CHAT_SCROLL_BOTTOM_THRESHOLD_PX) {
     return Math.abs(element.scrollHeight - element.clientHeight - element.scrollTop) <= threshold;
 }
 
+function isChatLoadBottomLockActive() {
+    return Date.now() < chatLoadBottomLockUntil;
+}
+
+function clearChatLoadBottomLock() {
+    chatLoadBottomLockUntil = 0;
+
+    if (chatLoadBottomPinFrame) {
+        cancelAnimationFrame(chatLoadBottomPinFrame);
+        chatLoadBottomPinFrame = 0;
+    }
+}
+
+function pinChatLoadToBottom({ waitForFrame = false } = {}) {
+    if (!isChatLoadBottomLockActive()) {
+        return false;
+    }
+
+    const pin = () => {
+        if (!isChatLoadBottomLockActive()) {
+            return;
+        }
+
+        scrollLock = false;
+        scrollChatElementToBottom();
+    };
+
+    if (waitForFrame) {
+        if (!chatLoadBottomPinFrame) {
+            chatLoadBottomPinFrame = requestAnimationFrame(() => {
+                chatLoadBottomPinFrame = 0;
+                pin();
+            });
+        }
+
+        return true;
+    }
+
+    pin();
+    return true;
+}
+
+function beginChatLoadBottomLock({ durationMs = Math.max(...CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS) + CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS } = {}) {
+    chatLoadBottomLockUntil = Math.max(chatLoadBottomLockUntil, Date.now() + durationMs);
+    scrollLock = false;
+    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, chatLoadBottomLockUntil);
+    pinChatLoadToBottom();
+}
+
 function markMobileChatManualScroll({ touchActive = false, suppressMs = MOBILE_CHAT_MANUAL_SCROLL_SUPPRESS_MS } = {}) {
     if (!shouldGuardMobileChatScroll()) {
         return;
     }
 
     mobileChatBottomPinUntil = 0;
+    clearMobileStreamingBottomPin();
 
     if (touchActive) {
         mobileChatTouchScrolling = true;
@@ -1768,6 +1951,10 @@ function releaseMobileChatTouchScroll() {
 
     mobileChatTouchScrolling = false;
     markMobileChatManualScroll();
+}
+
+function isMobileChatManualScrollSuppressionActive() {
+    return shouldGuardMobileChatScroll() && (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil);
 }
 
 function shouldSuppressMobileChatAutoScroll() {
@@ -1800,14 +1987,14 @@ function requestMobileChatBottomPin({ requireNearBottom = true, durationMs = MOB
 }
 
 function shouldPinMobileChatToBottom() {
-    if (!shouldGuardMobileChatScroll() || mobileChatTouchScrolling) {
+    if (!shouldGuardMobileChatScroll() || isMobileChatManualScrollSuppressionActive()) {
         return false;
     }
 
     return Date.now() < mobileChatBottomPinUntil || isChatScrolledNearBottom();
 }
 
-function pinMobileChatToBottom({ waitForFrame = true, settle = false } = {}) {
+function pinMobileChatToBottom({ waitForFrame = true, settle = false, immediate = true, behavior = 'auto' } = {}) {
     if (!shouldGuardMobileChatScroll()) {
         return;
     }
@@ -1818,13 +2005,12 @@ function pinMobileChatToBottom({ waitForFrame = true, settle = false } = {}) {
     scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
 
     const pin = () => {
-        const element = chatElement[0];
-        if (element) {
-            element.scrollTop = element.scrollHeight;
-        }
+        scrollChatElementToBottom({ behavior });
     };
 
-    pin();
+    if (immediate) {
+        pin();
+    }
 
     if (waitForFrame) {
         requestAnimationFrame(pin);
@@ -1837,6 +2023,248 @@ function pinMobileChatToBottom({ waitForFrame = true, settle = false } = {}) {
             }
         }, MOBILE_SEND_SCROLL_SETTLE_MS);
     }
+}
+
+function clearMobileStreamingBottomPinTimer() {
+    if (mobileStreamingBottomPinTimer) {
+        clearTimeout(mobileStreamingBottomPinTimer);
+        mobileStreamingBottomPinTimer = 0;
+    }
+}
+
+function clearMobileStreamingBottomPin() {
+    clearMobileStreamingBottomPinTimer();
+
+    if (mobileStreamingBottomPinFrame) {
+        cancelAnimationFrame(mobileStreamingBottomPinFrame);
+        mobileStreamingBottomPinFrame = 0;
+    }
+
+    mobileStreamingBottomPinSettle = false;
+    mobileStreamingBottomPinSmooth = false;
+}
+
+function requestMobileStreamingBottomPinFrame({ isFinal = false } = {}) {
+    mobileStreamingBottomPinSettle = mobileStreamingBottomPinSettle || isFinal;
+    mobileStreamingBottomPinSmooth = mobileStreamingBottomPinSmooth || !isFinal;
+
+    if (mobileStreamingBottomPinFrame) {
+        return;
+    }
+
+    mobileStreamingBottomPinFrame = requestAnimationFrame(() => {
+        mobileStreamingBottomPinFrame = 0;
+        const shouldSettle = mobileStreamingBottomPinSettle;
+        const behavior = getMobileStreamingBottomPinBehavior({
+            isFinal: shouldSettle,
+            allowSmooth: mobileStreamingBottomPinSmooth,
+        });
+        mobileStreamingBottomPinSettle = false;
+        mobileStreamingBottomPinSmooth = false;
+
+        if (!shouldPinMobileChatToBottom()) {
+            return;
+        }
+
+        lastMobileStreamingBottomPinAt = Date.now();
+        pinMobileChatToBottom({
+            waitForFrame: false,
+            settle: shouldSettle,
+            behavior,
+        });
+    });
+}
+
+function scheduleMobileStreamingBottomPin({ isFinal = false } = {}) {
+    if (!shouldGuardMobileChatScroll()) {
+        return false;
+    }
+
+    if (isFinal) {
+        clearMobileStreamingBottomPinTimer();
+        requestMobileStreamingBottomPinFrame({ isFinal: true });
+        return true;
+    }
+
+    const now = Date.now();
+    const elapsed = now - lastMobileStreamingBottomPinAt;
+
+    if (elapsed >= MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS) {
+        requestMobileStreamingBottomPinFrame();
+        return true;
+    }
+
+    if (!mobileStreamingBottomPinTimer) {
+        mobileStreamingBottomPinTimer = setTimeout(() => {
+            mobileStreamingBottomPinTimer = 0;
+            requestMobileStreamingBottomPinFrame();
+        }, MOBILE_STREAMING_SCROLL_MIN_INTERVAL_MS - elapsed);
+    }
+
+    return false;
+}
+
+function resetMobileViewportScrollState() {
+    mobileChatTouchScrolling = false;
+    mobileChatManualScrollSuppressedUntil = 0;
+    mobileChatBottomPinUntil = 0;
+    clearMobileStreamingBottomPin();
+}
+
+function getMobileViewportScrollHandler() {
+    return () => {
+        if (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil) {
+            markMobileChatManualScroll({ suppressMs: MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS });
+        }
+    };
+}
+
+function isVerticallyScrollableElement(element) {
+    if (!(element instanceof HTMLElement)) {
+        return false;
+    }
+
+    const style = getComputedStyle(element);
+    const canScrollY = style.overflowY === 'auto' || style.overflowY === 'scroll' || style.overflowY === 'overlay';
+
+    return canScrollY && element.scrollHeight - element.clientHeight > 1;
+}
+
+function hasScrollableWheelTarget(target, boundaryElement) {
+    if (!(target instanceof Element)) {
+        return false;
+    }
+
+    const chatNode = chatElement[0];
+
+    for (let element = target; element && element !== boundaryElement; element = element.parentElement) {
+        if (element === chatNode || isVerticallyScrollableElement(element)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+const CHAT_SHELL_WHEEL_SURFACE_SELECTOR = '#sheld, #chat_wrapper, #form_sheld, #top-bar, #send_form';
+
+function getChatShellWheelBoundary(target) {
+    if (!(target instanceof Element)) {
+        return null;
+    }
+
+    return target.closest(CHAT_SHELL_WHEEL_SURFACE_SELECTOR);
+}
+
+function isInteractiveShellWheelTarget(target) {
+    if (!(target instanceof Element)) {
+        return false;
+    }
+
+    return Boolean(target.closest([
+        '#left-nav-panel',
+        '#right-nav-panel',
+        '.popup',
+        'dialog',
+        '.scrollableInner',
+        '.inline-drawer-content',
+        '.select2-container',
+        'input',
+        'textarea',
+        'select',
+        'button',
+        'a',
+        '[contenteditable="true"]',
+    ].join(',')));
+}
+
+function getWheelDeltaYPixels(event, scrollElement) {
+    if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+        return event.deltaY * scrollElement.clientHeight;
+    }
+
+    if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+        return event.deltaY * 16;
+    }
+
+    return event.deltaY;
+}
+
+function routeShellWheelToChat(event) {
+    const chatNode = chatElement[0];
+
+    if (!(chatNode instanceof HTMLElement) || event.defaultPrevented || event.ctrlKey || event.metaKey) {
+        return;
+    }
+
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
+        return;
+    }
+
+    if (event.target instanceof Node && chatNode.contains(event.target)) {
+        return;
+    }
+
+    const shellBoundary = getChatShellWheelBoundary(event.target);
+    if (!shellBoundary) {
+        return;
+    }
+
+    if (isInteractiveShellWheelTarget(event.target)) {
+        return;
+    }
+
+    if (hasScrollableWheelTarget(event.target, shellBoundary)) {
+        return;
+    }
+
+    const maxScrollTop = Math.max(0, chatNode.scrollHeight - chatNode.clientHeight);
+    if (maxScrollTop <= 0) {
+        return;
+    }
+
+    const currentScrollTop = chatNode.scrollTop;
+    const nextScrollTop = clamp(currentScrollTop + getWheelDeltaYPixels(event, chatNode), 0, maxScrollTop);
+
+    if (Math.abs(nextScrollTop - currentScrollTop) < 1) {
+        return;
+    }
+
+    clearChatLoadBottomLock();
+    chatNode.scrollTop = nextScrollTop;
+    event.preventDefault();
+}
+
+function disposeMobileChatViewportObserver() {
+    mobileChatViewportObserver?.dispose();
+    mobileChatViewportObserver = null;
+}
+
+function resetMobileChatViewportLifecycle() {
+    if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MOBILE_VIEWPORT)) {
+        return;
+    }
+
+    resetMobileViewportScrollState();
+
+    if (mobileChatViewportObserver) {
+        setupMobileChatViewportObserver(getMobileViewportScrollHandler());
+    }
+}
+
+function setupMobileChatViewportObserver(onViewportChange) {
+    if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MOBILE_VIEWPORT)) {
+        window.visualViewport?.addEventListener('scroll', onViewportChange, { passive: true });
+        window.visualViewport?.addEventListener('resize', onViewportChange, { passive: true });
+        return;
+    }
+
+    disposeMobileChatViewportObserver();
+    mobileChatViewportObserver = createMobileViewportObserver({
+        onViewportChange,
+        onViewportSettle: onViewportChange,
+    });
+    mobileChatViewportObserver.start();
 }
 
 function shouldDeferMobileMessageUpdates() {
@@ -1855,71 +2283,380 @@ function waitForNextFrame() {
     return new Promise(resolve => requestAnimationFrame(() => resolve()));
 }
 
+function getChatRenderLifecycleRolloutQueryValue() {
+    try {
+        return new URLSearchParams(globalThis.location?.search ?? '').get(CHAT_RENDER_LIFECYCLE_ROLLOUT_KEY);
+    } catch {
+        return null;
+    }
+}
+
+function getChatRenderLifecycleRolloutStorage() {
+    try {
+        return globalThis.localStorage ?? null;
+    } catch {
+        return null;
+    }
+}
+
+function isChatRenderLifecycleRolloutEnabled(route = null) {
+    // SillyBunny: explicit overrides remain global; defaults are per-route for one-route-at-a-time rollout.
+    return resolveChatRenderLifecycleRollout({
+        queryValue: getChatRenderLifecycleRolloutQueryValue(),
+        route,
+        storage: getChatRenderLifecycleRolloutStorage(),
+    }).enabled;
+}
+
 function captureVisibleChatMessageAnchor() {
-    const chatNode = chatElement[0];
-
-    if (!(chatNode instanceof HTMLElement)) {
-        return null;
-    }
-
-    const chatRect = chatNode.getBoundingClientRect();
-    const messages = Array.from(chatNode.querySelectorAll('.mes[mesid]'));
-    const anchorElement = messages.find(message => {
-        const messageRect = message.getBoundingClientRect();
-        return messageRect.bottom > chatRect.top && messageRect.top < chatRect.bottom;
-    });
-
-    if (!(anchorElement instanceof HTMLElement)) {
-        return null;
-    }
-
-    return {
-        messageId: anchorElement.getAttribute('mesid'),
-        offsetTop: anchorElement.getBoundingClientRect().top - chatRect.top,
-    };
+    return captureVisibleMessageAnchor(chatElement[0]);
 }
 
 function restoreVisibleChatMessageAnchor(anchor) {
-    const chatNode = chatElement[0];
-
-    if (!(chatNode instanceof HTMLElement) || !anchor?.messageId) {
-        return;
-    }
-
-    const anchorElement = chatNode.querySelector(`.mes[mesid="${anchor.messageId}"]`);
-
-    if (!(anchorElement instanceof HTMLElement)) {
-        return;
-    }
-
-    const chatRect = chatNode.getBoundingClientRect();
-    const nextOffsetTop = anchorElement.getBoundingClientRect().top - chatRect.top;
-    chatNode.scrollTop += nextOffsetTop - anchor.offsetTop;
+    restoreVisibleMessageAnchor(chatElement[0], anchor);
 }
 
 async function settleVisibleChatMessageAnchor(anchor, frames = 8) {
-    for (let i = 0; i < frames; i++) {
-        await waitForNextFrame();
-        restoreVisibleChatMessageAnchor(anchor);
+    await settleVisibleMessageAnchor(chatElement[0], anchor, {
+        frames,
+        requestAnimationFrameRef: requestAnimationFrame,
+    });
+}
+
+function getMessageUpdateQueue() {
+    if (!messageUpdateQueue) {
+        messageUpdateQueue = createMessageUpdateQueue({
+            applyUpdate: applyMessageBlockUpdate,
+        });
     }
+
+    return messageUpdateQueue;
+}
+
+function getMobileMessageUpdateQueue() {
+    if (!mobileMessageUpdateQueue) {
+        mobileMessageUpdateQueue = createMessageUpdateQueue({
+            applyUpdate: applyMessageBlockUpdate,
+        });
+    }
+
+    return mobileMessageUpdateQueue;
+}
+
+function applyStreamingVisibleWrite(messageId, {
+    messageTextDom,
+    messageTimerDom,
+    messageTokenCounterDom,
+    messageDom,
+    message,
+    formattedText,
+    timePassed,
+    currentTokenCount,
+    shouldRefreshTokenCount,
+    shouldUpdateMetaBadges,
+    shouldUseStreamFadeIn,
+    bypassFadeIn,
+}, { isFinal = false } = {}) {
+    if (shouldRefreshTokenCount && messageTokenCounterDom instanceof HTMLElement) {
+        messageTokenCounterDom.textContent = `${currentTokenCount}t`;
+    }
+
+    if (shouldUpdateMetaBadges) {
+        updateMessageMetaBadges(messageDom, message);
+    }
+
+    if (messageTextDom instanceof HTMLElement) {
+        if (shouldUseStreamFadeIn) {
+            applyStreamFadeIn(messageTextDom, formattedText, { bypassFadeIn });
+        } else {
+            messageTextDom.innerHTML = formattedText;
+        }
+    }
+
+    if (messageTimerDom instanceof HTMLElement) {
+        messageTimerDom.textContent = timePassed.timerValue;
+        messageTimerDom.title = timePassed.timerTitle;
+    }
+
+    return isFinal;
+}
+
+function getStreamingVisibleWriteBuffer() {
+    if (!streamingVisibleWriteBuffer) {
+        streamingVisibleWriteBuffer = createStreamWriteBuffer({
+            applyWrite: applyStreamingVisibleWrite,
+        });
+    }
+
+    return streamingVisibleWriteBuffer;
+}
+
+function getObservedElementHeight(element, entry = null) {
+    return Number(entry?.contentRect?.height ?? element?.getBoundingClientRect?.().height ?? 0);
+}
+
+function captureChatMessageResizeViewportState() {
+    return {
+        anchor: captureVisibleChatMessageAnchor(),
+        isNearBottom: isChatScrolledNearBottom(),
+    };
+}
+
+function captureChatMessageResizeState(element, entry = null) {
+    return {
+        ...captureChatMessageResizeViewportState(),
+        blockHeight: getObservedElementHeight(element, entry),
+    };
+}
+
+function refreshChatMessageResizeState(element, metadata, entry = null) {
+    if (!metadata) {
+        return;
+    }
+
+    Object.assign(metadata, captureChatMessageResizeState(element, entry));
+}
+
+function refreshObservedChatMessageResizeViewportStates() {
+    if (chatMessageResizeStates.size === 0) {
+        return;
+    }
+
+    const viewportState = captureChatMessageResizeViewportState();
+
+    for (const [element, metadata] of chatMessageResizeStates) {
+        if (!element.isConnected) {
+            unobserveChatMessageResizeBlock(element);
+            continue;
+        }
+
+        Object.assign(metadata, viewportState);
+    }
+}
+
+function isActiveStreamingMessageResizeBlock(element) {
+    if (!streamingProcessor || streamingProcessor.isFinished) {
+        return false;
+    }
+
+    const streamingMessageId = Number(streamingProcessor.messageId);
+    const messageElement = element?.closest?.('.mes');
+    const resizeMessageId = messageElement?.getAttribute('mesid');
+
+    return Number.isInteger(streamingMessageId) && resizeMessageId !== null && Number(resizeMessageId) === streamingMessageId;
+}
+
+async function applyChatMessageResizeAction(element, entry, metadata) {
+    if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MEDIA_RESIZE)) {
+        return;
+    }
+
+    const nextHeight = getObservedElementHeight(element, entry);
+    const resizeState = metadata ?? captureChatMessageResizeState(element, entry);
+    const previousHeight = Number(resizeState.blockHeight ?? nextHeight);
+
+    if (Math.abs(nextHeight - previousHeight) < 1) {
+        refreshChatMessageResizeState(element, metadata, entry);
+        return;
+    }
+
+    // SillyBunny: streaming progress owns the live message's scroll lane; skip resize scrolls for that block.
+    if (isActiveStreamingMessageResizeBlock(element)) {
+        refreshChatMessageResizeState(element, metadata, entry);
+        return;
+    }
+
+    const action = resolveChatScrollAction({
+        intent: CHAT_SCROLL_INTENT.MEDIA_RESIZE,
+        autoScrollEnabled: power_user.auto_scroll_chat_to_bottom,
+        isNearBottom: Boolean(resizeState.isNearBottom),
+        hasAnchor: Boolean(resizeState.anchor),
+        isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll(),
+    });
+
+    if (shouldApplyChatBottomScrollAction(action)) {
+        // SillyBunny: coalesce media resize pins with the shared bottom-scroll rAF lane.
+        scrollChatToBottom({ waitForFrame: true, isNearBottom: true });
+        requestAnimationFrame(() => refreshChatMessageResizeState(element, metadata, entry));
+        return;
+    }
+
+    if (action.action === CHAT_SCROLL_ACTION.PRESERVE_ANCHOR) {
+        await settleVisibleChatMessageAnchor(resizeState.anchor);
+    }
+
+    refreshChatMessageResizeState(element, metadata, entry);
+}
+
+function onChatMessageResize(element, entry, metadata) {
+    if (!element?.isConnected) {
+        unobserveChatMessageResizeBlock(element);
+        return;
+    }
+
+    void applyChatMessageResizeAction(element, entry, metadata);
+}
+
+function getChatMessageResizeObserver() {
+    if (!chatMessageResizeObserver) {
+        chatMessageResizeObserver = createDelegatedResizeObserver({
+            onResize: onChatMessageResize,
+        });
+    }
+
+    return chatMessageResizeObserver;
+}
+
+function canObserveChatMessageResize() {
+    return typeof globalThis.ResizeObserver === 'function';
+}
+
+function getMessageBlockElement(messageElement) {
+    const element = messageElement?.jquery ? messageElement[0] : messageElement;
+
+    if (!(element instanceof HTMLElement)) {
+        return null;
+    }
+
+    return element.matches('.mes_block') ? element : element.querySelector('.mes_block');
+}
+
+function unobserveChatMessageResizeBlock(messageBlock) {
+    if (messageBlock instanceof HTMLElement) {
+        chatMessageResizeObserver?.unobserve(messageBlock);
+        chatMessageResizeStates.delete(messageBlock);
+    }
+}
+
+function observeChatMessageResize(messageElement) {
+    if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MEDIA_RESIZE) || !canObserveChatMessageResize()) {
+        return;
+    }
+
+    const messageBlock = getMessageBlockElement(messageElement);
+
+    if (!(messageBlock instanceof HTMLElement)) {
+        return;
+    }
+
+    requestAnimationFrame(() => {
+        if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MEDIA_RESIZE) || !messageBlock.isConnected) {
+            return;
+        }
+
+        const observer = getChatMessageResizeObserver();
+        unobserveChatMessageResizeBlock(messageBlock);
+
+        const metadata = captureChatMessageResizeState(messageBlock);
+        if (observer.observe(messageBlock, metadata)) {
+            chatMessageResizeStates.set(messageBlock, metadata);
+        }
+    });
+}
+
+function unobserveChatMessageResize(messageElement) {
+    if (messageElement?.jquery && typeof messageElement.toArray === 'function') {
+        messageElement.toArray().forEach(unobserveChatMessageResize);
+        return;
+    }
+
+    const messageBlock = getMessageBlockElement(messageElement);
+
+    unobserveChatMessageResizeBlock(messageBlock);
+}
+
+function disposeChatMessageResizeObserver() {
+    chatMessageResizeObserver?.dispose();
+    chatMessageResizeObserver = null;
+    chatMessageResizeStates.clear();
+}
+
+function updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessage }) {
+    const queue = getMessageUpdateQueue();
+    queue.queue(messageId, message, { rerenderMessage });
+    queue.flush();
+}
+
+function scrollStartedStreamingMessageThroughLifecycle() {
+    if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.STREAM_START)) {
+        scrollChatToBottom({ waitForFrame: true });
+        return;
+    }
+
+    const action = resolveChatScrollAction({
+        intent: CHAT_SCROLL_INTENT.STREAM_PROGRESS,
+        autoScrollEnabled: power_user.auto_scroll_chat_to_bottom,
+        isNearBottom: isChatScrolledNearBottom(),
+        isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll(),
+    });
+
+    if (shouldApplyChatBottomScrollAction(action)) {
+        requestAnimationFrame(() => {
+            scrollChatElementToBottom();
+        });
+    }
+}
+
+function getSwipeReplacementViewportUpdate({ isLastMessageSwipe, useLifecycleRoute }) {
+    if (!useLifecycleRoute || !isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.REPLACE_MESSAGE)) {
+        const anchor = isLastMessageSwipe && !isChatScrolledNearBottom()
+            ? captureVisibleChatMessageAnchor()
+            : null;
+
+        return {
+            action: null,
+            anchor,
+            scrollWithAddOneMessage: isLastMessageSwipe && !anchor,
+        };
+    }
+
+    const isNearBottom = isChatScrolledNearBottom();
+    const anchor = !isNearBottom ? captureVisibleChatMessageAnchor() : null;
+    const action = resolveChatScrollAction({
+        intent: CHAT_SCROLL_INTENT.REPLACE_MESSAGE,
+        autoScrollEnabled: power_user.auto_scroll_chat_to_bottom,
+        isNearBottom,
+        hasAnchor: Boolean(anchor),
+        isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll(),
+    });
+
+    return {
+        action,
+        anchor,
+        scrollWithAddOneMessage: false,
+    };
+}
+
+function shouldSettleSwipeReplacementAnchor(viewportUpdate) {
+    return Boolean(viewportUpdate?.anchor)
+        && (!viewportUpdate.action || viewportUpdate.action.action === CHAT_SCROLL_ACTION.PRESERVE_ANCHOR);
+}
+
+async function settleSwipeReplacementAnchor(viewportUpdate) {
+    if (shouldSettleSwipeReplacementAnchor(viewportUpdate)) {
+        await settleVisibleChatMessageAnchor(viewportUpdate.anchor);
+    }
+}
+
+async function applySwipeReplacementViewportUpdate(viewportUpdate) {
+    if (shouldApplyChatBottomScrollAction(viewportUpdate?.action)) {
+        requestAnimationFrame(() => {
+            scrollChatElementToBottom();
+        });
+        return;
+    }
+
+    await settleSwipeReplacementAnchor(viewportUpdate);
 }
 
 function flushPendingMobileMessageUpdates() {
     pendingMobileMessageUpdateFrame = 0;
     pendingMobileMessageUpdateTimer = 0;
-    const updates = [...pendingMobileMessageUpdates.entries()];
-    pendingMobileMessageUpdates.clear();
-
-    for (const [messageId, { message, rerenderMessage }] of updates) {
-        applyMessageBlockUpdate(messageId, message, { rerenderMessage });
-    }
+    getMobileMessageUpdateQueue().flush();
 }
 
 function queueMobileMessageBlockUpdate(messageId, message, { rerenderMessage }) {
-    pendingMobileMessageUpdates.set(messageId, {
-        message,
-        rerenderMessage: pendingMobileMessageUpdates.get(messageId)?.rerenderMessage || rerenderMessage,
-    });
+    getMobileMessageUpdateQueue().queue(messageId, message, { rerenderMessage });
 
     if (pendingMobileMessageUpdateFrame || pendingMobileMessageUpdateTimer) {
         return;
@@ -1937,6 +2674,194 @@ function insertShowMoreFragment(referenceNode, fragment) {
     }
 }
 
+const CHAT_HISTORY_OLDER_BUTTON_ID = 'show_more_messages';
+const CHAT_HISTORY_NEWER_BUTTON_ID = 'show_newer_messages';
+const CHAT_HISTORY_WINDOW_CONTROL_SELECTOR = `#${CHAT_HISTORY_OLDER_BUTTON_ID}, #${CHAT_HISTORY_NEWER_BUTTON_ID}`;
+
+function getChatRenderWindowSize(requestedSize = power_user.chat_truncation) {
+    // SillyBunny: prevent long chats from using 0/huge truncation values to render every message into the DOM.
+    return normalizeChatRenderWindowSize(requestedSize);
+}
+
+function getRenderedChatMessageElements() {
+    return Array.from(chatElement[0]?.querySelectorAll('.mes[mesid]') ?? []);
+}
+
+function getRenderedChatMessageWindow() {
+    const elements = getRenderedChatMessageElements();
+    const firstMessageId = Number(elements.at(0)?.getAttribute('mesid'));
+    const lastMessageId = Number(elements.at(-1)?.getAttribute('mesid'));
+
+    return {
+        elements,
+        renderedMessageCount: elements.length,
+        firstMessageId: Number.isInteger(firstMessageId) ? firstMessageId : null,
+        lastMessageId: Number.isInteger(lastMessageId) ? lastMessageId : null,
+    };
+}
+
+function removeChatHistoryWindowControls() {
+    $(CHAT_HISTORY_WINDOW_CONTROL_SELECTOR).remove();
+}
+
+function ensureChatHistoryWindowControl(id, label, appendMethod) {
+    if (document.getElementById(id)) {
+        return;
+    }
+
+    if (appendMethod === 'prepend') {
+        chatElement.prepend(`<div id="${id}">${label}</div>`);
+    } else {
+        chatElement.append(`<div id="${id}">${label}</div>`);
+    }
+}
+
+function syncRenderedChatLastMessageClass() {
+    const chatNode = chatElement[0];
+    const renderedMessages = getRenderedChatMessageElements();
+
+    chatNode?.querySelector('.mes.last_mes')?.classList.remove('last_mes');
+    renderedMessages.at(-1)?.classList.add('last_mes');
+}
+
+function syncChatHistoryWindowControls() {
+    const { renderedMessageCount, firstMessageId, lastMessageId } = getRenderedChatMessageWindow();
+
+    if (renderedMessageCount === 0) {
+        removeChatHistoryWindowControls();
+        return;
+    }
+
+    if (Number.isInteger(firstMessageId) && firstMessageId > 0) {
+        ensureChatHistoryWindowControl(CHAT_HISTORY_OLDER_BUTTON_ID, 'Show more messages', 'prepend');
+    } else {
+        $(`#${CHAT_HISTORY_OLDER_BUTTON_ID}`).remove();
+    }
+
+    if (Number.isInteger(lastMessageId) && lastMessageId < getLastMessageId()) {
+        ensureChatHistoryWindowControl(CHAT_HISTORY_NEWER_BUTTON_ID, 'Show newer messages', 'append');
+    } else {
+        $(`#${CHAT_HISTORY_NEWER_BUTTON_ID}`).remove();
+    }
+}
+
+function pruneRenderedChatMessagesToWindow({ windowSize, pruneFrom }) {
+    const renderedMessages = getRenderedChatMessageElements();
+    const excessMessageCount = renderedMessages.length - windowSize;
+
+    if (excessMessageCount <= 0) {
+        return;
+    }
+
+    const removedMessages = pruneFrom === 'end'
+        ? renderedMessages.slice(-excessMessageCount)
+        : renderedMessages.slice(0, excessMessageCount);
+    const removedMessageElements = $(removedMessages);
+
+    unobserveChatMessageResize(removedMessageElements);
+    removedMessageElements.remove();
+    syncRenderedChatLastMessageClass();
+    syncChatHistoryWindowControls();
+}
+
+function removeRenderedChatMessages() {
+    const renderedMessages = $(getRenderedChatMessageElements());
+
+    unobserveChatMessageResize(renderedMessages);
+    renderedMessages.remove();
+    removeChatHistoryWindowControls();
+}
+
+async function renderShowMoreMessagesLegacy({
+    messages,
+    firstId,
+    batchSize,
+    insertionReference,
+    anchor,
+    shouldPreserveScroll,
+}) {
+    const shouldYieldBetweenBatches = batchSize < messages.length;
+
+    for (let offset = 0; offset < messages.length; offset += batchSize) {
+        const fragment = document.createDocumentFragment();
+        const batch = messages.slice(offset, offset + batchSize);
+
+        batch.forEach((message, id) => {
+            const messageElement = updateMessageElement(message, { messageId: firstId + offset + id });
+            if (messageElement[0]) {
+                fragment.appendChild(messageElement[0]);
+            }
+        });
+
+        // Fallback to chatElement if the button isn't where it's expected to be.
+        insertShowMoreFragment(insertionReference, fragment);
+
+        if (shouldPreserveScroll) {
+            restoreVisibleChatMessageAnchor(anchor);
+        }
+
+        if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
+            await waitForNextFrame();
+            if (shouldPreserveScroll) {
+                restoreVisibleChatMessageAnchor(anchor);
+            }
+        }
+    }
+}
+
+async function renderShowMoreMessagesThroughLifecycle({
+    messages,
+    firstId,
+    batchSize,
+    insertionReference,
+    anchor,
+    shouldPreserveScroll,
+}) {
+    const restoreAnchorIfNeeded = () => {
+        if (shouldPreserveScroll) {
+            restoreVisibleChatMessageAnchor(anchor);
+        }
+    };
+
+    await renderMessagesInBatches({
+        messages,
+        firstMessageId: firstId,
+        batchSize,
+        renderMessageElement: (message, messageId) => updateMessageElement(message, { messageId }),
+        insertFragment: fragment => insertShowMoreFragment(insertionReference, fragment),
+        waitForNextFrame: async () => {
+            await waitForNextFrame();
+            restoreAnchorIfNeeded();
+        },
+        afterBatch: restoreAnchorIfNeeded,
+    });
+}
+
+async function renderShowMoreMessages({
+    messages,
+    firstId,
+    insertionReference,
+    anchor,
+    shouldPreserveScroll,
+}) {
+    const batchSize = getMobileChatRenderBatchSize(messages.length);
+    const renderOptions = {
+        messages,
+        firstId,
+        batchSize,
+        insertionReference,
+        anchor,
+        shouldPreserveScroll,
+    };
+
+    if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.SHOW_MORE_BATCH)) {
+        await renderShowMoreMessagesThroughLifecycle(renderOptions);
+        return;
+    }
+
+    await renderShowMoreMessagesLegacy(renderOptions);
+}
+
 export async function showMoreMessages(messagesToLoad = null) {
     if (isLoadingMoreMessages) {
         return;
@@ -1945,9 +2870,16 @@ export async function showMoreMessages(messagesToLoad = null) {
     isLoadingMoreMessages = true;
 
     const firstDisplayedMesId = chatElement.children('.mes').first().attr('mesid');
+    const renderedMessageCount = getRenderedChatMessageElements().length;
+    const requestedWindowSize = messagesToLoad ?? power_user.chat_truncation;
+    const windowSize = getChatRenderWindowSize(requestedWindowSize);
+    const count = getChatHistoryPageSize(requestedWindowSize, {
+        renderedMessageCount,
+        windowSize,
+        preserveAnchor: messagesToLoad === null,
+    });
     let messageId = Number(firstDisplayedMesId);
-    let count = messagesToLoad || power_user.chat_truncation || Number.MAX_SAFE_INTEGER;
-    const showMoreButton = $('#show_more_messages');
+    const showMoreButton = $(`#${CHAT_HISTORY_OLDER_BUTTON_ID}`);
     const showMoreButtonElement = showMoreButton[0];
 
     // If there are no messages displayed, or the message somehow has no mesid, we default to one higher than last message id,
@@ -1961,8 +2893,6 @@ export async function showMoreMessages(messagesToLoad = null) {
 
         const firstId = clamp(messageId - count, 0, Infinity);
         const messages = chat.slice(firstId, messageId);
-        const batchSize = getMobileChatRenderBatchSize(messages.length);
-        const shouldYieldBetweenBatches = batchSize < messages.length;
         const insertionReference = showMoreButtonElement instanceof HTMLElement
             ? showMoreButtonElement.nextSibling
             : chatElement[0]?.firstChild ?? null;
@@ -1973,32 +2903,16 @@ export async function showMoreMessages(messagesToLoad = null) {
             showMoreButtonElement.setAttribute('aria-busy', 'true');
         }
 
-        for (let offset = 0; offset < messages.length; offset += batchSize) {
-            const fragment = document.createDocumentFragment();
-            const batch = messages.slice(offset, offset + batchSize);
+        await renderShowMoreMessages({
+            messages,
+            firstId,
+            insertionReference,
+            anchor,
+            shouldPreserveScroll,
+        });
 
-            batch.forEach((message, id) => {
-                const messageElement = updateMessageElement(message, { messageId: firstId + offset + id });
-                if (messageElement[0]) {
-                    fragment.appendChild(messageElement[0]);
-                }
-            });
-
-            // Fallback to chatElement if the button isn't where it's expected to be.
-            insertShowMoreFragment(insertionReference, fragment);
-
-            if (shouldPreserveScroll) {
-                restoreVisibleChatMessageAnchor(anchor);
-            }
-
-            if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
-                await waitForNextFrame();
-                if (shouldPreserveScroll) {
-                    restoreVisibleChatMessageAnchor(anchor);
-                }
-            }
-        }
-
+        pruneRenderedChatMessagesToWindow({ windowSize, pruneFrom: 'end' });
+        syncChatHistoryWindowControls();
         refreshSwipeButtons();
 
         if (firstId === 0) {
@@ -2008,6 +2922,7 @@ export async function showMoreMessages(messagesToLoad = null) {
         }
 
         applyStylePins();
+        updateEditArrowClasses();
 
         if (shouldPreserveScroll) {
             await settleVisibleChatMessageAnchor(anchor);
@@ -2022,33 +2937,176 @@ export async function showMoreMessages(messagesToLoad = null) {
     }
 }
 
-export async function printMessages() {
-    let startIndex = 0;
-    let count = power_user.chat_truncation || Number.MAX_SAFE_INTEGER;
-
-    if (chat.length > count) {
-        startIndex = chat.length - count;
-        chatElement.append('<div id="show_more_messages">Show more messages</div>');
+export async function showNewerMessages(messagesToLoad = null) {
+    if (isLoadingMoreMessages) {
+        return;
     }
 
-    await redisplayChat({ startIndex, fade: false });
+    isLoadingMoreMessages = true;
+
+    const { renderedMessageCount, lastMessageId } = getRenderedChatMessageWindow();
+    const requestedWindowSize = messagesToLoad ?? power_user.chat_truncation;
+    const windowSize = getChatRenderWindowSize(requestedWindowSize);
+    const count = getChatHistoryPageSize(requestedWindowSize, {
+        renderedMessageCount,
+        windowSize,
+        preserveAnchor: messagesToLoad === null,
+    });
+    const showNewerButton = $(`#${CHAT_HISTORY_NEWER_BUTTON_ID}`);
+    const showNewerButtonElement = showNewerButton[0];
+    const firstId = Number.isInteger(lastMessageId) ? lastMessageId + 1 : 0;
+    const lastId = Math.min(firstId + count, chat.length);
+    const messages = chat.slice(firstId, lastId);
+
+    if (messages.length === 0) {
+        syncChatHistoryWindowControls();
+        isLoadingMoreMessages = false;
+        return;
+    }
+
+    try {
+        if (showNewerButtonElement instanceof HTMLElement) {
+            showNewerButtonElement.setAttribute('aria-busy', 'true');
+        }
+
+        showNewerButton.remove();
+
+        const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex: firstId });
+
+        pruneRenderedChatMessagesToWindow({ windowSize, pruneFrom: 'start' });
+        syncRenderedChatLastMessageClass();
+        syncChatHistoryWindowControls();
+        applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });
+        refreshSwipeButtons();
+        applyStylePins();
+        updateEditArrowClasses();
+
+        await eventSource.emit(event_types.MORE_MESSAGES_LOADED);
+    } finally {
+        if (showNewerButtonElement instanceof HTMLElement) {
+            showNewerButtonElement.removeAttribute('aria-busy');
+        }
+        isLoadingMoreMessages = false;
+    }
+}
+
+export async function printMessages() {
+    const count = getChatRenderWindowSize(power_user.chat_truncation);
+    const startIndex = getChatRenderWindowStartIndex(chat.length, count);
+
+    removeRenderedChatMessages();
+    beginChatLoadBottomLock();
+    await redisplayChat({ startIndex, fade: false, pinBottomDuringRender: true });
+    syncChatHistoryWindowControls();
 
     // Wait for next frame to ensure batch rendering completes
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    scrollLoadedChatToBottom();
+    scrollLoadedChatToBottomThroughLifecycle();
     delay(debounce_timeout.short).then(() => scrollOnMediaLoad({ force: true }));
+}
+
+function scrollLoadedChatToBottomThroughLifecycle() {
+    if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.INITIAL_LOAD)) {
+        scrollLoadedChatToBottom();
+        return;
+    }
+
+    const action = resolveChatScrollAction({
+        intent: CHAT_SCROLL_INTENT.INITIAL_LOAD,
+    });
+
+    if (shouldApplyChatBottomScrollAction(action)) {
+        scrollLoadedChatToBottom();
+    }
 }
 
 function scrollLoadedChatToBottom() {
     // SillyBunny: previous-chat taps can leave the mobile manual-scroll guard active.
+    const latestSettleDelay = Math.max(...CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS);
+    const bottomLockDurationMs = latestSettleDelay + CHAT_LOAD_BOTTOM_LOCK_EXTRA_MS;
+    beginChatLoadBottomLock({ durationMs: bottomLockDurationMs });
+    scrollLock = false;
+    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, chatLoadBottomLockUntil);
+
+    if (shouldGuardMobileChatScroll()) {
+        mobileChatManualScrollSuppressedUntil = 0;
+        requestMobileChatBottomPin({ requireNearBottom: false, durationMs: bottomLockDurationMs + MOBILE_SEND_SCROLL_SETTLE_MS });
+    }
+
     scrollChatToBottom({ force: true });
     scrollChatToBottom({ waitForFrame: true, force: true });
 
-    if (shouldGuardMobileChatScroll()) {
+    for (const delayMs of CHAT_LOAD_SCROLL_SETTLE_DELAYS_MS) {
         setTimeout(() => {
+            if (!isChatLoadBottomLockActive()) {
+                return;
+            }
+
             scrollChatToBottom({ waitForFrame: true, force: true });
-        }, MOBILE_CHAT_LOAD_SCROLL_SETTLE_MS);
+        }, delayMs);
     }
+}
+
+async function renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize, pinBottomDuringRender }) {
+    const renderedMessageIds = lodash.range(startIndex, startIndex + messages.length, 1);
+    const shouldYieldBetweenBatches = batchSize < messages.length;
+
+    for (let offset = 0; offset < messages.length; offset += batchSize) {
+        const batchMessages = messages.slice(offset, offset + batchSize);
+        const fragment = document.createDocumentFragment();
+        const newMessageElements = batchMessages.map((message, batchOffset) => {
+            const messageId = startIndex + offset + batchOffset;
+            const messageElement = updateMessageElement(message, { messageId });
+
+            return messageElement[0];
+        });
+
+        if (offset + batchSize >= messages.length) {
+            //The last_mes has been removed, add it to the new last message.
+            newMessageElements.at(-1).classList.add('last_mes');
+        }
+
+        //Append each batch in one DOM update.
+        for (const messageElement of newMessageElements) {
+            fragment.appendChild(messageElement);
+        }
+        chatElement[0].appendChild(fragment);
+
+        if (pinBottomDuringRender) {
+            beginChatLoadBottomLock();
+        }
+
+        if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
+            await waitForNextFrame();
+        }
+    }
+
+    return renderedMessageIds;
+}
+
+async function renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize, pinBottomDuringRender }) {
+    const { renderedMessageIds } = await renderMessagesInBatches({
+        messages,
+        firstMessageId: startIndex,
+        batchSize,
+        renderMessageElement: (message, messageId) => updateMessageElement(message, { messageId }),
+        insertFragment: fragment => chatElement[0].appendChild(fragment),
+        waitForNextFrame,
+        markLastMessage: true,
+        afterBatch: pinBottomDuringRender ? () => beginChatLoadBottomLock() : undefined,
+    });
+
+    return renderedMessageIds;
+}
+
+async function renderRedisplayChatMessages({ messages, startIndex, pinBottomDuringRender = false }) {
+    const batchSize = getMobileChatRenderBatchSize(messages.length);
+
+    if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.REDISPLAY_BATCH)) {
+        return renderRedisplayChatMessagesThroughLifecycle({ messages, startIndex, batchSize, pinBottomDuringRender });
+    }
+
+    return renderRedisplayChatMessagesLegacy({ messages, startIndex, batchSize, pinBottomDuringRender });
 }
 
 /**
@@ -2057,57 +3115,42 @@ function scrollLoadedChatToBottom() {
  * @param {ChatMessage[]} [options.targetChat=chat] All messages in chat before startIndex will remain unchanged.
  * @param {Number} [options.startIndex=0] Everything including and after startIndex will be replaced.
  * @param {Boolean} [options.fade=true] When false, the swipe chevrons will not fade in.
+ * @param {Boolean} [options.pinBottomDuringRender=false] Keep initial chat loads at the newest rendered message while batches append.
  */
-export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = true } = {}) {
+export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = true, pinBottomDuringRender = false } = {}) {
     const messageElements = chatElement.find('.mes');
     messageElements.removeClass('last_mes');
+    const { renderedMessageCount, firstMessageId, lastMessageId } = getRenderedChatMessageWindow();
+    const shouldReplaceRenderedWindow = renderedMessageCount > 0
+        && Number.isInteger(firstMessageId)
+        && Number.isInteger(lastMessageId)
+        && (startIndex < firstMessageId || startIndex > lastMessageId + 1);
 
     //Remove messages after index.
-    messageElements.filter(`.mes[mesid="${startIndex}"]`).nextAll('.mes').addBack().remove();
+    const removedMessageElements = shouldReplaceRenderedWindow
+        ? messageElements
+        : messageElements.filter(`.mes[mesid="${startIndex}"]`).nextAll('.mes').addBack();
+    unobserveChatMessageResize(removedMessageElements);
+    removedMessageElements.remove();
 
     const t1 = performance.now();
 
-    const messages = targetChat.slice(startIndex);
+    const windowSize = getChatRenderWindowSize();
+    const endIndex = Math.min(targetChat.length, startIndex + windowSize);
+    const messages = targetChat.slice(startIndex, endIndex);
 
     if (messages.length > 0) {
-        const renderedMessageIds = lodash.range(startIndex, targetChat.length, 1);
-        const batchSize = getMobileChatRenderBatchSize(messages.length);
-        const shouldYieldBetweenBatches = batchSize < messages.length;
-
-        for (let offset = 0; offset < messages.length; offset += batchSize) {
-            const batchMessages = messages.slice(offset, offset + batchSize);
-            const fragment = document.createDocumentFragment();
-            const newMessageElements = batchMessages.map((message, batchOffset) => {
-                const i = startIndex + offset + batchOffset;
-                const messageElement = updateMessageElement(message, { messageId: i });
-
-                return messageElement[0];
-            });
-
-            if (offset + batchSize >= messages.length) {
-                //The last_mes has been removed, add it to the new last message.
-                newMessageElements.at(-1).classList.add('last_mes');
-            }
-
-            //Append each batch in one DOM update.
-            for (const messageElement of newMessageElements) {
-                fragment.appendChild(messageElement);
-            }
-            chatElement[0].appendChild(fragment);
-
-            if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
-                await waitForNextFrame();
-            }
-        }
+        const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex, pinBottomDuringRender });
 
         applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });
     }
 
+    syncChatHistoryWindowControls();
     refreshSwipeButtons(false, fade);
     applyStylePins();
     updateEditArrowClasses();
 
-    console.info(`Rendered ${targetChat.length - startIndex} messages in ${((performance.now() - t1) / 1000).toFixed(3)} seconds.`);
+    console.info(`Rendered ${messages.length} of ${targetChat.length - startIndex} messages in ${((performance.now() - t1) / 1000).toFixed(3)} seconds.`);
 }
 
 export function scrollOnMediaLoad({ force = false } = {}) {
@@ -2170,11 +3213,14 @@ export async function clearChat({ clearData = false } = {}) {
     cancelDebouncedChatSave();
     cancelDebouncedMetadataSave();
     closeMessageEditor();
+    clearChatLoadBottomLock();
+    disposeChatMessageResizeObserver();
+    resetMobileChatViewportLifecycle();
     extension_prompts = {};
     if (is_delete_mode) {
         $('#dialogue_del_mes_cancel').trigger('click');
     }
-    //This will also remove non '.mes' elements, e.g. '<div id="show_more_messages">Show more messages</div>'.
+    //This will also remove non '.mes' elements, e.g. chat history window controls.
     chatElement.children().remove();
     if ($('.zoomed_avatar[forChar]').length) {
         console.debug('saw avatars to remove');
@@ -2188,10 +3234,19 @@ export async function clearChat({ clearData = false } = {}) {
 }
 
 export async function deleteLastMessage() {
-    deleteItemizedPromptForMessage(chat.length - 1);
-    chat.length = chat.length - 1;
-    chatElement.children('.mes').last().remove();
-    await eventSource.emit(event_types.MESSAGE_DELETED, chat.length);
+    if (chat.length === 0) {
+        return;
+    }
+
+    const deletedMessageId = chat.length - 1;
+    deleteItemizedPromptForMessage(deletedMessageId);
+    chat.length = deletedMessageId;
+    const messageElement = chatElement.find(`.mes[mesid="${deletedMessageId}"]`);
+    unobserveChatMessageResize(messageElement);
+    messageElement.remove();
+    syncRenderedChatLastMessageClass();
+    syncChatHistoryWindowControls();
+    await eventSource.emit(event_types.MESSAGE_DELETED, deletedMessageId);
 }
 
 /**
@@ -2239,6 +3294,7 @@ export async function deleteMessage(id, swipeDeletionIndex = undefined, askConfi
     }
 
     chat.splice(id, 1);
+    unobserveChatMessageResize(messageElement);
     messageElement.remove();
 
     chat_metadata.tainted = true;
@@ -2512,6 +3568,7 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
         RETURN_TRUSTED_TYPE: false,
         MESSAGE_SANITIZE: true,
         ADD_TAGS: ['custom-style', CARD_SCRIPT_MARKER_TAG],
+        ADD_ATTR: ['style'], // Allow inline CSS effects from model-generated message spans.
         ...sanitizerOverrides,
     };
     mes = restoreOocBlocksForDisplay(mes, oocBlocks);
@@ -2732,6 +3789,11 @@ function applyMessageBlockUpdate(messageId, message, { rerenderMessage = true } 
 export function updateMessageBlock(messageId, message, { rerenderMessage = true } = {}) {
     if (shouldDeferMobileMessageUpdates()) {
         queueMobileMessageBlockUpdate(messageId, message, { rerenderMessage });
+        return;
+    }
+
+    if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.MESSAGE_UPDATE)) {
+        updateMessageBlockThroughLifecycle(messageId, message, { rerenderMessage });
         return;
     }
 
@@ -3268,10 +4330,22 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
         }
         return chat.length - 1;
     })();
-    const shouldPinMobileBottom = !insertAfter && !insertBefore && scroll && shouldPinMobileChatToBottom();
+    const isTailAppend = !insertAfter && !insertBefore;
+    const tailAppendIsNearBottom = isTailAppend && scroll ? isChatScrolledNearBottom() : true;
+    const shouldPinMobileBottom = isTailAppend && scroll && shouldPinMobileChatToBottom();
+    const renderedWindowBeforeAdd = getRenderedChatMessageWindow();
+    const shouldResetForTailGap = isTailAppend
+        && type !== 'swipe'
+        && renderedWindowBeforeAdd.renderedMessageCount > 0
+        && Number.isInteger(renderedWindowBeforeAdd.lastMessageId)
+        && renderedWindowBeforeAdd.lastMessageId < messageId - 1;
 
     let messageElement;
     let insertedElement = null;
+
+    if (shouldResetForTailGap) {
+        removeRenderedChatMessages();
+    }
 
     if (type === 'swipe') {
         // Forbidden black magic
@@ -3306,13 +4380,18 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
         : Array.from(chatNode?.querySelectorAll('.mes') ?? []).at(-1);
     lastMessageElement?.classList.add('last_mes');
 
+    if (isTailAppend && type !== 'swipe') {
+        pruneRenderedChatMessagesToWindow({ windowSize: getChatRenderWindowSize(), pruneFrom: 'start' });
+        syncChatHistoryWindowControls();
+    }
+
     if (showSwipes) refreshSwipeButtons();
     // Don't scroll if not inserting last
-    if (!insertAfter && !insertBefore && scroll) {
+    if (isTailAppend && scroll) {
         if (shouldPinMobileBottom) {
             pinMobileChatToBottom({ waitForFrame: true, settle: true });
         } else {
-            scrollChatToBottom({ waitForFrame: true });
+            scrollChatToBottom({ waitForFrame: true, isNearBottom: tailAppendIsNearBottom });
         }
     }
 
@@ -3440,6 +4519,7 @@ export function updateMessageElement(mes, { messageId = chat.length - 1, message
         updateSwipeCounter(messageId, { message: mes, messageElement });
     }
 
+    observeChatMessageResize(messageElement);
     return messageElement;
 }
 
@@ -3619,35 +4699,63 @@ function formatGenerationTimer(gen_started, gen_finished, tokenCount, reasoningD
 
 let requestId = null;
 
+function scrollChatElementToBottom({ behavior = 'auto' } = {}) {
+    let position = chatElement[0].scrollHeight;
+
+    if (power_user.waifuMode) {
+        const lastMessage = chatElement.find('.mes').last();
+        if (lastMessage.length) {
+            const lastMessagePosition = lastMessage.position().top;
+            position = chatElement.scrollTop() + lastMessagePosition;
+        }
+    }
+
+    const element = chatElement[0];
+    if (behavior === 'smooth' && typeof element?.scrollTo === 'function') {
+        element.scrollTo({ top: position, behavior });
+        return;
+    }
+
+    chatElement.scrollTop(position);
+}
+
 /**
  * Scrolls the chat to the bottom if configured to do so.
  * @param {object} [options] Options
  * @param {boolean} [options.waitForFrame] If true, waits for the animation frame before scrolling
  * @param {boolean} [options.force=false] If true, bypasses the auto-scroll preference and temporary mobile manual-scroll suppression
+ * @param {boolean} [options.isNearBottom=true] Lifecycle hint for future call sites that capture pre-mutation scroll state
  */
-export function scrollChatToBottom({ waitForFrame, force = false } = {}) {
+export function scrollChatToBottom({ waitForFrame, force = false, isNearBottom = true } = {}) {
     if (!force && !power_user.auto_scroll_chat_to_bottom) {
         return;
     }
 
     const doScroll = () => {
+        // SillyBunny: guarded lifecycle route keeps the legacy path available during rollout.
+        if (isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.BOTTOM_SCROLL)) {
+            const action = resolveChatBottomScrollAction({
+                force,
+                autoScrollEnabled: power_user.auto_scroll_chat_to_bottom,
+                isNearBottom,
+                isManualScrollSuppressed: shouldSuppressMobileChatAutoScroll(),
+            });
+
+            if (shouldApplyChatBottomScrollAction(action)) {
+                scrollChatElementToBottom();
+            }
+
+            requestId = null;
+            return;
+        }
+
         // SillyBunny: mobile browsers can fight streaming autoscroll during touch and momentum scrolling.
         if (!force && shouldSuppressMobileChatAutoScroll()) {
             requestId = null;
             return;
         }
 
-        let position = chatElement[0].scrollHeight;
-
-        if (power_user.waifuMode) {
-            const lastMessage = chatElement.find('.mes').last();
-            if (lastMessage.length) {
-                const lastMessagePosition = lastMessage.position().top;
-                position = chatElement.scrollTop() + lastMessagePosition;
-            }
-        }
-
-        chatElement.scrollTop(position);
+        scrollChatElementToBottom();
         requestId = null;
     };
 
@@ -3667,13 +4775,14 @@ export function scrollChatToBottom({ waitForFrame, force = false } = {}) {
     requestId = requestAnimationFrame(() => doScroll());
 }
 
-function keepMobileSendScrollAnchored({ settle = false } = {}) {
-    if (!shouldBatchMobileChatRendering()) {
-        return;
+function keepSendScrollAnchored({ settle = false } = {}) {
+    const shouldApplyMobileScrollGuards = shouldBatchMobileChatRendering();
+
+    if (shouldApplyMobileScrollGuards) {
+        scrollLock = false;
+        scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
     }
 
-    scrollLock = false;
-    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
     scrollChatToBottom({ waitForFrame: true });
 
     if (!settle) {
@@ -3681,11 +4790,14 @@ function keepMobileSendScrollAnchored({ settle = false } = {}) {
     }
 
     setTimeout(() => {
-        if (Date.now() >= scrollLockImmunityUntil) {
+        if (shouldApplyMobileScrollGuards && Date.now() >= scrollLockImmunityUntil) {
             return;
         }
 
-        scrollLock = false;
+        if (shouldApplyMobileScrollGuards) {
+            scrollLock = false;
+        }
+
         scrollChatToBottom({ waitForFrame: true });
     }, MOBILE_SEND_SCROLL_SETTLE_MS);
 }
@@ -4416,13 +5528,55 @@ function showStopButton() {
     $('#mes_stop').css({ 'display': 'flex' });
 }
 
-function hideStopButton() {
+function hideStopButton({ emitGenerationEnded = true } = {}) {
     $('#send_form').removeClass('sb-generating-controls');
     // prevent NOOP, because hideStopButton() gets called multiple times
     if ($('#mes_stop').css('display') !== 'none') {
         $('#mes_stop').css({ 'display': 'none' });
-        eventSource.emit(event_types.GENERATION_ENDED, chat.length);
+        if (emitGenerationEnded) {
+            eventSource.emit(event_types.GENERATION_ENDED, chat.length);
+        }
     }
+}
+
+async function shouldBufferMainGenerationOutput({ type, isStreaming = false } = {}) {
+    const eventData = {
+        type,
+        isStreaming: Boolean(isStreaming),
+        hasPostMainInterceptors: false,
+    };
+
+    await eventSource.emit(event_types.GENERATION_OUTPUT_BUFFERING_DECISION, eventData);
+    return resolveGenerationOutputBufferState({
+        type,
+        isStreaming,
+        hasPostMainInterceptors: Boolean(eventData.hasPostMainInterceptors),
+    }).shouldBuffer;
+}
+
+async function applyMainGenerationOutputInterceptors({ type, text, isStreaming = false } = {}) {
+    const outputState = resolveGenerationOutputBufferState({
+        type,
+        isStreaming,
+        hasPostMainInterceptors: true,
+    });
+
+    if (!outputState.canInterceptMainOutput) {
+        return { text, cancelled: false };
+    }
+
+    const eventData = {
+        type,
+        isStreaming: Boolean(isStreaming),
+        text: String(text ?? ''),
+        cancelled: false,
+    };
+
+    await eventSource.emit(event_types.MAIN_GENERATION_OUTPUT_READY, eventData);
+    return {
+        text: typeof eventData.text === 'string' ? eventData.text : String(text ?? ''),
+        cancelled: Boolean(eventData.cancelled),
+    };
 }
 
 class StreamingProcessor {
@@ -4511,12 +5665,25 @@ class StreamingProcessor {
         }
     }
 
+    #queueStreamingVisibleWrite({ messageId, write, isFinal }) {
+        if (!isChatRenderLifecycleRolloutEnabled(CHAT_RENDER_LIFECYCLE_ROUTE.STREAM_PROGRESS)) {
+            applyStreamingVisibleWrite(messageId, write, { isFinal });
+            return;
+        }
+
+        getStreamingVisibleWriteBuffer().queue(messageId, write, { isFinal });
+    }
+
     markUIGenStarted() {
         deactivateSendButtons();
     }
 
-    markUIGenStopped() {
-        unblockGeneration();
+    markUIGenStopped({ emitGenerationEnded = true, emitGenerationStopped = false } = {}) {
+        if (emitGenerationStopped) {
+            eventSource.emit(event_types.GENERATION_STOPPED);
+        }
+
+        unblockGeneration(this.type, { emitGenerationEnded });
     }
 
     async onStartStreaming(text) {
@@ -4539,7 +5706,7 @@ class StreamingProcessor {
         hideSwipeButtons({ hideCounters: true });
         scrollLock = false;
         scrollLockImmunityUntil = Date.now() + 500;
-        scrollChatToBottom({ waitForFrame: true });
+        scrollStartedStreamingMessageThroughLifecycle();
         return messageId;
     }
 
@@ -4548,7 +5715,8 @@ class StreamingProcessor {
         const isContinue = this.type == 'continue';
         const isIOSWebKit = isIOSWebKitPlatform();
         const shouldReduceIntermediateStreamingWork = !isFinal && isIOSWebKit && power_user.ios_webkit_reduce_streaming_work;
-        const shouldPinMobileBottom = !isImpersonate && shouldPinMobileChatToBottom();
+        const shouldUseMobileStreamingPin = !isImpersonate && shouldGuardMobileChatScroll();
+        const shouldPinMobileBottom = shouldUseMobileStreamingPin && shouldPinMobileChatToBottom();
 
         if (!isImpersonate && !isContinue && Array.isArray(this.swipes) && this.swipes.length > 0) {
             for (let i = 0; i < this.swipes.length; i++) {
@@ -4615,16 +5783,6 @@ class StreamingProcessor {
                 });
                 currentTokenCount = outputTokens;
             }
-            if (shouldRefreshTokenCount) {
-                if (this.messageTokenCounterDom instanceof HTMLElement) {
-                    this.messageTokenCounterDom.textContent = `${currentTokenCount}t`;
-                }
-            }
-
-            if (!shouldReduceIntermediateStreamingWork) {
-                updateMessageMetaBadges(this.messageDom, chat[messageId]);
-            }
-
             if ((this.type == 'swipe' || this.type === 'continue') && Array.isArray(chat[messageId].swipes)) {
                 chat[messageId].swipes[chat[messageId].swipe_id] = processedText;
                 if (!shouldReduceIntermediateStreamingWork) {
@@ -4646,31 +5804,38 @@ class StreamingProcessor {
                 {},
                 false,
             );
-            if (this.messageTextDom instanceof HTMLElement) {
-                if (power_user.stream_fade_in) {
-                    applyStreamFadeIn(this.messageTextDom, formattedText, {
-                        bypassFadeIn: isIOSWebKit && power_user.ios_webkit_disable_stream_fade_in,
-                    });
-                } else {
-                    this.messageTextDom.innerHTML = formattedText;
-                }
-            }
-
             const timePassed = formatGenerationTimer(this.timeStarted, currentTime, currentTokenCount, this.reasoningHandler.getDuration(), this.timeToFirstToken);
-            if (this.messageTimerDom instanceof HTMLElement) {
-                this.messageTimerDom.textContent = timePassed.timerValue;
-                this.messageTimerDom.title = timePassed.timerTitle;
-            }
+            this.#queueStreamingVisibleWrite({
+                messageId,
+                write: {
+                    messageTextDom: this.messageTextDom,
+                    messageTimerDom: this.messageTimerDom,
+                    messageTokenCounterDom: this.messageTokenCounterDom,
+                    messageDom: this.messageDom,
+                    message: chat[messageId],
+                    formattedText,
+                    timePassed,
+                    currentTokenCount,
+                    shouldRefreshTokenCount,
+                    shouldUpdateMetaBadges: !shouldReduceIntermediateStreamingWork,
+                    shouldUseStreamFadeIn: power_user.stream_fade_in,
+                    bypassFadeIn: isIOSWebKit && power_user.ios_webkit_disable_stream_fade_in,
+                },
+                isFinal,
+            });
 
             if (!shouldReduceIntermediateStreamingWork) {
                 this.setFirstSwipe(messageId);
             }
         }
 
-        if (shouldPinMobileBottom) {
-            pinMobileChatToBottom({ waitForFrame: true, settle: isFinal });
-        } else if (!scrollLock) {
-            scrollChatToBottom({ waitForFrame: true });
+        if (shouldPinMobileBottom && shouldPinMobileChatToBottom()) {
+            scheduleMobileStreamingBottomPin({ isFinal });
+        } else if (!scrollLock && (!shouldUseMobileStreamingPin || !isMobileChatManualScrollSuppressionActive())) {
+            scrollChatToBottom({
+                waitForFrame: true,
+                isNearBottom: shouldUseMobileStreamingPin ? shouldPinMobileBottom : true,
+            });
         }
     }
 
@@ -4760,7 +5925,7 @@ class StreamingProcessor {
         this.isStopped = true;
         this.isFinished = true;
 
-        this.markUIGenStopped();
+        this.markUIGenStopped({ emitGenerationEnded: false, emitGenerationStopped: true });
 
         const noEmitTypes = ['swipe', 'impersonate', 'continue'];
         if (!noEmitTypes.includes(this.type)) {
@@ -4798,6 +5963,62 @@ class StreamingProcessor {
      */
     async* nullStreamingGeneration() {
         throw new Error('Generation function for streaming is not hooked up');
+    }
+
+    async generateBuffered() {
+        const isImpersonate = this.type == 'impersonate';
+        const isContinue = this.type == 'continue';
+        this.stoppingStrings = getStoppingStrings(isImpersonate, isContinue, main_api);
+
+        try {
+            const timestamps = [];
+            for await (const { text, swipes, logprobs, toolCalls, state } of this.generator()) {
+                const now = Date.now();
+                timestamps.push(now);
+                if (!this.timeToFirstToken) {
+                    this.timeToFirstToken = now - this.createdAt.getTime();
+                }
+                if (this.isStopped || this.abortController.signal.aborted) {
+                    this.isStopped = true;
+                    this.isFinished = true;
+                    return this.result;
+                }
+
+                this.toolCalls = toolCalls;
+                this.result = text;
+                this.swipes = Array.from(swipes ?? []);
+                if (logprobs) {
+                    this.messageLogprobs.push(...(Array.isArray(logprobs) ? logprobs : [logprobs]));
+                }
+                this.pendingReasoning = typeof state?.reasoning === 'string' ? state.reasoning : null;
+                if (this.pendingReasoning !== null) {
+                    this.reasoningHandler.reasoning = getRegexedString(this.pendingReasoning, regex_placement.REASONING);
+                }
+                this.images = state?.images ?? [];
+                this.reasoningSignature = state?.signature ?? null;
+                this.reasoningTokens = state?.reasoning_tokens ?? 0;
+            }
+            const seconds = (timestamps[timestamps.length - 1] - timestamps[0]) / 1000;
+            console.warn(`Stream stats: ${timestamps.length} tokens, ${seconds.toFixed(2)} seconds, rate: ${Number(timestamps.length / seconds).toFixed(2)} TPS`);
+        } catch (err) {
+            const isCancelled = this.isCancelled || this.abortController.signal.aborted;
+            if (!this.isFinished && isCancelled) {
+                this.isStopped = true;
+                this.isFinished = true;
+                return this.result;
+            }
+
+            if (!this.isFinished) {
+                console.error(err);
+                this.abortController.abort();
+                this.isStopped = true;
+                this.isFinished = true;
+            }
+            return this.result;
+        }
+
+        this.isFinished = true;
+        return this.result;
     }
 
     async generate() {
@@ -5216,14 +6437,20 @@ class TempResponseLength {
  * Removes last message from the chat DOM.
  * @returns {Promise<void>} Resolves when the message is removed.
  */
-function removeLastMessage() {
+function removeLastMessage(messageId = null) {
     return new Promise((resolve) => {
-        const lastMes = chatElement.children('.mes').last();
+        const lastMes = Number.isInteger(messageId)
+            ? chatElement.find(`.mes[mesid="${messageId}"]`)
+            : chatElement.children('.mes').last();
         if (lastMes.length === 0) {
+            syncRenderedChatLastMessageClass();
+            syncChatHistoryWindowControls();
             return resolve();
         }
         lastMes.hide(animation_duration, function () {
             $(this).remove();
+            syncRenderedChatLastMessageClass();
+            syncChatHistoryWindowControls();
             resolve();
         });
     });
@@ -5344,10 +6571,11 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 if (type === 'regenerate') {
                     requestMobileChatBottomPin();
                 }
-                deleteItemizedPromptForMessage(chat.length - 1);
-                chat.length = chat.length - 1;
-                await removeLastMessage();
-                await eventSource.emit(event_types.MESSAGE_DELETED, chat.length);
+                const deletedMessageId = chat.length - 1;
+                deleteItemizedPromptForMessage(deletedMessageId);
+                chat.length = deletedMessageId;
+                await removeLastMessage(deletedMessageId);
+                await eventSource.emit(event_types.MESSAGE_DELETED, deletedMessageId);
             }
         }
 
@@ -6428,10 +7656,13 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                     activeStreamingProcessor.firstMessageText = '';
                 }
 
+                const shouldBufferOutput = await shouldBufferMainGenerationOutput({ type, isStreaming: true });
                 activeStreamingProcessor.generator = await sendStreamingRequest(type, generate_data, { jsonSchema, cacheScope: generate_data.cacheScope });
 
                 hideSwipeButtons();
-                let getMessage = await activeStreamingProcessor.generate();
+                let getMessage = shouldBufferOutput
+                    ? await activeStreamingProcessor.generateBuffered()
+                    : await activeStreamingProcessor.generate();
                 let messageChunk = cleanUpMessage({
                     getMessage: getMessage,
                     isImpersonate: isImpersonate,
@@ -6449,11 +7680,11 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 const isStreamFinished = !isStreamCancelled && activeStreamingProcessor.isFinished;
                 const isStreamWithToolCalls = Array.isArray(activeStreamingProcessor.toolCalls) && activeStreamingProcessor.toolCalls.length;
                 if (canPerformToolCalls && isStreamFinished && isStreamWithToolCalls) {
-                    const lastMessage = chat[chat.length - 1];
                     const hasToolCalls = ToolManager.hasToolCalls(activeStreamingProcessor.toolCalls);
-                    const shouldDeleteMessage = type !== 'swipe' && ['', '...'].includes(lastMessage?.mes) && !lastMessage?.extra?.reasoning && ['', '...'].includes(activeStreamingProcessor.result);
+                    const lastMessage = chat[chat.length - 1];
+                    const shouldDeleteMessage = !shouldBufferOutput && type !== 'swipe' && ['', '...'].includes(lastMessage?.mes) && !lastMessage?.extra?.reasoning && ['', '...'].includes(activeStreamingProcessor.result);
                     hasToolCalls && shouldDeleteMessage && await deleteLastMessage();
-                    if (hasToolCalls && !shouldDeleteMessage) {
+                    if (!shouldBufferOutput && hasToolCalls && !shouldDeleteMessage) {
                         await activeStreamingProcessor.finalizeIntermediaryMessage(activeStreamingProcessor.messageId, getMessage, { unlockUI: false });
                     }
                     const invocationResult = await ToolManager.invokeFunctionTools(activeStreamingProcessor.toolCalls, {
@@ -6479,6 +7710,55 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 }
 
                 if (isStreamFinished) {
+                    if (shouldBufferOutput) {
+                        const interceptResult = await applyMainGenerationOutputInterceptors({
+                            type,
+                            text: getMessage,
+                            isStreaming: true,
+                        });
+
+                        if (interceptResult.cancelled || activeStreamingProcessor.abortController.signal.aborted) {
+                            unblockGeneration(type, { emitGenerationEnded: false });
+                            clearStreamingProcessorIfCurrent(activeStreamingProcessor);
+                            return;
+                        }
+
+                        getMessage = interceptResult.text;
+                        messageChunk = cleanUpMessage({
+                            getMessage: getMessage,
+                            isImpersonate: isImpersonate,
+                            isContinue: isContinue,
+                            displayIncompleteSentences: false,
+                        });
+
+                        const saveReplyType = originalType !== 'continue' ? type : 'appendFinal';
+                        ({ type, getMessage } = await saveReply({
+                            type: saveReplyType,
+                            getMessage,
+                            swipes: activeStreamingProcessor.swipes,
+                            reasoning: activeStreamingProcessor.reasoningHandler.reasoning,
+                            imageUrls: activeStreamingProcessor.images,
+                            reasoningSignature: activeStreamingProcessor.reasoningSignature,
+                            reasoningTokens: activeStreamingProcessor.reasoningTokens,
+                        }));
+                        saveLogprobsForActiveMessage(activeStreamingProcessor.messageLogprobs.filter(Boolean), continue_mag);
+                        unblockGeneration(type);
+                        clearStreamingProcessorIfCurrent(activeStreamingProcessor);
+
+                        const isAborted = activeStreamingProcessor.abortController.signal.aborted;
+                        if (!isAborted && power_user.auto_swipe && generatedTextFiltered(getMessage)) {
+                            return await swipe(null, SWIPE_DIRECTION.RIGHT, { source: SWIPE_SOURCE.AUTO_SWIPE, repeated: true, forceMesId: chat.length - 1 });
+                        }
+
+                        await saveChatConditional();
+                        playMessageSound();
+                        triggerAutoContinue(messageChunk, isImpersonate);
+                        return Object.defineProperties(new String(getMessage), {
+                            'messageChunk': { value: messageChunk },
+                            'fromStream': { value: true },
+                        });
+                    }
+
                     await activeStreamingProcessor.onFinishStreaming(activeStreamingProcessor.messageId, getMessage);
                     clearStreamingProcessorIfCurrent(activeStreamingProcessor);
                     triggerAutoContinue(messageChunk, isImpersonate);
@@ -6572,6 +7852,26 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             displayIncompleteSentences: displayIncomplete,
         });
 
+        const interceptResult = await applyMainGenerationOutputInterceptors({
+            type,
+            text: getMessage,
+            isStreaming: false,
+        });
+
+        if (interceptResult.cancelled || (abortController && abortController.signal.aborted)) {
+            unblockGeneration(type, { emitGenerationEnded: false });
+            streamingProcessor = null;
+            return;
+        }
+
+        getMessage = interceptResult.text;
+        messageChunk = cleanUpMessage({
+            getMessage: getMessage,
+            isImpersonate: isImpersonate,
+            isContinue: isContinue,
+            displayIncompleteSentences: false,
+        });
+
         if (isImpersonate) {
             $('#send_textarea').val(getMessage)[0].dispatchEvent(new Event('input', { bubbles: true }));
             await eventSource.emit(event_types.IMPERSONATE_READY, getMessage);
@@ -6645,7 +7945,8 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             toastr.error(exception.error.message, t`Text generation error`, { timeOut: 10000, extendedTimeOut: 20000 });
         }
 
-        unblockGeneration(type);
+        eventSource.emit(event_types.GENERATION_STOPPED);
+        unblockGeneration(type, { emitGenerationEnded: false });
         console.log(exception);
         streamingProcessor = null;
         throw exception;
@@ -6658,24 +7959,34 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
  */
 export function stopGeneration() {
     const activeStreamingProcessor = streamingProcessor;
-    const activeGenerationType = activeStreamingProcessor?.type;
-    const shouldAbortRequest = Boolean(is_send_press || is_group_generating || activeStreamingProcessor);
-    let stopped = false;
-    if (activeStreamingProcessor) {
+    const stopState = resolveStopGenerationState({
+        isSendPressed: is_send_press,
+        isGroupGenerating: is_group_generating,
+        hasStreamingProcessor: Boolean(activeStreamingProcessor),
+        streamingType: activeStreamingProcessor?.type,
+    });
+
+    if (stopState.shouldStopStreaming) {
         activeStreamingProcessor.onStopStreaming();
+    }
+
+    if (stopState.shouldAbortRequest && abortController) {
+        abortController.abort(stopState.abortReason);
+    }
+
+    if (stopState.shouldEmitStopped) {
+        eventSource.emitAndWait(event_types.GENERATION_STOPPED);
+    }
+
+    if (stopState.shouldClearStreamingProcessor) {
         clearStreamingProcessorIfCurrent(activeStreamingProcessor);
-        stopped = true;
     }
-    if (shouldAbortRequest && abortController) {
-        abortController.abort('Clicked stop button');
-        stopped = true;
+
+    if (stopState.shouldStop) {
+        unblockGeneration(stopState.unblockType, { emitGenerationEnded: false });
     }
-    if (stopped) {
-        unblockGeneration(activeGenerationType);
-        hideStopButton();
-        eventSource.emit(event_types.GENERATION_STOPPED);
-    }
-    return stopped;
+
+    return stopState.shouldStop;
 }
 
 /**
@@ -6749,17 +8060,28 @@ function flushWIInjections() {
  * Unblocks the UI after a generation is complete.
  * @param {string} [type] Generation type (optional)
  */
-function unblockGeneration(type) {
-    // Don't unblock if a parallel stream is still running
-    if (type === 'quiet' && streamingProcessor && !streamingProcessor.isFinished) {
+function unblockGeneration(type, { emitGenerationEnded = true } = {}) {
+    const unblockState = resolveGenerationUnblockState({
+        type,
+        hasStreamingProcessor: Boolean(streamingProcessor),
+        isStreamingFinished: Boolean(streamingProcessor?.isFinished),
+    });
+
+    if (!unblockState.shouldUnblock) {
         return;
     }
 
     is_send_press = false;
-    activateSendButtons();
-    setGenerationProgress(0);
-    flushEphemeralStoppingStrings();
-    flushWIInjections();
+    if (unblockState.shouldActivateSendButtons) {
+        activateSendButtons({ emitGenerationEnded });
+    }
+    if (unblockState.shouldResetProgress) {
+        setGenerationProgress(0);
+    }
+    if (unblockState.shouldFlushEphemeralState) {
+        flushEphemeralStoppingStrings();
+        flushWIInjections();
+    }
 }
 
 export function getNextMessageId(type) {
@@ -6979,10 +8301,10 @@ export async function sendMessageAsUser(messageText, messageBias, insertAt = nul
         await eventSource.emit(event_types.USER_MESSAGE_RENDERED, insertAt);
     } else {
         chat.push(message);
-        await saveChatConditional();
         const chat_id = (chat.length - 1);
         addOneMessage(message, { scroll: false });
-        keepMobileSendScrollAnchored({ settle: true });
+        keepSendScrollAnchored({ settle: true });
+        await saveChatConditional();
         await eventSource.emit(event_types.MESSAGE_SENT, chat_id);
         await eventSource.emit(event_types.USER_MESSAGE_RENDERED, chat_id);
     }
@@ -8244,20 +9566,38 @@ export function getGeneratingModel(mes) {
 /**
  * A function mainly used to switch 'generating' state - setting it to false and activating the buttons again
  */
-export function activateSendButtons() {
+export function activateSendButtons({ emitGenerationEnded = true } = {}) {
+    const lockState = resolveGenerationUiLockState({ isGenerating: false });
     is_send_press = false;
-    hideStopButton();
-    showSwipeButtons();
-    delete document.body.dataset.generating;
+    if (!lockState.shouldShowStopButton) {
+        hideStopButton({ emitGenerationEnded });
+    }
+    if (!lockState.shouldHideSwipeButtons) {
+        showSwipeButtons();
+    }
+    if (lockState.bodyGeneratingValue === null) {
+        delete document.body.dataset.generating;
+    } else {
+        document.body.dataset.generating = lockState.bodyGeneratingValue;
+    }
 }
 
 /**
  * A function mainly used to switch 'generating' state - setting it to true and deactivating the buttons
  */
 export function deactivateSendButtons() {
-    showStopButton();
-    hideSwipeButtons();
-    document.body.dataset.generating = 'true';
+    const lockState = resolveGenerationUiLockState({ isGenerating: true });
+    if (lockState.shouldShowStopButton) {
+        showStopButton();
+    }
+    if (lockState.shouldHideSwipeButtons) {
+        hideSwipeButtons();
+    }
+    if (lockState.bodyGeneratingValue === null) {
+        delete document.body.dataset.generating;
+    } else {
+        document.body.dataset.generating = lockState.bodyGeneratingValue;
+    }
 }
 
 export function resetChatState() {
@@ -8278,9 +9618,18 @@ export function resetChatState() {
  * @param {'characters' | 'character_edit' | 'create' | 'group_edit' | 'group_create'} value
  */
 export function setMenuType(value) {
+    const rightNavPanel = document.getElementById('right-nav-panel');
+
+    if (rightNavPanel instanceof HTMLElement && value !== 'character_edit' && value !== 'create') {
+        rightNavPanel.classList.remove('sb-character-editor-fullscreen');
+        rightNavPanel.dataset.sbCharacterEditorFullscreen = 'false';
+    }
+
     menu_type = value;
     // Allow custom CSS to see which menu type is active
-    document.getElementById('right-nav-panel').dataset.menuType = menu_type;
+    if (rightNavPanel instanceof HTMLElement) {
+        rightNavPanel.dataset.menuType = menu_type;
+    }
 }
 
 export function setExternalAbortController(controller) {
@@ -8537,6 +9886,8 @@ export function saveChatDebounced() {
     cancelDebouncedChatSave();
 
     chatSaveTimeout = setTimeout(async () => {
+        chatSaveTimeout = null;
+
         if (selectedGroup !== selected_group) {
             console.warn('Chat save timeout triggered, but group changed. Aborting.');
             return;
@@ -8548,9 +9899,70 @@ export function saveChatDebounced() {
         }
 
         console.debug('Chat save timeout triggered');
-        await saveChatConditional();
-        console.debug('Chat saved');
+        chatSavePromise = saveChatConditional();
+        try {
+            await chatSavePromise;
+            console.debug('Chat saved');
+        } finally {
+            chatSavePromise = null;
+        }
     }, DEFAULT_SAVE_EDIT_TIMEOUT);
+}
+
+function hasPendingChatSave() {
+    return chatSaveTimeout !== null || chatSavePromise !== null;
+}
+
+/**
+ * Flushes any pending chat save, waits for in-flight saves, and saves the current chat immediately.
+ * @returns {Promise<boolean>} Whether the chat save completed successfully.
+ */
+export async function flushPendingChatSaves() {
+    const chatId = getCurrentChatId();
+
+    if (!chatId) {
+        return true;
+    }
+
+    cancelDebouncedChatSave();
+
+    if (chatSavePromise) {
+        try {
+            await chatSavePromise;
+        } catch (error) {
+            console.error('Error waiting for pending chat save', error);
+        }
+    }
+
+    await waitUntilCondition(() => !isChatSaving, debounce_timeout.extended, 100, { rejectOnTimeout: false });
+    if (isChatSaving) {
+        toastr.error(t`The current chat is still saving. Try again in a moment.`, t`Chat save still in progress`);
+        return false;
+    }
+
+    toastr.info(t`Saving chat...`, t`Saving chat`);
+
+    try {
+        isChatSaving = true;
+
+        const didSave = selected_group
+            ? await saveGroupChat(selected_group, true, false, true)
+            : await saveChat({ throwOnError: true });
+
+        if (!didSave) {
+            return false;
+        }
+
+        saveTokenCache();
+        await saveItemizedPrompts(chatId);
+        toastr.success(t`Chat saved successfully.`, t`Chat saved`);
+        return true;
+    } catch (error) {
+        console.error('Error flushing pending chat saves', error);
+        return false;
+    } finally {
+        isChatSaving = false;
+    }
 }
 
 /**
@@ -8694,25 +10106,7 @@ async function read_avatar_load(input) {
 
         const formData = new FormData(/** @type {HTMLFormElement} */($('#form_create').get(0)));
         const avatarKey = formData.get('avatar_url').toString();
-
-        // Bust cache for the avatar thumbnail and character image
-        const thumbnailUrl = getThumbnailUrl('avatar', avatarKey);
-        await fetch(thumbnailUrl, { method: 'GET', cache: 'reload' });
-        await fetch(`/characters/${avatarKey}`, { method: 'GET', cache: 'reload' });
-
-        // Refresh all visible avatar images that use this thumbnail URL
-        // This handles messages, character list, and any other place using the thumbnail
-        const avatarImages = document.querySelectorAll(`img[src^="${thumbnailUrl}"]`);
-        for (const img of avatarImages) {
-            if (img instanceof HTMLImageElement) {
-                const originalSrc = img.src;
-                img.src = '';
-                img.src = originalSrc;
-            }
-        }
-        console.debug(`Refreshed ${avatarImages.length} avatar images for ${avatarKey}`);
-
-        console.log('Avatar refreshed');
+        await refreshCharacterAvatar(avatarKey);
     }
 }
 
@@ -8776,6 +10170,90 @@ function parseAvatarSource(rawSrc) {
     }
 
     return { type: null, file: rawSrc, original: rawSrc };
+}
+
+function isThumbnailAvatarSource(rawSrc) {
+    try {
+        return new URL(rawSrc, window.location.origin).pathname === '/thumbnail';
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Refreshes visible UI references after a character avatar image is replaced in-place.
+ * @param {string} avatarKey Character avatar filename.
+ * @returns {Promise<void>}
+ */
+export async function refreshCharacterAvatar(avatarKey) {
+    if (!avatarKey || avatarKey === 'none') {
+        return;
+    }
+
+    const thumbnailUrl = getThumbnailUrl('avatar', avatarKey);
+    const fullAvatarUrl = getFullAvatarUrl('avatar', avatarKey);
+    const cacheBustedThumbnailUrl = getThumbnailUrl('avatar', avatarKey, true);
+    const cacheBustedFullAvatarUrl = getFullAvatarUrl('avatar', avatarKey, true);
+
+    try {
+        await Promise.all([
+            fetch(thumbnailUrl, { method: 'GET', cache: 'reload' }),
+            fetch(fullAvatarUrl, { method: 'GET', cache: 'reload' }),
+        ]);
+    } catch (error) {
+        console.warn('Could not reload character avatar cache:', error);
+    }
+
+    let refreshedImages = 0;
+
+    for (const img of document.querySelectorAll('img')) {
+        if (!(img instanceof HTMLImageElement)) {
+            continue;
+        }
+
+        const srcAvatar = parseAvatarSource(img.getAttribute('src'));
+        const thumbnailAvatar = parseAvatarSource(img.getAttribute('data-thumbnail-src'));
+        const srcMatches = srcAvatar?.type === 'avatar' && srcAvatar.file === avatarKey;
+        const thumbnailMatches = thumbnailAvatar?.type === 'avatar' && thumbnailAvatar.file === avatarKey;
+
+        if (!srcMatches && !thumbnailMatches) {
+            continue;
+        }
+
+        if (thumbnailMatches) {
+            img.setAttribute('data-thumbnail-src', cacheBustedThumbnailUrl);
+        }
+
+        if (srcMatches) {
+            img.setAttribute('src', isThumbnailAvatarSource(img.getAttribute('src')) ? cacheBustedThumbnailUrl : cacheBustedFullAvatarUrl);
+        }
+
+        refreshedImages++;
+    }
+
+    const avatarCssUrl = `url("${String(cacheBustedThumbnailUrl).replace(/(["\\])/g, '\\$1')}")`;
+    const originalAvatarCssUrl = `url("${String(cacheBustedFullAvatarUrl).replace(/(["\\])/g, '\\$1')}")`;
+
+    for (const messageElement of document.querySelectorAll('.mes')) {
+        if (!(messageElement instanceof HTMLElement)) {
+            continue;
+        }
+
+        const avatarImg = messageElement.querySelector('.avatar img');
+        const srcAvatar = parseAvatarSource(avatarImg?.getAttribute('src'));
+        const thumbnailAvatar = parseAvatarSource(avatarImg?.getAttribute('data-thumbnail-src'));
+        const matchesAvatar = (srcAvatar?.type === 'avatar' && srcAvatar.file === avatarKey) || (thumbnailAvatar?.type === 'avatar' && thumbnailAvatar.file === avatarKey);
+
+        if (!matchesAvatar) {
+            continue;
+        }
+
+        messageElement.style.setProperty('--sb-message-avatar', avatarCssUrl);
+        messageElement.style.setProperty('--mes-avatar-url', avatarCssUrl);
+        messageElement.style.setProperty('--mes-avatar-original-url', originalAvatarCssUrl);
+    }
+
+    console.debug(`Refreshed ${refreshedImages} avatar images for ${avatarKey}`);
 }
 
 export function buildAvatarList(block, entities, { templateId = 'inline_avatar_template', empty = true, interactable = false, highlightFavs = true } = {}) {
@@ -8869,7 +10347,7 @@ export async function unshallowCharacter(characterId) {
     await getOneCharacter(avatar);
 }
 
-export async function getChat({ allowMissingPersisted = false } = {}) {
+export async function getChat({ allowMissingPersisted = false, switchMenu = true } = {}) {
     try {
         await unshallowCharacter(this_chid);
         const resolvedChat = await resolveCharacterChatForLoad(this_chid, { allowCreate: true, allowMissingPersisted });
@@ -8904,7 +10382,7 @@ export async function getChat({ allowMissingPersisted = false } = {}) {
         if (!chat_metadata.integrity) {
             chat_metadata.integrity = uuidv4();
         }
-        await getChatResult({ emitCreated: resolvedChat.created });
+        await getChatResult({ emitCreated: resolvedChat.created, switchMenu });
         eventSource.emit(event_types.CHAT_LOADED, { detail: { id: this_chid, character: characters[this_chid] } });
 
         // Focus on the textarea if not already focused on a visible text input
@@ -8915,12 +10393,12 @@ export async function getChat({ allowMissingPersisted = false } = {}) {
             $('#send_textarea').trigger('click').trigger('focus');
         });
     } catch (error) {
-        await getChatResult();
+        await getChatResult({ switchMenu });
         console.log(error);
     }
 }
 
-async function getChatResult({ emitCreated = false } = {}) {
+async function getChatResult({ emitCreated = false, switchMenu = true } = {}) {
     name2 = characters[this_chid].name;
     let freshChat = false;
     if (chat.length === 0) {
@@ -8934,7 +10412,7 @@ async function getChatResult({ emitCreated = false } = {}) {
     }
     await loadItemizedPrompts(getCurrentChatId());
     await printMessages();
-    select_selected_character(this_chid);
+    select_selected_character(this_chid, { switchMenu });
 
     await eventSource.emit(event_types.CHAT_CHANGED, (getCurrentChatId()));
     if (freshChat && emitCreated) await eventSource.emit(event_types.CHAT_CREATED);
@@ -9244,6 +10722,10 @@ export async function getSettings(initLoaderHandle = null) {
         $('#main_api').val(main_api);
         $(`#main_api option[value=${main_api}]`).attr('selected', 'true');
         changeMainAPI();
+        if (shouldRestoreTextGenStatusOnStartup({ mainApi: main_api, serverUrl: getTextGenServer() })) {
+            startStatusLoading();
+            getStatusTextgen();
+        }
 
         //Load User's Name and Avatar
         initUserAvatar(settings.user_avatar);
@@ -9361,6 +10843,19 @@ export async function saveSettings(loopCounter = 0) {
     }
 }
 
+async function confirmCacheClearAfterChatSaveFailure() {
+    const confirmation = await Popup.show.confirm(
+        t`Chat save failed`,
+        t`The cache will still be cleared if you continue, but unsaved chat changes may be lost. Do you want to continue?`,
+        {
+            okButton: t`Continue`,
+            cancelButton: t`Cancel`,
+        },
+    );
+
+    return confirmation === POPUP_RESULT.AFFIRMATIVE;
+}
+
 export async function clearFrontendCache({ skipConfirmation = false, saveBeforeClear = true } = {}) {
     if (!skipConfirmation) {
         const confirmation = await Popup.show.confirm(
@@ -9381,9 +10876,17 @@ export async function clearFrontendCache({ skipConfirmation = false, saveBeforeC
 
     if (saveBeforeClear) {
         try {
-            await saveChatConditional();
+            const didSaveChat = await flushPendingChatSaves();
+            if (!didSaveChat) {
+                if (!await confirmCacheClearAfterChatSaveFailure()) {
+                    return false;
+                }
+            }
         } catch (error) {
             console.warn('Failed to save chat before clearing cache', error);
+            if (!await confirmCacheClearAfterChatSaveFailure()) {
+                return false;
+            }
         }
 
         try {
@@ -9442,7 +10945,7 @@ async function clearAllCacheAndReload() {
     }
 
     toastr.success(t`Cache cleared. Reloading SillyBunny...`, t`Cache cleared`);
-    window.setTimeout(() => window.location.reload(), 450);
+    window.setTimeout(() => window.location.reload(), 1000);
     return true;
 }
 
@@ -9468,7 +10971,7 @@ async function maybeAutoClearCacheOnVersionChange(isVersionChanged) {
     }
 
     toastr.info(t`SillyBunny updated. Clearing cached UI data and reloading...`, t`Update detected`);
-    window.setTimeout(() => window.location.reload(true), 450);
+    window.setTimeout(() => window.location.reload(true), 1000);
     return true;
 }
 
@@ -9499,33 +11002,22 @@ async function handleClearAllCacheButtonClick(event) {
 }
 
 function normalizeMessageScreenshotRange(startId, endId) {
-    if (!Number.isInteger(startId) || !Number.isInteger(endId)) {
-        return null;
-    }
-
-    const normalizedStart = Math.min(startId, endId);
-    const normalizedEnd = Math.max(startId, endId);
-
-    if (normalizedStart < 0 || normalizedEnd >= chat.length) {
-        return null;
-    }
-
-    return {
-        startId: normalizedStart,
-        endId: normalizedEnd,
-    };
+    return normalizeToolingCaptureRange({
+        startId,
+        endId,
+        maxId: chat.length - 1,
+    });
 }
 
 function buildMessageScreenshotFilename(startId, endId) {
     const activeGroupName = selected_group ? groups.find(group => group.id == selected_group)?.name : null;
     const baseName = activeGroupName ?? getCharaFilename(this_chid) ?? neutralCharacterName ?? 'chat';
-    const safeBaseName = String(baseName)
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '') || 'chat';
-    const rangeLabel = startId === endId ? `message-${startId}` : `messages-${startId}-${endId}`;
-    return `${safeBaseName}-${rangeLabel}.png`;
+
+    return buildToolingCaptureFilename({
+        baseName,
+        startId,
+        endId,
+    });
 }
 
 function closeExpandedMessageActionMenus() {
@@ -9550,12 +11042,15 @@ function sanitizeMessageElementForScreenshot(messageElement) {
     const removableSelector = [
         '.mes_button',
         '.mes_buttons',
+        '.extraMesButtons',
+        '.extraMesButtonsHint',
         '.mes_edit_buttons',
         '.mes_reasoning_actions',
         '.for_checkbox',
         '.del_checkbox',
         '.swipe_left',
         '.swipe_right',
+        '.swipeRightBlock',
         '.swipes-counter',
         '.right_menu_button',
         '.code-copy',
@@ -9592,8 +11087,12 @@ function buildMessageScreenshotElements(startId, endId) {
 
 async function waitForMessageScreenshotAssets(container) {
     const assets = Array.from(container.querySelectorAll('img'));
+    const assetWait = resolveToolingAssetWait({
+        assetCount: assets.length,
+        timeoutMs: 2000,
+    });
 
-    if (assets.length === 0) {
+    if (!assetWait.shouldWait) {
         return;
     }
 
@@ -9616,18 +11115,23 @@ async function waitForMessageScreenshotAssets(container) {
 
     await Promise.race([
         Promise.all(assetLoads),
-        delay(2000),
+        delay(assetWait.timeoutMs),
     ]);
 }
 
 let messageScreenshotLibraryPromise = null;
 
 async function getMessageScreenshotLibrary() {
-    if (typeof window.html2canvas === 'function') {
+    const hydrationState = resolveLazyToolingLibraryHydration({
+        isLoaded: typeof window.html2canvas === 'function',
+        hasPendingLoad: Boolean(messageScreenshotLibraryPromise),
+    });
+
+    if (hydrationState.status === TOOLING_UI_HYDRATION_STATUS.READY) {
         return window.html2canvas;
     }
 
-    if (!messageScreenshotLibraryPromise) {
+    if (hydrationState.shouldLoad) {
         messageScreenshotLibraryPromise = loadFileToDocument('/lib/html2canvas.min.js', 'js')
             .then(() => {
                 if (typeof window.html2canvas !== 'function') {
@@ -9673,12 +11177,118 @@ function normalizeSrgbAlpha(alpha) {
     return Number.isFinite(numericAlpha) ? clamp(numericAlpha, 0, 1) : null;
 }
 
+function normalizeOklabLightness(lightness) {
+    const trimmedLightness = lightness.trim();
+
+    if (trimmedLightness.endsWith('%')) {
+        const percent = Number.parseFloat(trimmedLightness.slice(0, -1));
+        return Number.isFinite(percent) ? clamp(percent / 100, 0, 1) : null;
+    }
+
+    const numericLightness = Number.parseFloat(trimmedLightness);
+    if (!Number.isFinite(numericLightness)) {
+        return null;
+    }
+
+    return clamp(numericLightness > 1 ? numericLightness / 100 : numericLightness, 0, 1);
+}
+
+function normalizeOklchChroma(chroma) {
+    const trimmedChroma = chroma.trim();
+    if (trimmedChroma === 'none') {
+        return 0;
+    }
+
+    if (trimmedChroma.endsWith('%')) {
+        const percent = Number.parseFloat(trimmedChroma.slice(0, -1));
+        return Number.isFinite(percent) ? Math.max(0, percent / 100 * 0.4) : null;
+    }
+
+    const numericChroma = Number.parseFloat(trimmedChroma);
+    return Number.isFinite(numericChroma) ? Math.max(0, numericChroma) : null;
+}
+
+function normalizeCssHueToDegrees(hue) {
+    const trimmedHue = hue.trim().toLowerCase();
+    if (trimmedHue === 'none') {
+        return 0;
+    }
+
+    const numericHue = Number.parseFloat(trimmedHue);
+    if (!Number.isFinite(numericHue)) {
+        return null;
+    }
+
+    if (trimmedHue.endsWith('turn')) {
+        return numericHue * 360;
+    }
+
+    if (trimmedHue.endsWith('rad')) {
+        return numericHue * 180 / Math.PI;
+    }
+
+    if (trimmedHue.endsWith('grad')) {
+        return numericHue * 0.9;
+    }
+
+    return numericHue;
+}
+
+function linearSrgbToRgbChannel(channel) {
+    const clampedChannel = clamp(channel, 0, 1);
+    const srgbChannel = clampedChannel <= 0.0031308
+        ? 12.92 * clampedChannel
+        : 1.055 * Math.pow(clampedChannel, 1 / 2.4) - 0.055;
+
+    return Math.round(clamp(srgbChannel, 0, 1) * 255);
+}
+
+function oklabToRgbString(lightness, a, b, alpha) {
+    const lPrime = lightness + 0.3963377774 * a + 0.2158037573 * b;
+    const mPrime = lightness - 0.1055613458 * a - 0.0638541728 * b;
+    const sPrime = lightness - 0.0894841775 * a - 1.2914855480 * b;
+    const l = lPrime ** 3;
+    const m = mPrime ** 3;
+    const s = sPrime ** 3;
+    const red = linearSrgbToRgbChannel(+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s);
+    const green = linearSrgbToRgbChannel(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s);
+    const blue = linearSrgbToRgbChannel(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s);
+
+    return alpha >= 1
+        ? `rgb(${red}, ${green}, ${blue})`
+        : `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function normalizeOklchFunctionString(value) {
+    return value.replace(/oklch\(\s*([^()]+?)\s*\)/gi, (_match, contents) => {
+        const [channelSection, alphaSection] = contents.split('/').map(section => section.trim());
+        const channels = channelSection.split(/\s+/).filter(Boolean);
+
+        if (channels.length < 2) {
+            return _match;
+        }
+
+        const lightness = normalizeOklabLightness(channels[0]);
+        const chroma = normalizeOklchChroma(channels[1]);
+        const hue = normalizeCssHueToDegrees(channels[2] ?? '0');
+        const alpha = alphaSection ? normalizeSrgbAlpha(alphaSection) : 1;
+        if ([lightness, chroma, hue, alpha].some(channel => channel === null)) {
+            return _match;
+        }
+
+        const hueRadians = hue * Math.PI / 180;
+        const a = chroma * Math.cos(hueRadians);
+        const b = chroma * Math.sin(hueRadians);
+        return oklabToRgbString(lightness, a, b, alpha);
+    });
+}
+
 function normalizeColorFunctionString(value) {
-    if (!/color\(srgb/i.test(value)) {
+    if (!/(?:color\(srgb|oklch\()/i.test(value)) {
         return value;
     }
 
-    return value.replace(/color\(srgb\s+([^()]+?)\)/gi, (_match, contents) => {
+    const normalizedSrgbValue = value.replace(/color\(srgb\s+([^()]+?)\)/gi, (_match, contents) => {
         const [channelSection, alphaSection] = contents.split('/').map(section => section.trim());
         const channels = channelSection.split(/\s+/).filter(Boolean);
 
@@ -9702,6 +11312,8 @@ function normalizeColorFunctionString(value) {
 
         return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
     });
+
+    return normalizeOklchFunctionString(normalizedSrgbValue);
 }
 
 function normalizeMessageScreenshotStyles(container) {
@@ -9719,7 +11331,7 @@ function normalizeMessageScreenshotStyles(container) {
             }
 
             const propertyValue = computedStyle.getPropertyValue(propertyName);
-            if (!/color\(srgb/i.test(propertyValue)) {
+            if (!/(?:color\(srgb|oklch\()/i.test(propertyValue)) {
                 continue;
             }
 
@@ -9747,7 +11359,12 @@ async function renderMessageScreenshotCanvas(startId, endId) {
     surface.style.width = `${Math.max(320, chatWidth)}px`;
     surface.replaceChildren(...screenshotElements);
     shell.appendChild(surface);
-    document.body.appendChild(shell);
+
+    // Keep the capture under #chat so chat-scoped SillyBunny layout rules apply to cloned messages.
+    const captureParent = chatElement[0] instanceof HTMLElement
+        ? chatElement[0]
+        : document.getElementById('chat') ?? document.body;
+    captureParent.appendChild(shell);
 
     try {
         const html2canvas = await getMessageScreenshotLibrary();
@@ -11335,31 +12952,6 @@ function syncAlternateGreetingsEditor() {
     updateAlternateGreetingsHintVisibility(editor);
 }
 
-function closeAdvancedCharacterPopup({ restoreFocus = true } = {}) {
-    is_advanced_char_open = false;
-
-    const popup = $('#character_popup');
-    popup.stop(true, true);
-    popup.transition({
-        opacity: 0,
-        duration: animation_duration,
-        easing: animation_easing,
-    });
-
-    window.setTimeout(() => {
-        popup.css('display', 'none').removeClass('open');
-    }, animation_duration);
-
-    if (restoreFocus) {
-        const fallbackTarget = previousAdvancedCharacterFocus instanceof HTMLElement && document.body.contains(previousAdvancedCharacterFocus)
-            ? previousAdvancedCharacterFocus
-            : document.getElementById('advanced_div') ?? document.getElementById('right-nav-panel');
-        focusUiSurface(fallbackTarget);
-    }
-
-    previousAdvancedCharacterFocus = null;
-}
-
 export function select_rm_info(type, charId, previousCharId = null) {
     if (!type) {
         toastr.error(t`Invalid process (no 'type')`);
@@ -11503,7 +13095,6 @@ export function select_selected_character(chid, { switchMenu = true } = {}) {
 
     $('#add_avatar_button').val('');
 
-    $('#character_popup-button-h3').text(characters[chid].name);
     $('#character_name_pole').val(characters[chid].name);
     $('#description_textarea').val(characters[chid].description);
     $('#character_world').val(characters[chid].data?.extensions?.world || '');
@@ -11542,8 +13133,8 @@ export function select_selected_character(chid, { switchMenu = true } = {}) {
     syncAlternateGreetingsEditor();
     focusUiSurface(document.getElementById('right-nav-panel'));
 
-    $('#name_div').removeClass('displayBlock');
-    $('#name_div').addClass('displayNone');
+    $('#name_div').removeClass('displayNone');
+    $('#name_div').addClass('displayBlock');
     $('#renameCharButton').css('display', '');
 
     $('#form_create').attr('actiontype', 'editcharacter');
@@ -11591,7 +13182,6 @@ function select_rm_create({ switchMenu = true } = {}) {
     //create text poles
     $('#rm_button_back').css('display', '');
     $('#character_import_button').css('display', '');
-    $('#character_popup-button-h3').text('Create character');
     $('#character_name_pole').val(create_save.name);
     $('#description_textarea').val(create_save.description);
     $('#character_world').val(create_save.world);
@@ -12434,7 +14024,6 @@ export async function createOrEditCharacter(e) {
 
             const avatarId = await fetchResult.text();
 
-            $('#character_cross').trigger('click'); //closes the advanced character editing popup
             const fields = [
                 { id: '#character_name_pole', callback: value => create_save.name = value },
                 { id: '#description_textarea', callback: value => create_save.description = value },
@@ -12472,8 +14061,6 @@ export async function createOrEditCharacter(e) {
                 saveSettingsDebounced();
             }
             create_save.extra_books = [];
-
-            $('#character_popup-button-h3').text('Create character');
 
             create_save.avatar = null;
 
@@ -12624,6 +14211,7 @@ export async function swipe(event, direction, { source, repeated, message = chat
 
     swipeState = SWIPE_STATE.SWIPING;
     let generation;
+    let isOverswipeReplacement = false;
 
     const thisMesDiv = chatElement.children('.mes').filter(`[mesid="${mesId}"]`);
     const thisMesText = thisMesDiv.find('.mes_block .mes_text');
@@ -12900,6 +14488,8 @@ export async function swipe(event, direction, { source, repeated, message = chat
      * @param {boolean} [skipSwipeOut=false]
      */
     async function animateSwipe(run_generate = false, skipSwipeOut = false) {
+        let swipeViewportUpdate = null;
+
         if (!skipSwipeOut) {
             //Swipe out.
             await animateSwipeTransition(mesId, { xEnd: `${swipeRange}px`, duration: swipeDuration });
@@ -12918,10 +14508,13 @@ export async function swipe(event, direction, { source, repeated, message = chat
             //console.log('showing previously generated swipe candidate, or "..."');
             //console.log('onclick right swipe calling addOneMessage');
 
-            //Only scroll when swiping the last message.
-            const scroll = (mesId == chat.length - 1);
+            // SillyBunny: route display-only swipe replacement scroll handling through the guarded lifecycle seam.
+            const isLastMessageSwipe = (mesId == chat.length - 1);
+            const useLifecycleRoute = source !== SWIPE_SOURCE.DELETE && source !== SWIPE_SOURCE.BACK && !isOverswipeReplacement;
+            swipeViewportUpdate = getSwipeReplacementViewportUpdate({ isLastMessageSwipe, useLifecycleRoute });
             //The swipe buttons will be refreshed in endSwipe(), refreshing them now will cause flickering.
-            addOneMessage(chat[mesId], { type: 'swipe', forceId: mesId, scroll: scroll, showSwipes: false });
+            addOneMessage(chat[mesId], { type: 'swipe', forceId: mesId, scroll: swipeViewportUpdate.scrollWithAddOneMessage, showSwipes: false });
+            await applySwipeReplacementViewportUpdate(swipeViewportUpdate);
 
             if (power_user.message_token_count_enabled) {
                 if (!chat[mesId].extra) {
@@ -12950,6 +14543,8 @@ export async function swipe(event, direction, { source, repeated, message = chat
 
         //Swipe in from the opposite side.
         await animateSwipeTransition(mesId, { xStart: `${-swipeRange}px`, xEnd: `${0}px`, duration: swipeDuration });
+
+        await settleSwipeReplacementAnchor(swipeViewportUpdate);
     }
 
     if (mesId === Number(this_edit_mes_id)) {
@@ -13046,6 +14641,7 @@ export async function swipe(event, direction, { source, repeated, message = chat
                 return;
             } else if (overswipe == OVERSWIPE_BEHAVIOR.LOOP || overswipe == OVERSWIPE_BEHAVIOR.PRISTINE_GREETING) {
                 // Loop to the first swipe.
+                isOverswipeReplacement = true;
                 newSwipeId = 0;
             }
         }
@@ -13118,7 +14714,7 @@ export async function processDroppedFiles(files, data = new Map()) {
 
     if (avatarFileNames.length > 0) {
         await importCharactersTags(avatarFileNames);
-        selectImportedChar(avatarFileNames[avatarFileNames.length - 1]);
+        await selectImportedChar(avatarFileNames[avatarFileNames.length - 1]);
     }
 }
 
@@ -13139,13 +14735,18 @@ async function importCharactersTags(avatarFileNames) {
 /**
  * Selects the given imported char
  * @param {string} charId char to select
+ * @returns {Promise<boolean>} True if the imported character was selected
  */
-function selectImportedChar(charId) {
-    let oldSelectedChar = null;
-    if (this_chid !== undefined) {
-        oldSelectedChar = characters[this_chid].avatar;
+async function selectImportedChar(charId) {
+    const avatarFileName = String(charId).endsWith('.png') ? String(charId) : `${charId}.png`;
+    const importedCharacterId = characters.findIndex(character => character.avatar === avatarFileName);
+
+    if (importedCharacterId === -1) {
+        console.log(`Could not find imported character ${charId} in the list`);
+        return false;
     }
-    select_rm_info('char_import_no_toast', charId, oldSelectedChar);
+
+    return selectCharacterById(importedCharacterId);
 }
 
 /**
@@ -13212,7 +14813,7 @@ async function importCharacter(file, { preserveFileName = '', importTags = false
             }
             if (importTags) {
                 await importCharactersTags([avatarFileName]);
-                selectImportedChar(data.file_name);
+                await selectImportedChar(data.file_name);
             }
             return avatarFileName;
         }
@@ -13534,7 +15135,6 @@ export async function deleteCharacter(characterKey, { deleteChats = true } = {})
 async function removeCharacterFromUI() {
     preserveNeutralChat();
     await clearChat();
-    $('#character_cross').trigger('click');
     resetChatState();
     $(document.getElementById('rm_button_selected_ch')).children('h2').text('');
     restoreNeutralChat();
@@ -13854,9 +15454,15 @@ jQuery(async function () {
     });
 
     $(document).on('click', '.character_select', async function () {
-        const shouldCloseCharacterMenu = $(this).closest('#rm_print_characters_block').length > 0;
+        const isCharactersBlockClick = $(this).closest('#rm_print_characters_block').length > 0;
+        const shouldCloseCharacterMenu = isCharactersBlockClick && (window.SillyBunnyShell?.isMobileViewport?.() ?? true);
         const id = Number($(this).attr('data-chid'));
-        await selectCharacterById(id);
+        // SillyBunny: drawer selection flashes Editor instead of opening it.
+        const didSelectCharacter = await selectCharacterById(id, { switchMenu: false });
+        if (didSelectCharacter && isCharactersBlockClick) {
+            pulseSelectedEntityCard(this);
+            window.SillyBunnyShell?.highlightCharacterEditorTab?.();
+        }
         if (shouldCloseCharacterMenu) {
             window.SillyBunnyShell?.closeCharacters?.();
         }
@@ -13893,24 +15499,36 @@ jQuery(async function () {
     }
 
     const chatElementScroll = document.getElementById('chat');
-    const markMobileChatTouchScrollStart = () => markMobileChatManualScroll({ touchActive: true });
-    const markMobileChatTouchScrollMove = () => markMobileChatManualScroll();
-    const markMobileChatWheelScroll = () => markMobileChatManualScroll();
-    const markMobileViewportScroll = () => {
-        if (mobileChatTouchScrolling || Date.now() < mobileChatManualScrollSuppressedUntil) {
-            markMobileChatManualScroll({ suppressMs: MOBILE_CHAT_VIEWPORT_SCROLL_SUPPRESS_MS });
-        }
+    const markMobileChatTouchScrollStart = () => {
+        clearChatLoadBottomLock();
+        markMobileChatManualScroll({ touchActive: true });
     };
+    const markMobileChatTouchScrollMove = () => {
+        clearChatLoadBottomLock();
+        markMobileChatManualScroll();
+    };
+    const markMobileChatWheelScroll = () => {
+        clearChatLoadBottomLock();
+        markMobileChatManualScroll();
+    };
+    const markMobileViewportScroll = getMobileViewportScrollHandler();
 
     chatElementScroll.addEventListener('touchstart', markMobileChatTouchScrollStart, { passive: true });
     chatElementScroll.addEventListener('touchmove', markMobileChatTouchScrollMove, { passive: true });
     chatElementScroll.addEventListener('touchend', releaseMobileChatTouchScroll, { passive: true });
     chatElementScroll.addEventListener('touchcancel', releaseMobileChatTouchScroll, { passive: true });
     chatElementScroll.addEventListener('wheel', markMobileChatWheelScroll, { passive: true });
-    window.visualViewport?.addEventListener('scroll', markMobileViewportScroll, { passive: true });
-    window.visualViewport?.addEventListener('resize', markMobileViewportScroll, { passive: true });
+    document.addEventListener('wheel', routeShellWheelToChat, { passive: false, capture: true });
+    setupMobileChatViewportObserver(markMobileViewportScroll);
 
     const chatScrollHandler = function () {
+        refreshObservedChatMessageResizeViewportStates();
+
+        if (isChatLoadBottomLockActive() && !isChatScrolledNearBottom()) {
+            pinChatLoadToBottom();
+            return;
+        }
+
         if (power_user.waifuMode) {
             scrollLock = true;
             return;
@@ -13924,7 +15542,7 @@ jQuery(async function () {
             return;
         }
 
-        const scrollIsAtBottom = isChatScrolledNearBottom(5);
+        const scrollIsAtBottom = isChatScrolledNearBottom();
 
         // Resume autoscroll if the user scrolls to the bottom
         if (scrollLock && scrollIsAtBottom) {
@@ -14017,35 +15635,6 @@ jQuery(async function () {
         if (result === POPUP_RESULT.AFFIRMATIVE) {
             await handleDeleteChat(deleteFileName, selected_group, false);
         }
-    });
-
-    $('#advanced_div').on('click', function () {
-        if (!is_advanced_char_open) {
-            is_advanced_char_open = true;
-            previousAdvancedCharacterFocus = document.activeElement instanceof HTMLElement && !document.activeElement.closest('#send_form')
-                ? document.activeElement
-                : document.getElementById('advanced_div');
-
-            const popup = $('#character_popup');
-            popup.stop(true, true);
-            popup.css({ 'display': 'flex', 'opacity': 0.0 }).addClass('open');
-            popup.transition({
-                opacity: 1.0,
-                duration: animation_duration,
-                easing: animation_easing,
-            });
-            focusUiSurface(document.getElementById('character_cross') ?? document.getElementById('character_popup'));
-        } else {
-            closeAdvancedCharacterPopup();
-        }
-    });
-
-    $('#character_cross').on('click', function () {
-        closeAdvancedCharacterPopup();
-    });
-
-    $('#character_popup_ok').on('click', function () {
-        closeAdvancedCharacterPopup();
     });
 
     $('#dialogue_popup_ok').on('click', async function (_e) {
@@ -14761,7 +16350,7 @@ jQuery(async function () {
 
         if (avatarFileNames.length > 0) {
             await importCharactersTags(avatarFileNames);
-            selectImportedChar(avatarFileNames[avatarFileNames.length - 1]);
+            await selectImportedChar(avatarFileNames[avatarFileNames.length - 1]);
         }
 
         // Clear the file input value to allow re-uploading the same file
@@ -14905,7 +16494,6 @@ jQuery(async function () {
         }
 
         const forbiddenTargets = [
-            '#character_cross',
             '#avatar-and-name-block',
             '#shadow_popup',
             '.popup',
@@ -15076,12 +16664,6 @@ jQuery(async function () {
 
     $(document).on('keydown', function (e) {
         if (e.key === 'Escape' && !e.originalEvent.isComposing) {
-            if (is_advanced_char_open) {
-                e.preventDefault();
-                closeAdvancedCharacterPopup();
-                return;
-            }
-
             const isEditVisible = $('#curEditTextarea').is(':visible') || $('.reasoning_edit_textarea').length > 0;
             if (isEditVisible && power_user.auto_save_msg_edits === false) {
                 closeMessageEditor('all');
@@ -15216,6 +16798,8 @@ jQuery(async function () {
     });
 
     $(window).on('beforeunload', () => {
+        disposeChatMessageResizeObserver();
+        disposeMobileChatViewportObserver();
         cancelTtsPlay();
         if (streamingProcessor) {
             console.log('Page reloaded. Aborting streaming...');
@@ -15330,13 +16914,13 @@ jQuery(async function () {
         $('#avatar-and-name-block').slideToggle();
     });
 
-    $(document).on('touchstart', '#show_more_messages', function (event) {
+    $(document).on('touchstart', CHAT_HISTORY_WINDOW_CONTROL_SELECTOR, function (event) {
         const touch = event.originalEvent?.changedTouches?.[0];
         showMoreTouchMoved = false;
         showMoreTouchStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
     });
 
-    $(document).on('touchmove', '#show_more_messages', function (event) {
+    $(document).on('touchmove', CHAT_HISTORY_WINDOW_CONTROL_SELECTOR, function (event) {
         if (!showMoreTouchStart) {
             return;
         }
@@ -15352,7 +16936,7 @@ jQuery(async function () {
         showMoreTouchMoved = showMoreTouchMoved || deltaX > SHOW_MORE_TOUCH_MOVE_CANCEL_PX || deltaY > SHOW_MORE_TOUCH_MOVE_CANCEL_PX;
     });
 
-    $(document).on('mouseup touchend', '#show_more_messages', async function (event) {
+    $(document).on('mouseup touchend', CHAT_HISTORY_WINDOW_CONTROL_SELECTOR, async function (event) {
         if (event.type === 'touchend') {
             lastShowMoreTouchEventAt = Date.now();
             showMoreTouchStart = null;
@@ -15368,6 +16952,11 @@ jQuery(async function () {
         showMoreTouchMoved = false;
         event.stopPropagation();
         event.preventDefault();
+        if (event.currentTarget?.id === CHAT_HISTORY_NEWER_BUTTON_ID) {
+            await showNewerMessages();
+            return;
+        }
+
         await showMoreMessages();
     });
 
@@ -15382,7 +16971,7 @@ jQuery(async function () {
     await firstLoadInit();
 
     window.addEventListener('beforeunload', (e) => {
-        if (isChatSaving || this_edit_mes_id >= 0) {
+        if (isChatSaving || hasPendingChatSave() || this_edit_mes_id >= 0) {
             e.preventDefault();
             e.returnValue = true;
         }
