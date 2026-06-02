@@ -5,6 +5,7 @@ import {
     getQuickReplySetNameKey,
     getUniqueQuickReplySetLinksBySetName,
     getUniqueQuickReplySetsByName,
+    removeQuickReplySetLinksByName,
 } from '../public/scripts/extensions/quick-reply/src/quick-reply-set-list.js';
 
 describe('Quick Reply set list helpers', () => {
@@ -42,5 +43,17 @@ describe('Quick Reply set list helpers', () => {
             { set: null },
             memoryLink,
         ])).toEqual([defaultLink, memoryLink]);
+    });
+
+    test('removes links by normalized set display name', () => {
+        const defaultLink = { set: { name: 'Default' }, isVisible: true };
+        const duplicateDefaultLink = { set: { name: ' default ' }, isVisible: true };
+        const memoryLink = { set: { name: 'Memory Sharding' }, isVisible: false };
+
+        expect(removeQuickReplySetLinksByName([
+            defaultLink,
+            duplicateDefaultLink,
+            memoryLink,
+        ], 'DEFAULT')).toEqual([memoryLink]);
     });
 });

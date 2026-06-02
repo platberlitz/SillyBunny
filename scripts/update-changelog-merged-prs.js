@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '..');
@@ -109,15 +109,21 @@ function readEventPrNumbers() {
     return prNumbers;
 }
 
-function extractMergedPrNumbers(message) {
-    const numbers = [];
-    const pattern = /^Merge pull request #(\d+)\b/gm;
+export function extractMergedPrNumbers(message) {
+    const numbers = new Set();
+    const text = String(message || '');
 
-    for (const match of String(message || '').matchAll(pattern)) {
-        numbers.push(match[1]);
+    for (const match of text.matchAll(/^Merge pull request #(\d+)\b/gm)) {
+        numbers.add(match[1]);
     }
 
-    return numbers;
+    const [subject = ''] = text.split(/\r?\n/, 1);
+    const squashMatch = /\(#(\d+)\)\s*$/.exec(subject);
+    if (squashMatch) {
+        numbers.add(squashMatch[1]);
+    }
+
+    return [...numbers];
 }
 
 function normalizePrNumbers(values) {
@@ -321,4 +327,6 @@ function main() {
     }
 }
 
-main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    main();
+}

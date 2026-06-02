@@ -59,7 +59,7 @@ async function showSamplerSelectPopup() {
 
             const isActive = $(this).hasClass('toggleEnabled');
 
-            toggleSamplerManualPriority(isActive);
+            toggleSamplerManualPriority(isActive, '', true);
         });
     } else {
         $('#prioritizeManuallySelectedSamplers').hide();
@@ -201,7 +201,7 @@ function setSamplerListListeners() {
         const shouldDisplay = isChecked ? targetDisplayType : 'none';
         relatedDOMElement.css('display', shouldDisplay);
 
-        if (main_api === 'textgenerationwebui') setApiSamplersState(samplerName, shouldDisplay !== 'none');
+        if (main_api === 'textgenerationwebui') setApiSamplersState(samplerName, shouldDisplay !== 'none', '', true);
 
         console.log(samplerName, relatedDOMElement.data(SELECT_SAMPLER.DATA), shouldDisplay);
     });
@@ -373,15 +373,17 @@ export async function resetApiSelectedSamplers(tcApiType = '', silent = false) {
  * @param {string} samplerName Target sampler key name
  * @param {string|boolean} state Visibility state of the target sampler
  * @param {string?} tcApiType Name of the target API Type - It picks the currently active TC API type name by default
+ * @param {boolean} explicitSave Whether this write comes from a user/API action that should re-enable saving after a startup timeout
  * @returns void
  */
-export function setApiSamplersState(samplerName, state, tcApiType = '') {
+export function setApiSamplersState(samplerName, state, tcApiType = '', explicitSave = false) {
     if (!textgenerationwebui_settings?.type && !tcApiType) return;
     if (!tcApiType) tcApiType = textgenerationwebui_settings.type;
     if (!selectedSamplers[tcApiType]) selectedSamplers[tcApiType] = {};
 
     const presetSamplers = selectedSamplers[tcApiType];
     presetSamplers[samplerName] = String(state) === 'true';
+    if (explicitSave) selectedSamplersStorageReady = true;
 }
 
 /**
@@ -452,15 +454,17 @@ export function getActiveManualApiSamplers(tcApiType = '') {
 /**
  * @param {string|boolean} state Target state of the feature
  * @param {string?} tcApiType Name of the target API Type - It picks the currently active TC API type name by default
+ * @param {boolean} explicitSave Whether this write comes from a user/API action that should re-enable saving after a startup timeout
  * @returns void
  */
-export function toggleSamplerManualPriority(state = false, tcApiType = '') {
+export function toggleSamplerManualPriority(state = false, tcApiType = '', explicitSave = false) {
     if (!textgenerationwebui_settings?.type && !tcApiType) return;
     if (!tcApiType) tcApiType = textgenerationwebui_settings.type;
     if (!selectedSamplers[tcApiType]) selectedSamplers[tcApiType] = {};
 
     const presetSamplers = selectedSamplers[tcApiType];
     presetSamplers.st_manual_priority = String(state) === 'true';
+    if (explicitSave) selectedSamplersStorageReady = true;
 }
 
 /**

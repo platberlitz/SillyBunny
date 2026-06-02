@@ -1,71 +1,68 @@
 How to Update SillyBunny
 
-The most recent version can be found here: https://docs.sillytavern.app/usage/update/
+This guide assumes you already have a working SillyBunny install. If you are
+installing for the first time, follow the installation instructions for your
+platform first, then return here when you need to update.
 
-This is not an installation guide. If you need installation instructions, look here:
-https://docs.sillytavern.app/installation/windows/
+Before updating
 
-This guide assumes you have already installed SillyBunny once, and know how to run it on your OS.
+1. Close SillyBunny.
+2. Back up your data folder if you have important characters, chats, presets,
+   themes, or secrets.
+3. If you run multiple user accounts, back up the whole data directory instead
+   of only data/default-user.
 
-Linux/Termux:
+Git installs
 
-You definitely installed via git, so just 'git pull' inside the SillyBunny directory.
+Git is the recommended update method.
 
-Windows/MacOS:
+1. Open a terminal in your SillyBunny folder.
+2. Run:
 
-Method 1 - GIT
+   git pull --ff-only
 
-We always recommend users install using 'git'. Here's why:
+3. If dependencies changed, run:
 
-When you have installed via `git clone`, all you have to do to update is type `git pull` in a command line in the ST folder.
-Alternatively, if the command prompt gives you problems (and you have GitHub Desktop installed), you can use the 'Repository' menu and select 'Pull'.
-The updates are applied automatically and safely.
+   bun install
 
-Method 2 - ZIP
+4. Start SillyBunny normally.
 
-If you insist on installing via a zip, here is the tedious process for doing the update:
+If Git reports local changes, review them before updating. Keep changes you made
+intentionally, or move them out of the way before pulling the update.
 
-1. Download the new release zip.
-2. Unzip it into a folder OUTSIDE of your current ST installation.
-3. Do the usual setup procedure for your OS to install Bun and the required packages.
+ZIP installs
 
-4a. Updating 1.12.0 and above
+ZIP updates require copying your user data into a fresh download.
 
-Copy the user data directory from your data root into the data root of the new install.
+1. Download the new SillyBunny release ZIP.
+2. Extract it into a new folder, outside your current SillyBunny install.
+3. Install or refresh the required packages for the new folder:
 
-By default: /data/default-user
+   bun install
 
-4a. Migrating from <1.12.0 to >=1.20.0
-Copy the following files/folders as necessary(*) from your old ST installation:
+4. Copy your user data from the old install into the new install.
 
-  - Assets
-  - Backgrounds
-  - Characters
-  - Chats
-  - Context
-  - Groups
-  - Group chats
-  - Instruct
-  - movingUI
-  - KoboldAI Settings
-  - NovelAI Settings
-  - OpenAI Settings (Chat Completion API)
-  - TextGen Settings (Text Completion API)
-  - QuickReplies
-  - Themes
-  - User Avatars
-  - Worlds
-  - User
-  - settings.json
-  - secrets.json <---- This one is in the base folder, not /public/
+   For current installs, copy:
 
-  (*) 'As necessary' = "If you made any custom content related to those folders".
-  None of the folders are mandatory, so only copy what you need.
+   data/default-user
 
-  **NB: DO NOT COPY THE ENTIRE /PUBLIC/ FOLDER.**
-  Doing so could break the new install and prevent new features from being present.
-  Paste those items into the /data/default-user folder of the new install.
+   If you use multiple accounts, copy the full data directory instead.
 
-5. Start SillyBunny once again with the method appropriate to your OS, and pray you got it right.
+5. Current installs keep secrets with the user data you copied above. If your
+   old install still has a legacy root-level secrets.json file, copy that file
+   into the matching location in the new install too.
+6. Start SillyBunny from the new folder and confirm your characters, chats,
+   presets, and settings appear correctly.
+7. After the new install is working, you can archive or delete the old folder.
 
-6. If everything shows up, you can safely delete the old ST folder.
+Do not copy the entire public folder from an old ZIP install into a new one.
+That can overwrite updated app files and hide new fixes.
+
+Troubleshooting
+
+- If SillyBunny does not start after an update, run bun install again in the
+  SillyBunny folder and restart.
+- If your data is missing after a ZIP update, confirm it was copied into the
+  new data folder, not into public.
+- If you need help with a SillyBunny-specific update issue, open an issue at:
+  https://github.com/platberlitz/SillyBunny/issues

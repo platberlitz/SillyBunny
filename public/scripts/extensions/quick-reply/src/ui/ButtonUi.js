@@ -98,7 +98,7 @@ export class ButtonUi {
             ...this.settings.config.setList,
             ...(this.settings.chatConfig?.setList ?? []),
             ...(this.settings.charConfig?.setList ?? []),
-        ].filter(link => link.isVisible));
+        ].filter(link => link.isVisible && !link.set?.isDeleted));
     }
 
 

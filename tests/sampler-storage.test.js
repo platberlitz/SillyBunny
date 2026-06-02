@@ -140,6 +140,62 @@ describe('selected sampler save guard', () => {
         }
     });
 
+    test('allows explicit popup sampler changes after a storage timeout', async () => {
+        jest.useFakeTimers();
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+
+        try {
+            mockTextGenObjectStore.getItem.mockReturnValue(new Promise(() => {}));
+            const {
+                loadApiSelectedSamplers,
+                saveApiSelectedSamplers,
+                setApiSamplersState,
+            } = await importSamplerSelect();
+
+            const loadPromise = loadApiSelectedSamplers();
+            await jest.advanceTimersByTimeAsync(1500);
+            await loadPromise;
+
+            setApiSamplersState('temperature', true, 'ooba', true);
+
+            await expect(saveApiSelectedSamplers()).resolves.toBe(true);
+            expect(mockTextGenObjectStore.setItem).toHaveBeenCalledWith('selectedSamplers', {
+                ooba: { temperature: true },
+            });
+        } finally {
+            jest.useRealTimers();
+            console.log.mockRestore();
+        }
+    });
+
+    test('allows explicit manual priority changes after a storage timeout', async () => {
+        jest.useFakeTimers();
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+
+        try {
+            mockTextGenObjectStore.getItem.mockReturnValue(new Promise(() => {}));
+            const {
+                loadApiSelectedSamplers,
+                saveApiSelectedSamplers,
+                toggleSamplerManualPriority,
+            } = await importSamplerSelect();
+
+            const loadPromise = loadApiSelectedSamplers();
+            await jest.advanceTimersByTimeAsync(1500);
+            await loadPromise;
+
+            toggleSamplerManualPriority(true, 'ooba', true);
+
+            await expect(saveApiSelectedSamplers()).resolves.toBe(true);
+            expect(mockTextGenObjectStore.setItem).toHaveBeenCalledWith('selectedSamplers', {
+                ooba: { st_manual_priority: true },
+            });
+        } finally {
+            jest.useRealTimers();
+            console.log.mockRestore();
+        }
+    });
+
     test('does not arm the save guard when reset follows a storage timeout', async () => {
         jest.useFakeTimers();
         jest.spyOn(console, 'log').mockImplementation(() => {});
