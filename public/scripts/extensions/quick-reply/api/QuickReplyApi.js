@@ -4,7 +4,7 @@ import { QuickReplySet } from '../src/QuickReplySet.js';
 import { QuickReplySettings } from '../src/QuickReplySettings.js';
 import { SettingsUi } from '../src/ui/SettingsUi.js';
 import { onlyUnique } from '../../../utils.js';
-import { getUniqueQuickReplySetLinksBySetName, getUniqueQuickReplySetsByName } from '../src/quick-reply-set-list.js';
+import { getUniqueQuickReplySetLinksBySetName, getUniqueQuickReplySetsByName, removeQuickReplySetLinksByName } from '../src/quick-reply-set-list.js';
 
 export class QuickReplyApi {
     /** @type {QuickReplySettings} */ settings;
@@ -445,6 +445,14 @@ export class QuickReplyApi {
             throw new Error(`No quick reply set with name "${name}" found.`);
         }
         await set.delete();
+        this.settings.config.setList = removeQuickReplySetLinksByName(this.settings.config.setList, set);
+        if (this.settings.chatConfig) {
+            this.settings.chatConfig.setList = removeQuickReplySetLinksByName(this.settings.chatConfig.setList, set);
+        }
+        if (this.settings.charConfig) {
+            this.settings.charConfig.setList = removeQuickReplySetLinksByName(this.settings.charConfig.setList, set);
+        }
+        this.settings.save();
         this.settingsUi.rerender();
     }
 

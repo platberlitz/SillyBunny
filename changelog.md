@@ -2,9 +2,9 @@
 
 ## v1.6.1
 
-Date: 2026-05-31
+Date: 2026-06-02
 
-This maintenance bump separates staging work merged after v1.6.0 so the next stable release changelog can collect it cleanly.
+This update keeps the 1.6 series moving with safer chat lifecycle defaults, stronger preset/profile persistence, more reliable Quick Replies, and cleaner release automation.
 
 ### Release Metadata
 - Updated app, Horde client, bundled extension, package, lockfile, and test metadata to 1.6.1.
@@ -127,6 +127,10 @@ This maintenance bump separates staging work merged after v1.6.0 so the next sta
 - PR #302 (2026-06-02) `fix: harden Select2 dropdown surfaces`
 - PR #303 (2026-06-02) `fix: prevent corrupted wand message screenshots`
 - PR #304 (2026-06-02) `fix: switch backend for bound reverse proxy presets`
+- PR #305 (2026-06-02) `chore: remove stale semantic map artifacts`
+- PR #306 (2026-06-02) `fix: close release readiness regressions`
+- PR #307 (2026-06-02) `fix: avoid forced reconnect when loading bound reverse proxy presets`
+- PR #308 (2026-06-02) `fix: restore desktop lorebook selection surfaces`
 
 ## v1.6.0
 
@@ -247,8 +251,8 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 ### In-Chat Agents
 - Synced the Achievements Tracker and Scene Tracker template catalog entries with their updated source wording, and made bundled template reset recognize saved bundled agents after prompt wording changes.
 
-### PR #13 SillyTavern 1.18.0 Sync
-Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. GitHub and the local merge both reported the PR as conflict-free.
+### SillyTavern 1.18.0 Compatibility Sync
+SillyBunny incorporates the 1.18.0 compatibility updates while preserving the fork's Bun-first runtime and custom shell.
 
 - Kept SillyBunny's Bun-first defaults and port `4444` while updating Node-compatible dependency and lockfile state for the SillyTavern 1.18.0 surface.
 - Updated launcher and Electron package files for the new runtime layout.

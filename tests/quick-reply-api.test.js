@@ -46,6 +46,10 @@ function createSet(name, labels = []) {
     return {
         name,
         qrList: labels.map(createQuickReply),
+        isDeleted: false,
+        async delete() {
+            this.isDeleted = true;
+        },
     };
 }
 
@@ -109,5 +113,45 @@ describe('Quick Reply API set listing', () => {
         expect(firstSet.qrList[0].onExecute).toHaveBeenCalledTimes(1);
         expect(duplicateSet.qrList[0].onExecute).not.toHaveBeenCalled();
         expect(secondSet.qrList[0].onExecute).toHaveBeenCalledTimes(1);
+    });
+
+    test('deletes sets through the API and purges matching active links across scopes', async () => {
+        const targetSet = createSet('Memory Sharding');
+        const duplicateLinkedSet = createSet(' memory sharding ');
+        const otherSet = createSet('Chat Tools');
+        MockQuickReplySet.list = [targetSet, otherSet];
+        const settings = {
+            save: jest.fn(),
+            config: {
+                setList: [
+                    { set: targetSet },
+                    { set: duplicateLinkedSet },
+                    { set: otherSet },
+                ],
+            },
+            chatConfig: {
+                setList: [
+                    { set: duplicateLinkedSet },
+                    { set: otherSet },
+                ],
+            },
+            charConfig: {
+                setList: [
+                    { set: duplicateLinkedSet },
+                    { set: otherSet },
+                ],
+            },
+        };
+        const settingsUi = { rerender: jest.fn() };
+        const api = new QuickReplyApi(settings, settingsUi);
+
+        await api.deleteSet(' memory sharding ');
+
+        expect(targetSet.isDeleted).toBe(true);
+        expect(settings.config.setList).toEqual([{ set: otherSet }]);
+        expect(settings.chatConfig.setList).toEqual([{ set: otherSet }]);
+        expect(settings.charConfig.setList).toEqual([{ set: otherSet }]);
+        expect(settings.save).toHaveBeenCalledTimes(1);
+        expect(settingsUi.rerender).toHaveBeenCalledTimes(1);
     });
 });

@@ -3,7 +3,7 @@ import { getSortableDelay } from '../../../../utils.js';
 import { log, warn } from '../shared.js';
 import { QuickReply } from '../QuickReply.js';
 import { QuickReplySet } from '../QuickReplySet.js';
-import { getQuickReplySetLinkNameKey, getQuickReplySetNameKey, getUniqueQuickReplySetsByName } from '../quick-reply-set-list.js';
+import { getUniqueQuickReplySetsByName, removeQuickReplySetLinksByName } from '../quick-reply-set-list.js';
 import { QuickReplySettings } from '../QuickReplySettings.js';
 
 export class SettingsUi {
@@ -309,13 +309,12 @@ export class SettingsUi {
     async doDeleteQrSet(qrs) {
         await qrs.delete();
         //TODO (HACK) should just bubble up from QuickReplySet.delete() but that would require proper or at least more comples onDelete listeners
-        const deletedKey = getQuickReplySetNameKey(qrs);
-        this.settings.config.setList = this.settings.config.setList.filter(link => getQuickReplySetLinkNameKey(link) !== deletedKey);
+        this.settings.config.setList = removeQuickReplySetLinksByName(this.settings.config.setList, qrs);
         if (this.settings.chatConfig) {
-            this.settings.chatConfig.setList = this.settings.chatConfig.setList.filter(link => getQuickReplySetLinkNameKey(link) !== deletedKey);
+            this.settings.chatConfig.setList = removeQuickReplySetLinksByName(this.settings.chatConfig.setList, qrs);
         }
         if (this.settings.charConfig) {
-            this.settings.charConfig.setList = this.settings.charConfig.setList.filter(link => getQuickReplySetLinkNameKey(link) !== deletedKey);
+            this.settings.charConfig.setList = removeQuickReplySetLinksByName(this.settings.charConfig.setList, qrs);
         }
         this.settings.save();
     }

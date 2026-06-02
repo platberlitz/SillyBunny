@@ -36,3 +36,13 @@ export function getUniqueQuickReplySetLinksBySetName(links) {
         return true;
     });
 }
+
+export function removeQuickReplySetLinksByName(links, setOrName) {
+    const deletedKey = getQuickReplySetNameKey(setOrName);
+
+    if (!Array.isArray(links) || !deletedKey) {
+        return Array.isArray(links) ? links : [];
+    }
+
+    return links.filter(link => getQuickReplySetLinkNameKey(link) !== deletedKey);
+}

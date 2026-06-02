@@ -223,7 +223,7 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ## Latest Update
 
-### v1.6.1 (2026-05-31)
+### v1.6.1 (2026-06-02)
 
 This update carries the post-v1.6.0 staging line forward with safer chat rendering, tighter mobile navigation, sturdier preset/profile persistence, more reliable Quick Replies, and a broader cleanup pass across settings, screenshots, and release tooling.
 
@@ -247,7 +247,7 @@ This update carries the post-v1.6.0 staging line forward with safer chat renderi
 * Sampler visibility startup now avoids overwriting saved selections when browser storage is slow to respond.
 * Character avatar refresh, imported character selection, desktop Prompt Manager scroll, chat shell wheel routing, shell resize handles, Select2 dropdowns, native chat style headers, bounded rendered messages, and wand message screenshots were tightened.
 * Duplicate agent runner initialization, text-completion close handlers, local generation aborts, LCPP status restore, text-completion reasoning leaks, Guided Generations steering, post-agent provider-error handling, and Pathfinder swipe/settings reuse were hardened.
-* PR checks, changelog automation, frontend asset handling, and upstream touch tracking were cleaned up.
+* Changelog automation, frontend asset handling, and compatibility tracking were cleaned up.
 
 ### v1.6.0 (2026-05-18)
 
@@ -309,8 +309,8 @@ This update adds the Black Orange theme and desktop character drawer tiles, impr
 **In-Chat Agents**
 * Synced the Achievements Tracker and Scene Tracker template catalog entries with their updated source wording, and made bundled template reset recognize saved bundled agents after prompt wording changes.
 
-**PR #13 SillyTavern 1.18.0 Sync**
-Merged PR #13 from `codex/sync-118-compatibility` into `staging` on 2026-05-05. GitHub and the local merge both reported the PR as conflict-free.
+**SillyTavern 1.18.0 Compatibility Sync**
+SillyBunny incorporates the 1.18.0 compatibility updates while preserving the fork's Bun-first runtime and custom shell.
 
 * Kept SillyBunny's Bun-first defaults and port `4444` while updating Node-compatible dependency and lockfile state for the SillyTavern 1.18.0 surface.
 * Updated launcher and Electron package files for the new runtime layout.

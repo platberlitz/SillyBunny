@@ -29,6 +29,7 @@ const CORE_EXTENSIONS = new Set([
 ]);
 const BUNDLED_THIRD_PARTY_EXTENSIONS = new Set([
     'BunnyPresetTools',
+    'ChatCompletionTabs',
 ]);
 const MANUAL_SYNC_EXTENSIONS = new Map([
     ['quick-image-gen', {
@@ -185,7 +186,7 @@ async function ensureExtensionRepo(extensionPath, isGlobal = false) {
     }
 }
 
-function isBundledThirdPartyExtension(extensionName) {
+export function isBundledThirdPartyExtension(extensionName) {
     return BUNDLED_THIRD_PARTY_EXTENSIONS.has(sanitize(extensionName));
 }
 
@@ -194,7 +195,7 @@ function getBuiltInExtensionType(extensionName) {
     return CORE_EXTENSIONS.has(sanitizedName) ? 'core' : 'system';
 }
 
-function rejectBundledThirdPartyExtension(extensionName, response, action) {
+export function rejectBundledThirdPartyExtension(extensionName, response, action) {
     if (!isBundledThirdPartyExtension(extensionName)) {
         return false;
     }

@@ -303,4 +303,20 @@ describe('Quick Reply button bar', () => {
         expect(qrButtons).toHaveLength(1);
         expect(qrButtons[0].textContent).toBe('Visible Chat');
     });
+
+    test('does not render stale visible links to deleted sets', () => {
+        appendComposer();
+        const settings = createSettings('Deleted Help');
+        settings.config.setList[0].set.isDeleted = true;
+        settings.chatConfig = {
+            setList: [{ isVisible: true, set: createVisibleSet('Active Chat') }],
+        };
+        const buttons = new ButtonUi(settings);
+
+        buttons.show();
+
+        const qrButtons = document.querySelector('#qr--bar')?.querySelectorAll('.qr--button') ?? [];
+        expect(qrButtons).toHaveLength(1);
+        expect(qrButtons[0].textContent).toBe('Active Chat');
+    });
 });
