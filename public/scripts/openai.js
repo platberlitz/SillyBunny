@@ -663,6 +663,27 @@ export let openai_settings;
 /** @type {import('./PromptManager.js').PromptManager} */
 export let promptManager = null;
 
+/**
+ * SillyBunny: prompt order reset needs the selected preset's saved order, not the current modified settings.
+ * Gets the prompt order from the selected OpenAI preset before user edits are applied.
+ * @param {number|string|null} characterId Character/dummy ID to match in the preset prompt order.
+ * @returns {Array<Object>} Prompt order from the selected preset, or an empty array.
+ */
+export function getCurrentOpenAIPresetPromptOrder(characterId) {
+    const presetName = oai_settings.preset_settings_openai;
+    const presetIndex = openai_setting_names?.[presetName];
+    const presetPromptOrder = openai_settings?.[presetIndex]?.prompt_order;
+
+    if (!Array.isArray(presetPromptOrder)) {
+        return [];
+    }
+
+    const promptOrderEntry = presetPromptOrder.find(entry => String(entry?.character_id) === String(characterId))
+        ?? presetPromptOrder.find(entry => Array.isArray(entry?.order));
+
+    return Array.isArray(promptOrderEntry?.order) ? promptOrderEntry.order : [];
+}
+
 async function validateReverseProxy() {
     if (!oai_settings.reverse_proxy) {
         return;
