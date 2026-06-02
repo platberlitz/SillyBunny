@@ -229,6 +229,7 @@ exports[`public/script.js named export surface matches the parser-derived export
   "settingsReady",
   "shouldAutoContinue",
   "showMoreMessages",
+  "showNewerMessages",
   "showSwipeButtons",
   "startStatusLoading",
   "stopGeneration",

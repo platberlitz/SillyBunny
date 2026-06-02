@@ -387,6 +387,35 @@ export function getAllManualApiSamplers(tcApiType = '') {
 }
 
 /**
+ * Returns a copy of the sampler visibility state for the active/selected TC API Type.
+ * @param {string?} tcApiType Name of the target API Type - It picks the currently active TC API type name by default
+ * @returns {Record<string, boolean>} Sampler visibility state
+ */
+export function getApiSamplerVisibilityState(tcApiType = '') {
+    return Object.fromEntries(
+        Object.entries(getAllManualApiSamplers(tcApiType)).map(([key, value]) => [key, String(value) === 'true']),
+    );
+}
+
+/**
+ * Replaces the sampler visibility state for the active/selected TC API Type.
+ * @param {Record<string, any>} state Sampler visibility state
+ * @param {string?} tcApiType Name of the target API Type - It picks the currently active TC API type name by default
+ * @returns {boolean} Whether the sampler visibility state was applied
+ */
+export function setApiSamplerVisibilityState(state, tcApiType = '') {
+    if (!state || typeof state !== 'object' || Array.isArray(state)) return false;
+    if (!textgenerationwebui_settings?.type && !tcApiType) return false;
+    if (!tcApiType) tcApiType = textgenerationwebui_settings.type;
+
+    selectedSamplers[tcApiType] = Object.fromEntries(
+        Object.entries(state).map(([key, value]) => [key, String(value) === 'true']),
+    );
+
+    return true;
+}
+
+/**
  * Returns the key names of all the manually activated API Type samplers.
  * @param {string?} tcApiType Name of the target API Type - It picks the currently active TC API type name by default
  * @returns {string[]} Array of sampler key names

@@ -79,8 +79,12 @@ describe('chat render lifecycle script wiring', () => {
         const printMessages = findExportedFunction('printMessages');
         const source = getSource(printMessages);
 
+        expect(source).toContain('const count = getChatRenderWindowSize(power_user.chat_truncation);');
+        expect(source).toContain('const startIndex = getChatRenderWindowStartIndex(chat.length, count);');
+        expect(source).toContain('removeRenderedChatMessages();');
         expect(source).toContain('beginChatLoadBottomLock();');
         expect(source).toContain('await redisplayChat({ startIndex, fade: false, pinBottomDuringRender: true });');
+        expect(source).toContain('syncChatHistoryWindowControls();');
         expect(source).toContain('scrollLoadedChatToBottomThroughLifecycle();');
         expect(source).toContain('delay(debounce_timeout.short).then(() => scrollOnMediaLoad({ force: true }));');
 
@@ -99,9 +103,13 @@ describe('chat render lifecycle script wiring', () => {
         const redisplayChat = findExportedFunction('redisplayChat');
         const source = getSource(redisplayChat);
 
-        expect(source).toContain('const messages = targetChat.slice(startIndex);');
+        expect(source).toContain('const shouldReplaceRenderedWindow = renderedMessageCount > 0');
+        expect(source).toContain('const windowSize = getChatRenderWindowSize();');
+        expect(source).toContain('const endIndex = Math.min(targetChat.length, startIndex + windowSize);');
+        expect(source).toContain('const messages = targetChat.slice(startIndex, endIndex);');
         expect(source).toContain('const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex, pinBottomDuringRender });');
         expect(source).toContain('applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });');
+        expect(source).toContain('syncChatHistoryWindowControls();');
         expect(source).toContain('refreshSwipeButtons(false, fade);');
         expect(source).toContain('applyStylePins();');
         expect(source).toContain('updateEditArrowClasses();');
@@ -152,14 +160,41 @@ describe('chat render lifecycle script wiring', () => {
         const showMoreMessages = findExportedFunction('showMoreMessages');
         const source = getSource(showMoreMessages);
 
+        expect(source).toContain('const requestedWindowSize = messagesToLoad ?? power_user.chat_truncation;');
+        expect(source).toContain('const windowSize = getChatRenderWindowSize(requestedWindowSize);');
+        expect(source).toContain('const count = getChatHistoryPageSize(requestedWindowSize, { renderedMessageCount, windowSize });');
         expect(source).toContain('const firstId = clamp(messageId - count, 0, Infinity);');
         expect(source).toContain('const messages = chat.slice(firstId, messageId);');
         expect(source).toContain('const anchor = captureVisibleChatMessageAnchor();');
         expect(source).toContain('await renderShowMoreMessages({');
+        expect(source).toContain('pruneRenderedChatMessagesToWindow({ windowSize, pruneFrom: \'end\' });');
+        expect(source).toContain('syncChatHistoryWindowControls();');
         expect(source).toContain('refreshSwipeButtons();');
         expect(source).toContain('showMoreButton.remove();');
         expect(source).toContain('applyStylePins();');
+        expect(source).toContain('updateEditArrowClasses();');
         expect(source).toContain('await settleVisibleChatMessageAnchor(anchor);');
+        expect(source).toContain('await eventSource.emit(event_types.MORE_MESSAGES_LOADED);');
+    });
+
+    test('showNewerMessages appends newer history through the bounded redisplay renderer', () => {
+        const showNewerMessages = findExportedFunction('showNewerMessages');
+        const source = getSource(showNewerMessages);
+
+        expect(source).toContain('const { renderedMessageCount, lastMessageId } = getRenderedChatMessageWindow();');
+        expect(source).toContain('const requestedWindowSize = messagesToLoad ?? power_user.chat_truncation;');
+        expect(source).toContain('const windowSize = getChatRenderWindowSize(requestedWindowSize);');
+        expect(source).toContain('const count = getChatHistoryPageSize(requestedWindowSize, { renderedMessageCount, windowSize });');
+        expect(source).toContain('const firstId = Number.isInteger(lastMessageId) ? lastMessageId + 1 : 0;');
+        expect(source).toContain('const messages = chat.slice(firstId, lastId);');
+        expect(source).toContain('const renderedMessageIds = await renderRedisplayChatMessages({ messages, startIndex: firstId });');
+        expect(source).toContain('pruneRenderedChatMessagesToWindow({ windowSize, pruneFrom: \'start\' });');
+        expect(source).toContain('syncRenderedChatLastMessageClass();');
+        expect(source).toContain('syncChatHistoryWindowControls();');
+        expect(source).toContain('applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });');
+        expect(source).toContain('refreshSwipeButtons();');
+        expect(source).toContain('applyStylePins();');
+        expect(source).toContain('updateEditArrowClasses();');
         expect(source).toContain('await eventSource.emit(event_types.MORE_MESSAGES_LOADED);');
     });
 
@@ -262,8 +297,13 @@ describe('chat render lifecycle script wiring', () => {
         const addOneMessage = findExportedFunction('addOneMessage');
         const source = getSource(addOneMessage);
 
+        expect(source).toContain('const renderedWindowBeforeAdd = getRenderedChatMessageWindow();');
+        expect(source).toContain('const shouldResetForTailGap = isTailAppend');
+        expect(source).toContain('removeRenderedChatMessages();');
         expect(source).toContain('querySelector(\'.mes.last_mes\')?.classList.remove(\'last_mes\')');
         expect(source).toContain('lastMessageElement?.classList.add(\'last_mes\')');
+        expect(source).toContain('pruneRenderedChatMessagesToWindow({ windowSize: getChatRenderWindowSize(), pruneFrom: \'start\' });');
+        expect(source).toContain('syncChatHistoryWindowControls();');
         expect(source).toContain('if (showSwipes) refreshSwipeButtons();');
         expect(source).toContain('applyCharacterTagsToMessageDivs({ mesIds: messageId });');
         expect(source).toContain('updateEditArrowClasses();');

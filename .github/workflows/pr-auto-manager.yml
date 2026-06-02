@@ -279,7 +279,6 @@ jobs:
               "🔨 Needs Work",
               "🔬 Needs Testing",
               "⛔ Waiting For External/Upstream",
-              "❗ Against Release Branch",
               "💥💣 Breaking Changes"
             ];
             const hasBlockingLabel = prLabels.some(label => blockingLabels.includes(label));

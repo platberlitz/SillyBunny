@@ -463,7 +463,6 @@ const SB_SHELLS = Object.freeze({
             id: 'presets',
             label: 'Presets',
             icon: 'fa-sliders',
-            description: 'Choose presets and tune the prompts that shape each reply.',
         },
         embeddedTabs: [
             {
@@ -471,14 +470,12 @@ const SB_SHELLS = Object.freeze({
                 drawerId: 'sys-settings-button',
                 label: 'API',
                 icon: 'fa-plug',
-                description: 'Connect a provider, pick a model, and test the connection.',
             },
             {
                 id: 'advanced-formatting',
                 drawerId: 'advanced-formatting-button',
                 label: 'Formatting',
                 icon: 'fa-text-height',
-                description: 'Adjust how context, instructions, and reasoning are formatted.',
             },
         ],
         customTabs: [
@@ -486,7 +483,6 @@ const SB_SHELLS = Object.freeze({
                 id: 'sampling',
                 label: 'Sampling',
                 icon: 'fa-wave-square',
-                description: 'Tune generation style, randomness, seeds, and token controls.',
                 searchPlaceholder: 'Search temperature, top p, repetition penalty, or backend samplers',
                 searchExamples: ['temperature', 'top p', 'repetition penalty'],
             },
@@ -494,7 +490,6 @@ const SB_SHELLS = Object.freeze({
                 id: 'agents',
                 label: 'Agents',
                 icon: 'fa-robot',
-                description: 'Manage helpers that can assist during the conversation.',
             },
         ],
     },
@@ -5216,11 +5211,16 @@ async function ensureChatMessageRendered(messageId) {
 
     const context = getSillyTavernContext();
     const chatLength = Array.isArray(context?.chat) ? context.chat.length : 0;
-    const firstRenderedId = Number(document.querySelector('#chat .mes[mesid]')?.getAttribute('mesid') ?? NaN);
+    const renderedMessages = Array.from(document.querySelectorAll('#chat .mes[mesid]'));
+    const firstRenderedId = Number(renderedMessages.at(0)?.getAttribute('mesid') ?? NaN);
+    const lastRenderedId = Number(renderedMessages.at(-1)?.getAttribute('mesid') ?? NaN);
     const chatModule = await getChatScriptModule().catch(() => null);
     const showMoreMessages = typeof context?.showMoreMessages === 'function'
         ? context.showMoreMessages
         : chatModule?.showMoreMessages;
+    const showNewerMessages = typeof context?.showNewerMessages === 'function'
+        ? context.showNewerMessages
+        : chatModule?.showNewerMessages;
     const redisplayChat = typeof context?.redisplayChat === 'function'
         ? context.redisplayChat
         : chatModule?.redisplayChat;
@@ -5234,12 +5234,22 @@ async function ensureChatMessageRendered(messageId) {
         }
     }
 
+    if (typeof showNewerMessages === 'function' && Number.isInteger(lastRenderedId) && messageId > lastRenderedId) {
+        await showNewerMessages(messageId - lastRenderedId);
+        await waitForNextAnimationFrame();
+        messageElement = getChatMessageElement(messageId);
+        if (messageElement instanceof HTMLElement) {
+            return messageElement;
+        }
+    }
+
     if (typeof redisplayChat === 'function' && chatLength > 0) {
-        if (!getChatMessageElement(0)) {
-            getChatScrollElement()?.querySelectorAll('.mes, #show_more_messages').forEach(element => element.remove());
+        const fallbackStartIndex = Math.max(0, Math.min(messageId, chatLength - 1));
+        if (!getChatMessageElement(fallbackStartIndex)) {
+            getChatScrollElement()?.querySelectorAll('.mes, #show_more_messages, #show_newer_messages').forEach(element => element.remove());
         }
 
-        await redisplayChat({ startIndex: 0, fade: false });
+        await redisplayChat({ startIndex: fallbackStartIndex, fade: false });
         await waitForNextAnimationFrame();
         return getChatMessageElement(messageId);
     }
@@ -11978,7 +11988,7 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
 
     const activeTab = shellState.tabs.get(tabId);
     shellState.headerTitle.textContent = activeTab.label;
-    shellState.headerSubtitle.textContent = activeTab.description;
+    shellState.headerSubtitle.textContent = activeTab.description ?? '';
     scrollShellTabButtonIntoView(shellState.nav, activeTab.button, { smooth: focusButton });
     shellState.updateNavScrollIndicators?.();
 
@@ -12246,7 +12256,7 @@ function buildShell(shellKey) {
     });
     const eyebrow = createElement('div', { className: 'sb-shell-kicker', text: shellConfig.title });
     const title = createElement('h2', { className: 'sb-shell-title', text: shellConfig.baseTab.label, attrs: { tabindex: '-1' } });
-    const subtitle = createElement('p', { className: 'sb-shell-subtitle', text: shellConfig.baseTab.description });
+    const subtitle = createElement('p', { className: 'sb-shell-subtitle', text: shellConfig.baseTab.description ?? '' });
     const shellDescription = createElement('p', { className: 'sb-shell-description', text: shellConfig.subtitle });
     const panelBody = createElement('div', { className: 'sb-shell-body' });
     const resizeHandle = createElement('div', {
