@@ -6617,9 +6617,34 @@ export function initWorldInfo() {
 
     // Not needed on mobile
     if (!isMobile()) {
+        const syncWorldInfoSelect2DropdownGeometry = (select) => {
+            const $select = $(select);
+            const select2 = $select.data('select2');
+            const $container = select2?.$container?.length ? select2.$container : $select.next('.select2-container');
+            const containerRect = $container[0]?.getBoundingClientRect();
+            const fallbackRect = select.closest('.world_popup_action_group')?.getBoundingClientRect();
+            const measuredWidth = containerRect?.width || fallbackRect?.width || select.getBoundingClientRect().width;
+            const maxViewportWidth = Math.max(240, (document.documentElement.clientWidth || window.innerWidth || measuredWidth) - 24);
+            const width = Math.min(Math.max(240, Math.ceil(measuredWidth || 0)), maxViewportWidth);
+            const $dropdown = select2?.dropdown?.$dropdown?.length
+                ? select2.dropdown.$dropdown
+                : $(`#select2-${select.id}-results`).closest('.select2-dropdown');
+
+            if (!$dropdown.length || !Number.isFinite(width)) {
+                return;
+            }
+
+            const dropdownWidth = `${width}px`;
+            const $dropdownContainer = $dropdown.closest('.select2-container--open');
+            $dropdown.css({ width: dropdownWidth, minWidth: dropdownWidth });
+            $dropdownContainer.css({ width: dropdownWidth, minWidth: dropdownWidth });
+        };
+
         $('#world_editor_select').select2({
+            width: '100%',
             placeholder: t`--- Pick to Edit ---`,
             searchInputPlaceholder: t`Search...`,
+            dropdownCssClass: 'sb-world-info-select2-dropdown',
             allowClear: true,
             closeOnSelect: true,
             multiple: false,
@@ -6628,9 +6653,16 @@ export function initWorldInfo() {
         $('#world_info').select2({
             width: '100%',
             placeholder: t`No Worlds active. Click here to select.`,
+            dropdownCssClass: 'sb-world-info-select2-dropdown',
             allowClear: true,
             closeOnSelect: false,
         });
+
+        $('#world_editor_select, #world_info')
+            .off('select2:open.sillybunnyWorldInfoGeometry')
+            .on('select2:open.sillybunnyWorldInfoGeometry', function () {
+                window.requestAnimationFrame(() => syncWorldInfoSelect2DropdownGeometry(this));
+            });
 
         // Subscribe world loading to the select2 multiselect items (We need to target the specific select2 control)
         select2ChoiceClickSubscribe($('#world_info'), target => {
