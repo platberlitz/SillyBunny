@@ -196,8 +196,7 @@ Core invariants:
 - [ ] 11.2 Keep temporary kill-switch for one release cycle if needed.
 - [ ] 11.3 Remove old inline scroll state from `public/script.js` after default-on validation.
 - [ ] 11.4 Update upstream touch ledger entries as seams absorb inline divergence.
-- [ ] 11.5 Run `graphify update .` after code changes.
-- [ ] 11.6 Document validation evidence in PR descriptions.
+- [ ] 11.5 Document validation evidence in PR descriptions.
 
 ## Phase 12: Next Deep Modules [PENDING]
 - [ ] 12.1 Mobile shell lifecycle: resize, drawer, nav, bottom bar, and viewport behavior.
@@ -264,7 +263,6 @@ Recommended waves:
 | E2E | Long-chat initial load, send scroll, show-more prepend, swipe replace, mobile stream, and late media resize. |
 | Runtime | `bun run start` smoke when structural frontend changes land. |
 | Runtime | `npm run start:node` smoke when structural frontend changes land. |
-| Graph | `graphify update .` after code edits. |
 
 ## Acceptance Criteria
 | Criterion | Target |
