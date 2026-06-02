@@ -8501,6 +8501,43 @@ function onProxyPresetChange() {
     saveSettingsDebounced();
 }
 
+// SillyBunny: reverse direction of the reverse-proxy backend binding. Selecting a bound preset already
+// switches the backend (forward); this keeps the binding two-way by selecting a preset bound to the
+// newly chosen backend. Guarded against re-entrancy so it can't feed back into the source change handler.
+let isSyncingProxyBinding = false;
+
+/**
+ * Selects the reverse proxy preset bound to the given Chat Completion source, when one exists.
+ * @param {string} source Chat Completion source value
+ */
+function syncProxyPresetToBoundSource(source) {
+    if (isSyncingProxyBinding) {
+        return;
+    }
+    if (!source || !REVERSE_PROXY_SUPPORTED_SOURCES.includes(source)) {
+        return;
+    }
+    // Already on a preset bound to this source; nothing to switch.
+    if (selected_proxy && selected_proxy.name !== 'None' && selected_proxy.source === source) {
+        return;
+    }
+    const boundPreset = proxies.find(preset => preset.name !== 'None' && preset.source === source);
+    if (!boundPreset || boundPreset.name === selected_proxy?.name) {
+        return;
+    }
+
+    isSyncingProxyBinding = true;
+    try {
+        $('#openai_proxy_preset').val(boundPreset.name);
+        // applySource: false avoids re-triggering the source change we are already handling;
+        // silent: true applies the proxy URL/password without a redundant reconnect.
+        setProxyPreset(boundPreset.name, boundPreset.url, boundPreset.password, boundPreset.source, { applySource: false, silent: true });
+        saveSettingsDebounced();
+    } finally {
+        isSyncingProxyBinding = false;
+    }
+}
+
 $('#save_proxy').on('click', async function () {
     const presetName = $('#openai_reverse_proxy_name').val();
     const reverseProxy = $('#openai_reverse_proxy').val();
@@ -9166,6 +9203,7 @@ export function initOpenAI() {
         syncMaxContextUnlockedControl(oai_settings);
         toggleChatCompletionForms();
         applyConfigurableContextLimit();
+        syncProxyPresetToBoundSource(oai_settings.chat_completion_source);
         saveSettingsDebounced();
         reconnectOpenAi();
         forceCharacterEditorTokenize();
