@@ -85,4 +85,12 @@ describe('tooling UI hydration wiring', () => {
         expect(source).toContain('return await messageScreenshotLibraryPromise;');
         expect(source).not.toContain('if (!messageScreenshotLibraryPromise)');
     });
+
+    test('renders message screenshots inside the chat layout context', () => {
+        const source = getFunctionSource('renderMessageScreenshotCanvas');
+
+        expect(source).toContain("document.getElementById('chat')");
+        expect(source).toContain('captureParent.appendChild(shell)');
+        expect(source).not.toContain('document.body.appendChild(shell)');
+    });
 });
