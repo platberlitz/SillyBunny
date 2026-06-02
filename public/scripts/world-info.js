@@ -6617,12 +6617,7 @@ export function initWorldInfo() {
 
     // Not needed on mobile
     if (!isMobile()) {
-        // SillyBunny: keep embedded World Info dropdowns anchored to the desktop shell surface.
-        const worldInfoDropdownParent = $('#WorldInfo');
-        const select2DropdownParent = worldInfoDropdownParent.length ? worldInfoDropdownParent : $(document.body);
-
         $('#world_editor_select').select2({
-            dropdownParent: select2DropdownParent,
             placeholder: t`--- Pick to Edit ---`,
             searchInputPlaceholder: t`Search...`,
             allowClear: true,
@@ -6631,7 +6626,6 @@ export function initWorldInfo() {
         });
 
         $('#world_info').select2({
-            dropdownParent: select2DropdownParent,
             width: '100%',
             placeholder: t`No Worlds active. Click here to select.`,
             allowClear: true,
