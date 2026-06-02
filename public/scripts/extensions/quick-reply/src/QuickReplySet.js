@@ -408,6 +408,9 @@ export class QuickReplySet {
             }
         } else {
             warn(`Failed to delete Quick Reply Set: ${this.name}`);
+            return false;
         }
+
+        return true;
     }
 }

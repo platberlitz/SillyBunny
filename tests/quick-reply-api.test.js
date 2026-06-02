@@ -42,13 +42,15 @@ function createQuickReply(label) {
     };
 }
 
-function createSet(name, labels = []) {
+function createSet(name, labels = [], { deleteResult = true } = {}) {
     return {
         name,
         qrList: labels.map(createQuickReply),
         isDeleted: false,
+        deleteResult,
         async delete() {
-            this.isDeleted = true;
+            this.isDeleted = this.deleteResult;
+            return this.deleteResult;
         },
     };
 }
@@ -153,5 +155,37 @@ describe('Quick Reply API set listing', () => {
         expect(settings.charConfig.setList).toEqual([{ set: otherSet }]);
         expect(settings.save).toHaveBeenCalledTimes(1);
         expect(settingsUi.rerender).toHaveBeenCalledTimes(1);
+    });
+
+    test('keeps active links when set deletion fails', async () => {
+        const targetSet = createSet('Memory Sharding', [], { deleteResult: false });
+        const otherSet = createSet('Chat Tools');
+        MockQuickReplySet.list = [targetSet, otherSet];
+        const settings = {
+            save: jest.fn(),
+            config: {
+                setList: [
+                    { set: targetSet },
+                    { set: otherSet },
+                ],
+            },
+            chatConfig: {
+                setList: [{ set: targetSet }],
+            },
+            charConfig: {
+                setList: [{ set: targetSet }],
+            },
+        };
+        const settingsUi = { rerender: jest.fn() };
+        const api = new QuickReplyApi(settings, settingsUi);
+
+        await api.deleteSet('Memory Sharding');
+
+        expect(targetSet.isDeleted).toBe(false);
+        expect(settings.config.setList).toEqual([{ set: targetSet }, { set: otherSet }]);
+        expect(settings.chatConfig.setList).toEqual([{ set: targetSet }]);
+        expect(settings.charConfig.setList).toEqual([{ set: targetSet }]);
+        expect(settings.save).not.toHaveBeenCalled();
+        expect(settingsUi.rerender).not.toHaveBeenCalled();
     });
 });

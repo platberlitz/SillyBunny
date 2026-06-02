@@ -54,7 +54,7 @@ These screenshots show the graphical shell UI across Workspace, Customize, Agent
 * [Project Goals](#project-goals-aka-why-we-made-this-fork)
 * [Changes Compared to SillyTavern](#changes-vs-sillytavern)
 * [Latest Update](#latest-update)
-    * [v1.6.1 (2026-05-31)](#v161-2026-05-31)
+    * [v1.6.1 (2026-06-02)](#v161-2026-06-02)
     * [v1.6.0 (2026-05-18)](#v160-2026-05-18)
     * [v1.5.3 (2026-05-03)](#v153-2026-05-03)
     * [v1.5.2 (2026-04-30)](#v152-2026-04-30)

@@ -28,8 +28,8 @@ const CORE_EXTENSIONS = new Set([
     'in-chat-agents',
 ]);
 const BUNDLED_THIRD_PARTY_EXTENSIONS = new Set([
-    'BunnyPresetTools',
-    'ChatCompletionTabs',
+    'bunnypresettools',
+    'chatcompletiontabs',
 ]);
 const MANUAL_SYNC_EXTENSIONS = new Map([
     ['quick-image-gen', {
@@ -187,7 +187,8 @@ async function ensureExtensionRepo(extensionPath, isGlobal = false) {
 }
 
 export function isBundledThirdPartyExtension(extensionName) {
-    return BUNDLED_THIRD_PARTY_EXTENSIONS.has(sanitize(extensionName));
+    const sanitizedName = sanitize(String(extensionName).split(/[\\/]/).pop() ?? '');
+    return BUNDLED_THIRD_PARTY_EXTENSIONS.has(sanitizedName.toLowerCase());
 }
 
 function getBuiltInExtensionType(extensionName) {
