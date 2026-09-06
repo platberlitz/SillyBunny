@@ -1,5 +1,6 @@
 /* eslint-disable dot-notation */
 import process from 'node:process';
+import { validateHeaderValue } from 'node:http';
 import https from 'node:https';
 import { text } from 'node:stream/consumers';
 import nodeUtil from 'node:util';
@@ -3114,6 +3115,46 @@ export async function handleChatCompletionsGenerate(request, response) {
             apiKey = readSecret(request.user.directories, SECRET_KEYS.NANOGPT);
             headers = {};
             bodyParams = {};
+
+            // SillyBunny: explicit lists replace the legacy selector even when empty; malformed restrictions must fail closed.
+            let hasProviderLists = false;
+            for (const [field, key] of [
+                ['nanogpt_allowed_providers', 'only'],
+                ['nanogpt_ignored_providers', 'ignore'],
+            ]) {
+                if (!Object.hasOwn(request.body, field)) continue;
+                hasProviderLists = true;
+                const providers = request.body[field];
+                if (!Array.isArray(providers) || providers.some(provider => typeof provider !== 'string' || !provider.trim())) {
+                    return response.status(400).send({ error: true });
+                }
+                if (providers.length > 0) {
+                    bodyParams['provider'] ??= {};
+                    bodyParams['provider'][key] = providers;
+                }
+            }
+            if (!hasProviderLists && Object.hasOwn(request.body, 'nanogpt_provider')) {
+                const provider = request.body.nanogpt_provider;
+                if (typeof provider !== 'string') {
+                    return response.status(400).send({ error: true });
+                }
+                try {
+                    validateHeaderValue('X-Provider', provider);
+                } catch {
+                    return response.status(400).send({ error: true });
+                }
+                if (provider.trim()) {
+                    headers['X-Provider'] = provider;
+                }
+            }
+            if (Object.hasOwn(request.body, 'nanogpt_payg_override') && typeof request.body.nanogpt_payg_override !== 'boolean') {
+                return response.status(400).send({ error: true });
+            }
+            if (request.body.nanogpt_payg_override === true) {
+                headers['X-Billing-Mode'] = 'paygo';
+                bodyParams['billing_mode'] = 'paygo';
+            }
+
             if (request.body.enable_web_search && !/:online$/.test(request.body.model)) {
                 request.body.model = `${request.body.model}:online`;
             }
