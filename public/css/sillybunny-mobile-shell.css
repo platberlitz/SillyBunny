@@ -2319,6 +2319,14 @@ html.sb-ios-keyboard-inset-active #right-nav-panel.openDrawer > .scrollableInner
         max-width: 100%;
     }
 
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls > #tags_div .tag_controls {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls > #tags_div .tag_controls > label[for="char-management-dropdown"] {
+        grid-column: 1 / -1;
+    }
+
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls .char-button-group-icons {
         flex-wrap: wrap;
         justify-self: start;
@@ -2892,15 +2900,14 @@ html.sb-ios-keyboard-inset-active #right-nav-panel.openDrawer > .scrollableInner
     }
 
     #form_sheld {
-        padding: 0 0 max(var(--sb-ios-composer-controls-clearance, 0px), env(safe-area-inset-bottom, 0px)) !important;
+        padding: 0 0 env(safe-area-inset-bottom, 0px) !important;
         margin: 0 !important;
         width: 100% !important;
         max-width: none !important;
     }
 
-    /* Safari's floating form controls can overlap the reported visible viewport. */
     html.sb-ios-composer-keyboard-controls-active #form_sheld {
-        --sb-ios-composer-controls-clearance: 48px;
+        padding-bottom: 0 !important;
     }
 
     #send_form {

@@ -55,6 +55,14 @@ describe('mobile character editor css', () => {
         expect(flattenedActionWrappersRule).toContain('display: contents !important;');
     });
 
+    test('gives the tag input the full first row on mobile', () => {
+        const tagControlsRule = getRuleBody(mobileShellCss, '#right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls > #tags_div .tag_controls');
+        const tagDropdownRule = getRuleBody(mobileShellCss, '#right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls > #tags_div .tag_controls > label[for="char-management-dropdown"]');
+
+        expect(tagControlsRule).toContain('grid-template-columns: minmax(0, 1fr) auto;');
+        expect(tagDropdownRule).toContain('grid-column: 1 / -1;');
+    });
+
     test('keeps the parked mode toggle and close button clear of the editor sub-tabs on mobile', () => {
         const editorBandRule = getRuleBody(mobileShellCss, '#right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) > #CharListButtonAndHotSwaps');
 

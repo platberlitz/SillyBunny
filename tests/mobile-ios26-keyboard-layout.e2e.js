@@ -112,10 +112,11 @@ async function drawerGeometry(page) {
     });
 }
 
-test('modern iOS reserves composer controls only while focused with the keyboard open', async ({ page }) => {
+test('modern iOS keeps the composer flush with the keyboard while focused', async ({ page }) => {
     const errors = await mountFixture(page);
     const root = page.locator('html');
     const composer = page.locator('#form_sheld');
+    const composerForm = page.locator('#send_form');
     await page.locator('#send_textarea').focus();
     await expect(composer).toHaveCSS('padding-bottom', '0px');
     await expect(root).not.toHaveClass(controlsClass);
@@ -123,17 +124,20 @@ test('modern iOS reserves composer controls only while focused with the keyboard
     // Chromium does not implement the iOS-only CSS supports block; composer geometry uses offset zero.
     await setVisualViewport(page, 500);
     await expect(root).toHaveClass(controlsClass);
-    await expect(composer).toHaveCSS('padding-bottom', '48px');
+    await expect(composer).toHaveCSS('padding-bottom', '0px');
     const bounds = await composer.boundingBox();
     expect(bounds.y + bounds.height).toBeLessThanOrEqual(500);
     expect(bounds.y + bounds.height).toBeGreaterThanOrEqual(498);
+    const formBounds = await composerForm.boundingBox();
+    expect(formBounds.y + formBounds.height).toBeLessThanOrEqual(500);
+    expect(formBounds.y + formBounds.height).toBeGreaterThanOrEqual(498);
 
     // No resize or direct sync: both focusout and focusin must use the production queue.
     await page.locator('#send_textarea').evaluate(textarea => textarea.blur());
     await expect(root).not.toHaveClass(controlsClass);
     await expect(composer).toHaveCSS('padding-bottom', '0px');
     await page.locator('#send_textarea').focus();
-    await expect(composer).toHaveCSS('padding-bottom', '48px');
+    await expect(composer).toHaveCSS('padding-bottom', '0px');
     await page.locator('#user-settings-block').evaluate(drawer => drawer.classList.add('openDrawer'));
     await page.locator('#first-setting').focus();
     await expect(composer).toHaveCSS('padding-bottom', '0px');
@@ -144,7 +148,7 @@ test('modern iOS reserves composer controls only while focused with the keyboard
 
     await page.locator('#user-settings-block').evaluate(drawer => drawer.classList.remove('openDrawer'));
     await page.locator('#send_textarea').focus();
-    await expect(composer).toHaveCSS('padding-bottom', '48px');
+    await expect(composer).toHaveCSS('padding-bottom', '0px');
     await setVisualViewport(page, 844);
     await expect(root).not.toHaveClass(controlsClass);
     await expect(composer).toHaveCSS('padding-bottom', '0px');
