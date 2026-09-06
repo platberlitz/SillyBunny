@@ -79,6 +79,7 @@
 - PR #826 (2026-09-06) `chore: update Quick Image Gen to 3.5.0`
 - PR #827 (2026-09-06) `fix(windows): sanitise forbidden characters in filenames on Windows`
 - PR #828 (2026-09-06) `fix(mobile): extend tagging input box`
+- PR #829 (2026-09-06) `fix(mobile): move the arrow a bit on the thought block`
 
 ## v1.7.0
 
