@@ -2325,6 +2325,14 @@ html.sb-ios-keyboard-inset-active #right-nav-panel.openDrawer > .scrollableInner
 
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls > #tags_div .tag_controls > label[for="char-management-dropdown"] {
         grid-column: 1 / -1;
+        justify-self: stretch;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls #char-management-dropdown {
+        width: 100%;
+        max-width: 100%;
     }
 
     #right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls .char-button-group-icons {

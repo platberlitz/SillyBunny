@@ -58,9 +58,15 @@ describe('mobile character editor css', () => {
     test('gives the tag input the full first row on mobile', () => {
         const tagControlsRule = getRuleBody(mobileShellCss, '#right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls > #tags_div .tag_controls');
         const tagDropdownRule = getRuleBody(mobileShellCss, '#right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls > #tags_div .tag_controls > label[for="char-management-dropdown"]');
+        const tagDropdownSelectRule = getRuleBody(mobileShellCss, '#right-nav-panel.openDrawer:is([data-menu-type="character_edit"], [data-menu-type="create"]) #avatar_controls #char-management-dropdown');
 
         expect(tagControlsRule).toContain('grid-template-columns: minmax(0, 1fr) auto;');
         expect(tagDropdownRule).toContain('grid-column: 1 / -1;');
+        expect(tagDropdownRule).toContain('justify-self: stretch;');
+        expect(tagDropdownRule).toContain('width: 100%;');
+        expect(tagDropdownRule).toContain('max-width: 100%;');
+        expect(tagDropdownSelectRule).toContain('width: 100%;');
+        expect(tagDropdownSelectRule).toContain('max-width: 100%;');
     });
 
     test('keeps the parked mode toggle and close button clear of the editor sub-tabs on mobile', () => {
