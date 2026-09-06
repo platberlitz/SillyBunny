@@ -16553,7 +16553,7 @@ function reinitSelect2AfterShell() {
             dropdownParent: apiDropdownParent.length ? apiDropdownParent : $(document.body),
             minimumResultsForSearch: 0,
         };
-        const allSelectors = [...modelSelectors, '.openrouter_quantizations', '.openrouter_providers'];
+        const allSelectors = [...modelSelectors, '.openrouter_quantizations', '.openrouter_providers', '#nanogpt_allowed_providers', '#nanogpt_ignored_providers'];
         for (const selector of allSelectors) {
             const $el = $(selector);
             if ($el.length && $el.data('select2')) {

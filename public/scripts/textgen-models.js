@@ -399,19 +399,20 @@ export async function syncOpenRouterProvidersForModel(modelId, providersSelector
     }
 }
 
+let nanoGptProvidersRequest = 0;
+
 export async function syncNanoGptProvidersForModel(modelId, providersSelector) {
+    const requestId = ++nanoGptProvidersRequest;
     const $providers = $(providersSelector);
 
     const refreshWarningState = () => {
         updateNanoGptProvidersWarning(providersSelector);
     };
 
-    if (!modelId) {
-        $providers.find('option').prop('disabled', false);
-        $providers.trigger('change.select2');
-        refreshWarningState();
-        return;
-    }
+    $providers.removeData('supportsProviderSelection').find('option').prop('disabled', false);
+    $providers.trigger('change.select2');
+    refreshWarningState();
+    if (!modelId) return;
 
     try {
         const response = await fetch('/api/nanogpt/models/providers', {
@@ -426,20 +427,22 @@ export async function syncNanoGptProvidersForModel(modelId, providersSelector) {
         }
 
         const data = await response.json();
-        const providerIds = Array.isArray(data?.providers) ? data.providers : [];
+        if (requestId !== nanoGptProvidersRequest || !Array.isArray(data?.providers) || typeof data.supportsProviderSelection !== 'boolean') return;
+        const providerIds = data.providers.filter(id => typeof id === 'string' && id.trim());
 
-        if (!data?.supportsProviderSelection || providerIds.length === 0) {
-            $providers.find('option').each(function () {
-                $(this).prop('disabled', Boolean($(this).val()));
-            });
-            $providers.trigger('change').trigger('change.select2');
-            refreshWarningState();
-            return;
+        // SillyBunny: refresh availability without changing saved restrictions or losing new provider IDs.
+        for (const select of $providers.add('#nanogpt_ignored_providers')) {
+            for (const id of providerIds) {
+                if (!Array.from(select.options).some(option => option.value === id)) {
+                    select.add(new Option(id, id));
+                }
+            }
         }
 
+        $providers.data('supportsProviderSelection', data.supportsProviderSelection);
         $providers.find('option').each(function () {
             const value = $(this).val();
-            const isAvailable = !value || providerIds.includes(value);
+            const isAvailable = !value || (data.supportsProviderSelection && providerIds.includes(value));
             $(this).prop('disabled', !isAvailable);
         });
 
@@ -459,10 +462,13 @@ export function updateNanoGptProvidersWarning(providersSelector) {
     }
 
     const selectedCount = $providers.find('option:selected').length;
-    const applicableSelectedCount = $providers.find('option:selected:not(:disabled)').length;
-    const showWarning = selectedCount > 0 && applicableSelectedCount === 0;
+    const ignored = new Set($('#nanogpt_ignored_providers option:selected').map((_, option) => option.value).get());
+    const applicableSelectedCount = $providers.find('option:selected:not(:disabled)').filter((_, option) => !ignored.has(option.value)).length;
+    const showWarning = (selectedCount > 0 && applicableSelectedCount === 0)
+        || ($providers.data('supportsProviderSelection') === false && ignored.size > 0);
 
     $('#nanogpt_provider_warning').toggleClass('displayNone', !showWarning);
+    $('#nanogpt_billing_warning').toggleClass('displayNone', selectedCount === 0 && ignored.size === 0);
 }
 
 export async function loadOllamaModels(data) {
@@ -1362,7 +1368,7 @@ export function initTextGenModels() {
         }));
     }
 
-    const nanoGptProvidersSelect = $('#nanogpt_provider');
+    const nanoGptProvidersSelect = $('#nanogpt_allowed_providers, #nanogpt_ignored_providers');
     for (const provider of NANOGPT_PROVIDERS) {
         nanoGptProvidersSelect.append($('<option>', {
             value: provider.id,
@@ -1488,10 +1494,11 @@ export function initTextGenModels() {
     nanoGptProvidersSelect.select2({
         ...select2Defaults,
         sorter: data => data.sort((a, b) => a.text.localeCompare(b.text)),
-        placeholder: t`Select providers. No selection = all providers.`,
+        placeholder: t`Select providers`,
         searchInputPlaceholder: t`Search providers...`,
         searchInputCssClass: 'text_pole',
         width: '100%',
         allowClear: true,
+        closeOnSelect: false,
     });
 }

@@ -2746,6 +2746,20 @@ html.sb-ios-keyboard-inset-active #right-nav-panel.openDrawer > .scrollableInner
         touch-action: manipulation;
     }
 
+    #nanogpt_form :is(#nanogpt_allowed_providers, #nanogpt_ignored_providers) {
+        display: none;
+    }
+
+    #nanogpt_form .sb-nanogpt-provider-picker {
+        display: block;
+        width: 100%;
+        min-height: 44px;
+        height: auto;
+        text-align: left;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
     .sb-inline-select-picker-menu[data-sb-inline-select-multiple] .sb-inline-select-picker-option {
         gap: 8px;
     }
