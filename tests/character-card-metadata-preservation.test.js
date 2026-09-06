@@ -26,7 +26,7 @@ process.env[diskCacheEnvironmentKey] = 'false';
 process.chdir(repoRoot);
 setConfigFilePath(path.join(repoRoot, 'default', 'config.yaml'));
 
-const { router: charactersRouter } = await import('../src/endpoints/characters.js');
+const { router: charactersRouter, sanitiseFilenameForWindows } = await import('../src/endpoints/characters.js');
 
 describe('character card metadata preservation', () => {
     let baseUrl;
@@ -351,6 +351,14 @@ describe('character card metadata preservation', () => {
             expect(response.status).toBe(200);
             expect(fs.existsSync(avatarPath)).toBe(false);
             expect(fs.existsSync(chatDirectory)).toBe(false);
+        });
+    });
+
+    describeWindows('Windows character filenames', () => {
+        test('sanitises forbidden characters like pipes and question marks for Windows', () => {
+            const sanitised = sanitiseFilenameForWindows('Alice | Test?');
+            expect(sanitised).toBe('Alice _ Test_');
+            expect(sanitised).not.toMatch(/[<>:"/\\|?*]/);
         });
     });
 

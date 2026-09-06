@@ -55,6 +55,9 @@ const getPngFileName = fileName => path.extname(fileName).toLowerCase() === '.pn
     ? fileName
     : `${fileName}.png`;
 // SillyBunny: allow POSIX-valid character names while keeping avatar access inside the character folder.
+export const sanitiseFilenameForWindows = (filename) => process.platform === 'win32'
+    ? sanitize(filename, { replacement: sanitizeSafeCharacterReplacements }) || 'character'
+    : filename;
 const resolveCharacterAvatarPath = (directory, avatar) => {
     if (avatar.includes('\0') || path.basename(avatar) !== avatar || path.extname(avatar).toLowerCase() !== '.png') {
         return null;
@@ -1924,6 +1927,8 @@ router.post('/chats', validateAvatarUrlMiddleware, async function (request, resp
  * @returns {string} - The name for the uploaded PNG file
  */
 function getPngName(file, directories) {
+    // SillyBunny: Windows forbids <>:"/\|?* in file names, so sanitise imports there. POSIX keeps pipes.
+    file = sanitiseFilenameForWindows(file);
     let i = 1;
     const baseName = file;
     while (fs.existsSync(path.join(directories.characters, `${file}.png`))) {
@@ -1939,9 +1944,11 @@ function getPngName(file, directories) {
  * @returns {string | undefined} - The preserved name if the request is valid, otherwise undefined
  */
 function getPreservedName(request) {
-    return typeof request.body.preserved_name === 'string' && request.body.preserved_name.length > 0
-        ? path.parse(request.body.preserved_name).name
-        : undefined;
+    if (typeof request.body.preserved_name !== 'string' || request.body.preserved_name.length === 0) {
+        return undefined;
+    }
+    // SillyBunny: preserved names bypass getPngName, so sanitise them for Windows too.
+    return sanitiseFilenameForWindows(path.parse(request.body.preserved_name).name) || undefined;
 }
 
 router.post('/import', async function (request, response) {
