@@ -77,6 +77,7 @@
 - PR #823 (2026-09-04) `chore: add GPT 6 Astra on OpenAI backend`
 - PR #825 (2026-09-06) `fix(ios26+): correctly identify iOS versions`
 - PR #826 (2026-09-06) `chore: update Quick Image Gen to 3.5.0`
+- PR #827 (2026-09-06) `fix(windows): sanitise forbidden characters in filenames on Windows`
 
 ## v1.7.0
 
