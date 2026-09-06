@@ -2691,6 +2691,10 @@ function shouldUseStableIOSPanelViewport(layoutViewport, visualViewportSize) {
         return false;
     }
 
+    if (isMobileViewport() && !isLegacyIOSWebKitPlatform()) {
+        return false;
+    }
+
     const activeElement = document.activeElement;
     if (isChatComposerEditableElement(activeElement)) {
         return false;
@@ -2771,13 +2775,18 @@ function handleMobileKeyboardFocusOut() {
 function syncIOSKeyboardBottomInset() {
     const root = document.documentElement;
     let bottomInset = 0;
+    let composerControlsActive = false;
 
     if (isIOSWebKitPlatform()) {
         const layoutViewport = getLayoutViewportSize();
         const visualViewportSize = getVisualViewportSize(layoutViewport);
 
         if (isVisualViewportKeyboardOpen(layoutViewport, visualViewportSize)) {
-            bottomInset = Math.max(0, Math.round(layoutViewport.height - visualViewportSize.top - visualViewportSize.height));
+            if (isMobileViewport() && !isLegacyIOSWebKitPlatform()) {
+                composerControlsActive = isChatComposerEditableElement(document.activeElement);
+            } else {
+                bottomInset = Math.max(0, Math.round(layoutViewport.height - visualViewportSize.top - visualViewportSize.height));
+            }
         }
     }
 
@@ -2790,6 +2799,7 @@ function syncIOSKeyboardBottomInset() {
     // viewports (iPadOS desktop-mode Safari) gate the padding on this class so
     // desktop layouts only pick it up while the software keyboard is open.
     root.classList.toggle('sb-ios-keyboard-inset-active', bottomInset > 0);
+    root.classList.toggle('sb-ios-composer-keyboard-controls-active', composerControlsActive);
 }
 
 function getShellViewportSize() {
@@ -2802,9 +2812,8 @@ function getShellViewportSize() {
         return { ...layoutViewport, height, bottom: height };
     }
 
-    // SillyBunny: iOS keyboard edits inside shell panels should not feed Safari
-    // visualViewport jitter back into shell geometry. The chat composer remains
-    // on the visible viewport so the keyboard accessory bar cannot cover it.
+    // Older iOS and wide iPad panels retain the stable layout; modern phone
+    // panels fit the visible viewport without a second keyboard-sized reserve.
     if (shouldUseStableIOSPanelViewport(layoutViewport, visualViewportSize)) {
         return layoutViewport;
     }
@@ -2829,8 +2838,7 @@ function syncShellViewportBounds() {
     setRootViewportProperty('--sb-shell-viewport-height', `${viewportSize.height}px`);
     setRootViewportProperty('--sb-shell-measured-top-offset', `${topOffset}px`);
     setRootViewportProperty('--sb-shell-available-height', `${Math.max(0, viewportSize.height - topOffset)}px`);
-    // SillyBunny: iOS Safari shifts the visual viewport while the keyboard opens;
-    // panel edits keep the stable top, while composer edits follow the visible top.
+    // SillyBunny: Safari can pan the visible viewport without resizing it.
     setRootViewportProperty('--sb-shell-viewport-top', `${viewportSize.top}px`);
 
     // SillyBunny: browser-fixes.js may reset document scroll mid-edit once the
@@ -3078,6 +3086,7 @@ function syncMobileShellDrawerBounds() {
             isOpen,
             isViewportBound: drawer.dataset.sbMobileViewportBound === 'true',
             viewportHeight: viewportSize?.height ?? 0,
+            viewportTop: viewportSize?.top ?? 0,
             baseTopOffset,
             shellGap: drawerStyles ? Number.parseFloat(drawerStyles.getPropertyValue('--sb-mobile-shell-gap')) || 0 : 0,
         }));
@@ -17520,6 +17529,8 @@ function initAll() {
     if (isIOSWebKitPlatform()) {
         document.addEventListener('focusin', syncIOSKeyboardBottomInset);
         document.addEventListener('focusout', syncIOSKeyboardBottomInset);
+        document.addEventListener('focusin', queueMobileViewportStateSync);
+        document.addEventListener('focusout', queueMobileViewportStateSync);
     }
 
     if (isLegacyIOSWebKitPlatform()) {

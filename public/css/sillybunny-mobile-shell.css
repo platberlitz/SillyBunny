@@ -2808,7 +2808,7 @@ html.sb-ios-keyboard-inset-active #right-nav-panel.openDrawer > .scrollableInner
     #right-nav-panel.openDrawer,
     #top-settings-holder #right-nav-panel.openDrawer,
     :root[data-sb-character-drawer-lock='right'] #right-nav-panel.openDrawer {
-        top: calc(var(--sb-shell-measured-top-offset, var(--sb-topbar-layout-offset)) + var(--sb-mobile-shell-gap, 0px)) !important;
+        top: calc(var(--sb-shell-measured-top-offset, var(--sb-topbar-layout-offset)) + var(--sb-mobile-shell-gap, 0px) + var(--sb-shell-viewport-top, 0px)) !important;
         bottom: auto !important;
         box-sizing: border-box !important;
         height: calc(var(--sb-shell-available-height, calc(var(--sb-shell-viewport-height, 100dvh) - var(--sb-shell-measured-top-offset, var(--sb-topbar-layout-offset)))) - var(--sb-mobile-shell-gap, 0px) - env(safe-area-inset-bottom, 0px)) !important;
@@ -2892,10 +2892,15 @@ html.sb-ios-keyboard-inset-active #right-nav-panel.openDrawer > .scrollableInner
     }
 
     #form_sheld {
-        padding: 0 0 env(safe-area-inset-bottom, 0px) !important;
+        padding: 0 0 max(var(--sb-ios-composer-controls-clearance, 0px), env(safe-area-inset-bottom, 0px)) !important;
         margin: 0 !important;
         width: 100% !important;
         max-width: none !important;
+    }
+
+    /* Safari's floating form controls can overlap the reported visible viewport. */
+    html.sb-ios-composer-keyboard-controls-active #form_sheld {
+        --sb-ios-composer-controls-clearance: 48px;
     }
 
     #send_form {
