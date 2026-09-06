@@ -2908,14 +2908,14 @@ html.sb-ios-keyboard-inset-active #right-nav-panel.openDrawer > .scrollableInner
     }
 
     #form_sheld {
-        padding: 0 0 env(safe-area-inset-bottom, 0px) !important;
+        padding: 0 0 var(--sb-composer-bottom-padding, env(safe-area-inset-bottom, 0px)) !important;
         margin: 0 !important;
         width: 100% !important;
         max-width: none !important;
     }
 
     html.sb-ios-composer-keyboard-controls-active #form_sheld {
-        padding-bottom: 0 !important;
+        --sb-composer-bottom-padding: 0px;
     }
 
     #send_form {

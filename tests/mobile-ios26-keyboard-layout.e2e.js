@@ -113,12 +113,16 @@ async function drawerGeometry(page) {
 }
 
 test('modern iOS keeps the composer flush with the keyboard while focused', async ({ page }) => {
+    const session = await page.context().newCDPSession(page);
+    await session.send('Emulation.setSafeAreaInsetsOverride', {
+        insets: { top: 0, right: 0, bottom: 34, left: 0 },
+    });
     const errors = await mountFixture(page);
     const root = page.locator('html');
     const composer = page.locator('#form_sheld');
     const composerForm = page.locator('#send_form');
     await page.locator('#send_textarea').focus();
-    await expect(composer).toHaveCSS('padding-bottom', '0px');
+    await expect(composer).toHaveCSS('padding-bottom', '34px');
     await expect(root).not.toHaveClass(controlsClass);
 
     // Chromium does not implement the iOS-only CSS supports block; composer geometry uses offset zero.
@@ -135,12 +139,12 @@ test('modern iOS keeps the composer flush with the keyboard while focused', asyn
     // No resize or direct sync: both focusout and focusin must use the production queue.
     await page.locator('#send_textarea').evaluate(textarea => textarea.blur());
     await expect(root).not.toHaveClass(controlsClass);
-    await expect(composer).toHaveCSS('padding-bottom', '0px');
+    await expect(composer).toHaveCSS('padding-bottom', '34px');
     await page.locator('#send_textarea').focus();
     await expect(composer).toHaveCSS('padding-bottom', '0px');
     await page.locator('#user-settings-block').evaluate(drawer => drawer.classList.add('openDrawer'));
     await page.locator('#first-setting').focus();
-    await expect(composer).toHaveCSS('padding-bottom', '0px');
+    await expect(composer).toHaveCSS('padding-bottom', '34px');
     await expect(root).not.toHaveClass(controlsClass);
     await expect(page.locator('.sb-shell-panel-scroller')).toHaveCSS('padding-bottom', '34px');
     await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--sb-ios-keyboard-bottom-inset'))).toBe('0px');
@@ -151,7 +155,7 @@ test('modern iOS keeps the composer flush with the keyboard while focused', asyn
     await expect(composer).toHaveCSS('padding-bottom', '0px');
     await setVisualViewport(page, 844);
     await expect(root).not.toHaveClass(controlsClass);
-    await expect(composer).toHaveCSS('padding-bottom', '0px');
+    await expect(composer).toHaveCSS('padding-bottom', '34px');
     expect(errors).toEqual([]);
 });
 
